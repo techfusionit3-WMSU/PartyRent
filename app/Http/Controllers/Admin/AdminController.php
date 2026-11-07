@@ -255,7 +255,27 @@ class AdminController extends Controller
             'bySupplier' => $period->whereIn('type', Finance::RENTAL_TYPES)->groupBy(fn ($p) => $p->rentalRequest->supplier->name)->map(fn ($g, $n) => ['label' => $n, 'value' => $g->sum('amount')])->sortByDesc('value')->values(),
             'byEvent' => $inRange->groupBy('event_type')->map(fn ($g, $n) => ['label' => $n, 'value' => $g->count()])->sortByDesc('value')->values(),
             'byCity' => $inRange->groupBy(fn ($r) => $r->supplier->city)->map(fn ($g, $n) => ['label' => $n, 'value' => $g->count()])->sortByDesc('value')->values(),
+            // growth & activity (prototype "Platform Reports")
+            'userGrowth' => $this->cumulative(User::pluck('created_at')->map(fn ($d) => $d?->format('Y-m')), $months),
+            'supplierGrowth' => $this->cumulative(Supplier::approved()->pluck('approved_at')->map(fn ($d) => $d ? \Carbon\Carbon::parse($d)->format('Y-m') : null), $months),
+            'statusMix' => collect(['Pending' => ['pending'], 'Active' => Finance::ACTIVE, 'Completed' => ['completed'], 'Declined' => ['declined'], 'Cancelled' => ['cancelled']])
+                ->map(fn ($st, $l) => ['label' => $l, 'value' => $reqs->whereIn('status', $st)->count()])->values(),
+            'staffActivity' => AuditLog::whereIn('role', ['admin', 'superadmin', 'cashier'])->with('actor')->get()
+                ->groupBy(fn ($a) => $a->actor->name ?? 'System')->map(fn ($g, $n) => ['label' => $n, 'value' => $g->count()])->sortByDesc('value')->values(),
         ]);
+    }
+
+    /** Running total per month: everything before the window, then each month's additions. */
+    private function cumulative($monthKeys, array $months): array
+    {
+        $keys = $monthKeys->filter();
+        $run = $keys->filter(fn ($k) => $k < $months[0]['key'])->count();
+
+        return array_map(function ($m) use ($keys, &$run) {
+            $run += $keys->filter(fn ($k) => $k === $m['key'])->count();
+
+            return ['label' => $m['label'], 'value' => $run];
+        }, $months);
     }
 
     public function reportsCsv(Request $request)

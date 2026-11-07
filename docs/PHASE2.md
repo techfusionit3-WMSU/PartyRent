@@ -25,13 +25,14 @@ Resume in Claude Code with `/resume-phase2`. Unfinished work is auto-saved as a 
 - [x] Roles & permissions editor (`superadmin/roles.html`)
 - [x] System settings (`superadmin/settings.html`)
 - [x] Users + audit (`superadmin/users.html`, `audit.html`; audit reuses /admin/audit)
-- [ ] Platform reports growth charts (`superadmin/reports.html`): user growth, supplier growth, status mix, admin activity, added to /admin/reports
+- [x] Platform reports growth charts (`superadmin/reports.html`): user growth, supplier growth, status mix, admin activity, added to /admin/reports
 
 ## Wrap-up
-- [ ] Feature tests for every new page, full suite green
-- [ ] README "Build status" updated
+- [x] Feature tests for every new page, full suite green
+- [x] README "Build status" updated
 
 ## Notes (where things stand)
+- PHASE 2 COMPLETE (2026-11-08). 13 tests / 196 assertions green; every controller method routed; all staff pages return 200 for superadmin. Possible follow-ups: let customers file complaints themselves from a rental page (prototype doesn't have this either), visual check of each page in a browser.
 - Finding: most phase 2 controllers + views were already written in phase 1 but never routed or linked in the nav. Each item = add routes + nav + page tests, then check against the prototype.
 - Superadmin done (2026-11-08): /superadmin/* routes named super.*, own Platform overview dashboard, prototype nav layout, badges. Left: growth charts on reports, then wrap-up.
 - Admin section done (2026-11-08): routes, permission-gated sidebar, "Log an issue" form from the prototype, fixed crash when restoring a listing without a reason. Next: superadmin (controller SuperController + views in resources/views/super already exist; need routes named super.* under /superadmin).

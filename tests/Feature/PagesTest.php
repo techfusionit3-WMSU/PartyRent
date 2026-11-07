@@ -121,6 +121,14 @@ class PagesTest extends TestCase
         $this->assertSame('hidden', $p->fresh()->status);
         $this->post("/admin/listings/{$p->id}/status", ['status' => 'published'])->assertSessionHas('success');
 
+        // categories: create, reject duplicate, edit
+        $cat = ['name' => 'Photo Booths', 'icon' => 'tent', 'grad_from' => '#7C3AED', 'grad_to' => '#E11D74', 'active' => 1];
+        $this->post('/admin/categories', $cat)->assertSessionHas('success');
+        $this->post('/admin/categories', $cat)->assertSessionHas('error');
+        $this->post('/admin/categories/photo-booths', ['active' => 0] + $cat)->assertSessionHas('success');
+        $this->assertFalse((bool) \App\Models\Category::find('photo-booths')->active);
+        $this->post('/admin/categories', ['grad_from' => 'red'] + $cat)->assertSessionHasErrors('grad_from');
+
         // sidebar hides pages the admin can't open
         $this->as('paolo.admin@partyrent.ph')->get('/admin')->assertOk()->assertDontSee('Supplier Applications');
     }

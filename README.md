@@ -78,6 +78,9 @@ products, packages, inventory holds and condition counts, payments, shop profile
 offline recording, balances, history and receipts; admin dashboard, supplier applications, users, transactions,
 activity log; notifications and account settings for all roles.
 
-**Phase 2 (next):** supplier inventory calendar, damage & compensation page and business reports; cashier
-financial reports; admin listings, categories, complaints and reports; superadmin monitoring, administrators,
-roles & permissions editor and system settings; charts matching the prototype.
+**Phase 2 (done):** supplier inventory calendar (day/week/month), damage & compensation page and business reports
+with CSV export; cashier financial reports; admin listings moderation, categories, complaints (incl. "Log an issue")
+and platform reports with growth charts; superadmin platform overview, monitoring, platform users, administrators,
+roles & permissions editor and system settings. Sidebar links are hidden when a staff member lacks the permission.
+Progress log: `docs/PHASE2.md`.
+

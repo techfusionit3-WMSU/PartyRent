@@ -133,6 +133,8 @@ Route::prefix('cashier')->name('cashier.')->middleware(['auth', 'role:cashier,su
     Route::post('/record', [CashierController::class, 'storeRecord'])->name('record.store');
     Route::get('/balances', [CashierController::class, 'balances'])->name('balances');
     Route::get('/history', [CashierController::class, 'history'])->name('history');
+    Route::get('/reports', [CashierController::class, 'reports'])->name('reports');
+    Route::get('/reports.csv', [CashierController::class, 'reportsCsv'])->name('reports.csv');
 });
 
 /* ---------- admin & superadmin ---------- */

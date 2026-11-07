@@ -12,7 +12,7 @@
         ], 'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products'], ['requests', 'supplier.requests', 'list', 'Requests'], ['shop', 'supplier.shop', 'store', 'Profile']]],
         'cashier' => ['tag' => 'Cashier', 'items' => [
             ['Payments'], ['dashboard', 'cashier.dashboard', 'grid', 'Dashboard'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0], ['record', 'cashier.record', 'cash', 'Record Payment'], ['balances', 'cashier.balances', 'clock', 'Installments & Overdue'],
-            ['Records'], ['history', 'cashier.history', 'list', 'Payment History & Receipts'], ['notifications', 'notifications', 'bell', 'Notifications'],
+            ['Records'], ['history', 'cashier.history', 'list', 'Payment History & Receipts'], ['reports', 'cashier.reports', 'chart', 'Financial Reports', 0, 'reports.view'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'cashier.dashboard', 'grid', 'Home'], ['verification', 'cashier.verification', 'check', 'Verify'], ['record', 'cashier.record', 'cash', 'Record'], ['history', 'cashier.history', 'list', 'History']]],
         'admin' => ['tag' => 'Admin', 'items' => [
             ['Operations'], ['dashboard', 'admin.dashboard', 'grid', 'Dashboard'], ['users', 'admin.users', 'users', 'Customers & Suppliers'], ['applications', 'admin.applications', 'file', 'Supplier Applications', $b['applications'] ?? 0],
@@ -34,6 +34,7 @@
       <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="customer"><button class="mode-switch">{{ icon('swap') }}Switch to Customer Mode</button></form>
     @endif
     @foreach($cfg['items'] as $it)
+      @continue(! empty($it[5]) && ! $shellUser->hasPerm($it[5]))
       @if(count($it) === 1)
         <div class="nav-label">{{ $it[0] }}</div>
       @else

@@ -76,7 +76,7 @@ class PagesTest extends TestCase
     public function test_cashier_and_admin_pages_render(): void
     {
         $this->as('cashier@partyrent.ph');
-        foreach (['/cashier', '/cashier/verification', '/cashier/record', '/cashier/record?request=PR-0001', '/cashier/balances', '/cashier/balances?tab=overdue', '/cashier/history', '/cashier/history?q=PR-0001', '/payments/TXN-10001/receipt'] as $url) {
+        foreach (['/cashier', '/cashier/verification', '/cashier/record', '/cashier/record?request=PR-0001', '/cashier/balances', '/cashier/balances?tab=overdue', '/cashier/history', '/cashier/history?q=PR-0001', '/payments/TXN-10001/receipt', '/cashier/reports', '/cashier/reports?range=3m', '/cashier/reports.csv'] as $url) {
             $this->get($url)->assertOk();
         }
         $this->get('/admin')->assertRedirect();

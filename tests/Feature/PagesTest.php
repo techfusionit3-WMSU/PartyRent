@@ -59,7 +59,9 @@ class PagesTest extends TestCase
         $kid = \App\Models\Package::where('supplier_id', Supplier::where('name', 'like', 'Happy%')->value('id'))->value('id');
         foreach (['/supplier', '/supplier/requests', '/supplier/requests?tab=all', '/supplier/requests/PR-0001', '/supplier/requests/PR-0003', '/supplier/requests/PR-0011',
             '/supplier/schedule', '/supplier/payments', '/supplier/payments?tab=overdue', '/supplier/products', '/supplier/products/new', "/supplier/products/$pid/edit",
-            '/supplier/packages', '/supplier/packages/new', "/supplier/packages/$kid/edit", '/supplier/inventory', '/supplier/shop', '/notifications'] as $url) {
+            '/supplier/packages', '/supplier/packages/new', "/supplier/packages/$kid/edit", '/supplier/inventory', '/supplier/shop', '/notifications',
+            '/supplier/calendar', "/supplier/calendar?item=$pid&view=week", "/supplier/calendar?item=$pid&view=day", '/supplier/damages',
+            '/supplier/reports', '/supplier/reports?range=year', '/supplier/reports.csv'] as $url) {
             $this->get($url)->assertOk();
         }
         // other shops' requests are hidden

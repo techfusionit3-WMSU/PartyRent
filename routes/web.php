@@ -12,6 +12,7 @@ use App\Http\Controllers\Customer\StartSellingController;
 use App\Http\Controllers\MarketController;
 use App\Http\Controllers\PaymentFileController;
 use App\Http\Controllers\Supplier\CatalogController;
+use App\Http\Controllers\Supplier\ReportController as SupplierReportController;
 use App\Http\Controllers\Supplier\RequestController as SupplierRequestController;
 use App\Http\Controllers\Supplier\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -115,6 +116,11 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'role:supplier
     Route::post('/inventory/{product}/holds', [CatalogController::class, 'addHold'])->name('inventory.hold');
     Route::delete('/inventory/holds/{hold}', [CatalogController::class, 'releaseHold'])->name('inventory.release');
     Route::post('/inventory/{product}/condition', [CatalogController::class, 'adjustCondition'])->name('inventory.condition');
+
+    Route::get('/calendar', [SupplierReportController::class, 'calendar'])->name('calendar');
+    Route::get('/damages', [SupplierReportController::class, 'damages'])->name('damages');
+    Route::get('/reports', [SupplierReportController::class, 'reports'])->name('reports');
+    Route::get('/reports.csv', [SupplierReportController::class, 'reportsCsv'])->name('reports.csv');
 });
 
 /* ---------- cashier ---------- */

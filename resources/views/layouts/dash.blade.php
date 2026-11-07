@@ -6,8 +6,8 @@
     $NAV = [
         'supplier' => ['tag' => 'Supplier', 'items' => [
             ['Overview'], ['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['requests', 'supplier.requests', 'list', 'Rental Requests', $b['requests'] ?? 0], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns'],
-            ['Catalog'], ['products', 'supplier.products', 'box', 'Products'], ['packages', 'supplier.packages', 'package', 'Packages'], ['inventory', 'supplier.inventory', 'layers', 'Inventory'],
-            ['Money'], ['payments', 'supplier.payments', 'card', 'Payments'],
+            ['Catalog'], ['products', 'supplier.products', 'box', 'Products'], ['packages', 'supplier.packages', 'package', 'Packages'], ['inventory', 'supplier.inventory', 'layers', 'Inventory'], ['calendar', 'supplier.calendar', 'calendar', 'Inventory Calendar'], ['damages', 'supplier.damages', 'tool', 'Damage & Compensation'],
+            ['Money'], ['payments', 'supplier.payments', 'card', 'Payments'], ['reports', 'supplier.reports', 'chart', 'Business Reports'],
             ['Shop'], ['shop', 'supplier.shop', 'store', 'Shop Profile & Settings'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products'], ['requests', 'supplier.requests', 'list', 'Requests'], ['shop', 'supplier.shop', 'store', 'Profile']]],
         'cashier' => ['tag' => 'Cashier', 'items' => [

@@ -20,7 +20,13 @@
             ['Monitoring'], ['transactions', 'admin.transactions', 'activity', 'Transactions & Reservations', 0, 'transactions.view'], ['complaints', 'admin.complaints', 'flag', 'Complaints', $b['complaints'] ?? 0, 'complaints.manage'], ['reports', 'admin.reports', 'chart', 'Reports', 0, 'reports.view'], ['audit', 'admin.audit', 'clock', 'Activity Log'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'admin.dashboard', 'grid', 'Home'], ['users', 'admin.users', 'users', 'Users'], ['applications', 'admin.applications', 'file', 'Apps'], ['transactions', 'admin.transactions', 'activity', 'Rentals']]],
     ];
-    $NAV['superadmin'] = ['tag' => 'Superadmin', 'items' => array_merge($NAV['admin']['items'], [['Payments'], ['verification', 'cashier.verification', 'check', 'Payment Verification'], ['cash-history', 'cashier.history', 'list', 'Payment History']]), 'bottom' => $NAV['admin']['bottom']];
+    $NAV['superadmin'] = ['tag' => 'Superadmin', 'items' => [
+        ['Platform'], ['dashboard', 'super.dashboard', 'grid', 'Dashboard'], ['monitoring', 'super.monitoring', 'activity', 'Platform Monitoring'], ['platform-users', 'super.users', 'users', 'Platform Users'], ['reports', 'admin.reports', 'bars', 'Platform Reports'],
+        ['Operations'], ['applications', 'admin.applications', 'file', 'Supplier Applications', $b['applications'] ?? 0], ['listings', 'admin.listings', 'box', 'Listings'], ['categories', 'admin.categories', 'tag', 'Categories'], ['transactions', 'admin.transactions', 'list', 'Transactions & Reservations'], ['complaints', 'admin.complaints', 'flag', 'Complaints', $b['complaints'] ?? 0],
+        ['Payments'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0], ['cash-history', 'cashier.history', 'list', 'Payment History'],
+        ['Access control'], ['admins', 'super.admins', 'shield', 'Administrators'], ['roles', 'super.roles', 'lock', 'Roles & Permissions'],
+        ['System'], ['audit', 'admin.audit', 'file', 'Audit Logs'], ['settings', 'super.settings', 'settings', 'System Settings'], ['notifications', 'notifications', 'bell', 'Notifications'],
+    ], 'bottom' => [['dashboard', 'super.dashboard', 'grid', 'Home'], ['monitoring', 'super.monitoring', 'activity', 'Monitor'], ['admins', 'super.admins', 'shield', 'Admins'], ['audit', 'admin.audit', 'file', 'Audit']]];
     $cfg = $NAV[$role] ?? $NAV['admin'];
     $sup = $role === 'supplier' ? $shellUser->supplier : null;
     $nav = $nav ?? '';

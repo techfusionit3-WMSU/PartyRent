@@ -19,12 +19,13 @@ Resume in Claude Code with `/resume-phase2`. Unfinished work is auto-saved as a 
 - [x] Reports + charts (`admin/reports.html`)
 
 ## Superadmin (no views yet)
-- [ ] Role + dashboard (`superadmin/dashboard.html`)
-- [ ] System monitoring (`superadmin/monitoring.html`)
-- [ ] Administrators management (`superadmin/admins.html`)
-- [ ] Roles & permissions editor (`superadmin/roles.html`)
-- [ ] System settings (`superadmin/settings.html`)
-- [ ] Users / audit / reports (`superadmin/users.html`, `audit.html`, `reports.html`)
+- [x] Role + dashboard (`superadmin/dashboard.html`)
+- [x] System monitoring (`superadmin/monitoring.html`)
+- [x] Administrators management (`superadmin/admins.html`)
+- [x] Roles & permissions editor (`superadmin/roles.html`)
+- [x] System settings (`superadmin/settings.html`)
+- [x] Users + audit (`superadmin/users.html`, `audit.html`; audit reuses /admin/audit)
+- [ ] Platform reports growth charts (`superadmin/reports.html`): user growth, supplier growth, status mix, admin activity, added to /admin/reports
 
 ## Wrap-up
 - [ ] Feature tests for every new page, full suite green
@@ -32,6 +33,7 @@ Resume in Claude Code with `/resume-phase2`. Unfinished work is auto-saved as a 
 
 ## Notes (where things stand)
 - Finding: most phase 2 controllers + views were already written in phase 1 but never routed or linked in the nav. Each item = add routes + nav + page tests, then check against the prototype.
+- Superadmin done (2026-11-08): /superadmin/* routes named super.*, own Platform overview dashboard, prototype nav layout, badges. Left: growth charts on reports, then wrap-up.
 - Admin section done (2026-11-08): routes, permission-gated sidebar, "Log an issue" form from the prototype, fixed crash when restoring a listing without a reason. Next: superadmin (controller SuperController + views in resources/views/super already exist; need routes named super.* under /superadmin).
 - Cashier reports done. Sidebar items take an optional 6th element = permission key; hidden when the user lacks it.
 - Supplier section done: routes under /supplier (calendar, damages, reports, reports.csv) + sidebar links.

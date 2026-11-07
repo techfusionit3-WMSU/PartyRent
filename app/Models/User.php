@@ -116,7 +116,7 @@ class User extends Authenticatable
             'customer' => 'home',
             'supplier' => 'supplier.dashboard',
             'admin' => 'admin.dashboard',
-            'superadmin' => 'superadmin.dashboard',
+            'superadmin' => 'super.dashboard',
             'cashier' => 'cashier.dashboard',
         ][$this->activeRole($mode)];
     }

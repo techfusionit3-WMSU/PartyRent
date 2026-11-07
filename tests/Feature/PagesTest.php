@@ -91,7 +91,8 @@ class PagesTest extends TestCase
         $this->as('paolo.admin@partyrent.ph')->get('/admin/applications')->assertForbidden();
 
         $this->as('super@partyrent.ph');
-        foreach (['/superadmin', '/admin/applications', '/cashier/verification'] as $url) {
+        foreach (['/superadmin', '/superadmin/monitoring', '/superadmin/users', '/superadmin/users?role=cashier', '/superadmin/admins', '/superadmin/roles', '/superadmin/settings',
+            '/admin/applications', '/admin/listings', '/admin/complaints', '/admin/reports', '/admin/audit', '/cashier/verification'] as $url) {
             $this->get($url)->assertOk();
         }
     }
@@ -122,6 +123,37 @@ class PagesTest extends TestCase
 
         // sidebar hides pages the admin can't open
         $this->as('paolo.admin@partyrent.ph')->get('/admin')->assertOk()->assertDontSee('Supplier Applications');
+    }
+
+    public function test_superadmin_actions(): void
+    {
+        // only superadmins get in
+        $this->as('admin@partyrent.ph')->get('/superadmin/settings')->assertRedirect();
+
+        $this->as('super@partyrent.ph');
+        $this->post('/superadmin/admins', ['name' => 'Nina Reyes', 'email' => 'nina.cashier@partyrent.ph', 'role' => 'cashier', 'password' => 'Temp-pass-2026'])->assertSessionHas('success');
+        $nina = User::where('email', 'nina.cashier@partyrent.ph')->firstOrFail();
+        $this->assertTrue($nina->hasRole('cashier'));
+
+        // per-user permissions, then back to role defaults
+        $this->post("/superadmin/admins/{$nina->id}", ['perms' => ['payments.view']])->assertSessionHas('success');
+        $this->assertFalse($nina->fresh()->hasPerm('reports.view'));
+        $this->post("/superadmin/admins/{$nina->id}", ['use_defaults' => 1])->assertSessionHas('success');
+        $this->assertNull($nina->fresh()->cashier_perms);
+
+        // default role permissions
+        $this->post('/superadmin/roles', ['admin' => ['customers.view'], 'cashier' => ['payments.view', 'payments.verify']])->assertSessionHas('success');
+        $this->assertFalse(User::where('email', 'admin@partyrent.ph')->first()->hasPerm('reports.view'));
+
+        // settings
+        $this->post('/superadmin/settings', ['platformName' => 'PartyRent PH', 'supportEmail' => 'help@partyrent.ph', 'supportPhone' => '0917 000 0000', 'overdueGraceDays' => 2, 'maxRentalDays' => 14, 'commissionPct' => 7, 'aiEnabled' => 1])->assertSessionHas('success');
+        $this->assertSame('PartyRent PH', setting('platformName'));
+
+        // suspend / reactivate, but never yourself
+        $this->post("/superadmin/users/{$nina->id}/status", ['status' => 'suspended'])->assertSessionHas('success');
+        $this->assertSame('suspended', $nina->fresh()->status);
+        $me = User::where('email', 'super@partyrent.ph')->first();
+        $this->post("/superadmin/users/{$me->id}/status", ['status' => 'suspended'])->assertSessionHas('error');
     }
 
     public function test_login_and_suspended_accounts(): void

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\SuperController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\ApiController;
 use App\Http\Controllers\AuthController;
@@ -159,4 +160,16 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     Route::get('/reports.csv', [AdminController::class, 'reportsCsv'])->name('reports.csv');
 });
-Route::get('/superadmin', [AdminController::class, 'dashboard'])->middleware(['auth', 'role:superadmin'])->name('superadmin.dashboard');
+Route::prefix('superadmin')->name('super.')->middleware(['auth', 'role:superadmin'])->group(function () {
+    Route::get('/', [SuperController::class, 'dashboard'])->name('dashboard');
+    Route::get('/monitoring', [SuperController::class, 'monitoring'])->name('monitoring');
+    Route::get('/users', [SuperController::class, 'users'])->name('users');
+    Route::post('/users/{user}/status', [SuperController::class, 'userStatus'])->name('users.status');
+    Route::get('/admins', [SuperController::class, 'admins'])->name('admins');
+    Route::post('/admins', [SuperController::class, 'storeAdmin'])->name('admins.store');
+    Route::post('/admins/{user}', [SuperController::class, 'updateAdmin'])->name('admins.update');
+    Route::get('/roles', [SuperController::class, 'roles'])->name('roles');
+    Route::post('/roles', [SuperController::class, 'updateRoles'])->name('roles.update');
+    Route::get('/settings', [SuperController::class, 'settings'])->name('settings');
+    Route::post('/settings', [SuperController::class, 'updateSettings'])->name('settings.update');
+});

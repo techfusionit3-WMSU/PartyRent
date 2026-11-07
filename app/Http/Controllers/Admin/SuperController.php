@@ -21,6 +21,37 @@ use Illuminate\Validation\Rules\Password as PasswordRule;
 /** Superadmin-only pages (route group is guarded by role:superadmin). */
 class SuperController extends Controller
 {
+    public function dashboard()
+    {
+        \App\Domain\Rentals::scanOverdue();
+        $users = User::all();
+        $reqs = RentalRequest::with('payments')->get();
+        $ver = Payment::where('status', 'verified')->get();
+        $gross = $ver->whereIn('type', Finance::RENTAL_TYPES)->sum('amount') - $ver->where('type', 'refund')->sum('amount');
+        $active = $reqs->filter->isActive();
+        $months = \App\Support\Report::months(6);
+        $counted = $reqs->whereNotIn('status', ['pending', 'declined', 'cancelled']);
+
+        return view('super.dashboard', [
+            'users' => $users->count(), 'inactive' => $users->where('status', '!=', 'active')->count(),
+            'customers' => $users->filter(fn ($u) => $u->hasRole('customer'))->count(),
+            'alsoSuppliers' => Supplier::whereNotNull('owner_id')->count(),
+            'suppliers' => Supplier::approved()->count(), 'pendingApps' => Supplier::where('status', 'pending')->count(),
+            'admins' => $users->filter(fn ($u) => $u->hasRole('admin'))->count(), 'cashiers' => $users->filter(fn ($u) => $u->hasRole('cashier'))->count(),
+            'requests' => $reqs->count(), 'active' => $active->count(),
+            'gross' => $gross, 'commission' => $gross * (float) setting('commissionPct', 5) / 100,
+            'outstanding' => $active->sum(fn ($r) => $r->fin()['balance']), 'overdue' => $active->filter(fn ($r) => $r->fin()['isOverdue'])->count(),
+            'trend' => array_map(fn ($m) => ['label' => $m['label'], 'value' => $reqs->filter(fn ($r) => $r->created_at->format('Y-m') === $m['key'])->count()], $months),
+            'collections' => array_map(fn ($m) => ['label' => $m['label'], 'value' => $ver->whereIn('type', Finance::RENTAL_TYPES)->filter(fn ($p) => str_starts_with($p->date, $m['key']))->sum('amount')], $months),
+            'perf' => Supplier::approved()->orderByDesc('rating')->get()->map(fn ($s) => [
+                'model' => $s,
+                'rentals' => $reqs->where('supplier_id', $s->id)->whereNotIn('status', ['pending', 'declined'])->count(),
+                'value' => $counted->where('supplier_id', $s->id)->sum(fn ($r) => $r->fin()['payable']),
+            ]),
+            'audit' => AuditLog::with('actor')->orderByDesc('created_at')->take(7)->get(),
+        ]);
+    }
+
     public function monitoring()
     {
         $T = today_iso();

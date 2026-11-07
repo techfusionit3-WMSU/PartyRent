@@ -1,0 +1,18 @@
+<form method="GET" action="{{ route('browse') }}">
+  <input type="hidden" name="sort" value="{{ $st['sort'] }}"><input type="hidden" name="view" value="{{ $st['view'] }}">
+  <div class="row between mb-1"><h3 class="mb-0">Filters</h3><a class="btn btn-xs btn-ghost" href="{{ route('browse', array_filter(['view' => $st['view'] === 'packages' ? 'packages' : null])) }}">Clear all</a></div>
+  <div class="field"><label>Keyword</label><input class="input input-sm" name="q" value="{{ $st['q'] }}" placeholder="e.g. tiffany, tent"></div>
+  <div class="field"><label>Rental dates</label><div class="row" style="gap:6px"><input class="input input-sm" type="date" name="start" min="{{ today_iso() }}" value="{{ $st['start'] }}" aria-label="Start date"><input class="input input-sm" type="date" name="end" min="{{ today_iso() }}" value="{{ $st['end'] }}" aria-label="End date"></div><div class="hint">Shows stock for every day in the range.</div></div>
+  <div class="field"><label>Quantity needed per day</label><input class="input input-sm" type="number" min="1" name="qty" value="{{ $st['qty'] }}" placeholder="Any"></div>
+  <label class="check mb-2"><input type="checkbox" name="avail" value="1" @checked($st['avail'])> Available on selected dates</label>
+  <div class="field"><label>Category</label><select class="input input-sm" name="category"><option value="">All categories</option>@foreach($cats as $c)<option value="{{ $c->id }}" @selected($st['category'] === $c->id)>{{ $c->name }}</option>@endforeach</select></div>
+  <div class="field"><label>Event type</label><select class="input input-sm" name="event"><option value="">Any event</option>@foreach($events as $e)<option @selected($st['event'] === $e)>{{ $e }}</option>@endforeach</select></div>
+  <div class="field"><label>Color</label><select class="input input-sm" name="color"><option value="">Any color</option>@foreach($colors as $c)<option @selected($st['color'] === $c)>{{ $c }}</option>@endforeach</select></div>
+  <div class="field"><label>Theme</label><select class="input input-sm" name="theme"><option value="">Any theme</option>@foreach($themesList as $c)<option @selected($st['theme'] === $c)>{{ $c }}</option>@endforeach</select></div>
+  <div class="field"><label>Daily price (₱)</label><div class="row" style="gap:6px"><input class="input input-sm" type="number" min="0" name="min" placeholder="Min" value="{{ $st['min'] }}" aria-label="Minimum price"><input class="input input-sm" type="number" min="0" name="max" placeholder="Max" value="{{ $st['max'] }}" aria-label="Maximum price"></div></div>
+  <div class="field"><label>Supplier</label><select class="input input-sm" name="supplier"><option value="">All suppliers</option>@foreach($sups as $s)<option value="{{ $s->id }}" @selected((string) $st['supplier'] === (string) $s->id)>{{ $s->name }}</option>@endforeach</select></div>
+  <div class="field"><label>Supplier location</label><select class="input input-sm" name="city"><option value="">Anywhere</option>@foreach($cities as $c)<option @selected($st['city'] === $c)>{{ $c }}</option>@endforeach</select></div>
+  <div class="field"><label>Fulfillment</label><label class="check"><input type="checkbox" name="delivery" value="1" @checked($st['delivery'])> Delivery available</label><label class="check"><input type="checkbox" name="pickup" value="1" @checked($st['pickup'])> Pickup available</label></div>
+  <div class="field"><label>Supplier rating</label><select class="input input-sm" name="rating"><option value="">Any rating</option><option value="4.5" @selected($st['rating'] === '4.5')>4.5★ & up</option><option value="4.7" @selected($st['rating'] === '4.7')>4.7★ & up</option></select></div>
+  <button class="btn btn-primary btn-block">Apply filters</button>
+</form>

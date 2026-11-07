@@ -1,0 +1,1 @@
+<a class="brand" href="{{ route('home') }}"><span class="brand-mark">{{ icon('party') }}</span><span class="word">Party<b>Rent</b></span>@isset($tag)<span class="role-tag">{{ $tag }}</span>@endisset</a>

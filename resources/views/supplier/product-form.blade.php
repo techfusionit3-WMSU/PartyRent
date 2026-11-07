@@ -1,0 +1,64 @@
+@extends('layouts.dash', ['title' => $p->exists ? 'Edit product' : 'Add product', 'nav' => 'products'])
+
+@php($tiers = old('tiers', $p->tiers ?: [['min' => 1, 'max' => null, 'price' => '']]))
+@section('content')
+<div class="crumbs"><a href="{{ route('supplier.products') }}">Products</a> / {{ $p->exists ? $p->name : 'New product' }}</div>
+<div class="page-head"><div><h1>{{ $p->exists ? 'Edit '.$p->name : 'Add a rental item' }}</h1><p>Prices you set here are the only prices customers and the AI assistant ever see.</p></div></div>
+<form method="POST" action="{{ $p->exists ? route('supplier.products.update', $p) : route('supplier.products.store') }}" enctype="multipart/form-data" class="grid grid-side">
+  @csrf @if($p->exists) @method('PUT') @endif
+  <div class="stack">
+    <div class="card"><h3>Details</h3>
+      <div class="field"><label>Item name</label><input class="input" name="name" required minlength="3" value="{{ old('name', $p->name) }}" placeholder="e.g. White Monoblock Chair"></div>
+      <div class="form-grid">
+        <div class="field"><label>Category</label><select class="input" name="category_id" required><option value="">Select…</option>@foreach($cats as $c)<option value="{{ $c->id }}" @selected(old('category_id', $p->category_id) === $c->id)>{{ $c->name }}</option>@endforeach</select></div>
+        <div class="field"><label>Condition</label><select class="input" name="condition">@foreach(['Excellent', 'Very Good', 'Good', 'Fair'] as $c)<option @selected(old('condition', $p->condition) === $c)>{{ $c }}</option>@endforeach</select></div>
+      </div>
+      <div class="field"><label>Description</label><textarea class="input" name="description" required rows="4">{{ old('description', $p->description) }}</textarea></div>
+      <div class="form-grid">
+        <div class="field"><label>Colors (comma-separated)</label><input class="input" name="colors" value="{{ old('colors', implode(', ', $p->colors ?? [])) }}" placeholder="White, Gold"></div>
+        <div class="field"><label>Themes (comma-separated)</label><input class="input" name="themes" value="{{ old('themes', implode(', ', $p->themes ?? [])) }}" placeholder="Elegant, Classic"></div>
+      </div>
+      <div class="field"><label>Suitable events</label><div class="row wrap gap-sm">@foreach($events as $e)@php($on = in_array($e, old('events', $p->events ?? []), true))<label class="chip {{ $on ? 'active' : '' }}"><input type="checkbox" name="events[]" value="{{ $e }}" @checked($on) hidden>{{ $e }}</label>@endforeach</div></div>
+    </div>
+    <div class="card"><h3>Quantity-based pricing (per day)</h3>
+      <p class="small muted">The first tier starts at 1. Each tier starts right after the previous one ends; leave the last tier's maximum empty.</p>
+      <div id="tiers">
+        @foreach($tiers as $i => $t)
+          <div class="form-grid tier-row" style="grid-template-columns:1fr 1fr 1fr auto;align-items:end">
+            <div class="field"><label class="small">From qty</label><input class="input input-sm" type="number" min="1" name="tiers[{{ $i }}][min]" value="{{ $t['min'] ?? '' }}"></div>
+            <div class="field"><label class="small">To qty</label><input class="input input-sm" type="number" min="1" name="tiers[{{ $i }}][max]" value="{{ $t['max'] ?? '' }}" placeholder="and up"></div>
+            <div class="field"><label class="small">Price per unit (₱)</label><input class="input input-sm" type="number" min="0" step="0.01" name="tiers[{{ $i }}][price]" value="{{ $t['price'] ?? '' }}"></div>
+            <div class="field"><button type="button" class="btn btn-sm btn-ghost" onclick="this.closest('.tier-row').remove()" aria-label="Remove tier">{{ icon('trash') }}</button></div>
+          </div>
+        @endforeach
+      </div>
+      <button type="button" class="btn btn-sm" id="addTier">{{ icon('plus') }}Add tier</button>
+    </div>
+    <div class="card"><h3>Photos</h3>
+      @if($p->images)<div class="thumbs mb-1">@foreach($p->images as $im)<img src="{{ asset('storage/'.$im) }}" alt="Product photo">@endforeach</div><label class="check mb-1"><input type="checkbox" name="clear_images" value="1"> Remove current photos</label>@endif
+      <input class="input" type="file" name="images[]" accept="image/*" multiple><div class="hint">Up to 5 photos, 8 MB each. Without photos, the category illustration is shown.</div>
+    </div>
+  </div>
+  <aside class="card sticky-side"><h3>Stock & visibility</h3>
+    <div class="field"><label>Total stock (units you own)</label><input class="input" type="number" min="0" name="total_stock" required value="{{ old('total_stock', $p->total_stock ?? 0) }}"><div class="hint">Reducing stock is blocked if it would break accepted reservations.</div></div>
+    <div class="field"><label>Rental unit</label><select class="input" name="unit">@foreach(['piece / day', 'set / day', 'unit / day', 'pair / day', 'panel / day', 'kit / day', 'system / day'] as $un)<option @selected(old('unit', $p->unit) === $un)>{{ $un }}</option>@endforeach</select></div>
+    <div class="field"><label>Status</label><select class="input" name="status">@foreach(['published' => 'Published (visible)', 'draft' => 'Draft', 'hidden' => 'Hidden'] as $k => $l)<option value="{{ $k }}" @selected(old('status', $p->status) === $k)>{{ $l }}</option>@endforeach</select></div>
+    <label class="check mb-2"><input type="checkbox" name="delivery" value="1" @checked(old('delivery', $p->delivery ?? true))> Available for delivery</label>
+    <button class="btn btn-primary btn-block btn-lg">{{ $p->exists ? 'Save changes' : 'Add product' }}</button>
+    <a class="btn btn-block btn-ghost mt-1" href="{{ route('supplier.products') }}">Cancel</a>
+  </aside>
+</form>
+@push('scripts')
+<script>
+document.getElementById('addTier').addEventListener('click', function () {
+  var wrap = document.getElementById('tiers'), rows = wrap.querySelectorAll('.tier-row'), i = Date.now();
+  var last = rows[rows.length - 1], lastMax = last ? last.querySelector('[name$="[max]"]').value : '';
+  var row = (last ? last.cloneNode(true) : null);
+  if (!row) return;
+  row.querySelectorAll('input').forEach(function (inp) { inp.name = inp.name.replace(/tiers\[[^\]]+\]/, 'tiers[' + i + ']'); inp.value = ''; });
+  if (lastMax) row.querySelector('[name$="[min]"]').value = (+lastMax + 1);
+  wrap.appendChild(row);
+});
+</script>
+@endpush
+@endsection

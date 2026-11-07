@@ -1,0 +1,1 @@
+<a class="notif {{ $n->isReadBy(auth()->id()) ? '' : 'unread' }}" href="{{ route('notifications.open', $n) }}"><span class="ndot"></span><div class="grow"><div class="nt">{{ $n->title }}</div><div class="nb">{{ $n->body }}</div><div class="nw">{{ time_ago($n->created_at) }}</div></div></a>

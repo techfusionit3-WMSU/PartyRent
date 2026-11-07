@@ -1,0 +1,104 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Hold;
+use App\Models\Payment;
+use App\Models\RentalRequest;
+use App\Models\Supplier;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/** Every page renders for the roles allowed to see it, and is refused for the rest. */
+class PagesTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected bool $seed = true;
+
+    private function as(string $email, ?string $mode = null): static
+    {
+        $u = User::where('email', $email)->firstOrFail();
+
+        return $this->actingAs($u)->withSession(['mode' => $mode ?? $u->defaultMode()]);
+    }
+
+    public function test_public_pages_render(): void
+    {
+        $p = \App\Models\Product::first();
+        $k = \App\Models\Package::first();
+        $s = Supplier::approved()->first();
+        foreach (['/', '/browse', '/browse?view=packages', '/browse?q=pink+chairs&start='.add_days(today_iso(), 3).'&avail=1', '/suppliers', "/suppliers/{$s->id}", "/suppliers/{$s->id}?tab=policies", "/suppliers/{$s->id}?tab=reviews",
+            "/products/{$p->id}", '/packages', "/packages/{$k->id}", '/ai', '/ai?q='.urlencode('outdoor birthday for 50 guests with tent and pink balloons'), '/login', '/register', '/forgot-password'] as $url) {
+            $this->get($url)->assertOk();
+        }
+        $this->getJson('/api/calendar?kind=item&id='.$p->id.'&month='.substr(today_iso(), 0, 7))->assertOk()->assertJsonStructure(['days']);
+        $this->postJson('/api/schedule', ['type' => 'item', 'ref_id' => $p->id, 'days' => [add_days(today_iso(), 5) => 3]])->assertOk()->assertJsonPath('ok', true);
+        $this->postJson('/ai/chat', ['message' => 'tiffany chair prices'])->assertOk()->assertJsonStructure(['html', 'chips']);
+    }
+
+    public function test_customer_pages_render(): void
+    {
+        $r = RentalRequest::where('code', 'PR-0001')->first();
+        $this->as('maria@demo.ph');
+        foreach (['/', '/cart', '/cart?compare=1', '/rentals', '/rentals?tab=active', '/rentals/PR-0001', '/rentals/PR-0006', '/my-payments', '/profile', '/start-selling', '/notifications', '/account', '/checkout/'.$r->supplier_id] as $url) {
+            $this->get($url)->assertOk();
+        }
+        // another customer's rental is not visible
+        $this->get('/rentals/PR-0008')->assertNotFound();
+        // staff pages are not reachable
+        $this->get('/cashier')->assertRedirect();
+        $this->get('/admin')->assertRedirect();
+    }
+
+    public function test_supplier_pages_render(): void
+    {
+        $this->as('juan@demo.ph', 'supplier');
+        $pid = \App\Models\Product::where('supplier_id', Supplier::where('name', 'like', 'Happy%')->value('id'))->value('id');
+        $kid = \App\Models\Package::where('supplier_id', Supplier::where('name', 'like', 'Happy%')->value('id'))->value('id');
+        foreach (['/supplier', '/supplier/requests', '/supplier/requests?tab=all', '/supplier/requests/PR-0001', '/supplier/requests/PR-0003', '/supplier/requests/PR-0011',
+            '/supplier/schedule', '/supplier/payments', '/supplier/payments?tab=overdue', '/supplier/products', '/supplier/products/new', "/supplier/products/$pid/edit",
+            '/supplier/packages', '/supplier/packages/new', "/supplier/packages/$kid/edit", '/supplier/inventory', '/supplier/shop', '/notifications'] as $url) {
+            $this->get($url)->assertOk();
+        }
+        // other shops' requests are hidden
+        $this->get('/supplier/requests/PR-0005')->assertNotFound();
+    }
+
+    public function test_pending_supplier_cannot_open_supplier_mode(): void
+    {
+        $this->as('bea@demo.ph', 'supplier')->get('/supplier')->assertRedirect(route('start-selling'));
+    }
+
+    public function test_cashier_and_admin_pages_render(): void
+    {
+        $this->as('cashier@partyrent.ph');
+        foreach (['/cashier', '/cashier/verification', '/cashier/record', '/cashier/record?request=PR-0001', '/cashier/balances', '/cashier/balances?tab=overdue', '/cashier/history', '/cashier/history?q=PR-0001', '/payments/TXN-10001/receipt'] as $url) {
+            $this->get($url)->assertOk();
+        }
+        $this->get('/admin')->assertRedirect();
+
+        $this->as('admin@partyrent.ph');
+        foreach (['/admin', '/admin/applications', '/admin/applications?tab=approved', '/admin/users', '/admin/transactions', '/admin/audit'] as $url) {
+            $this->get($url)->assertOk();
+        }
+        // restricted admin can't review applications
+        $this->as('paolo.admin@partyrent.ph')->get('/admin/applications')->assertForbidden();
+
+        $this->as('super@partyrent.ph');
+        foreach (['/superadmin', '/admin/applications', '/cashier/verification'] as $url) {
+            $this->get($url)->assertOk();
+        }
+    }
+
+    public function test_login_and_suspended_accounts(): void
+    {
+        $this->post('/login', ['email' => 'maria@demo.ph', 'password' => 'demo123'])->assertRedirect();
+        $this->assertAuthenticated();
+        auth()->logout();
+        $this->post('/login', ['email' => 'miguel@demo.ph', 'password' => 'demo123']);
+        $this->assertGuest();
+        $this->post('/login', ['email' => 'maria@demo.ph', 'password' => 'wrong'])->assertSessionHasErrors('email');
+    }
+}

@@ -1,0 +1,235 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Domain\Ai;
+use App\Domain\Finance;
+use App\Domain\Notifier;
+use App\Models\Category;
+use App\Models\Package;
+use App\Models\Product;
+use App\Models\RentalRequest;
+use App\Models\Review;
+use App\Models\Supplier;
+use Illuminate\Http\Request;
+
+class MarketController extends Controller
+{
+    public const EVENT_THEMES = [
+        ['Birthday', '🎂', 'linear-gradient(135deg,#F472B6,#E11D74)'], ['Wedding', '💍', 'linear-gradient(135deg,#FBBF24,#B45309)'],
+        ['Debut', '👑', 'linear-gradient(135deg,#C084FC,#7C3AED)'], ['Christening', '🕊️', 'linear-gradient(135deg,#67E8F9,#0E7490)'],
+        ['Corporate', '🏢', 'linear-gradient(135deg,#60A5FA,#1D4ED8)'], ['Reunion', '👨‍👩‍👧‍👦', 'linear-gradient(135deg,#34D399,#0D9488)'],
+    ];
+
+    private function live()
+    {
+        $list = Product::live()->with(['supplier', 'category'])->get();
+        inv()->primeProducts($list);
+
+        return $list;
+    }
+
+    public function home(Request $request)
+    {
+        $u = $request->user();
+        if ($u && $u->isStaff()) {
+            return redirect()->route($u->homeRoute());
+        }
+        $prods = $this->live();
+        $pkgs = Package::live()->with('supplier')->get();
+        $sups = Supplier::approved()->withCount(['products' => fn ($q) => $q->where('status', 'published')])->get();
+
+        $recommended = collect();
+        if ($u) {
+            $evs = RentalRequest::where('customer_id', $u->id)->pluck('event_type')->unique()->all();
+            $recommended = $prods->filter(fn ($p) => array_intersect($p->events ?? [], $evs))->sortByDesc('rent_count')->take(4);
+        }
+        if ($recommended->isEmpty()) {
+            $recommended = $prods->sortByDesc('rent_count')->take(4);
+        }
+        $active = $u ? RentalRequest::where('customer_id', $u->id)->whereIn('status', array_merge(Finance::ACTIVE, ['pending']))->with(['payments', 'supplier'])->orderBy('start_date')->take(3)->get() : collect();
+        $notifs = $u ? Notifier::for($u, session('mode'))->filter(fn ($n) => ! $n->isReadBy($u->id))->take(3) : collect();
+
+        return view('market.home', [
+            'prods' => $prods, 'pkgs' => $pkgs, 'sups' => $sups,
+            'featured' => $prods->sortBy([['rating', 'desc'], ['rent_count', 'desc']])->take(8),
+            'recommended' => $recommended,
+            'recent' => $prods->sortByDesc('created_at')->take(4),
+            'offers' => $prods->filter(fn ($p) => count($p->tiers) > 1)->sortByDesc(fn ($p) => 1 - $p->lowestPrice() / max(1, $p->basePrice()))->take(4),
+            'cats' => Category::where('active', true)->orderBy('sort')->get(),
+            'active' => $active, 'notifs' => $notifs,
+            'themes' => self::EVENT_THEMES,
+        ]);
+    }
+
+    public function browse(Request $request)
+    {
+        $st = array_merge(['q' => '', 'category' => '', 'supplier' => '', 'city' => '', 'event' => '', 'color' => '', 'theme' => '', 'min' => '', 'max' => '', 'start' => '', 'end' => '', 'qty' => '', 'avail' => '', 'delivery' => '', 'pickup' => '', 'rating' => '', 'sort' => 'recommended', 'view' => 'items'], array_filter($request->only(['q', 'category', 'supplier', 'city', 'event', 'color', 'theme', 'min', 'max', 'start', 'end', 'qty', 'avail', 'delivery', 'pickup', 'rating', 'sort', 'view']), fn ($v) => $v !== null));
+        if ($st['start'] && $st['start'] < today_iso()) {
+            $st['start'] = today_iso();
+        }
+        if ($st['start'] && (! $st['end'] || $st['end'] < $st['start'])) {
+            $st['end'] = $st['start'];
+        }
+        $dates = $st['start'] ? array_slice(date_range($st['start'], $st['end']), 0, (int) setting('maxRentalDays', 30)) : [];
+        $need = max(1, (int) $st['qty']);
+        $ai = $st['q'] ? Ai::interpret($st['q']) : null;
+        $words = array_values(array_filter(preg_split('/\s+/', mb_strtolower($st['q'])) ?: [], fn ($w) => mb_strlen($w) > 1));
+        $matchText = fn (string $hay) => ! $words || collect($words)->every(fn ($w) => str_contains($hay, $w)) || ($ai && $ai['items'] && collect($words)->contains(fn ($w) => str_contains($hay, $w)));
+
+        $prods = $this->live();
+        $sups = Supplier::approved()->get();
+
+        if ($st['view'] === 'packages') {
+            $list = Package::live()->with('supplier')->get()->filter(function ($k) use ($st, $dates, $need, $matchText) {
+                $s = $k->supplier;
+                if (! $matchText(mb_strtolower($k->name.' '.$k->description.' '.$s->name.' '.implode(' ', $k->events ?? [])))) {
+                    return false;
+                }
+                if ($st['event'] && ! in_array($st['event'], $k->events ?? [], true)) return false;
+                if ($st['supplier'] && $k->supplier_id != $st['supplier']) return false;
+                if ($st['city'] && $s->city !== $st['city']) return false;
+                if ($st['min'] !== '' && $k->price < (float) $st['min']) return false;
+                if ($st['max'] !== '' && $k->price > (float) $st['max']) return false;
+                if ($st['delivery'] && $s->fulfillment === 'pickup') return false;
+                if ($st['pickup'] && $s->fulfillment === 'delivery') return false;
+                if ($st['rating'] && $s->rating < (float) $st['rating']) return false;
+                if ($st['category'] && ! collect($k->items)->contains(fn ($it) => inv()->product($it['product_id'])?->category_id === $st['category'])) return false;
+                if ($st['avail'] && $dates && collect($dates)->contains(fn ($d) => inv()->packageAvailableOn($k->id, $d) < $need)) return false;
+
+                return true;
+            });
+            $list = match ($st['sort']) {
+                'price_asc' => $list->sortBy('price'), 'price_desc' => $list->sortByDesc('price'),
+                'recent' => $list->sortByDesc('created_at'), default => $list->sortByDesc(fn ($k) => $k->supplier->rating),
+            };
+        } else {
+            $list = $prods->filter(function ($x) use ($st, $dates, $need, $matchText, $ai) {
+                $s = $x->supplier;
+                $hay = mb_strtolower($x->name.' '.$x->description.' '.$s->name.' '.$s->city.' '.($x->category->name ?? '').' '.implode(' ', $x->colors ?? []).' '.implode(' ', $x->themes ?? []).' '.implode(' ', $x->events ?? []));
+                if (! $matchText($hay) && ! ($ai && in_array($x->category_id, $ai['items'], true))) return false;
+                if ($st['category'] && $x->category_id !== $st['category']) return false;
+                if ($st['supplier'] && $x->supplier_id != $st['supplier']) return false;
+                if ($st['city'] && $s->city !== $st['city']) return false;
+                if ($st['event'] && ! in_array($st['event'], $x->events ?? [], true)) return false;
+                if ($st['color'] && ! in_array($st['color'], $x->colors ?? [], true)) return false;
+                if ($st['theme'] && ! in_array($st['theme'], $x->themes ?? [], true)) return false;
+                $price = $x->basePrice();
+                if ($st['min'] !== '' && $price < (float) $st['min']) return false;
+                if ($st['max'] !== '' && $price > (float) $st['max']) return false;
+                if ($st['delivery'] && ($s->fulfillment === 'pickup' || ! $x->delivery)) return false;
+                if ($st['pickup'] && $s->fulfillment === 'delivery') return false;
+                if ($st['rating'] && $s->rating < (float) $st['rating']) return false;
+                if ($st['avail'] && inv()->minAvailable($x->id, $dates) < $need) return false;
+
+                return true;
+            });
+            $score = fn ($x) => $x->rating * 2 + log10(1 + $x->rent_count) + ($ai && array_intersect($ai['colors'], $x->colors ?? []) ? 2 : 0) + (inv()->minAvailable($x->id, $dates) >= $need ? 2 : -3);
+            $list = match ($st['sort']) {
+                'price_asc' => $list->sortBy(fn ($x) => $x->basePrice()), 'price_desc' => $list->sortByDesc(fn ($x) => $x->basePrice()),
+                'popular' => $list->sortByDesc('rent_count'), 'recent' => $list->sortByDesc('created_at'),
+                'rating' => $list->sortBy([['rating', 'desc'], ['rent_count', 'desc']]), default => $list->sortByDesc($score),
+            };
+        }
+
+        $compare = collect();
+        if ($ids = array_slice((array) $request->query('compare', []), 0, 3)) {
+            $compare = $prods->whereIn('id', array_map('intval', $ids))->values();
+        }
+        $cat = $st['category'] ? Category::find($st['category']) : null;
+
+        return view('market.browse', [
+            'st' => $st, 'list' => $list->values(), 'dates' => $dates, 'ai' => $ai, 'compare' => $compare,
+            'cats' => Category::where('active', true)->orderBy('sort')->get(), 'sups' => $sups,
+            'colors' => $prods->flatMap(fn ($x) => $x->colors ?? [])->unique()->sort()->values(),
+            'themesList' => $prods->flatMap(fn ($x) => $x->themes ?? [])->unique()->sort()->values(),
+            'events' => array_keys(Ai::EVENTS), 'cities' => $sups->pluck('city')->unique()->values(),
+            'heading' => $st['q'] ? 'Results for “'.$st['q'].'”' : ($cat ? $cat->name : ($st['event'] ? $st['event'].' supplies' : ($st['view'] === 'packages' ? 'Rental packages' : 'Browse party supplies'))),
+            'cat' => $cat,
+        ]);
+    }
+
+    public function suppliers(Request $request)
+    {
+        $q = mb_strtolower((string) $request->query('q', ''));
+        $f = (string) $request->query('f', '');
+        $list = Supplier::approved()->with(['products' => fn ($p) => $p->where('status', 'published')->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
+            ->filter(fn ($s) => (! $q || str_contains(mb_strtolower($s->name.' '.$s->city.' '.$s->description), $q)) && (! $f || $s->fulfillment === 'both' || $s->fulfillment === $f));
+
+        return view('market.suppliers', ['list' => $list, 'q' => $request->query('q', ''), 'f' => $f]);
+    }
+
+    public function supplier(Request $request, Supplier $supplier)
+    {
+        $own = $request->user() && $supplier->owner_id === $request->user()->id;
+        abort_unless($supplier->status === 'approved' || $own, 404);
+        $items = $supplier->products()->where('status', 'published')->with(['supplier', 'category'])->get();
+        inv()->primeProducts($items);
+
+        return view('market.supplier', [
+            's' => $supplier, 'items' => $items, 'own' => $own,
+            'pkgs' => $supplier->packages()->where('active', true)->with('supplier')->get(),
+            'reviews' => Review::where('supplier_id', $supplier->id)->with(['customer', 'product'])->latest()->get(),
+            'tab' => $request->query('tab', 'items'), 'catFilter' => $request->query('category'),
+        ]);
+    }
+
+    public function product(Request $request, Product $product)
+    {
+        abort_unless($product->status === 'published' && $product->supplier->status === 'approved', 404);
+        $today = today_iso();
+        $start = $request->query('start') && $request->query('start') >= $today ? $request->query('start') : add_days($today, 7);
+        $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : $start;
+        $qty = max(1, (int) ($request->query('qty') ?: min(10, max(1, $product->total_stock))));
+        $live = $this->live();
+        $u = $request->user();
+
+        return view('market.product', [
+            'p' => $product, 'sup' => $product->supplier, 'cat' => $product->category,
+            'start' => $start, 'end' => $end, 'qty' => $qty,
+            'days' => array_fill_keys(date_range($start, $end), $qty),
+            'reviews' => $product->reviews()->with('customer')->latest()->get(),
+            'related' => $live->where('supplier_id', $product->supplier_id)->where('id', '!=', $product->id)->take(4),
+            'similar' => $live->where('category_id', $product->category_id)->where('id', '!=', $product->id)->sortByDesc('rating')->take(4),
+            'own' => $u && $product->supplier->owner_id === $u->id,
+            'siblings' => $u ? \App\Domain\Rentals::cartLinesFor($u, $product->supplier_id) : [],
+        ]);
+    }
+
+    /** HTML snippet: AI-suggested alternatives when the item can't cover the requested days. */
+    public function alternatives(Request $request, Product $product)
+    {
+        $days = \App\Domain\Rentals::cleanDays((array) json_decode((string) $request->query('days', '{}'), true));
+        $alts = $days ? Ai::alternatives($product, $days) : [];
+        $dates = array_keys($days);
+
+        return view('market._alternatives', ['alts' => $alts, 'dates' => $dates, 'maxQty' => $days ? max($days) : 1]);
+    }
+
+    public function packages(Request $request)
+    {
+        $all = Package::live()->with('supplier')->get();
+        $ev = (string) $request->query('event', '');
+
+        return view('market.packages', [
+            'list' => $ev ? $all->filter(fn ($k) => in_array($ev, $k->events ?? [], true)) : $all,
+            'events' => $all->flatMap(fn ($k) => $k->events ?? [])->unique()->values(), 'ev' => $ev,
+        ]);
+    }
+
+    public function package(Request $request, Package $package)
+    {
+        abort_unless($package->active && $package->supplier->status === 'approved', 404);
+        $today = today_iso();
+        $start = $request->query('start') && $request->query('start') >= $today ? $request->query('start') : add_days($today, 7);
+        $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : $start;
+        $u = $request->user();
+
+        return view('market.package', [
+            'k' => $package, 'sup' => $package->supplier, 'v' => \App\Domain\Pricing::packageValue($package),
+            'start' => $start, 'end' => $end, 'days' => array_fill_keys(date_range($start, $end), 1),
+            'own' => $u && $package->supplier->owner_id === $u->id,
+            'siblings' => $u ? \App\Domain\Rentals::cartLinesFor($u, $package->supplier_id) : [],
+        ]);
+    }
+}

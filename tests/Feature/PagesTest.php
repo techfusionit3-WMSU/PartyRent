@@ -82,7 +82,9 @@ class PagesTest extends TestCase
         $this->get('/admin')->assertRedirect();
 
         $this->as('admin@partyrent.ph');
-        foreach (['/admin', '/admin/applications', '/admin/applications?tab=approved', '/admin/users', '/admin/transactions', '/admin/audit'] as $url) {
+        foreach (['/admin', '/admin/applications', '/admin/applications?tab=approved', '/admin/users', '/admin/transactions', '/admin/audit',
+            '/admin/listings', '/admin/listings?view=packages', '/admin/categories', '/admin/complaints', '/admin/complaints?tab=all',
+            '/admin/reports', '/admin/reports?range=year', '/admin/reports.csv'] as $url) {
             $this->get($url)->assertOk();
         }
         // restricted admin can't review applications
@@ -92,6 +94,34 @@ class PagesTest extends TestCase
         foreach (['/superadmin', '/admin/applications', '/cashier/verification'] as $url) {
             $this->get($url)->assertOk();
         }
+    }
+
+    public function test_admin_moderation_actions(): void
+    {
+        $this->as('admin@partyrent.ph');
+        $maria = User::where('email', 'maria@demo.ph')->firstOrFail();
+
+        // log an issue on behalf of a customer
+        $this->post('/admin/complaints', ['reporter_id' => $maria->id, 'request_code' => 'PR-0001', 'subject' => 'Chairs arrived scratched (test)', 'body' => 'Arrived two hours late.', 'priority' => 'high'])
+            ->assertRedirect(route('admin.complaints', ['tab' => 'open']));
+        $c = \App\Models\Complaint::where('subject', 'Chairs arrived scratched (test)')->firstOrFail();
+        $this->assertSame('open', $c->status);
+        $this->assertNotNull($c->rental_request_id);
+        $this->post('/admin/complaints', ['reporter_id' => $maria->id, 'request_code' => 'PR-9999', 'subject' => 'x', 'body' => 'y', 'priority' => 'low'])->assertSessionHasErrors('request_code');
+
+        // update it: customer gets notified
+        $this->post("/admin/complaints/{$c->id}", ['status' => 'resolved', 'note' => 'Refunded the delivery fee.'])->assertSessionHas('success');
+        $this->assertSame('resolved', $c->fresh()->status);
+        $this->assertCount(1, $c->fresh()->updates);
+
+        // hide and restore a listing
+        $p = \App\Models\Product::where('status', 'published')->firstOrFail();
+        $this->post("/admin/listings/{$p->id}/status", ['status' => 'hidden', 'reason' => 'Blurry photos'])->assertSessionHas('success');
+        $this->assertSame('hidden', $p->fresh()->status);
+        $this->post("/admin/listings/{$p->id}/status", ['status' => 'published'])->assertSessionHas('success');
+
+        // sidebar hides pages the admin can't open
+        $this->as('paolo.admin@partyrent.ph')->get('/admin')->assertOk()->assertDontSee('Supplier Applications');
     }
 
     public function test_login_and_suspended_accounts(): void

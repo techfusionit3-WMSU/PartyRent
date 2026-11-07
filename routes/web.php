@@ -146,5 +146,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
     Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
+
+    Route::get('/listings', [AdminController::class, 'listings'])->name('listings');
+    Route::post('/listings/{product}/status', [AdminController::class, 'listingStatus'])->name('listings.status');
+    Route::post('/packages/{package}/status', [AdminController::class, 'packageStatus'])->name('packages.status');
+    Route::get('/categories', [AdminController::class, 'categories'])->name('categories');
+    Route::post('/categories', [AdminController::class, 'storeCategory'])->name('categories.store');
+    Route::post('/categories/{category}', [AdminController::class, 'updateCategory'])->name('categories.update');
+    Route::get('/complaints', [AdminController::class, 'complaints'])->name('complaints');
+    Route::post('/complaints', [AdminController::class, 'storeComplaint'])->name('complaints.store');
+    Route::post('/complaints/{complaint}', [AdminController::class, 'updateComplaint'])->name('complaints.update');
+    Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+    Route::get('/reports.csv', [AdminController::class, 'reportsCsv'])->name('reports.csv');
 });
 Route::get('/superadmin', [AdminController::class, 'dashboard'])->middleware(['auth', 'role:superadmin'])->name('superadmin.dashboard');

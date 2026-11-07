@@ -2,6 +2,20 @@
 
 @section('content')
 <div class="page-head"><div><h1>Complaints & issues</h1><p>Reports from customers. Every update is sent to the customer and logged.</p></div></div>
+<details class="card mb-3" @if($errors->any()) open @endif>
+  <summary class="strong" style="cursor:pointer">{{ icon('plus') }} Log an issue</summary>
+  <form method="POST" action="{{ route('admin.complaints.store') }}" class="mt-2">@csrf
+    <div class="grid grid-2">
+      <div class="field"><label for="c-rep">Reported by</label><select class="input" id="c-rep" name="reporter_id" required>@foreach($customers as $u)<option value="{{ $u->id }}" @selected(old('reporter_id') == $u->id)>{{ $u->name }} · {{ $u->email }}</option>@endforeach</select></div>
+      <div class="field"><label for="c-sup">About supplier (optional)</label><select class="input" id="c-sup" name="against_supplier_id"><option value="">—</option>@foreach($suppliers as $s)<option value="{{ $s->id }}" @selected(old('against_supplier_id') == $s->id)>{{ $s->name }}</option>@endforeach</select></div>
+      <div class="field"><label for="c-req">Rental request code (optional)</label><input class="input" id="c-req" name="request_code" value="{{ old('request_code') }}" placeholder="PR-0001">@error('request_code')<div class="err">No request with that code.</div>@enderror</div>
+      <div class="field"><label for="c-pri">Priority</label><select class="input" id="c-pri" name="priority">@foreach(['normal' => 'Normal', 'high' => 'High', 'low' => 'Low'] as $k => $l)<option value="{{ $k }}" @selected(old('priority') === $k)>{{ $l }}</option>@endforeach</select></div>
+    </div>
+    <div class="field"><label for="c-sub">Subject</label><input class="input" id="c-sub" name="subject" value="{{ old('subject') }}" required maxlength="160"></div>
+    <div class="field"><label for="c-body">Details</label><textarea class="input" id="c-body" name="body" required maxlength="2000">{{ old('body') }}</textarea></div>
+    <button class="btn btn-primary">Log issue</button>
+  </form>
+</details>
 <div class="tabs">@foreach(['open' => 'Open', 'in_review' => 'In review', 'resolved' => 'Resolved', 'all' => 'All'] as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('admin.complaints', ['tab' => $k]) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
 @if($list->isEmpty())
   <div class="card">@include('partials.empty', ['emoji' => '🎉', 'title' => 'Nothing here', 'text' => 'No complaints in this tab.'])</div>

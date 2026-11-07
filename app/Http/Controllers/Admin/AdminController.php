@@ -117,6 +117,7 @@ class AdminController extends Controller
         $data = $request->validate(['status' => 'required|in:published,hidden', 'reason' => 'nullable|string|max:255']);
         $product->update(['status' => $data['status']]);
         $hidden = $data['status'] === 'hidden';
+        $data['reason'] ??= null;
         Notifier::notify($product->supplier->owner_id, 'supplier', $hidden ? 'Listing hidden by PartyRent' : 'Listing restored', $product->name.($hidden ? ' was hidden from the marketplace'.($data['reason'] ? ': '.$data['reason'] : '.') : ' is visible again.'), route('supplier.products', [], false));
         Notifier::audit($hidden ? 'Hid listing' : 'Restored listing', $product->name.' · '.$product->supplier->name.($data['reason'] ? ' — '.$data['reason'] : ''));
 
@@ -186,7 +187,30 @@ class AdminController extends Controller
             'list' => $tab === 'all' ? $all : $all->where('status', $tab), 'tab' => $tab,
             'counts' => ['open' => $all->where('status', 'open')->count(), 'in_review' => $all->where('status', 'in_review')->count(), 'resolved' => $all->where('status', 'resolved')->count(), 'all' => $all->count()],
             'staff' => User::whereIn('id', $all->flatMap(fn ($c) => collect($c->updates)->pluck('by'))->unique())->pluck('name', 'id'),
+            'customers' => User::whereJsonContains('roles', 'customer')->orderBy('name')->get(['id', 'name', 'email']),
+            'suppliers' => Supplier::orderBy('name')->get(['id', 'name']),
         ]);
+    }
+
+    /** "Log an issue": staff file a report on behalf of a customer (phone, email, walk-in). */
+    public function storeComplaint(Request $request)
+    {
+        $this->need($request, 'complaints.manage');
+        $data = $request->validate([
+            'reporter_id' => 'required|exists:users,id', 'against_supplier_id' => 'nullable|exists:suppliers,id',
+            'request_code' => 'nullable|string|exists:rental_requests,code',
+            'subject' => 'required|string|max:160', 'body' => 'required|string|max:2000', 'priority' => 'required|in:low,normal,high',
+        ]);
+        $next = (int) Complaint::selectRaw('max(cast(substr(code, 5) as unsigned)) as n')->value('n') + 1;
+        $c = Complaint::create([
+            'code' => 'CMP-'.str_pad((string) $next, 3, '0', STR_PAD_LEFT),
+            'reporter_id' => $data['reporter_id'], 'against_supplier_id' => $data['against_supplier_id'] ?? null,
+            'rental_request_id' => ! empty($data['request_code']) ? RentalRequest::where('code', $data['request_code'])->value('id') : null,
+            'subject' => $data['subject'], 'body' => $data['body'], 'priority' => $data['priority'], 'status' => 'open', 'updates' => [],
+        ]);
+        Notifier::audit('Logged complaint', $c->code.' · '.$c->subject);
+
+        return redirect()->route('admin.complaints', ['tab' => 'open'])->with('success', $c->code.' logged.');
     }
 
     public function updateComplaint(Request $request, Complaint $complaint)

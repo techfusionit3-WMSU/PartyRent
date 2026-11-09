@@ -4,24 +4,26 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-Post-phase-2 features, all landed in one `WIP: auto-save` commit (03cee1a; not split, history is not rewritten).
-Finishing the UI for sale items + custom packages: the domain (`Packages`, `Rentals::savePackage/restock/...`,
-`Pricing`, `Inventory`) and migration are done, but routes point at controller methods that do not exist yet.
+Finish **sale items + custom packages** (migration `2026_11_10_000100`, `App\Domain\Packages`).
+Domain, pricing, inventory, stock deduction (`Rentals::deductSaleStock/restock/savePackage/...`) and
+routes exist; controllers + UI were never written.
 
 ## Done
 - [x] Phase 2 (see `docs/PHASE2.md`)
+- [x] Structured addresses + delivery zones (`DeliveryPricingTest`)
+- [x] Supplier location pins (`SupplierLocationTest`)
+- [x] Email verification at registration (`EmailVerificationTest`)
+- [x] Customer reviews + review reports (`ReviewsTest`)
+  (all four landed together in WIP commit 03cee1a; 41 tests green on 2026-11-09)
 
-## Next
-- [x] Migrations applied, 41 tests pass (2026-11-09)
-- [x] Structured addresses + delivery zones (`DeliveryPricingTest` passes)
-- [x] Supplier location pins (`SupplierLocationTest` passes)
-- [x] Email verification at registration (`EmailVerificationTest` passes)
-- [x] Customer reviews + review reports (`ReviewsTest` passes)
-- [ ] Sale items + custom packages — UI layer:
-  - [ ] CatalogController: `packagePrice`, `previewPackage`, `duplicatePackage`, `movePackage`, `packageActive`, `deletePackage`, `restock`; new `packageData` (components/pricing/guests/draft)
-  - [ ] `ApiController::packageQuote` (customer package configurator)
-  - [ ] Views: package builder (`supplier/package-form`), packages list actions, product form rent/sale fields, inventory restock, market package page choices/add-ons/guests, add-to-cart with `sel`
-  - [ ] `PackagesTest` + `SaleItemsTest`
+## Next (sale items + custom packages)
+- [ ] Product form: listing type rent/sale, perishable, lead days, shelf life, low-stock alert (CatalogController product data)
+- [ ] Inventory page: stock on hand, restock form, movement log (`CatalogController::restock`)
+- [ ] Package builder: components editor, pricing mode, guests, draft; `packagePrice`, `previewPackage`
+- [ ] Package list actions: `duplicatePackage`, `movePackage`, `packageActive`, `deletePackage`
+- [ ] Market package page: choices / add-ons / guests, `ApiController::packageQuote`, cart add with `sel`
+- [ ] Tests: `SaleItemsTest`, `PackagesTest`
 
 ## Notes (newest first)
-- 2026-11-09: Created this file and the `/pickup` + `/checkpoint` commands. The status of each feature above is not yet verified; check tests before ticking.
+- 2026-11-09 (pickup): routes in `routes/web.php` reference the missing controller methods above; editing a package is broken until the builder posts `components`/`pricing`.
+- 2026-11-09: Created this file and the `/pickup` + `/checkpoint` commands.

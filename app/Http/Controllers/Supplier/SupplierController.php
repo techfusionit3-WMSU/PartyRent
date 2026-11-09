@@ -21,7 +21,7 @@ class SupplierController extends Controller
         $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
         $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->get();
         inv()->primeProducts($prods);
-        $snap = $prods->map(fn ($p) => inv()->breakdown($p->id, $T));
+        $snap = $prods->reject->isSale()->map(fn ($p) => inv()->breakdown($p->id, $T)); // date-based stock: rental items only
         $fins = $reqs->filter(fn ($r) => $r->isActive() || $r->status === 'completed')->map(fn ($r) => $r->fin());
         $pend = $reqs->where('status', 'pending');
         $ids = $reqs->pluck('id');
@@ -46,6 +46,8 @@ class SupplierController extends Controller
             'monthly' => $months->map(fn ($m) => ['label' => $m['label'], 'value' => $reqs->filter(fn ($r) => $r->created_at->format('Y-m') === $m['key'])->count()]),
             'revenue' => $months->map(fn ($m) => ['label' => $m['label'], 'value' => $revBy($m['key'])]),
             'thisMonth' => $revBy(substr($T, 0, 7)),
+            'monthSplit' => Finance::incomeSplit($ver->filter(fn ($p) => str_starts_with($p->date, substr($T, 0, 7)))->load('rentalRequest')),
+            'lowStock' => $prods->filter->isLowStock()->values(),
             'topUnits' => collect(array_slice($units, 0, 6, true))->map(fn ($v, $pid) => ['label' => inv()->product($pid)?->name, 'value' => $v])->values(),
             'pendingPay' => $pendingPay,
         ]);
@@ -96,7 +98,7 @@ class SupplierController extends Controller
     {
         $s = $request->user()->supplier;
 
-        return view('supplier.shop', ['s' => $s, 'd' => $s->toArray(), 'p' => $s->policy ?? [], 'cities' => StartSellingController::CITIES, 'logos' => StartSellingController::LOGOS]);
+        return view('supplier.shop', ['s' => $s, 'd' => $s->toArray(), 'p' => $s->policy ?? [], 'logos' => StartSellingController::LOGOS, 'previewCity' => $s->city_code]);
     }
 
     public function updateShop(Request $request)

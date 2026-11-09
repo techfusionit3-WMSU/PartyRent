@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Ai;
 use App\Domain\Finance;
+use App\Domain\Locations;
 use App\Domain\Notifier;
 use App\Models\Category;
 use App\Models\Package;
@@ -71,6 +72,11 @@ class MarketController extends Controller
         if ($st['start'] && (! $st['end'] || $st['end'] < $st['start'])) {
             $st['end'] = $st['start'];
         }
+        // "Deliver to" city: picking one in the filters remembers it for this session (badges, cart estimates).
+        if ($request->has('to')) {
+            Locations::isCity($request->query('to')) ? session(['deliver_to' => $request->query('to')]) : session()->forget('deliver_to');
+        }
+        $to = customer_city();
         $dates = $st['start'] ? array_slice(date_range($st['start'], $st['end']), 0, (int) setting('maxRentalDays', 30)) : [];
         $need = max(1, (int) $st['qty']);
         $ai = $st['q'] ? Ai::interpret($st['q']) : null;
@@ -81,7 +87,7 @@ class MarketController extends Controller
         $sups = Supplier::approved()->get();
 
         if ($st['view'] === 'packages') {
-            $list = Package::live()->with('supplier')->get()->filter(function ($k) use ($st, $dates, $need, $matchText) {
+            $list = Package::live()->with('supplier')->get()->filter(function ($k) use ($st, $dates, $need, $matchText, $to) {
                 $s = $k->supplier;
                 if (! $matchText(mb_strtolower($k->name.' '.$k->description.' '.$s->name.' '.implode(' ', $k->events ?? [])))) {
                     return false;
@@ -91,7 +97,7 @@ class MarketController extends Controller
                 if ($st['city'] && $s->city !== $st['city']) return false;
                 if ($st['min'] !== '' && $k->price < (float) $st['min']) return false;
                 if ($st['max'] !== '' && $k->price > (float) $st['max']) return false;
-                if ($st['delivery'] && $s->fulfillment === 'pickup') return false;
+                if ($st['delivery'] && (! $s->offersDelivery() || ($to && ! $s->deliversTo($to)))) return false;
                 if ($st['pickup'] && $s->fulfillment === 'delivery') return false;
                 if ($st['rating'] && $s->rating < (float) $st['rating']) return false;
                 if ($st['category'] && ! collect($k->items)->contains(fn ($it) => inv()->product($it['product_id'])?->category_id === $st['category'])) return false;
@@ -104,7 +110,7 @@ class MarketController extends Controller
                 'recent' => $list->sortByDesc('created_at'), default => $list->sortByDesc(fn ($k) => $k->supplier->rating),
             };
         } else {
-            $list = $prods->filter(function ($x) use ($st, $dates, $need, $matchText, $ai) {
+            $list = $prods->filter(function ($x) use ($st, $dates, $need, $matchText, $ai, $to) {
                 $s = $x->supplier;
                 $hay = mb_strtolower($x->name.' '.$x->description.' '.$s->name.' '.$s->city.' '.($x->category->name ?? '').' '.implode(' ', $x->colors ?? []).' '.implode(' ', $x->themes ?? []).' '.implode(' ', $x->events ?? []));
                 if (! $matchText($hay) && ! ($ai && in_array($x->category_id, $ai['items'], true))) return false;
@@ -117,7 +123,7 @@ class MarketController extends Controller
                 $price = $x->basePrice();
                 if ($st['min'] !== '' && $price < (float) $st['min']) return false;
                 if ($st['max'] !== '' && $price > (float) $st['max']) return false;
-                if ($st['delivery'] && ($s->fulfillment === 'pickup' || ! $x->delivery)) return false;
+                if ($st['delivery'] && (! $s->offersDelivery() || ! $x->delivery || ($to && ! $s->deliversTo($to)))) return false;
                 if ($st['pickup'] && $s->fulfillment === 'delivery') return false;
                 if ($st['rating'] && $s->rating < (float) $st['rating']) return false;
                 if ($st['avail'] && inv()->minAvailable($x->id, $dates) < $need) return false;
@@ -145,7 +151,7 @@ class MarketController extends Controller
             'themesList' => $prods->flatMap(fn ($x) => $x->themes ?? [])->unique()->sort()->values(),
             'events' => array_keys(Ai::EVENTS), 'cities' => $sups->pluck('city')->unique()->values(),
             'heading' => $st['q'] ? 'Results for “'.$st['q'].'”' : ($cat ? $cat->name : ($st['event'] ? $st['event'].' supplies' : ($st['view'] === 'packages' ? 'Rental packages' : 'Browse party supplies'))),
-            'cat' => $cat,
+            'cat' => $cat, 'to' => $to,
         ]);
     }
 
@@ -169,7 +175,7 @@ class MarketController extends Controller
         return view('market.supplier', [
             's' => $supplier, 'items' => $items, 'own' => $own,
             'pkgs' => $supplier->packages()->where('active', true)->with('supplier')->get(),
-            'reviews' => Review::where('supplier_id', $supplier->id)->with(['customer', 'product'])->latest()->get(),
+            'reviews' => Review::visible()->where('supplier_id', $supplier->id)->with(['customer', 'product', 'package'])->latest()->get(),
             'tab' => $request->query('tab', 'items'), 'catFilter' => $request->query('category'),
         ]);
     }
@@ -188,7 +194,7 @@ class MarketController extends Controller
             'p' => $product, 'sup' => $product->supplier, 'cat' => $product->category,
             'start' => $start, 'end' => $end, 'qty' => $qty,
             'days' => array_fill_keys(date_range($start, $end), $qty),
-            'reviews' => $product->reviews()->with('customer')->latest()->get(),
+            'reviews' => $product->reviews()->visible()->with(['customer', 'product', 'supplier'])->latest()->get(),
             'related' => $live->where('supplier_id', $product->supplier_id)->where('id', '!=', $product->id)->take(4),
             'similar' => $live->where('category_id', $product->category_id)->where('id', '!=', $product->id)->sortByDesc('rating')->take(4),
             'own' => $u && $product->supplier->owner_id === $u->id,
@@ -229,6 +235,7 @@ class MarketController extends Controller
             'k' => $package, 'sup' => $package->supplier, 'v' => \App\Domain\Pricing::packageValue($package),
             'start' => $start, 'end' => $end, 'days' => array_fill_keys(date_range($start, $end), 1),
             'own' => $u && $package->supplier->owner_id === $u->id,
+            'reviews' => $package->reviews()->visible()->with(['customer', 'package', 'supplier'])->latest()->get(),
             'siblings' => $u ? \App\Domain\Rentals::cartLinesFor($u, $package->supplier_id) : [],
         ]);
     }

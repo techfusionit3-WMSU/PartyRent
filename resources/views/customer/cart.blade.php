@@ -13,7 +13,7 @@
   <div class="card mb-2"><div class="card-head"><h3>Compare suppliers in your list</h3><a class="btn btn-xs btn-ghost" href="{{ route('cart') }}">Close</a></div>
     <div class="table-wrap"><table class="table cards"><thead><tr><th>Supplier</th><th class="num">Items</th><th>Delivery</th><th>Payment options</th><th class="num">Deposit</th><th>Availability</th></tr></thead><tbody>
       @foreach($groups as $g)
-        <tr><td data-label="Supplier"><b>{{ $g['supplier']->name }}</b><div class="small muted">{{ $g['supplier']->city }} · ★ {{ $g['supplier']->rating }}</div></td><td data-label="Items" class="num">{{ money($g['quote']['itemsSubtotal']) }}</td><td data-label="Delivery">{{ $g['supplier']->fulfillmentLabel() }}@if($g['supplier']->fulfillment !== 'pickup')<div class="small muted">{{ money($g['supplier']->delivery_fee) }}</div>@endif</td><td data-label="Payment">{!! collect($g['supplier']->arrangements)->map(fn ($a) => e(\App\Models\Payment::ARR_LABEL[$a]))->implode('<br>') !!}</td><td data-label="Deposit" class="num">{{ money($g['compareQuote']['deposit']) }}</td><td data-label="Availability">@if($g['check']['ok'])<span class="badge b-green">All dates OK</span>@else<span class="badge b-red">Conflicts</span>@endif</td></tr>
+        <tr><td data-label="Supplier"><b>{{ $g['supplier']->name }}</b><div class="small muted">{{ $g['supplier']->city }} · ★ {{ rating_text($g['supplier']) }}</div></td><td data-label="Items" class="num">{{ money($g['quote']['itemsSubtotal']) }}</td><td data-label="Delivery">{{ $g['supplier']->fulfillmentLabel() }}@if($g['delivery'])<div class="small muted">{{ $g['delivery']['ok'] ? 'Est. '.money($g['delivery']['fee']) : ($g['delivery']['code'] === 'no_city' ? $g['supplier']->deliverySummary() : 'Pickup only in your area') }}</div>@endif</td><td data-label="Payment">{!! collect($g['supplier']->arrangements)->map(fn ($a) => e(\App\Models\Payment::ARR_LABEL[$a]))->implode('<br>') !!}</td><td data-label="Deposit" class="num">{{ money($g['compareQuote']['deposit']) }}</td><td data-label="Availability">@if($g['check']['ok'])<span class="badge b-green">All dates OK</span>@else<span class="badge b-red">Conflicts</span>@endif</td></tr>
       @endforeach
     </tbody></table></div>
   </div>
@@ -30,6 +30,14 @@
             @if($g['check']['ok'])<a class="btn btn-primary btn-sm" href="{{ route('checkout', $s) }}">Request from this supplier</a>@else<button class="btn btn-primary btn-sm" disabled>Request from this supplier</button>@endif
           </div>
         </div>
+        @php($dq = $g['delivery'])
+        @if($dq)
+          <div class="small" style="margin:10px 18px 0">{{ icon('truck', 'width:14px;vertical-align:-2px') }}
+            @if($dq['ok'])Estimated delivery to <b>{{ $dq['cityLabel'] }}</b>: <b>{{ money($dq['fee']) }}</b>{{ $dq['waived'] ? ' (free over '.money($s->deliverySettings()['freeOver']).')' : '' }} <span class="muted">· final fee confirmed at checkout</span>
+            @elseif($dq['code'] === 'no_city')<a href="{{ route('profile') }}">Set your city</a> to see delivery fees. <span class="muted">{{ $s->deliverySummary() }}</span>
+            @else<span style="color:#B45309">{{ $s->fulfillment === 'both' ? 'Pickup only in your area' : 'Not deliverable to your area' }}</span> <span class="muted">— {{ $dq['error'] }}</span>@endif
+          </div>
+        @endif
         @if(! $g['check']['ok'])<div class="alert alert-danger" style="margin:12px 18px 0">{{ icon('alert') }}<div>Some dates exceed available stock. Lower the highlighted quantities or remove those dates.</div></div>@endif
         @foreach($g['lines'] as $l)
           @php($item = $l['type'] === 'package' ? inv()->package($l['ref_id']) : inv()->product($l['ref_id']))
@@ -53,7 +61,9 @@
     <h3>Summary</h3>
     @foreach($groups as $g)<div class="sum-line"><span>{{ $g['supplier']->name }}</span><span>{{ money($g['quote']['itemsSubtotal']) }}</span></div>@endforeach
     <div class="sum-line total"><span>Items total</span><span class="price">{{ money(collect($groups)->sum(fn ($g) => $g['quote']['itemsSubtotal'])) }}</span></div>
-    <p class="small muted">Delivery fees, deposits and payment schedules are shown at checkout. Each supplier receives its own request.</p>
+    @php($estDelivery = collect($groups)->sum(fn ($g) => ($g['delivery']['ok'] ?? false) ? $g['delivery']['fee'] : 0))
+    @if($estDelivery > 0)<div class="sum-line"><span class="muted">Est. delivery{{ $city ? ' to '.\App\Domain\Locations::name($city) : '' }}</span><span>{{ money($estDelivery) }}</span></div>@endif
+    <p class="small muted">{{ $city ? 'Delivery estimates use your saved city; you can change the address at checkout.' : 'Set your city in your profile to see delivery estimates.' }} Deposits and payment schedules are shown at checkout. Each supplier receives its own request.</p>
     <div class="alert alert-info">{{ icon('info') }}<div class="small">Items in your list are <b>not reserved</b>. Stock is only reserved when a supplier accepts your request.</div></div>
   </aside>
 </div>

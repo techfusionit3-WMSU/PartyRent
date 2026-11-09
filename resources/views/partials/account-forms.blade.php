@@ -4,7 +4,12 @@
   <div class="field @error('name') invalid @enderror"><label>Full name</label><input class="input" name="name" required minlength="3" value="{{ old('name', $u->name) }}">@error('name')<div class="error-text">{{ $message }}</div>@enderror</div>
   <div class="field @error('email') invalid @enderror"><label>Email address</label><input class="input" type="email" name="email" required value="{{ old('email', $u->email) }}">@error('email')<div class="error-text">{{ $message }}</div>@enderror</div>
   <div class="field @error('phone') invalid @enderror"><label>Contact number</label><input class="input" name="phone" required value="{{ old('phone', $u->phone) }}">@error('phone')<div class="error-text">{{ $message }}</div>@enderror</div>
-  <div class="field @error('address') invalid @enderror"><label>Address</label><input class="input" name="address" required value="{{ old('address', $u->address) }}">@error('address')<div class="error-text">{{ $message }}</div>@enderror</div>
+  @if($u->isStaff())
+    <div class="field @error('address') invalid @enderror"><label>Address</label><input class="input" name="address" required value="{{ old('address', $u->address) }}">@error('address')<div class="error-text">{{ $message }}</div>@enderror</div>
+  @else
+    <div class="label mb-1">Address <span class="muted small" style="text-transform:none;font-weight:400">· used for delivery estimates and as your default delivery address</span></div>
+    @include('partials.address-fields', ['key' => 'addr', 'value' => $u->address_parts ?? [], 'full' => true, 'required' => true])
+  @endif
   <button class="btn btn-primary">Save changes</button>
 </form>
 <form class="card" method="POST" action="{{ route('account.password') }}">

@@ -8,7 +8,8 @@ The business rules from the prototype are ported to the server, rule for rule, i
 | Class | What it owns |
 |---|---|
 | `Inventory` | Date-by-date availability: `Available = Total − Reserved − Damaged − Missing − Maintenance − SetAside`. Only accepted-or-later rentals reserve stock; pending requests are shown as conflicts. Packages expand into their items. |
-| `Pricing` | Tiered (quantity-based) prices per day, package value, delivery fee, supplier payment-policy amounts. |
+| `Pricing` | Tiered (quantity-based) prices per day, package value, delivery fees, supplier payment-policy amounts. |
+| `Locations` | Region → province → city/municipality lookup (PSGC-style codes, approximate centroids) used for structured addresses and distance pricing. |
 | `Finance` | Payment schedules (full / down / installment / reservation), balances, deposit and compensation tracking. Only **verified** payments count. |
 | `Rentals` | Every workflow: cart, submit, accept (stock re-checked inside a lock so two people can't double-book), decline, cancel per policy, fulfillment steps, return inspection, deposit settlement, completion, payments, overdue scan, supplier onboarding, catalog edits. Notifications and the audit trail are written here. |
 | `Ai` | PartyRent Assist: a rule-based English/Filipino interpreter, event planner, alternatives finder and chatbot. It only suggests from real listings and live stock, and never books, prices, accepts or verifies anything. |
@@ -39,12 +40,41 @@ Reset the demo data at any time with `php artisan migrate:fresh --seed`.
 | maria@demo.ph | Customer |
 | juan@demo.ph | Customer + approved Supplier (Happy Moments) — switch modes from the profile menu |
 | bea@demo.ph | Customer with a pending supplier application |
+| tess@demo.ph | Customer in Cebu City (try checking out from a Metro Manila shop: delivery is refused, pickup works) |
+| dodong@demo.ph | Supplier in Cebu City (Sugbo Fiesta Rentals, distance-based delivery) |
+| liezl@demo.ph · nestor@demo.ph · marites@demo.ph | Suppliers in Davao City, Pampanga and Iloilo City |
 | cashier@partyrent.ph | Cashier |
 | admin@partyrent.ph | Admin (all permissions) |
 | paolo.admin@partyrent.ph | Admin with restricted permissions |
 | super@partyrent.ph | Superadmin |
 
 The demo-account buttons on the login page are hidden when `APP_ENV=production`.
+
+## Delivery anywhere in the Philippines
+
+Addresses are structured (region → province → city/municipality + barangay, street, landmark), and each
+supplier sets its own delivery rules in **Shop Profile → Fulfillment**:
+
+- **By area**: a fee per region, province or city. The most specific match wins (city > province > region).
+- **By distance**: base fee + rate per km from the shop's city (haversine × 1.3 road factor), with free km and a maximum distance.
+- Options: free delivery above an items total, one-way vs round-trip fees, a separate trip per block of
+  non-consecutive dates, and per-product handling fees (per order or per unit) for bulky items.
+
+Places outside a supplier's coverage can't be delivered to (pickup still works). The full delivery
+breakdown is saved on each rental request, so later rate changes never alter a submitted quote.
+
+Suppliers also say where they operate from, and can drop a map pin (Leaflet + OpenStreetMap):
+
+| Type | Customers see | Pickup | Pin |
+|---|---|---|---|
+| Physical shop or warehouse | Full address, map pin, directions | Yes | Required when offering pickup |
+| Home-based | City only (a circle on the map) until the supplier accepts their pickup request | Yes | Required when offering pickup, shared only after acceptance |
+| No pickup location (online seller) | City only | No, delivery only | Optional; makes distance-based delivery more accurate |
+
+Distance-based delivery is measured from the pin when there is one, otherwise from the city centre.
+
+Geography lives in `database/data/locations-ph.php`, a flat list of PSGC-style rows that the complete
+PSGC file can replace without code changes. The currency is set in `config/partyrent.php`.
 
 ## Scheduled tasks
 

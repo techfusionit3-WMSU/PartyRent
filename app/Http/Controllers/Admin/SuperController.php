@@ -137,6 +137,7 @@ class SuperController extends Controller
             'phone' => 'nullable|string|max:40', 'role' => 'required|in:admin,cashier', 'password' => ['required', PasswordRule::min(10)],
         ]);
         $u = User::create(['name' => $data['name'], 'email' => strtolower($data['email']), 'phone' => $data['phone'] ?? '', 'address' => 'PartyRent HQ', 'roles' => [$data['role']], 'status' => 'active', 'password' => $data['password']]);
+        $u->forceFill(['email_verified_at' => now()])->save(); // staff accounts are vouched for by the superadmin
         Notifier::audit('Created '.$data['role'].' account', $u->name.' ('.$u->email.')');
 
         return back()->with('success', $u->name.' can now sign in as '.$data['role'].'. Share the temporary password securely and ask them to change it.');

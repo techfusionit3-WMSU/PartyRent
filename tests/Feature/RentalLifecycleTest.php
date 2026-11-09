@@ -115,7 +115,8 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame('completed', $r->fresh()->status);
 
         // 7. customer reviews
-        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/review", ['rating' => 5, 'comment' => 'Great tables!'])->assertSessionHas('success');
+        $key = array_key_first(\App\Domain\Reviews::reviewables($r->fresh()));
+        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/review", ['reviews' => [$key => ['rating' => 5, 'comment' => 'Great tables, very sturdy!']]])->assertSessionHas('success');
         $this->assertDatabaseHas('reviews', ['rental_request_id' => $r->id, 'rating' => 5]);
     }
 
@@ -140,13 +141,20 @@ class RentalLifecycleTest extends TestCase
         $jose = $this->user('jose@demo.ph');
         $this->actingAs($jose)->withSession(['mode' => 'customer'])->post('/start-selling', [
             'name' => 'Jose Sounds', 'description' => 'Sound systems and lights for parties in Marikina.', 'logo' => '🎵', 'contact_person' => 'Jose Garcia',
-            'phone' => '0923 555 0707', 'email' => 'jose@demo.ph', 'city' => 'Marikina', 'address' => '7 Sampaguita St., Marikina', 'hours' => 'Daily 8–6',
-            'fulfillment' => 'both', 'delivery_fee' => 300, 'methods' => ['cod'], 'arrangements' => ['full'], 'reservationFee' => 0, 'reservationCredited' => '1',
+            'phone' => '0923 555 0707', 'email' => 'jose@demo.ph', 'hours' => 'Daily 8–6',
+            'shop_addr' => ['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '137402000', 'barangay' => 'Marikina Heights', 'street' => '7 Sampaguita St.'],
+            'location_type' => 'home', 'lat' => 14.6520, 'lng' => 121.1100,
+            'fulfillment' => 'both', 'delivery' => ['mode' => 'zones', 'zones' => [['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '137402000', 'fee' => 300], ['regionCode' => '040000000', 'provinceCode' => '045800000', 'cityCode' => '', 'fee' => 650]]],
+            'methods' => ['cod'], 'arrangements' => ['full'], 'reservationFee' => 0, 'reservationCredited' => '1',
             'downType' => 'percent', 'downValue' => 0, 'installments' => 2, 'depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 2,
             'cancellation' => 'Free up to 2 days before.', 'returns' => 'Return clean.', 'conditions' => 'Renter pays for damage.',
         ])->assertSessionHas('success');
         $s = Supplier::where('name', 'Jose Sounds')->firstOrFail();
         $this->assertSame('pending', $s->status);
+        $this->assertSame('Marikina City', $s->city);
+        $this->assertSame('137402000', $s->city_code);
+        // zone rows: deepest place picked decides the level
+        $this->assertEquals([['level' => 'city', 'code' => '137402000', 'fee' => 300], ['level' => 'province', 'code' => '045800000', 'fee' => 650]], $s->delivery['zones']);
 
         $admin = $this->user('admin@partyrent.ph');
         $this->actingAs($admin)->withSession(['mode' => 'admin'])->post("/admin/applications/{$s->id}", ['decision' => 'approve'])->assertSessionHas('success');

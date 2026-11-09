@@ -214,6 +214,86 @@
     }
   }
 
+  /* ---------- cascading address selects ----------
+     <div data-address> with select[data-level=region|province|city] (see partials/address-fields).
+     Children lists come from /api/locations once per page; fires `pr:city` {cityCode} on change. */
+  let locPromise = null;
+  const locationTree = () => locPromise || (locPromise = api(window.PR.routes.locations).then(rows => {
+    const kids = {}, byCode = {};
+    rows.forEach(r => {
+      const p = r[3] || '', x = { code: r[0], name: r[1], lat: r[4] != null ? r[4] : null, lng: r[5] != null ? r[5] : null };
+      (kids[p] = kids[p] || []).push(x); byCode[x.code] = x;
+    });
+    Object.keys(kids).forEach(k => { if (k) kids[k].sort((a, b) => a.name.localeCompare(b.name)); });
+    return { kids, byCode };
+  }));
+  function AddressPicker(box) {
+    const sel = l => $('select[data-level="' + l + '"]', box);
+    const fill = (s, list) => {
+      const ph = s.options[0] ? s.options[0].text : '';
+      s.innerHTML = '<option value="">' + esc(ph) + '</option>' + list.map(x => '<option value="' + esc(x.code) + '">' + esc(x.name) + '</option>').join('');
+      s.value = ''; s.disabled = !list.length;
+    };
+    const emit = () => box.dispatchEvent(new CustomEvent('pr:city', { bubbles: true, detail: { cityCode: sel('city').value } }));
+    const load = fn => locationTree().then(fn).catch(() => toast('Could not load the list of places. Please reload the page.', 'error'));
+    sel('region').addEventListener('change', () => load(t => { fill(sel('province'), t.kids[sel('region').value] || []); fill(sel('city'), []); emit(); }));
+    sel('province').addEventListener('change', () => load(t => { fill(sel('city'), t.kids[sel('province').value] || []); emit(); }));
+    sel('city').addEventListener('change', emit);
+  }
+
+  /* ---------- map pins (Leaflet, loaded only on pages that include partials/leaflet) ---------- */
+  const mapBase = (el, opts) => {
+    const cfg = window.PR.map;
+    const map = window.L.map(el, Object.assign({ maxBounds: cfg.bounds, maxBoundsViscosity: 0.8, minZoom: 5 }, opts || {})).setView(cfg.center, cfg.zoom);
+    window.L.tileLayer(cfg.tiles, { attribution: cfg.attribution, maxZoom: 19 }).addTo(map);
+    // maps inside hidden wizard steps / tabs have no size until shown
+    if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe(el);
+    return map;
+  };
+  const noMap = el => { el.innerHTML = '<div class="small muted" style="padding:16px">Map unavailable right now.</div>'; };
+
+  /* <div data-map-picker data-city-from="shop_addr"> with [data-map], input[data-lat], input[data-lng],
+     [data-locate], [data-unpin], [data-pin-status]. Click / drag to pin; follows the city picker until pinned. */
+  function MapPicker(box) {
+    const el = $('[data-map]', box), latI = $('[data-lat]', box), lngI = $('[data-lng]', box), st = $('[data-pin-status]', box);
+    if (!window.L) return noMap(el);
+    const map = mapBase(el);
+    let marker = null;
+    const status = () => { if (st) st.textContent = marker ? 'Pinned at ' + (+latI.value).toFixed(5) + ', ' + (+lngI.value).toFixed(5) + '. Drag the pin to adjust.' : 'No pin yet. Click the map at your location, or use your current location.'; };
+    const changed = () => box.dispatchEvent(new CustomEvent('pr:pin', { bubbles: true }));
+    const set = (lat, lng, zoomIn) => {
+      latI.value = (+lat).toFixed(7); lngI.value = (+lng).toFixed(7);
+      if (!marker) {
+        marker = window.L.marker([lat, lng], { draggable: true, autoPan: true }).addTo(map);
+        marker.on('dragend', () => { const p = marker.getLatLng(); set(p.lat, p.lng, false); });
+      } else marker.setLatLng([lat, lng]);
+      if (zoomIn) map.setView([lat, lng], Math.max(map.getZoom(), 16));
+      status(); changed();
+    };
+    const centreOnCity = code => locationTree().then(t => { const c = t.byCode[code]; if (c && c.lat != null && !marker) map.setView([c.lat, c.lng], 13); }).catch(() => {});
+    map.on('click', e => set(e.latlng.lat, e.latlng.lng, false));
+    $('[data-locate]', box).addEventListener('click', () => {
+      if (!navigator.geolocation) return toast('Your browser cannot share its location. Click the map instead.', 'warn');
+      navigator.geolocation.getCurrentPosition(p => set(p.coords.latitude, p.coords.longitude, true),
+        err => toast('Could not get your location (' + err.message + '). Click the map instead.', 'warn'), { enableHighAccuracy: true, timeout: 10000 });
+    });
+    $('[data-unpin]', box).addEventListener('click', () => { if (marker) { map.removeLayer(marker); marker = null; } latI.value = ''; lngI.value = ''; status(); changed(); });
+    document.addEventListener('pr:city', e => { const a = e.target.closest && e.target.closest('[data-address]'); if (a && a.dataset.address === box.dataset.cityFrom && e.detail.cityCode) centreOnCity(e.detail.cityCode); });
+    if (latI.value && lngI.value) set(latI.value, lngI.value, true);
+    else if (box.dataset.city) centreOnCity(box.dataset.city);
+    status();
+  }
+
+  /* Read-only: <div data-map-view data-lat data-lng [data-radius="2000"]> — a circle hides the exact spot. */
+  function MapView(el) {
+    if (!window.L) return noMap(el);
+    const lat = +el.dataset.lat, lng = +el.dataset.lng, r = +el.dataset.radius || 0;
+    const map = mapBase(el, { scrollWheelZoom: false });
+    map.setView([lat, lng], r ? 12 : 16);
+    if (r) window.L.circle([lat, lng], { radius: r, color: '#E11D74', weight: 2, fillOpacity: 0.12 }).addTo(map);
+    else window.L.marker([lat, lng]).addTo(map);
+  }
+
   /* ---------- AI chat widget ---------- */
   function Chat() {
     const fab = $('.chat-fab'), panel = $('.chat-panel'); if (!fab || !panel) return;
@@ -241,6 +321,9 @@
   /* ---------- boot ---------- */
   document.addEventListener('DOMContentLoaded', () => {
     (window.PR && window.PR.flash || []).forEach(f => toast(f[1], f[0]));
+    $$('[data-address]').forEach(AddressPicker);
+    $$('[data-map-picker]').forEach(MapPicker);
+    $$('[data-map-view]').forEach(MapView);
     $$('[data-rentbox]').forEach(RentBox);
     $$('[data-scheduler]').forEach(el => { if (!el.closest('[data-rentbox]')) Scheduler(el); });
     $$('[data-calendar]').forEach(el => { if (!$('[data-rentbox]')) Calendar(el); });
@@ -251,5 +334,82 @@
     $$('[data-live-search]').forEach(inp => inp.addEventListener('input', () => { const q = inp.value.toLowerCase(); $$(inp.dataset.liveSearch + ' [data-search]').forEach(r => { r.style.display = r.dataset.search.toLowerCase().includes(q) ? '' : 'none'; }); }));
   });
 
-  window.PRUI = { toast, confirmDialog, openModal, closeModal, Scheduler, Calendar, api };
+  /* ---------- review photos/videos: lightbox ----------
+     Thumbnails: <button data-media-group="g" data-media-type="image|video" data-media-src="url"> */
+  function Lightbox() {
+    const lb = $('#mediaLightbox'); if (!lb) return;
+    const stage = $('.lb-stage', lb); const count = $('.lb-count', lb);
+    let items = []; let idx = 0;
+    const show = i => {
+      idx = (i + items.length) % items.length;
+      const it = items[idx];
+      stage.innerHTML = it.type === 'video'
+        ? '<video src="' + esc(it.src) + '" controls autoplay playsinline></video>'
+        : '<img src="' + esc(it.src) + '" alt="Customer photo ' + (idx + 1) + ' of ' + items.length + '">';
+      count.textContent = items.length > 1 ? (idx + 1) + ' / ' + items.length : '';
+      $$('.lb-nav', lb).forEach(b => { b.style.display = items.length > 1 ? '' : 'none'; });
+    };
+    const close = () => { stage.innerHTML = ''; closeModal(lb); lb.setAttribute('aria-hidden', 'true'); };
+    document.addEventListener('click', e => {
+      const t = e.target.closest('[data-media-src]');
+      if (t) {
+        e.preventDefault();
+        items = $$('[data-media-group="' + t.dataset.mediaGroup + '"]').map(b => ({ type: b.dataset.mediaType, src: b.dataset.mediaSrc }));
+        openModal(lb); lb.setAttribute('aria-hidden', 'false');
+        show(Math.max(0, $$('[data-media-group="' + t.dataset.mediaGroup + '"]').indexOf(t)));
+        $('.lb-close', lb).focus();
+        return;
+      }
+      if (lb.classList.contains('hidden')) return;
+      const nav = e.target.closest('[data-lb]');
+      if (nav) { show(idx + Number(nav.dataset.lb)); return; }
+      if (e.target.closest('[data-close]') || e.target === lb || e.target.classList.contains('lightbox-inner')) close();
+    }, true); // capture: runs before the generic modal handler, so a playing video is stopped on close
+    document.addEventListener('keydown', e => {
+      if (lb.classList.contains('hidden')) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowRight' && items.length > 1) show(idx + 1);
+      else if (e.key === 'ArrowLeft' && items.length > 1) show(idx - 1);
+    });
+    let x0 = null;
+    lb.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+    lb.addEventListener('touchend', e => { if (x0 === null || items.length < 2) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) show(idx + (dx < 0 ? 1 : -1)); x0 = null; });
+  }
+
+  /* ---------- review form: preview + check photos/videos before upload ---------- */
+  function MediaInputs(form) {
+    const urls = new WeakMap();
+    const render = box => {
+      const old = urls.get(box) || []; old.forEach(u => URL.revokeObjectURL(u));
+      const made = [];
+      box.innerHTML = $$('[data-media-input]', box.closest('fieldset')).flatMap(inp => Array.from(inp.files || []).map(f => {
+        const u = URL.createObjectURL(f); made.push(u);
+        return '<div class="mp">' + (inp.dataset.mediaInput === 'video' ? '<video src="' + u + '#t=0.1" muted playsinline preload="metadata"></video>' : '<img src="' + u + '" alt="">') + '<span>' + esc(f.name) + '</span></div>';
+      })).join('');
+      urls.set(box, made);
+    };
+    $$('[data-media-input]', form).forEach(inp => inp.addEventListener('change', () => {
+      const max = Number(inp.dataset.max || 1); const mb = Number(inp.dataset.maxMb || 5);
+      const files = Array.from(inp.files || []);
+      const isVideo = inp.dataset.mediaInput === 'video';
+      let err = '';
+      if (files.length > max) err = 'You can add up to ' + max + ' ' + (isVideo ? 'video' : 'photos') + ' per item.';
+      else if (files.some(f => f.size > mb * 1024 * 1024)) err = (isVideo ? 'The video' : 'Each photo') + ' must be ' + mb + ' MB or smaller.';
+      else if (files.some(f => !f.type.startsWith(isVideo ? 'video/' : 'image/'))) err = isVideo ? 'Please choose a video file (MP4, WEBM or MOV).' : 'Please choose image files (JPG, PNG or WEBP).';
+      if (err) { inp.value = ''; toast(err, 'error'); }
+      render($('[data-media-preview]', inp.closest('fieldset')));
+    }));
+    form.addEventListener('submit', e => {
+      const rated = $$('.star-input input:checked', form).length;
+      if (!rated) { e.preventDefault(); toast('Tap the stars to rate at least one item.', 'error'); return; }
+      const btn = $('button:not([type=button])', form); if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    Lightbox();
+    $$('[data-review-form]').forEach(MediaInputs);
+  });
+
+  window.PRUI = { toast, confirmDialog, openModal, closeModal, Scheduler, Calendar, AddressPicker, api, esc };
 })();

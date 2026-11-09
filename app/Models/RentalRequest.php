@@ -34,11 +34,18 @@ class RentalRequest extends Model
         return [
             'lines' => 'array',
             'pricing' => 'array',
+            'address_parts' => 'array',
             'fulfillment_log' => 'array',
             'inspection' => 'array',
             'overdue_flags' => 'array',
             'cancel_free' => 'boolean',
         ];
+    }
+
+    /** A home-based supplier's exact address/pin is shared with the customer only while an accepted pickup is under way. */
+    public function revealsPickupLocation(): bool
+    {
+        return $this->fulfillment === 'pickup' && in_array($this->status, \App\Domain\Finance::ACTIVE, true);
     }
 
     public function getRouteKeyName(): string
@@ -50,7 +57,7 @@ class RentalRequest extends Model
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function payments(): HasMany { return $this->hasMany(Payment::class)->orderBy('submitted_at')->orderBy('id'); }
     public function events(): HasMany { return $this->hasMany(RequestEvent::class)->orderBy('id'); }
-    public function review(): HasOne { return $this->hasOne(Review::class); }
+    public function reviews(): HasMany { return $this->hasMany(Review::class); }
 
     public static function statusLabel(string $s): string { return self::STATUS[$s][0] ?? $s; }
     public static function statusClass(string $s): string { return self::STATUS[$s][1] ?? 'b-gray'; }

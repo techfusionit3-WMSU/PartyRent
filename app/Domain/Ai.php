@@ -67,8 +67,6 @@ class Ai
 
     private const MONTHS = [['january', 'jan', 'enero'], ['february', 'feb', 'pebrero'], ['march', 'mar', 'marso'], ['april', 'apr', 'abril'], ['may', 'mayo'], ['june', 'jun', 'hunyo'], ['july', 'jul', 'hulyo'], ['august', 'aug', 'agosto'], ['september', 'sep', 'sept', 'setyembre'], ['october', 'oct', 'oktubre'], ['november', 'nov', 'nobyembre'], ['december', 'dec', 'disyembre']];
 
-    private const CITIES = ['Quezon City', 'Pasig City', 'Makati City', 'Taguig City', 'Manila', 'Caloocan City', 'Marikina', 'Parañaque', 'Mandaluyong', 'San Juan', 'Pasay'];
-
     private const DEFAULTS = [
         'Birthday' => ['chairs', 'tables', 'tableware', 'decorations', 'backdrops', 'sound'],
         'Debut' => ['chairs', 'tables', 'backdrops', 'lighting', 'decorations', 'sound'],
@@ -200,11 +198,8 @@ class Ai
             $out['start'] = $d['start'];
             $out['end'] = $d['end'];
         }
-        foreach (self::CITIES as $c) {
-            if (str_contains($t, mb_strtolower(str_replace(' City', '', $c)))) {
-                $out['city'] = $c;
-                break;
-            }
+        if ($c = Locations::guessCityInText($t)) { // any city/municipality in the locations dataset
+            $out['city'] = $c['name'];
         }
         if (preg_match('/(?:₱|php|p)\s?([\d,]+(?:\.\d+)?)\s*(k)?|([\d,]+)\s*(k)?\s*(?:pesos|piso|budget)|budget\s*(?:of|ay|na)?\s*₱?\s*([\d,]+)\s*(k)?/iu', $t, $bm)) {
             $num = (float) str_replace(',', '', $bm[1] ?: ($bm[3] ?? '') ?: ($bm[5] ?? ''));
@@ -259,8 +254,15 @@ class Ai
             $s -= 5;
         }
         $sup = $p->supplier;
-        if (! empty($f['city']) && $sup->city === $f['city']) {
-            $s += 1.5;
+        if (! empty($f['city'])) {
+            $cityCode = Locations::findCityByName($f['city'])['code'] ?? null;
+            if ($sup->city === $f['city']) {
+                $s += 1.5;
+            } elseif ($cityCode && $sup->deliversTo($cityCode)) {
+                $s += 1;
+            } elseif ($cityCode && ($f['delivery'] ?? null) !== false) {
+                $s -= 3; // can't deliver to the event city
+            }
         }
         if (($f['delivery'] ?? null) === true && $sup->fulfillment === 'pickup') {
             $s -= 4;
@@ -486,7 +488,7 @@ class Ai
         if (preg_match('/(deliver|delivery|pickup|pick up|hatid|kunin)/', $t)) {
             $show = $sup ? collect([$sup]) : Supplier::approved()->get();
 
-            return $reply($show->map(fn ($s) => '• <b>'.e($s->name).'</b> ('.e($s->city).'): '.e($s->fulfillmentLabel()).($s->fulfillment !== 'pickup' ? ', delivery fee '.money($s->delivery_fee) : ''))->implode('<br>'));
+            return $reply($show->map(fn ($s) => '• <b>'.e($s->name).'</b> ('.e($s->city).'): '.e($s->fulfillmentLabel()).($s->offersDelivery() ? ' — '.e($s->deliverySummary()) : ''))->implode('<br>'));
         }
         if (preg_match('/(cancel|cancellation|ikansela)/', $t)) {
             return $reply('You can cancel a <b>Pending</b> request anytime. For accepted requests, each supplier has a free-cancellation window (for example, 3 days before the rental). Open the request in '.self::a(route('rentals.index'), 'My Rentals').' and use <b>Cancel request</b> to see the exact policy before confirming.');

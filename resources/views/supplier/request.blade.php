@@ -64,7 +64,7 @@
   <aside class="stack">
     <div class="card"><h3>Customer</h3>
       <div class="row mb-1"><span class="avatar">{{ $c->initials() }}</span><div><b>{{ $c->name }}</b><div class="small muted">{{ $custHist->count() }} request(s) on PartyRent · {{ $custHist->where('status', 'completed')->count() }} completed</div></div></div>
-      <dl class="kv"><dt>Contact</dt><dd>{{ $r->contact_name }}<br>{{ $r->contact_phone }}<br>{{ $c->email }}</dd><dt>Fulfillment</dt><dd>{{ $r->fulfillment === 'delivery' ? 'Delivery to '.$r->address : 'Pickup at your shop' }}</dd><dt>Payment</dt><dd>{{ \App\Models\Payment::ARR_LABEL[$r->arrangement] }} · {{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}</dd></dl>
+      <dl class="kv"><dt>Contact</dt><dd>{{ $r->contact_name }}<br>{{ $r->contact_phone }}<br>{{ $c->email }}</dd><dt>Fulfillment</dt><dd>{{ $r->fulfillment === 'delivery' ? 'Delivery to '.$r->address : 'Pickup at your shop' }}@if($r->fulfillment === 'delivery' && ($dsnap = $r->pricing['delivery'] ?? null))<div class="small muted">Quoted {{ money($r->pricing['deliveryFee']) }}{{ $dsnap['distanceKm'] !== null ? ' · ~'.$dsnap['distanceKm'].' km' : '' }}{{ ($dsnap['trips'] ?? 1) > 1 ? ' · '.$dsnap['trips'].' trips' : '' }}</div>@endif</dd><dt>Payment</dt><dd>{{ \App\Models\Payment::ARR_LABEL[$r->arrangement] }} · {{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}</dd></dl>
       @if($r->instructions)<div class="alert alert-info mt-1">{{ icon('message') }}<div class="small"><b>Instructions:</b> {{ $r->instructions }}</div></div>@endif
     </div>
     <div class="card">@include('partials.payment-summary')</div>
@@ -109,6 +109,9 @@
   <form method="POST" action="{{ route('supplier.requests.inspection', $r) }}" enctype="multipart/form-data">@csrf<div class="modal-body">
     <p class="small muted">Count returned units and classify their condition. Damaged (major/total) and missing units are removed from available stock; minor damage goes to a 3-day maintenance hold. Fees are entered by you — never by AI.</p>
     <div class="field"><label>Return date</label><input class="input" type="date" name="returnDate" value="{{ today_iso() }}" required style="max-width:200px"></div>
+    @foreach(inv()->saleDemand($r->lines) as $spid => $sq)
+      <div class="card card-flat mb-1 soft" style="padding:10px 14px"><div class="row between"><b>{{ inv()->product($spid)?->name }}</b><span class="small">{{ $sq }} sold · <span class="badge b-gold plain">Consumed — not returned</span></span></div></div>
+    @endforeach
     @foreach($peak as $pid => $q)
       <div class="card card-flat mb-1" style="padding:14px"><div class="row between mb-1"><b>{{ inv()->product($pid)->name }}</b><span class="small muted">Released (peak day): {{ $q }}</span></div>
         <div class="form-grid" style="grid-template-columns:repeat(6,minmax(0,1fr))">@foreach([['returned', 'Returned', $q], ['good', 'Good', $q], ['minor', 'Minor damage', 0], ['major', 'Major damage', 0], ['total', 'Completely damaged', 0], ['missing', 'Missing', 0]] as [$k, $l, $v])<div class="field"><label class="small">{{ $l }}</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][{{ $k }}]" value="{{ $v }}"></div>@endforeach</div>

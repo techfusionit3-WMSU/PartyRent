@@ -12,7 +12,7 @@
   <div data-rentbox data-type="item" data-max-days="{{ setting('maxRentalDays', 30) }}">
     <span class="badge b-purple plain">{{ $cat->name }}</span> <span class="badge b-gray plain">Condition: {{ $p->condition }}</span>
     <h1 class="mt-1">{{ $p->name }}</h1>
-    <div class="row wrap small muted"><span class="stars">{{ stars($p->rating) }}</span><span>{{ $p->rating }} · {{ $reviews->count() }} reviews · {{ $p->rent_count }} rentals</span></div>
+    <div class="row wrap small muted">@if($reviews->count())<span class="stars">{{ stars($p->rating) }}</span><a href="#reviews">{{ number_format($p->rating, 1) }} · {{ $reviews->count() }} {{ $reviews->count() === 1 ? 'review' : 'reviews' }}</a>@else<span>No reviews yet</span>@endif<span>· {{ $p->rent_count }} rentals</span></div>
     <div class="mt-2"><span class="price-lg">{{ money($p->basePrice()) }}</span> <span class="muted">/ {{ $p->unit }}</span></div>
     @if(count($p->tiers) > 1)
       <div class="mt-1"><div class="small strong mb-1">Quantity-based pricing (per day)</div><div class="tiers">
@@ -47,10 +47,19 @@
     </form>
 
     <div class="card mt-2">
-      <div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · ★ {{ $sup->rating }}</div></div><a class="btn btn-sm" href="{{ route('suppliers.show', $sup) }}">View Supplier Profile</a></div>
+      <div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }}</div></div><a class="btn btn-sm" href="{{ route('suppliers.show', $sup) }}">View Supplier Profile</a></div>
       <hr>
       <dl class="kv">
-        <dt>Delivery / pickup</dt><dd>{{ $sup->fulfillmentLabel() }}{{ ! $p->delivery && $sup->fulfillment !== 'pickup' ? ' (this item: pickup only)' : '' }}{{ $sup->fulfillment !== 'pickup' ? ' · delivery fee '.money($sup->delivery_fee) : '' }}</dd>
+        @php($myCity = customer_city())
+        <dt>Delivery / pickup</dt><dd>{{ $sup->fulfillmentLabel() }}{{ ! $p->delivery && $sup->offersDelivery() ? ' (this item: pickup only)' : '' }}{{ $sup->offersDelivery() ? ' · '.$sup->deliverySummary() : '' }}
+          @if($myCity && $sup->offersDelivery() && $p->delivery)
+            @php($reach = $sup->deliveryTo($myCity))
+            <div class="small" style="color:{{ $reach['ok'] ? 'var(--green)' : '#B45309' }}">{{ $reach['ok'] ? 'Delivers to '.\App\Domain\Locations::name($myCity).' from '.money($reach['fee']) : ($sup->fulfillment === 'both' ? 'Pickup only in your area' : $reach['error']) }}</div>
+          @elseif(! $myCity && $sup->offersDelivery())
+            <div class="small muted">@auth<a href="{{ route('profile') }}">Set your city</a>@else Log in and set your city @endauth to see the delivery fee.</div>
+          @endif
+        </dd>
+        @if($p->handling_fee > 0)<dt>Handling</dt><dd>{{ money($p->handling_fee) }} {{ $p->handling_per === 'unit' ? 'per unit' : 'per order' }} when delivered</dd>@endif
         <dt>Payment arrangements</dt><dd>{{ collect($sup->arrangements)->map(fn ($a) => \App\Models\Payment::ARR_LABEL[$a])->implode(', ') }}</dd>
         <dt>Payment methods</dt><dd>{{ collect($sup->methods)->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }}</dd>
         <dt>Security deposit</dt><dd>{{ $sup->depositLabel() }} (refundable)</dd>
@@ -61,11 +70,7 @@
   </div>
 </div>
 
-@if($reviews->isNotEmpty())
-<section class="section"><h2>Reviews</h2><div class="grid grid-2">
-  @foreach($reviews as $rv)<div class="card card-flat"><div class="row between"><b>{{ $rv->customer->firstName() }}</b><span class="stars">{{ stars($rv->rating) }}</span></div><p class="mb-0 mt-1">{{ $rv->comment }}</p></div>@endforeach
-</div></section>
-@endif
+<div class="section">@include('partials.reviews-block', ['reviews' => $reviews, 'showItem' => false, 'title' => 'Customer reviews', 'emptyText' => 'Be the first: rent this item and share how it went — photos and videos welcome.'])</div>
 @if($related->isNotEmpty())@include('market._section', ['title' => 'More from '.$sup->name, 'items' => $related])@endif
 @if($similar->isNotEmpty())@include('market._section', ['title' => 'Similar items from other shops', 'items' => $similar])@endif
 @endsection

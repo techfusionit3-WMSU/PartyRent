@@ -19,11 +19,47 @@ class Product extends Model
             'themes' => 'array',
             'events' => 'array',
             'images' => 'array',
-            'rating' => 'float',
+            'rating' => 'float', 'review_count' => 'integer',
             'delivery' => 'boolean',
             'pickup' => 'boolean',
+            'handling_fee' => 'float',
+            'perishable' => 'boolean',
+            'lead_days' => 'integer',
+            'shelf_life_days' => 'integer',
+            'low_stock_at' => 'integer',
         ];
     }
+
+    /** Units a sale item can be sold in. Rental items use "x / day" units. */
+    public const SALE_UNITS = ['pc', 'set', 'bundle', 'bouquet', 'pack', 'box', 'bag', 'kg', 'sack', 'tray'];
+
+    /** Categories whose new listings default to "For sale". */
+    public const SALE_CATEGORIES = ['catering', 'flowers', 'favors', 'balloons'];
+
+    /** Consumable: sold once, never returned, stock is not date-based. */
+    public function isSale(): bool
+    {
+        return $this->listing_type === 'sale';
+    }
+
+    /** For sale items `total_stock` is the stock on hand. */
+    public function stockOnHand(): int
+    {
+        return (int) $this->total_stock;
+    }
+
+    public function isLowStock(): bool
+    {
+        return $this->isSale() && $this->low_stock_at !== null && $this->stockOnHand() <= $this->low_stock_at;
+    }
+
+    /** "per day" for rentals, "per pc" for sale items. */
+    public function priceUnitLabel(): string
+    {
+        return $this->isSale() ? 'per '.$this->unitWord() : 'per '.$this->unitWord().' / day';
+    }
+
+    public function movements(): HasMany { return $this->hasMany(StockMovement::class)->latest('id'); }
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function category(): BelongsTo { return $this->belongsTo(Category::class); }

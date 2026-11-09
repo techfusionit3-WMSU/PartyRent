@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\RentalRequest;
 use App\Models\RequestEvent;
+use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -84,11 +85,49 @@ class Rentals
         return CartLine::where('user_id', $u->id)->where('supplier_id', $supplierId)->orderBy('id')->get()->map->toLine()->all();
     }
 
-    /** Add a line, merging with an existing line for the same item. Checks stock combined with the supplier's other cart lines. */
-    public static function addToCart(User $u, string $type, int $refId, array $days): array
+    /** Days of notice a line needs: a sale item's lead time, or the longest among a package's sale items. */
+    public static function leadDays(array $line): int
+    {
+        if ($line['type'] === 'package') {
+            $def = inv()->lineDef($line);
+
+            return $def ? Packages::leadDays($def, $line['sel'] ?? null) : 0;
+        }
+        $p = inv()->product($line['ref_id']);
+
+        return $p && $p->isSale() ? (int) $p->lead_days : 0;
+    }
+
+    /** Error when a line has a date inside its lead time ("Order at least N days before your event"). */
+    public static function leadTimeError(array $line): ?string
+    {
+        $lead = self::leadDays($line);
+        $dates = array_keys(array_filter(array_map('intval', $line['days'] ?? [])));
+        if ($lead > 0 && $dates && min($dates) < add_days(today_iso(), $lead)) {
+            return inv()->itemName($line).': order at least '.$lead.' day'.($lead > 1 ? 's' : '').' before your event (earliest '.fmt_date(add_days(today_iso(), $lead)).').';
+        }
+
+        return null;
+    }
+
+    /** Message for a failed stock check. */
+    private static function stockError(array $chk, bool $withCart): string
+    {
+        $bad = implode(', ', array_map(fn ($b) => ! empty($b['sale'])
+            ? (inv()->product($b['product_id'])?->name ?? 'Item').' (only '.$b['available'].' in stock)'
+            : fmt_date($b['date']).' (available '.$b['available'].')', $chk['bad']));
+
+        return 'Not enough stock: '.$bad.($withCart ? ', including items already in your Rental List.' : '.');
+    }
+
+    /**
+     * Add a line, merging with an existing line for the same item (a package only merges when the
+     * customer picked the same options). Checks stock combined with the supplier's other cart lines.
+     */
+    public static function addToCart(User $u, string $type, int $refId, array $days, ?array $sel = null): array
     {
         $item = $type === 'package' ? Package::find($refId) : Product::find($refId);
-        if (! $item || ($type === 'package' ? ! $item->active : $item->status !== 'published')) {
+        if (! $item || ($type === 'package' ? ! $item->active || $item->is_draft : $item->status !== 'published')) {
             return self::fail('This listing is not available.');
         }
         if ($item->supplier->owner_id === $u->id) {
@@ -104,14 +143,18 @@ class Rentals
         if (count($days) > (int) Settings::get('maxRentalDays', 30)) {
             return self::fail('Maximum of '.Settings::get('maxRentalDays', 30).' rental dates per item.');
         }
-        $existing = self::cartLinesFor($u, $item->supplier_id);
-        $chk = inv()->check(array_merge($existing, [['id' => '__new', 'type' => $type, 'ref_id' => $refId, 'days' => $days]]));
-        if (! $chk['ok']) {
-            $bad = implode(', ', array_map(fn ($b) => fmt_date($b['date']).' (available '.$b['available'].')', $chk['bad']));
-
-            return self::fail('Not enough stock on '.$bad.($existing ? ', including items already in your Rental List.' : '.'));
+        $sel = $type === 'package' ? Packages::cleanSel(Packages::def($item), $sel) : null;
+        $new = ['id' => '__new', 'type' => $type, 'ref_id' => $refId, 'days' => $days] + ($sel ? ['sel' => $sel] : []);
+        if ($e = self::leadTimeError($new)) {
+            return self::fail($e);
         }
-        $line = CartLine::where('user_id', $u->id)->where('type', $type)->where('ref_id', $refId)->first();
+        $existing = self::cartLinesFor($u, $item->supplier_id);
+        $chk = inv()->check(array_merge($existing, [$new]));
+        if (! $chk['ok']) {
+            return self::fail(self::stockError($chk, (bool) $existing));
+        }
+        $line = CartLine::where('user_id', $u->id)->where('type', $type)->where('ref_id', $refId)->get()
+            ->first(fn ($c) => $type !== 'package' || Packages::cleanSel(Packages::def($item), $c->sel) == $sel);
         if ($line) {
             $merged = $line->days;
             foreach ($days as $d => $q) {
@@ -120,7 +163,7 @@ class Rentals
             ksort($merged);
             $line->update(['days' => $merged]);
         } else {
-            CartLine::create(['user_id' => $u->id, 'supplier_id' => $item->supplier_id, 'type' => $type, 'ref_id' => $refId, 'days' => $days]);
+            CartLine::create(['user_id' => $u->id, 'supplier_id' => $item->supplier_id, 'type' => $type, 'ref_id' => $refId, 'days' => $days, 'sel' => $sel]);
         }
 
         return self::ok(['name' => $item->name, 'supplier_id' => $item->supplier_id]);
@@ -142,6 +185,9 @@ class Rentals
             return self::fail('Maximum of '.Settings::get('maxRentalDays', 30).' rental dates per item.');
         }
         ksort($clean);
+        if ($e = self::leadTimeError(array_merge($line->toLine(), ['days' => $clean]))) {
+            return self::fail($e);
+        }
         $line->update(['days' => $clean]);
 
         return self::ok();
@@ -169,11 +215,22 @@ class Rentals
         foreach (self::cartLinesFor($u, $s->id) as $l) {
             $days = self::cleanDays($l['days']);
             if ($days) {
-                $lines[] = ['id' => 'l'.$i++, 'type' => $l['type'], 'ref_id' => $l['ref_id'], 'days' => $days];
+                $line = ['id' => 'l'.$i++, 'type' => $l['type'], 'ref_id' => $l['ref_id'], 'days' => $days];
+                if ($l['type'] === 'package' && ($k = Package::find($l['ref_id']))) {
+                    // freeze the package as booked: later edits by the supplier never change this request
+                    $line['snap'] = Packages::snapshot($k);
+                    $line['sel'] = Packages::cleanSel(Packages::def($k), $l['sel'] ?? null);
+                }
+                $lines[] = $line;
             }
         }
         if (! $lines) {
             return self::fail('There are no items for this supplier in your rental list.');
+        }
+        foreach ($lines as $l) {
+            if ($e = self::leadTimeError($l)) {
+                return self::fail($e.' Please update the date in your Rental List.');
+            }
         }
         if ($s->owner_id === $u->id) {
             return self::fail('You cannot rent from your own shop.');
@@ -193,14 +250,23 @@ class Rentals
         if ($form['fulfillment'] === 'delivery' && $s->fulfillment === 'pickup') {
             return self::fail($s->name.' offers pickup only.');
         }
-        if ($form['fulfillment'] === 'pickup' && $s->fulfillment === 'delivery') {
+        if ($form['fulfillment'] === 'pickup' && ! $s->offersPickup()) {
             return self::fail($s->name.' offers delivery only.');
         }
         if (! in_array($form['arrangement'], $s->arrangements, true) || ! in_array($form['method'], $s->methods, true)) {
             return self::fail('Choose a payment arrangement and method this supplier accepts.');
         }
+        $addr = $form['fulfillment'] === 'delivery' ? Locations::cleanAddress($form['addr'] ?? []) : null;
+        if ($addr && ! $addr['cityCode']) {
+            return self::fail('Choose the delivery region, province and city.');
+        }
+        // The full delivery breakdown is frozen into the request; later rate changes never touch it.
+        $quote = Pricing::quote($lines, $s, $form['fulfillment'], $form['arrangement'], $addr['cityCode'] ?? null);
+        if ($addr && ! $quote['delivery']['ok']) {
+            return self::fail($quote['delivery']['error'].' Choose pickup instead, or a different address.');
+        }
 
-        $r = DB::transaction(function () use ($u, $s, $form, $lines, $allDates) {
+        $r = DB::transaction(function () use ($u, $s, $form, $lines, $allDates, $addr, $quote) {
             $r = new RentalRequest([
                 'code' => 'PR-'.str_pad((string) Settings::nextSeq('request'), 4, '0', STR_PAD_LEFT),
                 'customer_id' => $u->id, 'supplier_id' => $s->id,
@@ -208,14 +274,15 @@ class Rentals
                 'event_date' => $form['eventDate'] ?: $allDates[0],
                 'start_date' => $allDates[0], 'end_date' => end($allDates),
                 'fulfillment' => $form['fulfillment'],
-                'address' => $form['fulfillment'] === 'delivery' ? ($form['address'] ?? '') : '',
+                'address' => $addr ? Locations::formatAddress($addr) : '',
+                'address_parts' => $addr, 'city_code' => $addr['cityCode'] ?? null,
                 'contact_name' => $form['contactName'], 'contact_phone' => $form['contactPhone'],
                 'instructions' => $form['instructions'] ?? '',
                 'lines' => $lines, 'arrangement' => $form['arrangement'], 'method' => $form['method'],
                 'status' => 'pending', 'supplier_notes' => '',
             ]);
             $r->setRelation('supplier', $s);
-            $r->pricing = Pricing::quoteRequest($r);
+            $r->pricing = $quote;
             $r->save();
             self::history($r, 'pending', 'Request submitted');
             CartLine::where('user_id', $u->id)->where('supplier_id', $s->id)->delete();
@@ -242,10 +309,14 @@ class Rentals
         if (in_array($r->status, ['accepted', 'in_progress'], true)) {
             $deadline = add_days($r->start_date, -$days);
             $free = today_iso() <= $deadline;
+            // Consumables are refundable only until the supplier starts preparing the order.
+            $sales = (float) ($r->pricing['salesSubtotal'] ?? 0);
+            $saleLocked = $sales > 0 && $r->status === 'in_progress';
+            $saleNote = $saleLocked ? ' Items for sale ('.money($sales).') are no longer refundable because the supplier has started preparing them.' : '';
 
-            return ['allowed' => true, 'free' => $free, 'deadline' => $deadline, 'note' => $free
+            return ['allowed' => true, 'free' => $free && ! $saleLocked, 'deadline' => $deadline, 'nonRefundable' => $saleLocked ? $sales : 0.0, 'note' => ($free
                 ? 'Free cancellation until '.fmt_date($deadline).'. Verified payments will be refunded by the supplier.'
-                : 'The free cancellation period ended on '.fmt_date($deadline).'. Per policy: '.$s->pol('cancellation', '')];
+                : 'The free cancellation period ended on '.fmt_date($deadline).'. Per policy: '.$s->pol('cancellation', '')).$saleNote];
         }
 
         return ['allowed' => false, 'free' => false, 'note' => 'Items have already been released or the rental is closed, so it can no longer be cancelled online. Please contact the supplier.'];
@@ -360,9 +431,19 @@ class Rentals
             }
             $log = array_merge($log, ['releaseDate' => $data['releaseDate'] ?? today_iso(), 'releaseQty' => $data['releaseQty'] ?? '', 'receivedBy' => $data['receivedBy'], 'method' => $r->fulfillment]);
         }
-        $r->update(['status' => $to, 'fulfillment_log' => $log ?: null]);
-        self::history($r, $to, $data['note'] ?? null);
+        $low = [];
+        DB::transaction(function () use ($r, $to, $data, &$log, &$low) {
+            if ($to === 'ongoing' && empty($log['saleDeducted'])) {
+                $low = self::deductSaleStock($r);
+                $log['saleDeducted'] = true;
+            }
+            $r->update(['status' => $to, 'fulfillment_log' => $log ?: null]);
+            self::history($r, $to, $data['note'] ?? null);
+        });
         self::changed($r);
+        foreach ($low as $p) {
+            self::lowStockAlert($p);
+        }
         $msgs = [
             'in_progress' => 'is being prepared',
             'ready_pickup' => 'is ready for pickup at '.$r->supplier->address,
@@ -376,6 +457,56 @@ class Rentals
         }
 
         return self::ok();
+    }
+
+    /**
+     * Released to the customer: consumables are gone for good. Deduct them from stock on hand and log
+     * a 'sold' movement for each. Runs once per request. Returns products that dropped to low stock.
+     */
+    private static function deductSaleStock(RentalRequest $r): array
+    {
+        $low = [];
+        foreach (inv()->saleDemand($r->lines ?? []) as $pid => $qty) {
+            $p = Product::lockForUpdate()->find($pid);
+            if (! $p || ! $p->isSale()) {
+                continue;
+            }
+            $wasLow = $p->isLowStock();
+            $p->total_stock = max(0, $p->stockOnHand() - $qty);
+            $p->save();
+            StockMovement::create(['product_id' => $p->id, 'qty' => -$qty, 'type' => 'sold', 'rental_request_id' => $r->id, 'user_id' => auth()->id(), 'balance' => $p->stockOnHand(), 'note' => 'Released with '.$r->code, 'created_at' => now()]);
+            if (! $wasLow && $p->isLowStock()) {
+                $low[] = $p;
+            }
+        }
+
+        return $low;
+    }
+
+    private static function lowStockAlert(Product $p): void
+    {
+        Notifier::notify($p->supplier->owner_id, 'supplier', 'Low stock: '.$p->name, 'Only '.$p->stockOnHand().' '.$p->unitWord().' left (alert at '.$p->low_stock_at.'). Restock it from Inventory so new orders can be accepted.', self::link('supplier.inventory'));
+    }
+
+    /** Supplier adds stock on hand to a sale item. */
+    public static function restock(Product $p, int $qty, string $note = ''): array
+    {
+        if (! $p->isSale()) {
+            return self::fail('Only items for sale are restocked. Change a rental item\'s total stock in the product form.');
+        }
+        if ($qty < 1 || $qty > 100000) {
+            return self::fail('Enter a quantity from 1 to 100,000.');
+        }
+        DB::transaction(function () use ($p, $qty, $note) {
+            $p->refresh();
+            $p->total_stock = $p->stockOnHand() + $qty;
+            $p->save();
+            StockMovement::create(['product_id' => $p->id, 'qty' => $qty, 'type' => 'restock', 'user_id' => auth()->id(), 'balance' => $p->stockOnHand(), 'note' => $note, 'created_at' => now()]);
+        });
+        inv()->flush();
+        Notifier::audit('Restocked item', $p->name.' +'.$qty.' → '.$p->stockOnHand());
+
+        return self::ok(['product' => $p]);
     }
 
     /** Peak released quantity per product across the rental dates. */
@@ -779,12 +910,27 @@ class Rentals
             if ($p->supplier_id !== $s->id) {
                 return self::fail('You can only edit your own products.');
             }
-            $conflicts = inv()->stockChangeConflicts($p->id, (int) $data['total_stock']);
-            if ($conflicts) {
-                return self::fail('Total stock cannot be reduced to '.$data['total_stock'].'. Accepted reservations need '.implode(', ', array_map(fn ($c) => $c['reserved'].' on '.fmt_date($c['date']), $conflicts)).'.');
+            $type = $data['listing_type'] ?? $p->listing_type;
+            if ($type !== $p->listing_type && (inv()->reservedDates($p->id) || inv()->committedSale($p->id) || inv()->pendingSale($p->id))) {
+                return self::fail('This item has open bookings, so it cannot switch between rent and sale until they are completed.');
+            }
+            if ($type === 'sale') {
+                $committed = inv()->committedSale($p->id);
+                if ((int) $data['total_stock'] < $committed) {
+                    return self::fail('Stock on hand cannot go below '.$committed.': accepted orders still need that many.');
+                }
+            } else {
+                $conflicts = inv()->stockChangeConflicts($p->id, (int) $data['total_stock']);
+                if ($conflicts) {
+                    return self::fail('Total stock cannot be reduced to '.$data['total_stock'].'. Accepted reservations need '.implode(', ', array_map(fn ($c) => $c['reserved'].' on '.fmt_date($c['date']), $conflicts)).'.');
+                }
             }
             $priceChanged = json_encode($p->tiers) !== json_encode($tiers);
+            $stockDelta = $type === 'sale' && $p->isSale() ? (int) $data['total_stock'] - $p->stockOnHand() : 0;
             $p->update($data);
+            if ($stockDelta) {
+                StockMovement::create(['product_id' => $p->id, 'qty' => $stockDelta, 'type' => 'adjust', 'user_id' => auth()->id(), 'balance' => $p->stockOnHand(), 'note' => 'Edited stock on hand', 'created_at' => now()]);
+            }
             inv()->flush();
             if ($priceChanged) {
                 Notifier::audit('Updated product pricing', $p->name.' · '.implode(', ', array_map(fn ($t) => $t['min'].($t['max'] ? '–'.$t['max'] : '+').': '.money($t['price']), $tiers)));
@@ -836,38 +982,83 @@ class Rentals
         return self::ok();
     }
 
+    /**
+     * Create / update a package from the editor. $data: name, emoji, description, conditions, events,
+     * images, pricing, components, minGuests, maxGuests, draft (bool). See App\Domain\Packages.
+     * Booked requests keep their own snapshot, so editing is always safe.
+     */
     public static function savePackage(Supplier $s, array $data, ?Package $k = null): array
     {
-        if (empty($data['name'])) {
+        if (trim((string) ($data['name'] ?? '')) === '') {
             return self::fail('Package name is required.');
         }
-        $items = array_values(array_filter($data['items'] ?? [], fn ($it) => ! empty($it['product_id'])));
-        if (! $items) {
-            return self::fail('Add at least one item to the package.');
+        if ($k && $k->supplier_id !== $s->id) {
+            return self::fail('Not your package.');
         }
-        $own = Product::whereIn('id', array_column($items, 'product_id'))->where('supplier_id', $s->id)->pluck('id')->all();
-        foreach ($items as $it) {
-            if (! in_array((int) $it['product_id'], $own, true)) {
-                return self::fail('Packages can only contain your own items.');
-            }
-            if (! ((int) $it['qty'] > 0)) {
-                return self::fail('Every package item needs a quantity of at least 1.');
-            }
+        $v = Packages::validate($s, $data);
+        if (! $v['ok']) {
+            return self::fail($v['error']);
         }
-        if (! ((float) ($data['price'] ?? 0) > 0)) {
-            return self::fail('Set a package price.');
+        $def = $v['def'];
+        $attrs = [
+            'name' => trim($data['name']), 'emoji' => ($data['emoji'] ?? '') ?: '🎉', 'description' => (string) ($data['description'] ?? ''),
+            'conditions' => (string) ($data['conditions'] ?? ''), 'events' => array_values($data['events'] ?? []),
+            'components' => $def['components'], 'pricing' => $def['pricing'], 'min_guests' => $def['minGuests'], 'max_guests' => $def['maxGuests'],
+            'is_draft' => (bool) ($data['draft'] ?? false),
+        ];
+        if (isset($data['images'])) {
+            $attrs['images'] = $data['images'];
         }
-        $data['items'] = array_map(fn ($it) => ['product_id' => (int) $it['product_id'], 'qty' => (int) $it['qty']], $items);
         if ($k) {
-            if ($k->supplier_id !== $s->id) {
-                return self::fail('Not your package.');
+            if (! $attrs['is_draft'] && $k->is_draft) {
+                $attrs['active'] = true; // publishing a draft
             }
-            $k->update($data);
+            $k->update($attrs);
         } else {
-            $k = Package::create(array_merge(['active' => true, 'images' => []], $data, ['supplier_id' => $s->id]));
+            $attrs['active'] = ! $attrs['is_draft'];
+            $attrs['sort'] = (int) Package::where('supplier_id', $s->id)->max('sort') + 1;
+            $k = Package::create(array_merge(['images' => []], $attrs, ['supplier_id' => $s->id]));
         }
         inv()->flush();
+        Notifier::audit($attrs['is_draft'] ? 'Saved package draft' : 'Saved package', $k->name.' · '.money($k->price));
 
         return self::ok(['package' => $k]);
+    }
+
+    public static function duplicatePackage(Package $k): Package
+    {
+        $copy = $k->replicate(['created_at', 'updated_at']);
+        $copy->name = mb_substr('Copy of '.$k->name, 0, 120);
+        $copy->is_draft = true;
+        $copy->active = false;
+        $copy->sort = (int) Package::where('supplier_id', $k->supplier_id)->max('sort') + 1;
+        $copy->save();
+
+        return $copy;
+    }
+
+    /** Move a package one place up / down in the supplier's list (renumbers the sort order). */
+    public static function movePackage(Package $k, string $dir): void
+    {
+        $list = Package::where('supplier_id', $k->supplier_id)->orderBy('sort')->orderBy('id')->get()->values();
+        $i = $list->search(fn ($x) => $x->id === $k->id);
+        $j = $dir === 'up' ? $i - 1 : $i + 1;
+        if ($i === false || $j < 0 || $j >= $list->count()) {
+            return;
+        }
+        $ids = $list->pluck('id')->all();
+        [$ids[$i], $ids[$j]] = [$ids[$j], $ids[$i]];
+        foreach ($ids as $n => $id) {
+            Package::whereKey($id)->update(['sort' => $n]);
+        }
+    }
+
+    /** Removing a package never touches booked requests (they hold a snapshot); rental-list lines are dropped. */
+    public static function deletePackage(Package $k): void
+    {
+        CartLine::where('type', 'package')->where('ref_id', $k->id)->delete();
+        Notifier::audit('Deleted package', $k->name);
+        $k->delete();
+        inv()->flush();
     }
 }

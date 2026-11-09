@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Locations;
 use App\Domain\Pricing;
 use App\Domain\Rentals;
+use App\Models\Supplier;
+use App\Support\DeliveryInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -66,6 +69,35 @@ class ApiController extends Controller
             'unitWord' => $data['type'] === 'package' ? 'package' : $item->unitWord(),
             'minAvailable' => $data['type'] === 'item' && $days ? inv()->minAvailable($item->id, array_keys($days)) : null,
             'bad' => $bad, 'maxDays' => (int) setting('maxRentalDays', 30), 'today' => $today,
+        ]);
+    }
+
+    /** Region / province / city list for the cascading address selects. Static data, so cache it in the browser. */
+    public function locations(): JsonResponse
+    {
+        return response()->json(Locations::forClient())->setPublic()->setMaxAge(86400);
+    }
+
+    /** Live preview while a supplier edits delivery settings: what would a customer in `city` pay (no items, one trip)? */
+    public function deliveryPreview(Request $request): JsonResponse
+    {
+        $v = $request->validate(array_merge(DeliveryInput::rules(), [
+            'city' => 'required|string|max:12', 'fulfillment' => 'nullable|in:delivery,pickup,both', 'shop_addr' => 'nullable|array', 'shop_addr.cityCode' => 'nullable|string|max:12',
+        ]));
+        $shopCity = $v['shop_addr']['cityCode'] ?? null;
+        $sup = new Supplier([
+            'name' => 'This shop', 'fulfillment' => $v['fulfillment'] ?? 'both',
+            'city_code' => Locations::isCity($shopCity) ? $shopCity : null, 'city' => Locations::name($shopCity) ?: 'your shop city',
+        ]);
+        $q = Pricing::deliveryQuote($sup, [], 0, $v['city'], DeliveryInput::toSettings($v['delivery'] ?? [], $sup->fulfillment, false));
+        if (! $q['ok']) {
+            return response()->json(['ok' => false, 'error' => $q['error']]);
+        }
+        $detail = collect($q['breakdown'])->map(fn ($b) => $b['label'].': '.money($b['amount']))->implode(' · ');
+
+        return response()->json([
+            'ok' => true, 'fee' => $q['fee'], 'text' => 'Delivery to '.$q['cityLabel'].': '.money($q['fee']).($q['distanceKm'] !== null ? ' (~'.$q['distanceKm'].' km)' : ''),
+            'detail' => count($q['breakdown']) > 1 ? $detail : '',
         ]);
     }
 

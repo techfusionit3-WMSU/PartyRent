@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Notifier;
 use App\Models\AppNotification;
+use App\Support\AddressInput;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -66,9 +67,25 @@ class AccountController extends Controller
             'name' => 'required|string|min:3|max:120',
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($u->id)],
             'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'],
-            'address' => 'required|string|max:255',
-        ], ['phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'email.unique' => 'That email is used by another account.']);
-        $u->update(array_map('trim', $data));
+            // Staff accounts keep a free-text office address; customers get the structured one used for delivery.
+            ...($u->isStaff() ? ['address' => 'required|string|max:255'] : AddressInput::rules('addr')),
+        ], array_merge(AddressInput::messages(), ['phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'email.unique' => 'That email is used by another account.']));
+        $attrs = ['name' => trim($data['name']), 'email' => trim($data['email']), 'phone' => trim($data['phone'])];
+        $u->fill($u->isStaff() ? $attrs + ['address' => trim($data['address'])] : $attrs + AddressInput::attributes($data['addr']));
+        // A customer who changes their email must verify the new address (staff emails are managed by the superadmin).
+        $reverify = ! $u->isStaff() && $u->isDirty('email');
+        if ($reverify) {
+            $u->email_verified_at = null;
+        }
+        $u->save();
+        if (! $u->isStaff()) {
+            session()->forget('deliver_to'); // the saved address is the delivery city again
+        }
+        if ($reverify) {
+            \App\Http\Controllers\AuthController::sendVerification($u);
+
+            return redirect()->route('verification.notice')->with('success', 'Profile updated. Please verify your new email address.');
+        }
 
         return back()->with('success', 'Profile updated.');
     }

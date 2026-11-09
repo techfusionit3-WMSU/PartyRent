@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Ai;
+use App\Domain\Locations;
 use App\Domain\Rentals;
 use App\Models\Category;
 use App\Models\Supplier;
@@ -24,7 +25,8 @@ class AiController extends Controller
 
             return redirect()->route('browse', array_filter([
                 'category' => count($f['items']) === 1 ? $f['items'][0] : null, 'event' => $f['eventType'], 'color' => $f['colors'][0] ?? null,
-                'theme' => $f['themes'][0] ?? null, 'start' => $f['start'], 'end' => $f['end'], 'city' => $f['city'],
+                // The event city becomes the "deliver to" city, so results show who can deliver there.
+                'theme' => $f['themes'][0] ?? null, 'start' => $f['start'], 'end' => $f['end'], 'to' => Locations::findCityByName($f['city'])['code'] ?? null,
                 'delivery' => $f['delivery'] ? '1' : null, 'avail' => $f['start'] ? '1' : null,
             ]));
         }
@@ -49,7 +51,7 @@ class AiController extends Controller
 
         return view('market.ai', [
             'q' => $q, 'filters' => $filters, 'plan' => $plan, 'examples' => $examples,
-            'cats' => Category::pluck('name', 'id'), 'cities' => Supplier::approved()->pluck('city')->unique()->values(),
+            'cats' => Category::pluck('name', 'id'), 'cities' => collect(Locations::cities())->pluck('name')->unique()->sort()->values(),
         ]);
     }
 

@@ -2,8 +2,15 @@
 @php($f = $r->fin())
 @php($p = $f['pricing'])
 <div class="row between mb-1"><h3 class="mb-0">Payment summary</h3>@include('partials.badges', ['pay' => $f['status']])</div>
-<div class="sum-line"><span class="muted">Items & packages</span><span>{{ money($p['itemsSubtotal']) }}</span></div>
-@if($p['deliveryFee'])<div class="sum-line"><span class="muted">Delivery fee</span><span>{{ money($p['deliveryFee']) }}</span></div>@endif
+@include('partials.subtotals', ['p' => $p])
+{{-- Delivery comes from the snapshot frozen at submission, never from the supplier's current rates. --}}
+@php($dl = $p['delivery'] ?? null)
+@if($p['deliveryFee'] || ($dl['ok'] ?? false))
+  <div class="sum-line"><span class="muted">Delivery{{ ! empty($dl['cityLabel']) ? ' to '.$dl['cityLabel'] : '' }}{{ ! empty($dl['waived']) ? ' (free)' : '' }}</span><span>{{ money($p['deliveryFee']) }}</span></div>
+  @if(count($dl['breakdown'] ?? []) > 1)
+    @foreach($dl['breakdown'] as $b)<div class="sum-line small" style="padding-left:12px"><span class="muted">{{ $b['label'] }}</span><span class="muted">{{ $b['amount'] < 0 ? '− '.money(-$b['amount']) : money($b['amount']) }}</span></div>@endforeach
+  @endif
+@endif
 <div class="sum-line strong"><span>Total rental amount</span><span>{{ money($p['total']) }}</span></div>
 @if($p['reservationFee'])
   <div class="sum-line"><span class="muted">Reservation fee @if($p['reservationCredited'])<span class="badge b-teal plain">credited to down payment</span>@else<span class="badge b-gold plain">additional charge</span>@endif</span><span>{{ money($p['reservationFee']) }}</span></div>

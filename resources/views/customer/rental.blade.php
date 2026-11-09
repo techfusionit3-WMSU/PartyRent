@@ -16,10 +16,11 @@
   </div>
   <aside class="stack">
     <div class="card">@include('partials.payment-summary')</div>
+    @if($r->fulfillment === 'pickup')<div class="card"><h3>{{ icon('map', 'width:18px;vertical-align:-3px') }} Pickup location</h3>@include('partials.supplier-location', ['s' => $sup, 'reveal' => $r->revealsPickupLocation()])</div>@endif
     <div class="card"><h3>{{ $r->fulfillment === 'delivery' ? 'Delivery' : 'Pickup' }} details</h3>
       <dl class="kv">
         <dt>Supplier</dt><dd><a href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->phone }}</div></dd>
-        @if($r->fulfillment === 'delivery')<dt>Deliver to</dt><dd>{{ $r->address }}</dd>@else<dt>Pickup at</dt><dd>{{ $sup->address }}<div class="small muted">{{ $sup->hours }}</div></dd>@endif
+        @if($r->fulfillment === 'delivery')<dt>Deliver to</dt><dd>{{ $r->address }}</dd>@else<dt>Pickup at</dt><dd>{{ $r->revealsPickupLocation() ? $sup->address : $sup->publicAddress() }}<div class="small muted">{{ $sup->hours }}</div></dd>@endif
         <dt>Contact</dt><dd>{{ $r->contact_name }} · {{ $r->contact_phone }}</dd>
         <dt>Payment</dt><dd>{{ \App\Models\Payment::ARR_LABEL[$r->arrangement] }} · {{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}</dd>
         @if(! empty($r->fulfillment_log['releaseDate']))<dt>Released</dt><dd>{{ fmt_date($r->fulfillment_log['releaseDate']) }} to {{ $r->fulfillment_log['receivedBy'] ?? '' }}</dd>@endif
@@ -37,17 +38,68 @@
         <button class="btn btn-danger btn-sm">Cancel request</button>
       </form>
     @endif
-    @if($r->status === 'completed' && ! $review)
-      <form class="card" method="POST" action="{{ route('rentals.review', $r) }}">@csrf<h3>Rate your rental</h3>
-        <div class="row gap-sm mb-1">@for($i = 1; $i <= 5; $i++)<label class="chip {{ $i === 5 ? 'active' : '' }}"><input type="radio" name="rating" value="{{ $i }}" @checked($i === 5) hidden>{{ $i }}★</label>@endfor</div>
-        <div class="field"><textarea class="input" name="comment" required placeholder="How were the items and service?"></textarea></div>
-        <button class="btn btn-primary btn-sm">Submit review</button>
-      </form>
-    @elseif($review)
-      <div class="card"><h3>Your review</h3><div class="stars">{{ stars($review->rating) }}</div><p class="mb-0">{{ $review->comment }}</p></div>
-    @endif
   </aside>
 </div>
+
+@if($reviewables)
+  @php
+      $done = array_filter($reviewables, fn ($x) => $x['review']);
+      $todo = array_filter($reviewables, fn ($x) => ! $x['review']);
+      $RV = \App\Domain\Reviews::class;
+  @endphp
+  <section class="section" id="rate">
+    @if($todo)
+      <form class="card" method="POST" action="{{ route('rentals.review', $r) }}" enctype="multipart/form-data" data-review-form>@csrf
+        <h2 class="mb-0">Rate your rental</h2>
+        <p class="small muted">Rate each item you rented. Your stars and comments are shown on {{ $sup->name }}'s shop and item pages with a <b>Verified rental</b> badge. You can add up to {{ $RV::MAX_PHOTOS }} photos and 1 short video per item. Skip any item you don't want to rate.</p>
+        @error('reviews')<div class="alert alert-danger mb-2">{{ icon('alert') }}<div>{{ $message }}</div></div>@enderror
+        <div class="stack">
+        @foreach($todo as $key => $it)
+          @php($old = old("reviews.$key", []))
+          <fieldset class="review-item card card-flat">
+            <legend class="strong">{{ $it['type'] === 'package' ? '📦 ' : '' }}{{ $it['name'] }}</legend>
+            <div class="field {{ $errors->has("reviews.$key.rating") ? 'invalid' : '' }}">
+              <span class="label" id="lbl-{{ $key }}">Your rating</span>
+              <div class="star-input" role="radiogroup" aria-labelledby="lbl-{{ $key }}">
+                @for($i = 5; $i >= 1; $i--)
+                  <input type="radio" id="st-{{ $key }}-{{ $i }}" name="reviews[{{ $key }}][rating]" value="{{ $i }}" @checked((int) ($old['rating'] ?? 0) === $i)>
+                  <label for="st-{{ $key }}-{{ $i }}" title="{{ ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][$i] }}">★<span class="sr-only">{{ $i }} star{{ $i > 1 ? 's' : '' }}</span></label>
+                @endfor
+              </div>
+              @error("reviews.$key.rating")<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+            </div>
+            <div class="field {{ $errors->has("reviews.$key.comment") ? 'invalid' : '' }}">
+              <label for="cm-{{ $key }}">What did you think?</label>
+              <textarea class="input" id="cm-{{ $key }}" name="reviews[{{ $key }}][comment]" rows="3" maxlength="1000" placeholder="Condition, cleanliness, did it look like the photos, delivery/setup…">{{ $old['comment'] ?? '' }}</textarea>
+              @error("reviews.$key.comment")<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+            </div>
+            <div class="form-grid">
+              <div class="field {{ $errors->has("reviews.$key.photos") || $errors->has("reviews.$key.photos.*") ? 'invalid' : '' }}">
+                <label for="ph-{{ $key }}">{{ icon('image', 'width:15px;height:15px') }} Photos <span class="muted">(up to {{ $RV::MAX_PHOTOS }}, 5 MB each)</span></label>
+                <input class="input" type="file" id="ph-{{ $key }}" name="reviews[{{ $key }}][photos][]" accept="image/jpeg,image/png,image/webp" multiple data-media-input="image" data-max="{{ $RV::MAX_PHOTOS }}" data-max-mb="5">
+                @error("reviews.$key.photos")<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+                @error("reviews.$key.photos.*")<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+              </div>
+              <div class="field {{ $errors->has("reviews.$key.video") ? 'invalid' : '' }}">
+                <label for="vd-{{ $key }}">{{ icon('video', 'width:15px;height:15px') }} Video <span class="muted">(1 clip, up to 20 MB)</span></label>
+                <input class="input" type="file" id="vd-{{ $key }}" name="reviews[{{ $key }}][video]" accept="video/mp4,video/webm,video/quicktime" data-media-input="video" data-max="1" data-max-mb="20">
+                @error("reviews.$key.video")<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+              </div>
+            </div>
+            <div class="media-preview" data-media-preview></div>
+          </fieldset>
+        @endforeach
+        </div>
+        <div class="row between wrap mt-2"><span class="small muted">If the form shows an error, please re-attach your photos/videos — browsers can't keep files after a page reload.</span><button class="btn btn-primary">{{ icon('star') }}Submit review{{ count($todo) > 1 ? 's' : '' }}</button></div>
+      </form>
+    @endif
+    @if($done)
+      <h2 class="{{ $todo ? 'mt-3' : '' }}">Your reviews</h2>
+      <div class="stack">@foreach($done as $it)@include('partials.review', ['rv' => $it['review']->load(['customer', 'product', 'package', 'supplier'])])@endforeach</div>
+      @include('partials.media-lightbox')
+    @endif
+  </section>
+@endif
 
 @if($payTypes)
 <div class="modal-backdrop hidden" id="payModal"><div class="modal" role="dialog" aria-modal="true" aria-label="Make a payment">

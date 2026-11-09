@@ -64,6 +64,8 @@ class CatalogController extends Controller
             'themes' => 'nullable|string|max:255',
             'events' => 'nullable|array', 'events.*' => 'string|max:40',
             'delivery' => 'nullable|boolean',
+            'handling_fee' => 'nullable|numeric|min:0|max:1000000',
+            'handling_per' => 'nullable|in:line,unit',
             'images' => 'nullable|array|max:5', 'images.*' => 'image|max:8192',
         ]);
         $split = fn ($s) => array_values(array_filter(array_map(fn ($x) => ucwords(trim($x)), explode(',', (string) $s))));
@@ -73,6 +75,7 @@ class CatalogController extends Controller
             'total_stock' => (int) $v['total_stock'], 'unit' => $v['unit'], 'condition' => $v['condition'], 'status' => $v['status'],
             'tiers' => $v['tiers'], 'colors' => $split($v['colors'] ?? ''), 'themes' => $split($v['themes'] ?? ''), 'events' => $v['events'] ?? [],
             'delivery' => $request->boolean('delivery'), 'pickup' => true,
+            'handling_fee' => r2($v['handling_fee'] ?? 0), 'handling_per' => $v['handling_per'] ?? 'line',
         ];
     }
 

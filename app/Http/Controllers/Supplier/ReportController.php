@@ -97,7 +97,7 @@ class ReportController extends Controller
         $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->get();
         inv()->primeProducts($prods);
         $next30 = date_range(today_iso(), add_days(today_iso(), 29));
-        $util = $prods->map(function ($p) use ($next30) {
+        $util = $prods->reject->isSale()->map(function ($p) use ($next30) {
             $cap = count($next30) * max(0, $p->total_stock - $p->damaged - $p->missing);
             $used = array_sum(array_map(fn ($d) => inv()->reservedOn($p->id, $d), $next30));
 
@@ -116,6 +116,7 @@ class ReportController extends Controller
         return view('supplier.reports', [
             'rg' => $rg,
             'income' => $net($inPeriod),
+            'split' => Finance::incomeSplit($inPeriod->load('rentalRequest')),
             'inRange' => $inRange,
             'outstanding' => $reqs->filter(fn ($r) => $r->isActive() && $r->fin()['balance'] > 0)->values(),
             'dmg' => $reqs->filter(fn ($r) => ($r->inspection['compensation'] ?? 0) > 0)->values(),
@@ -131,10 +132,14 @@ class ReportController extends Controller
     public function reportsCsv(Request $request)
     {
         extract($this->data($request));
-        $rows = [['Request', 'Customer', 'Event', 'Start', 'End', 'Status', 'Total', 'Verified paid', 'Balance', 'Payment status', 'Compensation']];
+        $rows = [['Request', 'Customer', 'Event', 'Start', 'End', 'Status', 'Rental items', 'Sale items', 'Services', 'Total', 'Verified paid', 'Rental income', 'Sales income', 'Balance', 'Payment status', 'Compensation']];
         foreach ($inRange->sortBy('created_at') as $r) {
             $f = $r->fin();
-            $rows[] = [$r->code, $r->customer->name, $r->event_name, $r->start_date, $r->end_date, RentalRequest::statusLabel($r->status), $f['payable'], $f['paidRental'], $f['balance'], $f['status'], $f['compensation']];
+            $pr = $r->pricing ?? [];
+            $s = Finance::split($pr, $f['paidRental'] - $f['refunded']);
+            $rows[] = [$r->code, $r->customer->name, $r->event_name, $r->start_date, $r->end_date, RentalRequest::statusLabel($r->status),
+                $pr['rentalSubtotal'] ?? $pr['itemsSubtotal'] ?? 0, $pr['salesSubtotal'] ?? 0, $pr['servicesSubtotal'] ?? 0,
+                $f['payable'], $f['paidRental'], $s['rental'], $s['sales'], $f['balance'], $f['status'], $f['compensation']];
         }
 
         return Report::csv('partyrent-'.str($sup->name)->slug().'-'.$rg['from'].'-to-'.$rg['to'].'.csv', $rows);

@@ -18,7 +18,9 @@
   @include('partials.stat', ['label' => 'Pending payments', 'value' => $pendingPay->count(), 'sub' => money_short($pendingPay->sum('amount')).' awaiting cashier', 'icon' => 'card', 'color' => 'gold', 'href' => route('supplier.payments', ['tab' => 'pending'])])
   @include('partials.stat', ['label' => 'Fully paid', 'value' => $fins->where('status', 'Fully Paid')->count(), 'icon' => 'check', 'color' => 'teal', 'href' => route('supplier.payments')])
   @include('partials.stat', ['label' => 'Overdue payments', 'value' => $fins->where('isOverdue', true)->count(), 'sub' => money_short($fins->where('isOverdue', true)->sum('overdueAmount')).' outstanding', 'icon' => 'alert', 'color' => 'red', 'href' => route('supplier.payments', ['tab' => 'overdue'])])
-  @include('partials.stat', ['label' => 'Revenue this month', 'value' => money_short($thisMonth), 'sub' => 'verified rental payments', 'icon' => 'chart', 'color' => 'purple', 'href' => route('supplier.payments')])
+  @include('partials.stat', ['label' => 'Rental income this month', 'value' => money_short($monthSplit['rental']), 'sub' => 'rentals, services & delivery', 'icon' => 'chart', 'color' => 'purple', 'href' => route('supplier.reports')])
+  @include('partials.stat', ['label' => 'Sales income this month', 'value' => money_short($monthSplit['sales']), 'sub' => 'consumables sold', 'icon' => 'tag', 'color' => 'teal', 'href' => route('supplier.reports')])
+  @include('partials.stat', ['label' => 'Low stock', 'value' => $lowStock->count(), 'sub' => $lowStock->count() ? $lowStock->pluck('name')->take(2)->implode(', ') : 'sale items are well stocked', 'icon' => 'alert', 'color' => $lowStock->count() ? 'red' : 'teal', 'href' => route('supplier.inventory')])
 </div>
 <div class="grid grid-2 mt-3">
   <div class="card"><div class="card-head"><h3>Monthly rental requests</h3><span class="small muted">Last 6 months</span></div>@include('partials.bars', ['rows' => $monthly, 'color' => '#7C3AED'])</div>

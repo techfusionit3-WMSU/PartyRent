@@ -41,7 +41,7 @@
           <tr><td class="muted strong">Location</td>@foreach($compare as $p)<td>{{ $p->supplier->city }}</td>@endforeach</tr>
           <tr><td class="muted strong">Daily price</td>@foreach($compare as $p)<td>{{ money($p->basePrice()) }}@if(count($p->tiers) > 1)<div class="small muted">from {{ money($p->lowestPrice()) }} in bulk</div>@endif</td>@endforeach</tr>
           <tr><td class="muted strong">Available {{ $dates ? fmt_range($dates[0], end($dates)) : 'today' }}</td>@foreach($compare as $p)<td><b>{{ inv()->minAvailable($p->id, $dates) }}</b> of {{ $p->total_stock }}</td>@endforeach</tr>
-          <tr><td class="muted strong">Rating</td>@foreach($compare as $p)<td>★ {{ $p->rating }} · {{ $p->rent_count }} rentals</td>@endforeach</tr>
+          <tr><td class="muted strong">Rating</td>@foreach($compare as $p)<td>★ {{ rating_text($p) }} · {{ $p->rent_count }} rentals</td>@endforeach</tr>
           <tr><td class="muted strong">Fulfillment</td>@foreach($compare as $p)<td>{{ $p->supplier->fulfillmentLabel() }}</td>@endforeach</tr>
           <tr><td class="muted strong">Payment</td>@foreach($compare as $p)<td>{{ collect($p->supplier->arrangements)->map(fn ($a) => \App\Models\Payment::ARR_LABEL[$a])->implode(', ') }}</td>@endforeach</tr>
           <tr><td></td>@foreach($compare as $p)<td><a class="btn btn-sm btn-primary" href="{{ route('products.show', array_filter(['product' => $p->id, 'start' => $dates[0] ?? null, 'end' => $dates ? end($dates) : null])) }}">View</a></td>@endforeach</tr>

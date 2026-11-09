@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Customer;
 
 use App\Domain\Finance;
 use App\Domain\Rentals;
+use App\Domain\Reviews;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\RentalRequest;
@@ -58,7 +59,7 @@ class RentalController extends Controller
 
         return view('customer.rental', [
             'r' => $r, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
-            'policy' => Rentals::cancelPolicy($r), 'review' => $r->review,
+            'policy' => Rentals::cancelPolicy($r), 'reviewables' => $r->status === 'completed' ? Reviews::reviewables($r) : [],
         ]);
     }
 
@@ -112,13 +113,27 @@ class RentalController extends Controller
     public function review(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);
-        abort_unless($r->status === 'completed' && ! $r->review, 422);
-        $data = $request->validate(['rating' => 'required|integer|min:1|max:5', 'comment' => 'required|string|min:3|max:1000']);
-        $first = collect($r->lines)->firstWhere('type', 'item');
-        Review::create(['supplier_id' => $r->supplier_id, 'product_id' => $first['ref_id'] ?? null, 'rental_request_id' => $r->id, 'customer_id' => $r->customer_id, 'rating' => $data['rating'], 'comment' => trim($data['comment'])]);
-        $r->supplier->update(['rating' => round(Review::where('supplier_id', $r->supplier_id)->avg('rating'), 2)]);
+        abort_unless($r->status === 'completed', 422);
+        $request->validate([
+            'reviews' => 'required|array',
+            'reviews.*.rating' => 'nullable|integer|min:1|max:5',
+            'reviews.*.comment' => 'nullable|string|max:1000',
+            'reviews.*.photos' => 'nullable|array|max:'.Reviews::MAX_PHOTOS,
+            'reviews.*.photos.*' => 'file|mimes:'.Reviews::PHOTO_MIMES.'|max:'.Reviews::MAX_PHOTO_KB,
+            'reviews.*.video' => 'nullable|file|mimetypes:'.Reviews::VIDEO_MIMETYPES.'|max:'.Reviews::MAX_VIDEO_KB,
+        ], [
+            'reviews.*.photos.max' => 'You can add up to '.Reviews::MAX_PHOTOS.' photos per item.',
+            'reviews.*.photos.*.mimes' => 'Photos must be JPG, PNG or WEBP.',
+            'reviews.*.photos.*.max' => 'Each photo must be 5 MB or smaller.',
+            'reviews.*.video.mimetypes' => 'Videos must be MP4, WEBM or MOV.',
+            'reviews.*.video.max' => 'The video must be 20 MB or smaller.',
+        ]);
+        $res = Reviews::submit($r, $request->user(), $request->input('reviews', []), $request->file('reviews', []));
+        if (! $res['ok']) {
+            return back()->withInput()->withErrors($res['errors'] ?? ['reviews' => $res['error']]);
+        }
 
-        return back()->with('success', 'Thanks for your review!');
+        return back()->with('success', 'Thanks for your review'.($res['created'] > 1 ? 's' : '').'! It is now visible on the shop and item pages.');
     }
 
     public function payments(Request $request)

@@ -13,7 +13,12 @@
   <div class="p-body">
     <a class="p-name" href="{{ $link }}">{{ $p->name }}</a>
     <div class="p-sup">{{ icon('store', 'width:13px;height:13px') }}{{ $p->supplier->name }}</div>
-    <div class="p-sup">{{ icon('map', 'width:13px;height:13px') }}{{ $p->supplier->city }} · <span class="stars">★</span> {{ $p->rating ?: '—' }}</div>
+    <div class="p-sup">{{ icon('map', 'width:13px;height:13px') }}{{ $p->supplier->city }} · <span class="stars">★</span> {{ rating_text($p) }}</div>
+    @php($myCity = customer_city())
+    @if($myCity)
+      @php($canDeliver = $p->delivery && $p->supplier->deliversTo($myCity))
+      <div class="p-sup" style="color:{{ $canDeliver ? 'var(--green)' : '#B45309' }}">{{ icon('truck', 'width:13px;height:13px') }}{{ $canDeliver ? 'Delivers to '.\App\Domain\Locations::name($myCity) : ($p->delivery && $p->supplier->offersDelivery() ? 'Pickup only in your area' : 'Pickup only') }}</div>
+    @endif
     <div class="p-meta"><div class="p-price">{{ str_replace('.00', '', money($p->basePrice())) }} <small>/ {{ $p->unitWord() }}</small></div><span class="small {{ $avail > 0 ? 'muted' : '' }}" style="{{ $avail > 0 ? '' : 'color:var(--red)' }}">{{ $avail }} avail.</span></div>
   </div>
 </article>

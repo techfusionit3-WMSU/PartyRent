@@ -12,6 +12,7 @@ use App\Http\Controllers\Customer\RentalController;
 use App\Http\Controllers\Customer\StartSellingController;
 use App\Http\Controllers\MarketController;
 use App\Http\Controllers\PaymentFileController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\Supplier\CatalogController;
 use App\Http\Controllers\Supplier\ReportController as SupplierReportController;
 use App\Http\Controllers\Supplier\RequestController as SupplierRequestController;
@@ -34,13 +35,17 @@ Route::post('/ai/chat', [AiController::class, 'chat'])->middleware('throttle:30,
 /* ---------- live availability / pricing (JSON, read-only) ---------- */
 Route::get('/api/calendar', [ApiController::class, 'calendar'])->name('api.calendar');
 Route::post('/api/schedule', [ApiController::class, 'schedule'])->name('api.schedule');
-
+Route::get('/api/locations', [ApiController::class, 'locations'])->name('api.locations');
+Route::post('/api/package-quote', [ApiController::class, 'packageQuote'])->name('api.package-quote');
 /* ---------- authentication ---------- */
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::get('/register/verify', [AuthController::class, 'showRegisterVerify'])->name('register.verify');
+    Route::post('/register/verify', [AuthController::class, 'registerVerify'])->middleware('throttle:10,1,register-verify')->name('register.verify.submit');
+    Route::post('/register/resend', [AuthController::class, 'registerResend'])->middleware('throttle:5,1,register-resend')->name('register.resend');
     Route::get('/forgot-password', [AuthController::class, 'showForgot'])->name('password.request');
     Route::post('/forgot-password', [AuthController::class, 'sendReset'])->middleware('throttle:5,1')->name('password.email');
     Route::get('/reset-password/{token}', [AuthController::class, 'showReset'])->name('password.reset');
@@ -58,17 +63,25 @@ Route::middleware('auth')->group(function () {
     Route::put('/account', [AccountController::class, 'updateProfile'])->name('account.update');
     Route::put('/account/password', [AccountController::class, 'updatePassword'])->name('account.password');
     Route::get('/payments/{payment}/receipt', [PaymentFileController::class, 'receipt'])->name('payments.receipt');
+    Route::post('/reviews/{review}/report', [ReviewController::class, 'report'])->middleware('throttle:10,1')->name('reviews.report');
     Route::get('/payments/{payment}/proof', [PaymentFileController::class, 'proof'])->name('payments.proof');
+    Route::post('/api/delivery-preview', [ApiController::class, 'deliveryPreview'])->name('api.delivery-preview');
+
+    // Email verification: unverified customers can browse, but renting/selling needs a verified email.
+    Route::get('/email/verify', [AuthController::class, 'verifyNotice'])->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify'])->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
+    Route::post('/email/verification-notification', [AuthController::class, 'resendVerification'])->middleware('throttle:3,1')->name('verification.send');
 });
 
 /* ---------- customer mode ---------- */
-Route::middleware(['auth', 'role:customer'])->group(function () {
+Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/cart', [CartController::class, 'index'])->name('cart');
     Route::post('/cart', [CartController::class, 'add'])->name('cart.add');
     Route::patch('/cart/{line}', [CartController::class, 'update'])->name('cart.update');
     Route::delete('/cart/{line}', [CartController::class, 'remove'])->name('cart.remove');
     Route::get('/checkout/{supplier}', [CartController::class, 'checkout'])->name('checkout');
     Route::post('/checkout/{supplier}', [CartController::class, 'submit'])->name('checkout.submit');
+    Route::get('/checkout/{supplier}/quote', [CartController::class, 'quote'])->name('checkout.quote');
 
     Route::get('/rentals', [RentalController::class, 'index'])->name('rentals.index');
     Route::get('/rentals/{rentalRequest}', [RentalController::class, 'show'])->name('rentals.show');
@@ -84,10 +97,12 @@ Route::middleware(['auth', 'role:customer'])->group(function () {
 });
 
 /* ---------- supplier mode ---------- */
-Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'role:supplier'])->group(function () {
+Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'role:supplier'])->group(function () {
     Route::get('/', [SupplierController::class, 'dashboard'])->name('dashboard');
     Route::get('/schedule', [SupplierController::class, 'schedule'])->name('schedule');
     Route::get('/payments', [SupplierController::class, 'payments'])->name('payments');
+    Route::get('/reviews', [ReviewController::class, 'supplierIndex'])->name('reviews');
+    Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])->name('reviews.reply');
     Route::get('/shop', [SupplierController::class, 'shop'])->name('shop');
     Route::put('/shop', [SupplierController::class, 'updateShop'])->name('shop.update');
 
@@ -113,7 +128,14 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'role:supplier
     Route::post('/packages', [CatalogController::class, 'storePackage'])->name('packages.store');
     Route::get('/packages/{package}/edit', [CatalogController::class, 'editPackage'])->name('packages.edit');
     Route::put('/packages/{package}', [CatalogController::class, 'updatePackage'])->name('packages.update');
+    Route::post('/packages/price', [CatalogController::class, 'packagePrice'])->name('packages.price');
+    Route::post('/packages/preview', [CatalogController::class, 'previewPackage'])->name('packages.preview');
+    Route::post('/packages/{package}/duplicate', [CatalogController::class, 'duplicatePackage'])->name('packages.duplicate');
+    Route::post('/packages/{package}/move', [CatalogController::class, 'movePackage'])->name('packages.move');
+    Route::post('/packages/{package}/active', [CatalogController::class, 'packageActive'])->name('packages.active');
+    Route::delete('/packages/{package}', [CatalogController::class, 'deletePackage'])->name('packages.delete');
     Route::get('/inventory', [CatalogController::class, 'inventory'])->name('inventory');
+    Route::post('/inventory/{product}/restock', [CatalogController::class, 'restock'])->name('inventory.restock');
     Route::post('/inventory/{product}/holds', [CatalogController::class, 'addHold'])->name('inventory.hold');
     Route::delete('/inventory/holds/{hold}', [CatalogController::class, 'releaseHold'])->name('inventory.release');
     Route::post('/inventory/{product}/condition', [CatalogController::class, 'adjustCondition'])->name('inventory.condition');
@@ -157,6 +179,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/complaints', [AdminController::class, 'complaints'])->name('complaints');
     Route::post('/complaints', [AdminController::class, 'storeComplaint'])->name('complaints.store');
     Route::post('/complaints/{complaint}', [AdminController::class, 'updateComplaint'])->name('complaints.update');
+    Route::get('/reviews', [ReviewController::class, 'adminIndex'])->name('reviews');
+    Route::post('/reviews/{review}/moderate', [ReviewController::class, 'moderate'])->name('reviews.moderate');
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     Route::get('/reports.csv', [AdminController::class, 'reportsCsv'])->name('reports.csv');
 });

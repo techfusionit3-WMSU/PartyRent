@@ -18,15 +18,17 @@
     <div class="card"><h3>2 · Delivery or pickup</h3>
       <div class="row wrap gap-sm mb-2">
         @foreach(['delivery', 'pickup'] as $fo)
-          @php($ok = $s->fulfillment === 'both' || $s->fulfillment === $fo)
-          <a class="chip {{ $st['fulfillment'] === $fo ? 'active' : '' }}" style="{{ $ok ? '' : 'opacity:.45;pointer-events:none' }}" href="{{ route('checkout', ['supplier' => $s->id, 'fulfillment' => $fo, 'arrangement' => $st['arrangement']]) }}">{{ icon($fo === 'delivery' ? 'truck' : 'store', 'width:16px') }}{{ $fo === 'delivery' ? 'Delivery (+'.money($s->delivery_fee).')' : 'Pickup at shop' }}</a>
+          @php($ok = $fo === 'delivery' ? $s->offersDelivery() : $s->offersPickup())
+          <a class="chip {{ $st['fulfillment'] === $fo ? 'active' : '' }}" style="{{ $ok ? '' : 'opacity:.45;pointer-events:none' }}" href="{{ route('checkout', array_filter(['supplier' => $s->id, 'fulfillment' => $fo, 'arrangement' => $st['arrangement'], 'city' => $city])) }}">{{ icon($fo === 'delivery' ? 'truck' : 'store', 'width:16px') }}{{ $fo === 'delivery' ? 'Delivery' : ($s->location_type === 'home' ? 'Pickup (home-based seller)' : 'Pickup at shop') }}</a>
         @endforeach
         <input type="hidden" name="fulfillment" value="{{ $st['fulfillment'] }}">
       </div>
       @if($st['fulfillment'] === 'delivery')
-        <div class="field @error('address') invalid @enderror"><label>Delivery address</label><textarea class="input" name="address" rows="2" required placeholder="House no., street, barangay, city">{{ old('address', $u->address) }}</textarea>@error('address')<div class="error-text">{{ $message }}</div>@enderror</div>
+        <div class="label mb-1">Delivery address</div>
+        @include('partials.address-fields', ['key' => 'addr', 'value' => $addr, 'full' => true, 'required' => true])
+        <div id="dq" class="mb-2">@include('customer._delivery-quote', ['d' => $q['delivery'], 's' => $s])</div>
       @else
-        <div class="alert alert-info">{{ icon('map') }}<div>Pickup at <b>{{ $s->address }}</b> · {{ $s->hours }}</div></div>
+        <div class="alert alert-info">{{ icon('map') }}<div>Pickup at <b>{{ $s->publicAddress() }}</b> · {{ $s->hours }}@if(! $s->isPublicLocation())<div class="small">The exact address and map pin are shared once {{ $s->name }} accepts your request.</div>@elseif($s->hasPin()) · <a href="{{ $s->directionsUrl() }}" target="_blank" rel="noopener">Directions</a>@endif</div></div>
       @endif
       <div class="form-grid">
         <div class="field @error('contactName') invalid @enderror"><label>Contact person</label><input class="input" name="contactName" required value="{{ old('contactName', $u->name) }}"></div>
@@ -39,7 +41,7 @@
       <p class="small muted">{{ $s->name }} accepts the options below. You will pay after the supplier accepts your request.</p>
       <div class="stack-sm">
         @foreach($s->arrangements as $a)
-          <a class="card card-flat row" style="padding:12px 14px;cursor:pointer;color:inherit;text-decoration:none;{{ $a === $st['arrangement'] ? 'border-color:var(--brand)' : '' }}" href="{{ route('checkout', ['supplier' => $s->id, 'fulfillment' => $st['fulfillment'], 'arrangement' => $a]) }}">
+          <a class="card card-flat row" style="padding:12px 14px;cursor:pointer;color:inherit;text-decoration:none;{{ $a === $st['arrangement'] ? 'border-color:var(--brand)' : '' }}" href="{{ route('checkout', array_filter(['supplier' => $s->id, 'fulfillment' => $st['fulfillment'], 'arrangement' => $a, 'city' => $city])) }}">
             <input type="radio" @checked($a === $st['arrangement']) style="accent-color:var(--brand);width:18px;height:18px" tabindex="-1" aria-hidden="true">
             <div class="grow"><b>{{ \App\Models\Payment::ARR_LABEL[$a] }}</b><div class="small muted">{{ [
               'full' => 'Pay the whole amount before the rental.',
@@ -60,23 +62,13 @@
     </div>
   </div>
 
+  @php($deliveryBlocked = $st['fulfillment'] === 'delivery' && ! ($q['delivery']['ok'] ?? false))
   <aside class="card sticky-side"><h3>Order summary</h3>
-    <div class="sum-line"><span class="muted">Items & packages</span><span>{{ money($q['itemsSubtotal']) }}</span></div>
-    @if($q['deliveryFee'])<div class="sum-line"><span class="muted">Delivery fee</span><span>{{ money($q['deliveryFee']) }}</span></div>@endif
-    <div class="sum-line total"><span>Total rental amount</span><span class="price">{{ money($q['total']) }}</span></div>
-    @if($q['reservationFee'])<div class="sum-line"><span class="muted">Reservation fee</span><span>{{ money($q['reservationFee']) }}</span></div><div class="small muted mb-1">{!! $q['reservationCredited'] ? 'Credited toward your down payment / total — not charged twice.' : 'Charged in addition to the rental amount. Total payable: <b>'.e(money($q['payable'])).'</b>' !!}</div>@endif
-    @if($q['arrangement'] === 'down')
-      <div class="sum-line"><span class="muted">Down payment ({{ $q['downPct'] !== null ? $q['downPct'].'%' : 'fixed' }})</span><span>{{ money($q['downRequired']) }}</span></div>
-      @if($q['reservationFee'] && $q['reservationCredited'])<div class="sum-line"><span class="muted">Remaining down payment</span><span>{{ money($q['downRequired'] - $q['reservationFee']) }}</span></div>@endif
-      <div class="sum-line"><span class="muted">Balance after down payment</span><span>{{ money($q['payable'] - $q['downRequired'] - ($q['reservationCredited'] ? 0 : $q['reservationFee'])) }}</span></div>
-    @endif
-    <div class="sum-line"><span class="muted">Security deposit <span class="badge b-purple plain">refundable</span></span><span>{{ money($q['deposit']) }}</span></div>
-    <div class="small muted">Collected separately from rental charges and returned after inspection.</div>
-    <div class="label mt-2 mb-1">Expected schedule (if accepted today)</div>
-    @foreach($schedule as $x)<div class="sum-line small"><span>{{ $x['label'] }}<br><span class="muted">by {{ fmt_date($x['due']) }}</span></span><b>{{ money($x['amount']) }}</b></div>@endforeach
+    <div id="sumBox">@include('customer._checkout-summary', ['q' => $q, 'schedule' => $schedule])</div>
     <label class="check mt-2"><input type="checkbox" name="agree" value="1" required> I agree to {{ $s->name }}'s cancellation, return and rental policies.</label>
     @error('agree')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
-    <button class="btn btn-primary btn-lg btn-block mt-1" type="submit" data-busy="Submitting…" @disabled(! $check['ok'])>Submit rental request</button>
+    <button class="btn btn-primary btn-lg btn-block mt-1" type="submit" id="submitReq" data-busy="Submitting…" data-stock-ok="{{ $check['ok'] ? 1 : 0 }}" @disabled(! $check['ok'] || $deliveryBlocked)>Submit rental request</button>
+    <p class="small mt-1 mb-0 {{ $deliveryBlocked ? '' : 'hidden' }}" id="blockedNote" style="color:var(--red)">Choose an address this supplier delivers to, or switch to pickup.</p>
     <p class="small muted mt-1 mb-0">Your request will be <b>Pending</b> until the supplier reviews it. No payment is collected yet.</p>
   </aside>
 </form>
@@ -84,10 +76,30 @@
 <script>
 // Keep typed fields when the customer switches delivery/arrangement (those links reload the quote).
 (function () {
-  var f = document.getElementById('cf'), key = 'pr_checkout_{{ $s->id }}', keep = ['eventName', 'eventType', 'eventDate', 'address', 'contactName', 'contactPhone', 'instructions', 'method'];
-  try { var saved = JSON.parse(sessionStorage.getItem(key) || 'null'); if (saved && !{{ $errors->any() ? 'true' : 'false' }}) keep.forEach(function (k) { if (f[k] && saved[k] != null && saved[k] !== '') f[k].value = saved[k]; }); } catch (e) {}
-  document.querySelectorAll('#cf a.chip, #cf a.card').forEach(function (a) { a.addEventListener('click', function () { var o = {}; keep.forEach(function (k) { if (f[k]) o[k] = f[k].value; }); try { sessionStorage.setItem(key, JSON.stringify(o)); } catch (e) {} }); });
+  var f = document.getElementById('cf'), key = 'pr_checkout_{{ $s->id }}', keep = ['eventName', 'eventType', 'eventDate', 'addr[barangay]', 'addr[street]', 'addr[landmark]', 'contactName', 'contactPhone', 'instructions', 'method'];
+  var el = function (k) { return f.elements[k]; };
+  try { var saved = JSON.parse(sessionStorage.getItem(key) || 'null'); if (saved && !{{ $errors->any() ? 'true' : 'false' }}) keep.forEach(function (k) { if (el(k) && saved[k] != null && saved[k] !== '') el(k).value = saved[k]; }); } catch (e) {}
+  document.querySelectorAll('#cf a.chip, #cf a.card').forEach(function (a) { a.addEventListener('click', function () {
+    var o = {}; keep.forEach(function (k) { if (el(k)) o[k] = el(k).value; }); try { sessionStorage.setItem(key, JSON.stringify(o)); } catch (e) {}
+    // carry the currently chosen city into the reloaded page
+    var c = el('addr[cityCode]'); if (c && c.value) { var u = new URL(a.href); u.searchParams.set('city', c.value); a.href = u.toString(); }
+  }); });
   f.addEventListener('submit', function () { try { sessionStorage.removeItem(key); } catch (e) {} });
+
+  // Live delivery re-quote when the city changes.
+  var seq = 0, btn = document.getElementById('submitReq'), note = document.getElementById('blockedNote');
+  f.addEventListener('pr:city', function (e) {
+    var mine = ++seq, url = new URL(@json(route('checkout.quote', $s)));
+    url.searchParams.set('fulfillment', @json($st['fulfillment'])); url.searchParams.set('arrangement', @json($st['arrangement']));
+    url.searchParams.set('city', e.detail.cityCode || '');
+    window.PRUI.api(url.toString()).then(function (r) {
+      if (mine !== seq) return;
+      var dq = document.getElementById('dq'); if (dq) dq.innerHTML = r.deliveryHtml;
+      document.getElementById('sumBox').innerHTML = r.summaryHtml;
+      btn.disabled = !r.ok || btn.dataset.stockOk !== '1';
+      note.classList.toggle('hidden', r.ok);
+    }).catch(function () { window.PRUI.toast('Could not update the delivery fee. Please reload the page.', 'error'); });
+  });
 })();
 </script>
 @endpush

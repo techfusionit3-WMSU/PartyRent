@@ -146,6 +146,42 @@ class Finance
         ];
     }
 
+    /**
+     * Share of a request's charges that is SALES income (consumables). Payments are not itemised, so
+     * each rental-type payment is split in the same proportion as the quote: sales subtotal / total.
+     * Rentals, services and delivery count as rental income.
+     */
+    public static function salesShare(?array $pricing): float
+    {
+        $total = (float) ($pricing['total'] ?? 0);
+
+        return $total > 0 ? min(1, max(0, (float) ($pricing['salesSubtotal'] ?? 0) / $total)) : 0.0;
+    }
+
+    /** ['rental' => …, 'sales' => …] for an amount paid on a request. */
+    public static function split(?array $pricing, float $amount): array
+    {
+        $sales = r2($amount * self::salesShare($pricing));
+
+        return ['rental' => r2($amount - $sales), 'sales' => $sales];
+    }
+
+    /** Verified rental-type payments (minus refunds) split into rental and sales income. */
+    public static function incomeSplit(iterable $payments): array
+    {
+        $out = ['rental' => 0.0, 'sales' => 0.0];
+        foreach ($payments as $p) {
+            if ($p->status !== 'verified' || ! in_array($p->type, array_merge(self::RENTAL_TYPES, ['refund']), true)) {
+                continue;
+            }
+            $s = self::split($p->rentalRequest?->pricing, (float) $p->amount * ($p->type === 'refund' ? -1 : 1));
+            $out['rental'] = r2($out['rental'] + $s['rental']);
+            $out['sales'] = r2($out['sales'] + $s['sales']);
+        }
+
+        return $out;
+    }
+
     /** Suggested amount for the customer's next payment. */
     public static function suggestedNext(RentalRequest $req): array
     {

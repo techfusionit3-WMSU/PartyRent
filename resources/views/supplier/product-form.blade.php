@@ -44,6 +44,9 @@
     <div class="field"><label>Rental unit</label><select class="input" name="unit">@foreach(['piece / day', 'set / day', 'unit / day', 'pair / day', 'panel / day', 'kit / day', 'system / day'] as $un)<option @selected(old('unit', $p->unit) === $un)>{{ $un }}</option>@endforeach</select></div>
     <div class="field"><label>Status</label><select class="input" name="status">@foreach(['published' => 'Published (visible)', 'draft' => 'Draft', 'hidden' => 'Hidden'] as $k => $l)<option value="{{ $k }}" @selected(old('status', $p->status) === $k)>{{ $l }}</option>@endforeach</select></div>
     <label class="check mb-2"><input type="checkbox" name="delivery" value="1" @checked(old('delivery', $p->delivery ?? true))> Available for delivery</label>
+    <div class="field"><label>Handling fee for delivery <span class="muted">(optional)</span></label>
+      <div class="row" style="gap:6px"><input class="input" type="number" min="0" step="0.01" name="handling_fee" value="{{ old('handling_fee', $p->handling_fee ?? 0) }}" aria-label="Handling fee"><select class="input" name="handling_per" style="width:auto" aria-label="Charged">@foreach(['line' => 'per order', 'unit' => 'per unit'] as $k => $l)<option value="{{ $k }}" @selected(old('handling_per', $p->handling_per ?? 'line') === $k)>{{ $l }}</option>@endforeach</select></div>
+      <div class="hint">For bulky items (tents, stages, sound systems). Added to the delivery fee, even when delivery is free.</div>@error('handling_fee')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
     <button class="btn btn-primary btn-block btn-lg">{{ $p->exists ? 'Save changes' : 'Add product' }}</button>
     <a class="btn btn-block btn-ghost mt-1" href="{{ route('supplier.products') }}">Cancel</a>
   </aside>

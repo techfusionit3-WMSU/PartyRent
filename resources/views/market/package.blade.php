@@ -32,4 +32,5 @@
     <div class="card mt-2"><div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · {{ $sup->fulfillmentLabel() }}</div></div></div></div>
   </div>
 </div>
+<div class="section">@include('partials.reviews-block', ['reviews' => $reviews, 'showItem' => false, 'title' => 'Customer reviews', 'emptyText' => 'No one has reviewed this package yet.'])</div>
 @endsection

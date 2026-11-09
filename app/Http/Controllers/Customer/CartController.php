@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Customer;
 
 use App\Domain\Ai;
 use App\Domain\Finance;
+use App\Domain\Locations;
 use App\Domain\Pricing;
 use App\Domain\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\CartLine;
 use App\Models\Supplier;
+use App\Support\AddressInput;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
@@ -16,21 +18,25 @@ class CartController extends Controller
     public function index(Request $request)
     {
         $u = $request->user();
+        $city = customer_city(); // estimate delivery to the customer's saved / chosen city
         $groups = [];
         foreach (Rentals::cartGroups($u) as $sid => $lines) {
             $s = Supplier::find($sid);
             if (! $s) {
                 continue;
             }
+            $ful = $s->offersDelivery() ? 'delivery' : 'pickup';
+            $clean = array_map(fn ($l) => array_merge($l, ['days' => Rentals::cleanDays($l['days'])]), $lines);
             $groups[] = [
                 'supplier' => $s, 'lines' => $lines,
-                'quote' => Pricing::quote($lines, $s, $s->fulfillment === 'pickup' ? 'pickup' : 'delivery', 'full'),
+                'quote' => $q = Pricing::quote($clean, $s, $ful, 'full', $city),
+                'delivery' => $q['delivery'],
                 'check' => inv()->check($lines),
-                'compareQuote' => Pricing::quote($lines, $s, $s->fulfillment === 'pickup' ? 'pickup' : 'delivery', in_array('down', $s->arrangements, true) ? 'down' : $s->arrangements[0]),
+                'compareQuote' => Pricing::quote($clean, $s, $ful, in_array('down', $s->arrangements, true) ? 'down' : $s->arrangements[0], $city),
             ];
         }
 
-        return view('customer.cart', ['groups' => $groups, 'compare' => $request->boolean('compare')]);
+        return view('customer.cart', ['groups' => $groups, 'compare' => $request->boolean('compare'), 'city' => $city]);
     }
 
     public function add(Request $request)
@@ -66,36 +72,72 @@ class CartController extends Controller
     public function checkout(Request $request, Supplier $supplier)
     {
         $u = $request->user();
-        $lines = Rentals::cartLinesFor($u, $supplier->id);
-        if (! $lines) {
-            return redirect()->route('cart')->with('warn', 'Your rental list has no items from this supplier.');
-        }
         if ($supplier->owner_id === $u->id) {
             return redirect()->route('cart')->with('error', 'You cannot rent from your own shop. Remove these items from your rental list.');
         }
+        $c = $this->checkoutState($request, $supplier);
+        if (is_string($c)) {
+            return redirect()->route('cart')->with('warn', $c);
+        }
+        // Address shown in the form: what was typed (validation error) > a city picked before reloading > the saved address.
+        $city = $c['city'];
+        $addr = old('addr') ?: ($city && $city !== $u->city_code ? Locations::parentsOf($city) : ($u->address_parts ?: []));
+
+        return view('customer.checkout', array_merge($c, [
+            's' => $supplier, 'u' => $u, 'addr' => $addr,
+            'eventTypes' => array_merge(array_keys(Ai::EVENTS), ['Community', 'Other']),
+        ]));
+    }
+
+    /** Live re-quote while the customer changes the delivery city (checkout page). */
+    public function quote(Request $request, Supplier $supplier)
+    {
+        $c = $this->checkoutState($request, $supplier);
+        abort_if(is_string($c), 422, is_string($c) ? $c : '');
+        $q = $c['quote'];
+
+        return response()->json([
+            'ok' => $c['st']['fulfillment'] !== 'delivery' || ($q['delivery']['ok'] ?? false),
+            'deliveryHtml' => view('customer._delivery-quote', ['d' => $q['delivery'], 's' => $supplier])->render(),
+            'summaryHtml' => view('customer._checkout-summary', ['q' => $q, 'schedule' => $c['schedule']])->render(),
+        ]);
+    }
+
+    /** Quote + payment schedule for the checkout page, or a message when there is nothing to check out. */
+    private function checkoutState(Request $request, Supplier $supplier): array|string
+    {
+        $lines = Rentals::cartLinesFor($request->user(), $supplier->id);
+        if (! $lines) {
+            return 'Your rental list has no items from this supplier.';
+        }
         $dates = collect($lines)->flatMap(fn ($l) => array_keys(Rentals::cleanDays($l['days'])))->unique()->sort()->values()->all();
         if (! $dates) {
-            return redirect()->route('cart')->with('warn', 'Set at least one quantity before checking out.');
+            return 'Set at least one quantity before checking out.';
         }
         $st = [
-            'fulfillment' => old('fulfillment', $request->query('fulfillment', $supplier->fulfillment === 'pickup' ? 'pickup' : 'delivery')),
+            'fulfillment' => old('fulfillment', $request->query('fulfillment', $supplier->offersDelivery() ? 'delivery' : 'pickup')),
             'arrangement' => old('arrangement', $request->query('arrangement', in_array('down', $supplier->arrangements, true) ? 'down' : $supplier->arrangements[0])),
         ];
         if (! in_array($st['arrangement'], $supplier->arrangements, true)) {
             $st['arrangement'] = $supplier->arrangements[0];
         }
-        if (($st['fulfillment'] === 'delivery' && $supplier->fulfillment === 'pickup') || ($st['fulfillment'] === 'pickup' && $supplier->fulfillment === 'delivery')) {
-            $st['fulfillment'] = $supplier->fulfillment;
+        if ($st['fulfillment'] === 'delivery' && ! $supplier->offersDelivery()) {
+            $st['fulfillment'] = 'pickup';
         }
+        if ($st['fulfillment'] === 'pickup' && ! $supplier->offersPickup()) {
+            $st['fulfillment'] = 'delivery';
+        }
+        // An explicit ?city= (even empty, from the live re-quote) wins over the saved city.
+        $city = old('addr.cityCode') ?? ($request->has('city') ? $request->query('city') : customer_city());
+        $city = Locations::isCity($city) ? $city : null;
         $clean = array_map(fn ($l) => array_merge($l, ['days' => Rentals::cleanDays($l['days'])]), $lines);
-        $quote = Pricing::quote($clean, $supplier, $st['fulfillment'], $st['arrangement']);
+        $quote = Pricing::quote($clean, $supplier, $st['fulfillment'], $st['arrangement'], $city);
 
-        return view('customer.checkout', [
-            's' => $supplier, 'u' => $u, 'dates' => $dates, 'st' => $st, 'quote' => $quote,
+        return [
+            'dates' => $dates, 'st' => $st, 'quote' => $quote, 'city' => $city,
             'check' => inv()->check($clean),
             'schedule' => Finance::schedule($quote, today_iso(), $dates[0], $supplier->methods[0]),
-            'eventTypes' => array_merge(array_keys(Ai::EVENTS), ['Community', 'Other']),
-        ]);
+        ];
     }
 
     public function submit(Request $request, Supplier $supplier)
@@ -105,14 +147,14 @@ class CartController extends Controller
             'eventType' => 'required|string|max:40',
             'eventDate' => 'required|date',
             'fulfillment' => 'required|in:delivery,pickup',
-            'address' => 'required_if:fulfillment,delivery|nullable|string|max:255',
+            ...AddressInput::rules('addr', true, $request->input('fulfillment') === 'delivery'),
             'contactName' => 'required|string|max:120',
             'contactPhone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'],
             'instructions' => 'nullable|string|max:1000',
             'arrangement' => 'required|in:full,down,installment,reservation',
             'method' => 'required|in:cod,bank,debit',
             'agree' => 'accepted',
-        ], ['contactPhone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'agree.accepted' => 'Please accept the policies.', 'address.required_if' => 'Enter the delivery address.']);
+        ], array_merge(AddressInput::messages(), ['contactPhone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'agree.accepted' => 'Please accept the policies.']));
         $dates = collect(Rentals::cartLinesFor($request->user(), $supplier->id))->flatMap(fn ($l) => array_keys(Rentals::cleanDays($l['days'])))->sort()->values();
         if ($dates->isNotEmpty() && ($data['eventDate'] < $dates->first() || $data['eventDate'] > $dates->last())) {
             return back()->withInput()->with('error', 'Event date should fall within your rental dates.');
@@ -120,6 +162,9 @@ class CartController extends Controller
         $res = Rentals::submitRequest($request->user(), $supplier, $data);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
+        }
+        if ($data['fulfillment'] === 'delivery' && ! $request->user()->city_code) {
+            $request->user()->update(AddressInput::attributes($data['addr'])); // first delivery address becomes the saved one
         }
 
         return redirect()->route('rentals.confirmation', $res['request']);

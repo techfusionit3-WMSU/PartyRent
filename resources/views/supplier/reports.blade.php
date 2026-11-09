@@ -3,7 +3,7 @@
 @section('content')
 <div class="page-head"><div><h1>Business Reports</h1><p>{{ fmt_range($rg['from'], $rg['to']) }}</p></div>@include('partials.range-picker', ['route' => 'supplier.reports', 'csvRoute' => 'supplier.reports.csv'])</div>
 <div class="stats mb-3">
-  @include('partials.stat', ['label' => 'Rental income', 'value' => money_short($income), 'sub' => 'verified, net of refunds', 'icon' => 'chart', 'color' => 'teal'])
+  @include('partials.stat', ['label' => 'Total income', 'value' => money_short($income), 'sub' => 'Rental '.money_short($split['rental']).' · Sales '.money_short($split['sales']), 'icon' => 'chart', 'color' => 'teal'])
   @include('partials.stat', ['label' => 'Requests received', 'value' => $inRange->count(), 'sub' => $inRange->where('status', 'declined')->count().' declined', 'icon' => 'list', 'color' => 'purple'])
   @include('partials.stat', ['label' => 'Outstanding balances', 'value' => money_short($outstanding->sum(fn ($r) => $r->fin()['balance'])), 'sub' => $outstanding->count().' rentals', 'icon' => 'cash', 'color' => 'pink'])
   @include('partials.stat', ['label' => 'Damage & loss', 'value' => money_short($dmg->sum(fn ($r) => $r->inspection['compensation'])), 'sub' => $dmg->count().' incidents', 'icon' => 'tool', 'color' => 'red'])

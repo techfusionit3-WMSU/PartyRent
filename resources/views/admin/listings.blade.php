@@ -14,7 +14,7 @@
     @if($view === 'items')
       <thead><tr><th>Item</th><th>Supplier</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $p)
-        <tr><td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">★ {{ $p->rating }} · {{ $p->rent_count }} rentals</div></div></div></td><td data-label="Supplier">{{ $p->supplier->name }}<div class="small muted">{{ ucfirst($p->supplier->status) }}</div></td><td data-label="Category">{{ $p->category->name ?? '' }}</td><td data-label="Price" class="num">{{ money($p->basePrice()) }}</td><td data-label="Stock" class="num">{{ $p->total_stock }}</td>
+        <tr><td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">★ {{ rating_text($p) }} · {{ $p->rent_count }} rentals</div></div></div></td><td data-label="Supplier">{{ $p->supplier->name }}<div class="small muted">{{ ucfirst($p->supplier->status) }}</div></td><td data-label="Category">{{ $p->category->name ?? '' }}</td><td data-label="Price" class="num">{{ money($p->basePrice()) }}</td><td data-label="Stock" class="num">{{ $p->total_stock }}</td>
           <td data-label="Status"><span class="badge {{ ['published' => 'b-green', 'hidden' => 'b-red'][$p->status] ?? 'b-gray' }}">{{ ucfirst($p->status) }}</span></td>
           <td>@if($canManage && $p->status !== 'draft')
             @if($p->status === 'published')

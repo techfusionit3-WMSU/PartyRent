@@ -14,17 +14,43 @@ if (! function_exists('r2')) {
     }
 }
 
+if (! function_exists('currency_symbol')) {
+    /** The one place the currency comes from (config/partyrent.php). */
+    function currency_symbol(): string
+    {
+        return (string) config('partyrent.currency.symbol', '₱');
+    }
+}
+
 if (! function_exists('money')) {
     function money(float|int|string|null $n): string
     {
-        return '₱'.number_format(r2($n), 2);
+        return currency_symbol().number_format(r2($n), 2);
     }
 }
 
 if (! function_exists('money_short')) {
     function money_short(float|int|string|null $n): string
     {
-        return '₱'.number_format(round((float) $n));
+        return currency_symbol().number_format(round((float) $n));
+    }
+}
+
+if (! function_exists('customer_city')) {
+    /** City the shopper wants things delivered to: the "deliver to" pick for this session, else the saved address. */
+    function customer_city(): ?string
+    {
+        $c = session('deliver_to') ?: auth()->user()?->city_code;
+
+        return $c && \App\Domain\Locations::isCity($c) ? $c : null;
+    }
+}
+
+if (! function_exists('format_address')) {
+    /** Display string for a structured address (see App\Domain\Locations). */
+    function format_address(?array $parts, bool $withLandmark = true): string
+    {
+        return \App\Domain\Locations::formatAddress($parts, $withLandmark);
     }
 }
 
@@ -139,6 +165,16 @@ if (! function_exists('time_ago')) {
         $d = intdiv($h, 24);
 
         return $d < 30 ? $d.'d ago' : fmt_date($ts);
+    }
+}
+
+if (! function_exists('rating_text')) {
+    /** "4.8 (12)" from real reviews, or "No reviews yet". Accepts a Product or Supplier. */
+    function rating_text(object $m): string
+    {
+        $n = (int) ($m->review_count ?? 0);
+
+        return $n ? number_format((float) $m->rating, 1).' ('.$n.')' : 'No reviews yet';
     }
 }
 

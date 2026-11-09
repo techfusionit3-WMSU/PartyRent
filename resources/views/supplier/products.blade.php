@@ -10,7 +10,7 @@
       @foreach($list as $p)
         @php($b = inv()->breakdown($p->id, $today))
         <tr>
-          <td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">{{ $p->rent_count }} rentals · ★ {{ $p->rating }}</div></div></div></td>
+          <td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">{{ $p->rent_count }} rentals · ★ {{ rating_text($p) }}</div></div></div></td>
           <td data-label="Category">{{ $p->category->name ?? '' }}</td>
           <td data-label="Price" class="num">{{ money($p->basePrice()) }}@if(count($p->tiers) > 1)<div class="small muted">{{ count($p->tiers) }} tiers</div>@endif</td>
           <td data-label="Stock" class="num">{{ $p->total_stock }}</td>

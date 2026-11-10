@@ -4,6 +4,15 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
+Done: **pay at checkout** (user request 2026-11-10: "it goes to Request submitted without paying").
+Checkout now shows "Pay now to confirm" (`Finance::upfront` per payment method, `data-due-*`), a "Pay now with"
+choice (online via PayMongo/practice, or transfer), and the button "Place request & pay ₱X". After saving the
+request: online → `PayMongo::start` → checkout page; transfer → `rentals.show?pay=1`, which opens the pay form.
+The confirmation page is no longer used after checkout.
+- [x] `PracticeCheckoutTest::test_checkout_goes_straight_to_payment`; 70 tests green
+- [x] Browser run (`drv/paynow.js`): Maria, Celebration Hub, down payment → practice pay → PR-0017 verified (OR-10024). PR-0017 "Pay Now Smoke" is leftover test data in the dev DB.
+
+### Previous: PayMongo practice mode
 Done: **PayMongo practice mode** (user request 2026-11-10). PayMongo has paused new sign-ups, so there are no keys.
 `PAYMONGO_FAKE=true` (set in the local `.env`; never active when `APP_ENV=production`) makes "Pay online" open a
 built-in practice checkout (`PracticeCheckoutController`, `customer/practice-checkout`) with Pay / fail / cancel.

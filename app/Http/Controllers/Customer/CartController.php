@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Customer;
 use App\Domain\Ai;
 use App\Domain\Finance;
 use App\Domain\Locations;
+use App\Domain\PayMongo;
 use App\Domain\Pricing;
 use App\Domain\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\CartLine;
+use App\Models\RentalRequest;
 use App\Models\Supplier;
 use App\Support\AddressInput;
 use Illuminate\Http\Request;
@@ -100,7 +102,7 @@ class CartController extends Controller
         return response()->json([
             'ok' => $c['st']['fulfillment'] !== 'delivery' || ($q['delivery']['ok'] ?? false),
             'deliveryHtml' => view('customer._delivery-quote', ['d' => $q['delivery'], 's' => $supplier])->render(),
-            'summaryHtml' => view('customer._checkout-summary', ['q' => $q, 'schedule' => $c['schedule']])->render(),
+            'summaryHtml' => view('customer._checkout-summary', ['q' => $q, 'schedule' => $c['schedule'], 'due' => $c['due']])->render(),
         ]);
     }
 
@@ -134,10 +136,18 @@ class CartController extends Controller
         $clean = array_map(fn ($l) => array_merge($l, ['days' => Rentals::cleanDays($l['days'])]), $lines);
         $quote = Pricing::quote($clean, $supplier, $st['fulfillment'], $st['arrangement'], $city);
 
+        $due = [];
+        foreach ($supplier->methods as $m) {
+            $probe = new RentalRequest(['start_date' => $dates[0], 'method' => $m, 'status' => 'pending']);
+            $probe->setRelation('supplier', $supplier);
+            $due[$m] = Finance::upfront($probe, $quote);
+        }
+
         return [
             'dates' => $dates, 'st' => $st, 'quote' => $quote, 'city' => $city,
             'check' => inv()->check($clean),
             'schedule' => Finance::schedule($quote, today_iso(), $dates[0], $supplier->methods[0]),
+            'due' => $due, 'online' => PayMongo::enabled(),
         ];
     }
 
@@ -154,6 +164,7 @@ class CartController extends Controller
             'instructions' => 'nullable|string|max:1000',
             'arrangement' => 'required|in:full,down,installment,reservation',
             'method' => 'required|in:cod,bank,debit',
+            'payWith' => 'nullable|in:online,transfer',
             'agree' => 'accepted',
         ], array_merge(AddressInput::messages(), ['contactPhone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'agree.accepted' => 'Please accept the policies.']));
         $dates = collect(Rentals::cartLinesFor($request->user(), $supplier->id))->flatMap(fn ($l) => array_keys(Rentals::cleanDays($l['days'])))->sort()->values();
@@ -168,6 +179,19 @@ class CartController extends Controller
             $request->user()->update(AddressInput::attributes($data['addr'])); // first delivery address becomes the saved one
         }
 
-        return redirect()->route('rentals.confirmation', $res['request']);
+        // Like a marketplace checkout: go straight to paying the amount that confirms the request.
+        $r = $res['request']->fresh(['payments', 'supplier', 'customer']);
+        $up = $r->fin()['upfront'];
+        if (($data['payWith'] ?? 'transfer') === 'online' && PayMongo::enabled()) {
+            $pay = PayMongo::start($r, ['type' => $up['type'], 'amount' => $up['amount']]);
+            if ($pay['ok']) {
+                return redirect()->away($pay['url']);
+            }
+
+            return redirect()->route('rentals.show', ['rentalRequest' => $r, 'pay' => 1])->with('warn', 'Request '.$r->code.' saved, but online payment could not start: '.$pay['error']);
+        }
+
+        return redirect()->route('rentals.show', ['rentalRequest' => $r, 'pay' => 1])
+            ->with('success', 'Request '.$r->code.' saved. Pay the '.strtolower($up['label']).' of '.money($up['amount']).' now to confirm it.');
     }
 }

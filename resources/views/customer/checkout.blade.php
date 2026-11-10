@@ -38,7 +38,7 @@
     </div>
 
     <div class="card"><h3>3 · Payment arrangement</h3>
-      <p class="small muted">{{ $s->name }} accepts the options below. You will pay after the supplier accepts your request.</p>
+      <p class="small muted">{{ $s->name }} accepts the options below. You pay the first payment now; {{ $s->name }} accepts your request once PartyRent has verified it.</p>
       <div class="stack-sm">
         @foreach($s->arrangements as $a)
           <a class="card card-flat row" style="padding:12px 14px;cursor:pointer;color:inherit;text-decoration:none;{{ $a === $st['arrangement'] ? 'border-color:var(--brand)' : '' }}" href="{{ route('checkout', array_filter(['supplier' => $s->id, 'fulfillment' => $st['fulfillment'], 'arrangement' => $a, 'city' => $city])) }}">
@@ -53,7 +53,7 @@
         @endforeach
         <input type="hidden" name="arrangement" value="{{ $st['arrangement'] }}">
       </div>
-      <div class="field mt-2"><label>Payment method</label><select class="input" name="method">@foreach($s->methods as $m)<option value="{{ $m }}" @selected(old('method') === $m)>{{ \App\Models\Payment::METHOD_LABEL[$m] ?? $m }}</option>@endforeach</select></div>
+      <div class="field mt-2"><label>Payment method for the rest</label><select class="input" name="method" id="ckMethod">@foreach($s->methods as $m)<option value="{{ $m }}" @selected(old('method') === $m)>{{ \App\Models\Payment::METHOD_LABEL[$m] ?? $m }}</option>@endforeach</select></div>
     </div>
 
     <div class="card"><h3>4 · Review items & daily quantities</h3>
@@ -64,12 +64,18 @@
 
   @php($deliveryBlocked = $st['fulfillment'] === 'delivery' && ! ($q['delivery']['ok'] ?? false))
   <aside class="card sticky-side"><h3>Order summary</h3>
-    <div id="sumBox">@include('customer._checkout-summary', ['q' => $q, 'schedule' => $schedule])</div>
+    <div id="sumBox">@include('customer._checkout-summary', ['q' => $q, 'schedule' => $schedule, 'due' => $due])</div>
+    <div class="field mt-2"><label>Pay now with</label>
+      <div class="stack-sm">
+        @if($online)<label class="card card-flat row" style="padding:10px 12px;gap:8px"><input type="radio" name="payWith" value="online" @checked(old('payWith', 'online') === 'online')><div><b>Pay online</b><div class="small muted">{{ \App\Domain\PayMongo::practice() ? 'Practice checkout (no real money)' : 'GCash, Maya, card or QR Ph. Verified instantly.' }}</div></div></label>@endif
+        <label class="card card-flat row" style="padding:10px 12px;gap:8px"><input type="radio" name="payWith" value="transfer" @checked(! $online || old('payWith') === 'transfer')><div><b>Bank / GCash transfer</b><div class="small muted">Send to a PartyRent account and upload the receipt. Verified by our cashier.</div></div></label>
+      </div>
+    </div>
     <label class="check mt-2"><input type="checkbox" name="agree" value="1" required> I agree to {{ $s->name }}'s cancellation, return and rental policies.</label>
     @error('agree')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
-    <button class="btn btn-primary btn-lg btn-block mt-1" type="submit" id="submitReq" data-busy="Submitting…" data-stock-ok="{{ $check['ok'] ? 1 : 0 }}" @disabled(! $check['ok'] || $deliveryBlocked)>Submit rental request</button>
+    <button class="btn btn-primary btn-lg btn-block mt-1" type="submit" id="submitReq" data-busy="Placing request…" data-stock-ok="{{ $check['ok'] ? 1 : 0 }}" @disabled(! $check['ok'] || $deliveryBlocked)>Place request &amp; pay <span data-due-amount-btn>{{ money(reset($due)['amount']) }}</span></button>
     <p class="small mt-1 mb-0 {{ $deliveryBlocked ? '' : 'hidden' }}" id="blockedNote" style="color:var(--red)">Choose an address this supplier delivers to, or switch to pickup.</p>
-    <p class="small muted mt-1 mb-0">Your request will be <b>Pending</b> until the supplier reviews it. No payment is collected yet.</p>
+    <p class="small muted mt-1 mb-0">Your request stays <b>Pending</b> until you pay and the supplier accepts it. Items are reserved once it is accepted.</p>
   </aside>
 </form>
 @push('scripts')
@@ -86,6 +92,19 @@
   }); });
   f.addEventListener('submit', function () { try { sessionStorage.removeItem(key); } catch (e) {} });
 
+  // "Pay now" amount follows the payment method (Cash on Delivery + full payment pays only a down payment now).
+  var syncDue = function () {
+    var box = document.querySelector('[data-due-box]'), m = document.getElementById('ckMethod');
+    if (!box || !m) return;
+    var v = (box.getAttribute('data-due-' + m.value) || '').split('|');
+    if (v.length < 2) return;
+    box.querySelector('[data-due-label]').textContent = v[0];
+    box.querySelector('[data-due-amount]').textContent = v[1];
+    var b = document.querySelector('[data-due-amount-btn]'); if (b) b.textContent = v[1];
+  };
+  document.getElementById('ckMethod').addEventListener('change', syncDue); syncDue();
+  f.addEventListener('pr:quoted', syncDue);
+
   // Live delivery re-quote when the city changes.
   var seq = 0, btn = document.getElementById('submitReq'), note = document.getElementById('blockedNote');
   f.addEventListener('pr:city', function (e) {
@@ -96,6 +115,7 @@
       if (mine !== seq) return;
       var dq = document.getElementById('dq'); if (dq) dq.innerHTML = r.deliveryHtml;
       document.getElementById('sumBox').innerHTML = r.summaryHtml;
+      f.dispatchEvent(new Event('pr:quoted'));
       btn.disabled = !r.ok || btn.dataset.stockOk !== '1';
       note.classList.toggle('hidden', r.ok);
     }).catch(function () { window.PRUI.toast('Could not update the delivery fee. Please reload the page.', 'error'); });

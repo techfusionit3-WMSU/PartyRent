@@ -172,6 +172,8 @@
   document.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () { try { navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch (e) {} }); });
   k.addEventListener('change', function () { a.value = k.selectedOptions[0].dataset.amount; });
   m.addEventListener('change', sync); sync();
+  // arriving from checkout (?pay=1): open the payment form right away
+  if (new URLSearchParams(location.search).get('pay') === '1') { var opener = document.querySelector('[data-modal=payModal]'); if (opener) setTimeout(function () { opener.click(); }, 50); }
   document.getElementById('proof').addEventListener('change', function (e) { document.getElementById('proofName').textContent = e.target.files[0] ? 'Selected: ' + e.target.files[0].name : ''; });
 })();
 </script>

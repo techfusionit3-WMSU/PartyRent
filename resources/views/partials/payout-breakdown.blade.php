@@ -1,6 +1,6 @@
 {{-- Shopee-style payout breakdown. $b = Payouts::breakdown() or Payout::breakdown(); optional $title, $netLabel --}}
 @php($pctTxt = rtrim(rtrim(number_format($b['pct'], 2), '0'), '.'))
-<div class="payout-bd">
+<div class="payout-bd small" style="min-width:240px;text-align:left;margin-top:6px">
   @isset($title)<div class="strong mb-1">{{ $title }}</div>@endisset
   <div class="row between"><span>Items &amp; services</span><span class="num">{{ money($b['items']) }}</span></div>
   <div class="row between"><span>Platform commission ({{ $pctTxt }}%)</span><span class="num">− {{ money($b['commission']) }}</span></div>

@@ -20,7 +20,7 @@
         <td data-label="Items" class="num">{{ money($pb['items']) }}</td>
         <td data-label="Commission" class="num">− {{ money($p->commission) }}<div class="small muted">{{ rtrim(rtrim(number_format($p->commission_pct, 2), '0'), '.') }}%</div></td>
         <td data-label="Delivery · damages" class="num">{{ $pb['delivery'] + $pb['voucher'] + $pb['compensation'] > 0 ? '+ '.money($pb['delivery'] + $pb['voucher'] + $pb['compensation']) : '—' }}@if($pb['voucher'] > 0)<div class="small muted">incl. {{ money($pb['voucher']) }} voucher</div>@endif</td>
-        <td data-label="Send" class="num"><details><summary><b>{{ money($p->net) }}</b></summary>@include('partials.payout-breakdown', ['b' => $pb, 'netLabel' => 'Send to supplier'])</details></td>
+        <td data-label="Send" class="num"><b>{{ money($p->net) }}</b></td>
         <td data-label="Transfer">@if(! $p->supplier->hasPayoutAccount())<span class="small muted">Waiting for the supplier's payout account</span>@else<form method="POST" action="{{ route('admin.payouts.pay', $p) }}" class="row" style="gap:6px;flex-wrap:wrap">@csrf
           <select class="input input-sm" name="method" style="width:auto" aria-label="Method">@foreach(\App\Models\Payout::METHOD_LABEL as $k => $l)<option value="{{ $k }}" @selected($p->supplier->payout_method === $k)>{{ $l }}</option>@endforeach</select>
           <input class="input input-sm" name="reference" placeholder="Reference no." required maxlength="80" style="width:140px" aria-label="Reference number">
@@ -36,7 +36,7 @@
         <td data-label="Supplier">{{ $r->supplier->name }}</td>
         <td data-label="Status">@include('partials.badges', ['status' => $r->status])@if($r->payments->where('status', 'pending')->isNotEmpty())<div class="small" style="color:var(--red)">payment pending verification</div>@endif</td>
         <td data-label="Held" class="num">{{ money($b['income'] + $b['voucher'] + $b['compensation']) }}</td>
-        <td data-label="Payout" class="num"><details><summary><b>{{ money($b['net']) }}</b></summary>@include('partials.payout-breakdown', ['b' => $b, 'netLabel' => 'Supplier receives'])</details></td>
+        <td data-label="Payout" class="num"><b>{{ money($b['net']) }}</b><div class="small muted">after {{ money($b['commission']) }} commission{{ $b['delivery'] + $b['voucher'] > 0 ? ' · incl. '.money($b['delivery'] + $b['voucher']).' delivery' : '' }}</div></td>
         <td><form method="POST" action="{{ route('admin.payouts.release', $r) }}">@csrf<button class="btn btn-sm">Release</button></form></td>
       </tr>@endforeach
     </tbody></table></div>@endif

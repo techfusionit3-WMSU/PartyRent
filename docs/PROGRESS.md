@@ -16,7 +16,7 @@ full payment pays the supplier's down % (default `DEFAULT_COD_DOWN_PCT` = 20) up
 - [x] UI: customer pay-now alert + pay options, confirmation steps, supplier accept button/modal, requests list badges, cashier record list includes pending/declined
 - [x] Seeder: PR-0004 reservation fee verified, PR-0005 down payment pending
 - [x] `DownPaymentTest`; lifecycle + sale items tests pay before accepting
-- [ ] Browser check
+- [x] Browser check (`drv/downpay.js`): supplier list badge, disabled Accept + next-step text, customer pay-now alert and pay options at phone width; no console/500 errors. Dev DB differs from the seed (PR-0003 declined there), so PR-0005 was used.
 
 ### Previous: escrow + payouts
 Done: **escrow + supplier payouts (Shopee model)** (migration `2026_11_10_000200`, `App\Domain\Payouts`).

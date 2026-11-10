@@ -18,6 +18,8 @@ class RentalLifecycleTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private function user(string $email): User
     {
         return User::where('email', $email)->firstOrFail();

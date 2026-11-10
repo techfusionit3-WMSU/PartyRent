@@ -19,6 +19,8 @@ class DeliveryPricingTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private const QC = '137404000';
     private const MARIKINA = '137402000';
     private const CEBU_CITY = '072217000';

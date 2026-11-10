@@ -17,6 +17,8 @@ class EmailVerificationTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private function register(string $email = 'new.user@gmail.com')
     {
         return $this->post('/register', [

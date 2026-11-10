@@ -17,6 +17,8 @@ class SupplierLocationTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private const MARIKINA = ['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '137402000'];
 
     private function user(string $email): User

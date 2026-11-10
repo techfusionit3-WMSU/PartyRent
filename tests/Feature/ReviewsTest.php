@@ -21,6 +21,8 @@ class ReviewsTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private function as(User $u, ?string $mode = null): static
     {
         return $this->actingAs($u)->withSession(['mode' => $mode ?? $u->defaultMode()]);

@@ -17,6 +17,8 @@ class DownPaymentTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private function as(string $email, string $mode): static
     {
         return $this->actingAs(User::where('email', $email)->firstOrFail())->withSession(['mode' => $mode]);

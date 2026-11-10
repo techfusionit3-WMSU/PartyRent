@@ -17,6 +17,8 @@ class PagesTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private function as(string $email, ?string $mode = null): static
     {
         $u = User::where('email', $email)->firstOrFail();

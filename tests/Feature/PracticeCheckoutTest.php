@@ -17,6 +17,8 @@ class PracticeCheckoutTest extends TestCase
 
     protected bool $seed = true;
 
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     protected function setUp(): void
     {
         parent::setUp();

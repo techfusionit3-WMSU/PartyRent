@@ -26,7 +26,7 @@ routes exist; controllers + UI were never written.
 - [x] `PackagesTest`
 
 ## Notes (newest first)
-- 2026-11-10: packages/sale items finished; 47 tests green. Not yet tried in a real browser (builder JS, configurator JS): do that next.
+- 2026-11-10: packages/sale items finished and driven in headless Edge (playwright-core): sale form, builder, preview, publish, customer options, cart. Fixed: `[hidden]` lost to `.field{display:flex}`; cart package lines now show choices and price with the saved `sel`; warning when a fixed price exceeds the separate total. 47 tests green.
 - 2026-11-10: another session (4c1abe1) briefly worked the same task; user chose this session to continue. Its `CatalogController::restock` is the one kept.
 - 2026-11-09 (pickup): routes in `routes/web.php` reference the missing controller methods above; editing a package is broken until the builder posts `components`/`pricing`.
 - 2026-11-09: Created this file and the `/pickup` + `/checkpoint` commands.

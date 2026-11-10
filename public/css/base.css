@@ -404,3 +404,6 @@ label.pkg-row { cursor: pointer; }
 .pkg-comp { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
 .pkg-comp .head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .pkg-comp .opts { border-left: 3px solid var(--line); padding-left: 10px; margin-top: 6px; }
+
+/* the hidden attribute always wins over component display rules (.field, .row, …) */
+[hidden] { display: none !important; }

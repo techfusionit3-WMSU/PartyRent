@@ -254,7 +254,9 @@ class CatalogController extends Controller
         $pp = Packages::price($def, (array) $request->input('sel', []) ?: null);
 
         return response()->json([
-            'ok' => $v['ok'], 'error' => $v['error'], 'warnings' => $def['components'] ? Packages::stockWarnings($def) : [],
+            'ok' => $v['ok'], 'error' => $v['error'],
+            'warnings' => array_merge($def['components'] ? Packages::stockWarnings($def) : [], $def['pricing']['mode'] === 'fixed' && $pp['separate'] > 0 && $pp['package'] > $pp['separate']
+                ? ['Your fixed price ('.money($pp['package']).') is higher than getting everything separately ('.money($pp['separate']).'). Customers may skip the package.'] : []),
             'package' => $pp['package'], 'packageText' => money($pp['package']), 'perDayText' => money($pp['perDay']), 'onceText' => money($pp['once']),
             'separateText' => money($pp['separate']), 'savings' => $pp['savings'], 'savingsText' => money($pp['savings']),
             'usesGuests' => Packages::usesGuests($def), 'guests' => $pp['sel']['guests'],

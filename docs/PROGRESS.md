@@ -17,13 +17,15 @@ routes exist; controllers + UI were never written.
   (all four landed together in WIP commit 03cee1a; 41 tests green on 2026-11-09)
 
 ## Next (sale items + custom packages)
-- [ ] Product form: listing type rent/sale, perishable, lead days, shelf life, low-stock alert (CatalogController product data)
-- [ ] Inventory page: stock on hand, restock form, movement log (`CatalogController::restock`)
+- [x] Product form: listing type rent/sale, perishable, lead days, shelf life, low-stock alert (CatalogController product data)
+- [x] Inventory page: stock on hand, restock form, movement log (`CatalogController::restock`)
 - [ ] Package builder: components editor, pricing mode, guests, draft; `packagePrice`, `previewPackage`
 - [ ] Package list actions: `duplicatePackage`, `movePackage`, `packageActive`, `deletePackage`
 - [ ] Market package page: choices / add-ons / guests, `ApiController::packageQuote`, cart add with `sel`
-- [ ] Tests: `SaleItemsTest`, `PackagesTest`
+- [x] `SaleItemsTest`
+- [ ] `PackagesTest`
 
 ## Notes (newest first)
+- 2026-11-10: another session (4c1abe1) briefly worked the same task; user chose this session to continue. Its `CatalogController::restock` is the one kept.
 - 2026-11-09 (pickup): routes in `routes/web.php` reference the missing controller methods above; editing a package is broken until the builder posts `components`/`pricing`.
 - 2026-11-09: Created this file and the `/pickup` + `/checkpoint` commands.

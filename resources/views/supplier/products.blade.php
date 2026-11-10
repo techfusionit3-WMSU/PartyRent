@@ -1,18 +1,18 @@
 @extends('layouts.dash', ['title' => 'Products', 'nav' => 'products'])
 
 @section('content')
-<div class="page-head"><div><h1>Products</h1><p>{{ $list->count() }} listings. Stock shown for today; open Inventory for holds and condition counts.</p></div><a class="btn btn-primary" href="{{ route('supplier.products.create') }}">{{ icon('plus') }}Add product</a></div>
+<div class="page-head"><div><h1>Products</h1><p>{{ $list->count() }} listings. Stock shown for today; open Inventory for holds and condition counts.</p></div><div class="btn-group"><a class="btn" href="{{ route('supplier.products.create', ['type' => 'sale']) }}">{{ icon('plus') }}Add item for sale</a><a class="btn btn-primary" href="{{ route('supplier.products.create') }}">{{ icon('plus') }}Add rental item</a></div></div>
 <div class="card pad-0">
   @if($list->isEmpty())
     @include('partials.empty', ['emoji' => '📦', 'title' => 'No products yet', 'text' => 'Add your first rental item to start receiving requests.', 'action' => '<a class="btn btn-primary" href="'.route('supplier.products.create').'">Add product</a>'])
   @else
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Item</th><th>Category</th><th class="num">Price / day</th><th class="num">Stock</th><th class="num">Available today</th><th>Status</th><th></th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Item</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th class="num">Available today</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $p)
         @php($b = inv()->breakdown($p->id, $today))
         <tr>
-          <td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">{{ $p->rent_count }} rentals · ★ {{ rating_text($p) }}</div></div></div></td>
+          <td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b>@if($p->isSale()) <span class="badge b-purple">For sale</span>@endif @if($p->isLowStock()) <span class="badge b-red">Low stock</span>@endif<div class="small muted">{{ $p->rent_count }} {{ $p->isSale() ? 'orders' : 'rentals' }} · ★ {{ rating_text($p) }}</div></div></div></td>
           <td data-label="Category">{{ $p->category->name ?? '' }}</td>
-          <td data-label="Price" class="num">{{ money($p->basePrice()) }}@if(count($p->tiers) > 1)<div class="small muted">{{ count($p->tiers) }} tiers</div>@endif</td>
+          <td data-label="Price" class="num">{{ money($p->basePrice()) }}<div class="small muted">{{ $p->priceUnitLabel() }}</div>@if(count($p->tiers) > 1)<div class="small muted">{{ count($p->tiers) }} tiers</div>@endif</td>
           <td data-label="Stock" class="num">{{ $p->total_stock }}</td>
           <td data-label="Available" class="num"><b>{{ $b['available'] }}</b>@if($b['reserved'])<div class="small muted">{{ $b['reserved'] }} reserved</div>@endif</td>
           <td data-label="Status"><span class="badge {{ ['published' => 'b-green', 'draft' => 'b-gray', 'hidden' => 'b-gold'][$p->status] ?? 'b-gray' }}">{{ ucfirst($p->status) }}</span></td>

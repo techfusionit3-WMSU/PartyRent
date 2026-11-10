@@ -38,7 +38,7 @@ class CatalogController extends Controller
 
     public function createProduct(Request $request)
     {
-        return view('supplier.product-form', ['p' => new Product(['tiers' => [['min' => 1, 'max' => null, 'price' => '']], 'unit' => 'piece / day', 'condition' => 'Excellent', 'status' => 'published', 'delivery' => true, 'pickup' => true, 'colors' => [], 'themes' => [], 'events' => []]), 'cats' => Category::where('active', true)->orderBy('sort')->get(), 'events' => array_keys(Ai::EVENTS)]);
+        return view('supplier.product-form', ['p' => new Product(['listing_type' => $request->query('type') === 'sale' ? 'sale' : 'rent', 'tiers' => [['min' => 1, 'max' => null, 'price' => '']], 'unit' => $request->query('type') === 'sale' ? 'pc' : 'piece / day', 'condition' => 'Excellent', 'status' => 'published', 'delivery' => true, 'pickup' => true, 'colors' => [], 'themes' => [], 'events' => []]), 'cats' => Category::where('active', true)->orderBy('sort')->get(), 'events' => array_keys(Ai::EVENTS)]);
     }
 
     public function editProduct(Request $request, Product $product)
@@ -52,8 +52,13 @@ class CatalogController extends Controller
             'name' => 'required|string|min:3|max:120',
             'category_id' => 'required|exists:categories,id',
             'description' => 'required|string|min:10|max:2000',
+            'listing_type' => 'nullable|in:rent,sale',
             'total_stock' => 'required|integer|min:0|max:100000',
             'unit' => 'required|string|max:40',
+            'perishable' => 'nullable|boolean',
+            'lead_days' => 'nullable|integer|min:0|max:60',
+            'shelf_life_days' => 'nullable|integer|min:1|max:3650',
+            'low_stock_at' => 'nullable|integer|min:0|max:100000',
             'condition' => 'required|string|max:40',
             'status' => 'required|in:published,draft,hidden',
             'tiers' => 'required|array|min:1|max:8',
@@ -67,15 +72,41 @@ class CatalogController extends Controller
             'handling_fee' => 'nullable|numeric|min:0|max:1000000',
             'handling_per' => 'nullable|in:line,unit',
             'images' => 'nullable|array|max:5', 'images.*' => 'image|max:8192',
+            'listing_type' => 'nullable|in:rent,sale',
+            'perishable' => 'nullable|boolean',
+            'lead_days' => 'nullable|integer|min:0|max:60',
+            'shelf_life_days' => 'nullable|integer|min:1|max:3650',
+            'low_stock_at' => 'nullable|integer|min:0|max:100000',
         ]);
+        $sale = ($v['listing_type'] ?? 'rent') === 'sale';
+        if ($sale && ! in_array($v['unit'], Product::SALE_UNITS, true)) {
+            $v['unit'] = 'pc';
+        }
+        if (! $sale && ! str_contains($v['unit'], '/')) {
+            $v['unit'] = 'piece / day';
+        }
         $split = fn ($s) => array_values(array_filter(array_map(fn ($x) => ucwords(trim($x)), explode(',', (string) $s))));
+        $sale = ($v['listing_type'] ?? 'rent') === 'sale';
+        $unit = $sale
+            ? (in_array($v['unit'], Product::SALE_UNITS, true) ? $v['unit'] : 'pc')
+            : (str_contains($v['unit'], '/') ? $v['unit'] : 'piece / day');
 
         return [
+            'listing_type' => $sale ? 'sale' : 'rent',
+            'perishable' => $sale && $request->boolean('perishable'),
+            'lead_days' => $sale ? (int) ($v['lead_days'] ?? 0) : 0,
+            'shelf_life_days' => $sale && $request->boolean('perishable') ? ($v['shelf_life_days'] ?? null) : null,
+            'low_stock_at' => $sale ? ($v['low_stock_at'] ?? null) : null,
             'name' => trim($v['name']), 'category_id' => $v['category_id'], 'description' => trim($v['description']),
-            'total_stock' => (int) $v['total_stock'], 'unit' => $v['unit'], 'condition' => $v['condition'], 'status' => $v['status'],
+            'total_stock' => (int) $v['total_stock'], 'unit' => $unit, 'condition' => $v['condition'], 'status' => $v['status'],
             'tiers' => $v['tiers'], 'colors' => $split($v['colors'] ?? ''), 'themes' => $split($v['themes'] ?? ''), 'events' => $v['events'] ?? [],
             'delivery' => $request->boolean('delivery'), 'pickup' => true,
             'handling_fee' => r2($v['handling_fee'] ?? 0), 'handling_per' => $v['handling_per'] ?? 'line',
+            'listing_type' => $sale ? 'sale' : 'rent',
+            'perishable' => $sale && $request->boolean('perishable'),
+            'lead_days' => $sale ? (int) ($v['lead_days'] ?? 0) : 0,
+            'shelf_life_days' => $sale && $request->boolean('perishable') ? ($v['shelf_life_days'] ?? null) : null,
+            'low_stock_at' => $sale ? ($v['low_stock_at'] ?? null) : null,
         ];
     }
 
@@ -180,10 +211,19 @@ class CatalogController extends Controller
     public function inventory(Request $request)
     {
         $date = $request->query('date') ?: today_iso();
-        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->with(['holds' => fn ($q) => $q->orderBy('start_date')])->orderBy('name')->get();
+        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->with(['holds' => fn ($q) => $q->orderBy('start_date'), 'movements' => fn ($q) => $q->limit(200)])->orderBy('name')->get();
         inv()->primeProducts($prods);
 
         return view('supplier.inventory', ['prods' => $prods, 'date' => $date]);
+    }
+
+    public function restock(Request $request, Product $product)
+    {
+        $p = $this->ownProduct($request, $product);
+        $data = $request->validate(['qty' => 'required|integer|min:1|max:100000', 'note' => 'nullable|string|max:255']);
+        $res = Rentals::restock($p, (int) $data['qty'], (string) ($data['note'] ?? ''));
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $p->name.' restocked: '.$res['product']->stockOnHand().' '.$p->unitWord().' on hand.' : $res['error']);
     }
 
     public function addHold(Request $request, Product $product)

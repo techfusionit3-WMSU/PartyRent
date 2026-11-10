@@ -13,13 +13,5 @@
 </form>
 <p class="center mt-2 small">New to PartyRent? <a href="{{ route('register') }}" class="strong">Create an account</a></p>
 
-@if(! app()->environment('production'))
-  <div class="divider-text">Demo accounts · password <b>demo123</b></div>
-  <div class="demo-accounts">
-    @foreach([['maria@demo.ph', 'Maria Santos', 'Customer'], ['juan@demo.ph', 'Juan Dela Cruz', 'Customer + Supplier'], ['bea@demo.ph', 'Bea Mendoza', 'Customer · application pending'], ['cashier@partyrent.ph', 'Grace Villanueva', 'Cashier'], ['admin@partyrent.ph', 'Mark Reyes', 'Admin'], ['super@partyrent.ph', 'Patricia Lim', 'Superadmin']] as [$e, $n, $r])
-      <button type="button" onclick="var f=document.getElementById('loginForm');f.email.value='{{ $e }}';f.password.value='demo123';f.submit();">{{ $n }}<span>{{ $r }}</span></button>
-    @endforeach
-  </div>
-@endif
 <p class="center mt-2"><a href="{{ route('home') }}" class="small">← Continue browsing without logging in</a></p>
 @endsection

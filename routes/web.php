@@ -65,7 +65,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{payment}/receipt', [PaymentFileController::class, 'receipt'])->name('payments.receipt');
     Route::post('/reviews/{review}/report', [ReviewController::class, 'report'])->middleware('throttle:10,1')->name('reviews.report');
     Route::get('/payments/{payment}/proof', [PaymentFileController::class, 'proof'])->name('payments.proof');
-    Route::get('/pay-qr', [PaymentFileController::class, 'qr'])->name('payments.qr');
+    Route::get('/pay-accounts/{payAccount}/qr', [PaymentFileController::class, 'qr'])->name('payments.qr');
     Route::post('/api/delivery-preview', [ApiController::class, 'deliveryPreview'])->name('api.delivery-preview');
 
     // Email verification: unverified customers can browse, but renting/selling needs a verified email.
@@ -203,6 +203,11 @@ Route::prefix('superadmin')->name('super.')->middleware(['auth', 'role:superadmi
     Route::post('/roles', [SuperController::class, 'updateRoles'])->name('roles.update');
     Route::get('/settings', [SuperController::class, 'settings'])->name('settings');
     Route::post('/settings', [SuperController::class, 'updateSettings'])->name('settings.update');
+    Route::get('/pay-accounts', [\App\Http\Controllers\Admin\PayAccountController::class, 'index'])->name('pay-accounts');
+    Route::post('/pay-accounts', [\App\Http\Controllers\Admin\PayAccountController::class, 'store'])->name('pay-accounts.store');
+    Route::post('/pay-accounts/{payAccount}', [\App\Http\Controllers\Admin\PayAccountController::class, 'update'])->name('pay-accounts.update');
+    Route::post('/pay-accounts/{payAccount}/toggle', [\App\Http\Controllers\Admin\PayAccountController::class, 'toggle'])->name('pay-accounts.toggle');
+    Route::post('/pay-accounts/{payAccount}/delete', [\App\Http\Controllers\Admin\PayAccountController::class, 'destroy'])->name('pay-accounts.delete');
 });
 
 /* ---------- PayMongo webhook (no session; checked by signature; CSRF exempt in bootstrap/app.php) ---------- */

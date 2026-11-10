@@ -97,8 +97,7 @@ class DatabaseSeeder extends Seeder
 
     private function settings(): void
     {
-        $demoAccounts = ['payGcashName' => 'PartyRent Rentals Inc.', 'payGcashNumber' => '0917 555 0142', 'payBankName' => 'BDO', 'payBankAccountName' => 'PartyRent Rentals Inc.', 'payBankAccountNo' => '0012 3456 7890'];
-        foreach (array_merge(Settings::DEFAULTS, $demoAccounts) as $k => $v) {
+        foreach (Settings::DEFAULTS as $k => $v) {
             Setting::create(['key' => $k, 'value' => $v]);
         }
         Setting::create(['key' => 'permissions.admin', 'value' => array_keys(User::ADMIN_PERMS)]);
@@ -107,6 +106,12 @@ class DatabaseSeeder extends Seeder
             Setting::create(['key' => $k, 'value' => $v]);
         }
         Settings::flush();
+        // PartyRent's demo collection accounts (fake numbers): GCash with a monthly receiving limit, BDO without, Maya switched off
+        \App\Models\PayAccount::insert([
+            ['type' => 'gcash', 'label' => 'GCash', 'account_name' => 'PartyRent Rentals Inc.', 'account_no' => '0917 555 0142', 'monthly_cap' => 100000, 'active' => true, 'sort' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['type' => 'bank', 'label' => 'BDO', 'account_name' => 'PartyRent Rentals Inc.', 'account_no' => '0012 3456 7890', 'monthly_cap' => null, 'active' => true, 'sort' => 2, 'created_at' => now(), 'updated_at' => now()],
+            ['type' => 'maya', 'label' => 'Maya', 'account_name' => 'PartyRent Rentals Inc.', 'account_no' => '0918 555 0199', 'monthly_cap' => 100000, 'active' => false, 'sort' => 3, 'created_at' => now(), 'updated_at' => now()],
+        ]);
     }
 
     private function categories(): void

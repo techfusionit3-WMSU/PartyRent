@@ -333,7 +333,14 @@ table.table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .upload-box { border: 2px dashed var(--line-2); border-radius: var(--radius); padding: 18px; text-align: center; color: var(--muted); cursor: pointer; background: var(--surface-2); }
 .upload-box:hover { border-color: var(--brand); color: var(--brand); }
 .pay-accounts { border: 1px solid var(--line-2); border-radius: var(--radius); padding: 12px; background: var(--surface-2); }
-.pay-account { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.pay-account { display: flex; align-items: flex-start; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; }
+.pay-account + .pay-account { border-top: 1px solid var(--line-2); }
+.pay-account input { margin-top: 4px; }
+.pay-account.is-full { opacity: .55; cursor: not-allowed; }
+.cap-bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.cap-bar > span { display: block; height: 100%; background: var(--green, #16a34a); }
+.cap-bar.warn > span { background: #D97706; }
+.cap-bar.full > span { background: #DC2626; }
 .pay-account > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .pay-qr { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
 .pay-qr img { width: 140px; height: 140px; object-fit: contain; background: #fff; border-radius: 8px; border: 1px solid var(--line-2); flex: none; }

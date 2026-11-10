@@ -121,13 +121,19 @@
       @endif
       <div id="bankBox">
         <div class="pay-accounts mb-2">
-          <div class="small mb-1"><b>Send your payment to PartyRent</b> (not to {{ $sup->name }}), then enter the reference number and upload your receipt.</div>
-          @forelse($accounts as $a)
-            <div class="pay-account"><span class="badge b-sky plain">{{ $a['label'] }}</span><div><b>{{ $a['number'] }}</b>@if($a['name'])<div class="small muted">{{ $a['name'] }}</div>@endif</div><button type="button" class="btn btn-xs btn-ghost" data-copy="{{ $a['number'] }}">Copy</button></div>
+          <div class="small mb-1"><b>Send your payment to PartyRent</b> (not to {{ $sup->name }}), then pick the account you used, enter the reference number and upload your receipt.</div>
+          @forelse($accounts as $i => $a)
+            <label class="pay-account" data-room="{{ $a->room() ?? '' }}">
+              <input type="radio" name="pay_account" value="{{ $a->id }}" @checked((string) old('pay_account') === (string) $a->id || (! old('pay_account') && $i === 0))>
+              <span class="badge b-sky plain">{{ $a->label }}</span>
+              <div>@if($a->account_no)<b>{{ $a->account_no }}</b>@endif @if($a->account_name)<div class="small muted">{{ $a->account_name }}</div>@endif
+                <div class="small muted pay-full hidden">Can't take this amount this month. Use another account.</div>
+                @if($a->qr_path)<div class="pay-qr"><img src="{{ route('payments.qr', $a) }}" alt="{{ $a->label }} QR code" loading="lazy"><div class="small muted">Scan with GCash, Maya or your banking app.</div></div>@endif</div>
+              @if($a->account_no)<button type="button" class="btn btn-xs btn-ghost" data-copy="{{ $a->account_no }}">Copy</button>@endif
+            </label>
           @empty
-            @unless($qr)<div class="small muted">PartyRent's account details aren't posted yet. Contact {{ setting('supportPhone') }} or {{ setting('supportEmail') }} before paying.</div>@endunless
+            <div class="small muted">PartyRent's accounts aren't available right now. Contact {{ setting('supportPhone') }} or {{ setting('supportEmail') }} before paying.</div>
           @endforelse
-          @if($qr)<div class="pay-qr"><img src="{{ route('payments.qr') }}" alt="PartyRent payment QR code" loading="lazy"><div class="small muted">Scan with GCash, Maya or your banking app (QR Ph).</div></div>@endif
         </div>
         <div class="form-grid"><div class="field"><label>Reference number</label><input class="input" name="reference" value="{{ old('reference') }}" placeholder="e.g. 1012 345 678901" maxlength="80"><div class="hint">Each reference number can be used only once.</div></div><div class="field"><label>Payment date</label><input class="input" type="date" name="date" value="{{ today_iso() }}" max="{{ today_iso() }}"></div></div>
         <div class="field"><label>Payment proof</label><label class="upload-box" for="proof">{{ icon('upload') }}<div class="small">Upload a screenshot or photo of the receipt (JPG/PNG, up to 8 MB)</div></label><input type="file" id="proof" name="proof" accept="image/*" hidden><div class="small muted" id="proofName"></div></div>
@@ -152,6 +158,17 @@
     btn.textContent = online ? 'Continue to payment' : 'Submit payment';
     btn.dataset.busy = online ? 'Opening PayMongo…' : 'Submitting…';
   };
+  // hide accounts that can't take the amount this month (monthly limit)
+  var rooms = function () {
+    var amt = parseFloat(a.value) || 0, firstOk = null, chosenOk = false;
+    document.querySelectorAll('.pay-account[data-room]').forEach(function (el) {
+      var room = el.dataset.room === '' ? Infinity : parseFloat(el.dataset.room), ok = amt <= room + 0.001, r = el.querySelector('input');
+      el.classList.toggle('is-full', !ok); r.disabled = !ok; el.querySelector('.pay-full').classList.toggle('hidden', ok);
+      if (ok && !firstOk) firstOk = r; if (ok && r.checked) chosenOk = true;
+    });
+    if (!chosenOk && firstOk) firstOk.checked = true;
+  };
+  a.addEventListener('input', rooms); k.addEventListener('change', rooms); rooms();
   document.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () { try { navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch (e) {} }); });
   k.addEventListener('change', function () { a.value = k.selectedOptions[0].dataset.amount; });
   m.addEventListener('change', sync); sync();

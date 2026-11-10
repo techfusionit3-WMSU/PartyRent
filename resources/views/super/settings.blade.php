@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="page-head"><div><h1>System settings</h1><p>Platform-wide rules. Every change is written to the audit log.</p></div></div>
-<form method="POST" action="{{ route('super.settings.update') }}" class="stack" style="max-width:760px" enctype="multipart/form-data">
+<form method="POST" action="{{ route('super.settings.update') }}" class="stack" style="max-width:760px">
   @csrf
   <div class="card"><h3>Platform</h3><div class="form-grid">
     <div class="field"><label>Platform name</label><input class="input" name="platformName" required value="{{ old('platformName', $s['platformName']) }}"></div>
@@ -18,17 +18,7 @@
     <label class="check"><input type="checkbox" name="aiEnabled" value="1" @checked($s['aiEnabled'])> PartyRent Assist (AI chat & planner) is enabled</label>
   </div>
   <div class="card"><h3>Where customers send payments</h3>
-    <p class="small muted">PartyRent's own accounts, shown in the customer's payment form for transfers. Customers pay PartyRent, never the supplier. Leave a field empty to hide it.</p>
-    <div class="form-grid">
-      <div class="field"><label>GCash number</label><input class="input" name="payGcashNumber" maxlength="40" value="{{ old('payGcashNumber', $s['payGcashNumber']) }}" placeholder="0917 123 4567"></div>
-      <div class="field"><label>GCash account name</label><input class="input" name="payGcashName" maxlength="80" value="{{ old('payGcashName', $s['payGcashName']) }}"></div>
-      <div class="field"><label>Bank</label><input class="input" name="payBankName" maxlength="60" value="{{ old('payBankName', $s['payBankName']) }}" placeholder="BDO, BPI…"></div>
-      <div class="field"><label>Bank account name</label><input class="input" name="payBankAccountName" maxlength="80" value="{{ old('payBankAccountName', $s['payBankAccountName']) }}"></div>
-      <div class="field"><label>Bank account number</label><input class="input" name="payBankAccountNo" maxlength="40" value="{{ old('payBankAccountNo', $s['payBankAccountNo']) }}"></div>
-      <div class="field"><label>Payment QR code (GCash / Maya / QR Ph)</label><input class="input" type="file" name="payQr" accept="image/*">
-        @if($s['payQrPath'])<div class="row mt-1" style="gap:10px"><img src="{{ route('payments.qr') }}" alt="Current QR code" style="width:72px;height:72px;object-fit:contain;background:#fff;border-radius:6px"><label class="check"><input type="checkbox" name="removeQr" value="1"> Remove QR code</label></div>@endif</div>
-    </div>
-    <div class="hint">Reference numbers are checked automatically. A bank or GCash reference that's already on another payment is refused.</div>
+    <p class="small mb-0">{{ $accountCount }} active account{{ $accountCount === 1 ? '' : 's' }}. GCash, Maya and bank accounts, their QR codes and monthly limits are managed on <a href="{{ route('super.pay-accounts') }}">Payment accounts</a>.</p>
   </div>
   <div class="card"><h3>Online payments (PayMongo)</h3>
     @if($paymongo['enabled'])

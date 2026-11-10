@@ -76,6 +76,7 @@ class Payment extends Model
 
     public function rentalRequest(): BelongsTo { return $this->belongsTo(RentalRequest::class); }
     public function verifier(): BelongsTo { return $this->belongsTo(User::class, 'verified_by'); }
+    public function payAccount(): BelongsTo { return $this->belongsTo(PayAccount::class); }
 
     public function typeLabel(): string { return self::TYPE_LABEL[$this->type] ?? $this->type; }
     public function methodLabel(): string { return self::METHOD_LABEL[$this->method] ?? $this->method; }

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Settings;
+use App\Models\PayAccount;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -30,13 +30,12 @@ class PaymentFileController extends Controller
         return view('account.receipt', ['p' => $payment, 'r' => $r, 'f' => $r->fin()]);
     }
 
-    /** PartyRent's payment QR code (GCash / Maya / QR Ph), shown in the payment form. */
-    public function qr()
+    /** A PartyRent collection account's QR code (GCash / Maya / QR Ph), shown in the payment form. */
+    public function qr(PayAccount $payAccount)
     {
-        $path = (string) Settings::get('payQrPath');
-        abort_unless($path !== '' && Storage::disk('local')->exists($path), 404);
+        abort_unless($payAccount->qr_path && Storage::disk('local')->exists($payAccount->qr_path), 404);
 
-        return Storage::disk('local')->response($path);
+        return Storage::disk('local')->response($payAccount->qr_path);
     }
 
     public function proof(Request $request, Payment $payment)

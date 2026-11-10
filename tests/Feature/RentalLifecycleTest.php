@@ -53,13 +53,13 @@ class RentalLifecycleTest extends TestCase
         $this->assertEquals(['amount' => 1800.0, 'type' => 'full', 'label' => 'Full payment'], $r->fresh()->fin()['upfront']);
 
         // 3. customer pays in full before acceptance by bank transfer (needs proof) → pending until verified
-        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 1800, 'method' => 'bank', 'reference' => 'BDO-1'])
+        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 1800, 'method' => 'bank', 'pay_account' => \App\Models\PayAccount::where('label', 'BDO')->value('id'), 'reference' => 'BDO-1'])
             ->assertSessionHas('warn'); // proof missing
         // a real 1×1 PNG (the GD extension isn't required)
         $png = tempnam(sys_get_temp_dir(), 'pr').'.png';
         file_put_contents($png, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
         $proof = new \Illuminate\Http\UploadedFile($png, 'receipt.png', 'image/png', null, true);
-        $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 1800, 'method' => 'bank', 'reference' => 'BDO-1', 'proof' => $proof])
+        $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 1800, 'method' => 'bank', 'pay_account' => \App\Models\PayAccount::where('label', 'BDO')->value('id'), 'reference' => 'BDO-1', 'proof' => $proof])
             ->assertSessionHas('success');
         $pay = Payment::where('rental_request_id', $r->id)->where('type', 'full')->firstOrFail();
         $this->assertSame('pending', $pay->status);

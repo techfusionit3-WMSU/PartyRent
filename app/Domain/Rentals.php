@@ -5,6 +5,7 @@ namespace App\Domain;
 use App\Models\CartLine;
 use App\Models\Hold;
 use App\Models\Package;
+use App\Models\PayAccount;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\RentalRequest;
@@ -695,6 +696,9 @@ class Rentals
         if (in_array($data['method'], ['bank', 'debit'], true) && trim((string) ($data['reference'] ?? '')) === '') {
             return 'Reference number is required for bank transfers and debit payments.';
         }
+        if (! empty($data['pay_account_id']) && ! PayAccount::whereKey($data['pay_account_id'])->exists()) {
+            return 'Choose the PartyRent account the money was sent to.';
+        }
         if (in_array($data['method'], Payment::REF_CHECKED, true) && in_array($data['type'], Payment::INFLOW, true) && self::referenceUsed((string) $data['reference'])) {
             return 'Reference number '.trim((string) $data['reference']).' was already used for another payment. Check the number on your receipt.';
         }
@@ -728,8 +732,18 @@ class Rentals
             return self::fail($err);
         }
         $online = $data['method'] === 'online';
+        if (in_array($data['method'], ['bank', 'debit'], true) && $source === 'customer' && PayAccount::where('active', true)->exists()) {
+            $acc = empty($data['pay_account_id']) ? null : PayAccount::find($data['pay_account_id']);
+            if (! $acc) {
+                return self::fail('Choose which PartyRent account you sent the money to.');
+            }
+            if (! $acc->accepts((float) $data['amount'])) {
+                return self::fail($acc->active ? $acc->label.' cannot take '.money($data['amount']).' more this month. Please send it to another account.' : $acc->label.' is no longer accepting payments. Please send it to another account.');
+            }
+        }
         $p = Payment::create([
             'code' => self::nextPaymentCode(), 'rental_request_id' => $r->id, 'type' => $data['type'], 'method' => $data['method'],
+            'pay_account_id' => in_array($data['method'], ['bank', 'debit'], true) ? ($data['pay_account_id'] ?? null) : null,
             'amount' => r2($data['amount']), 'date' => $data['date'] ?? today_iso(), 'submitted_at' => now(),
             'reference' => trim((string) ($data['reference'] ?? '')), 'proof_path' => $data['proof_path'] ?? null, 'proof_name' => $data['proof_name'] ?? null,
             'notes' => $data['notes'] ?? null, 'status' => $online ? 'awaiting' : 'pending', 'recorded_by' => $source,
@@ -849,6 +863,7 @@ class Rentals
         $p = new Payment([
             'code' => self::nextPaymentCode(), 'rental_request_id' => $r->id, 'type' => $data['type'], 'method' => $data['method'],
             'amount' => r2($data['amount']), 'date' => $data['date'] ?? today_iso(), 'submitted_at' => now(), 'reference' => trim($data['reference']),
+            'pay_account_id' => $data['type'] !== 'refund' && in_array($data['method'], ['bank', 'debit'], true) ? ($data['pay_account_id'] ?? null) : null,
             'notes' => $data['notes'] ?? null, 'status' => 'verified', 'verified_by' => $by->id, 'verified_at' => now(), 'recorded_by' => 'cashier',
         ]);
         self::issueReceipt($p);

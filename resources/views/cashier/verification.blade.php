@@ -18,7 +18,7 @@
             <div class="small muted mt-1">{{ $r->code }} · {{ $r->event_name }} · {{ $r->customer->name }}</div></div>
           <div class="right"><div class="price-lg">{{ money($p->amount) }}</div><div class="small muted">{{ $p->typeLabel() }} · {{ $p->methodLabel() }}</div></div>
         </div>
-        <dl class="kv mt-2"><dt>Reference no.</dt><dd>{{ $p->reference ?: '—' }}</dd><dt>Payment date</dt><dd>{{ fmt_date($p->date) }}</dd><dt>Submitted</dt><dd>{{ fmt_datetime($p->submitted_at) }}</dd>
+        <dl class="kv mt-2">@if($p->payAccount)<dt>Paid to</dt><dd><b>{{ $p->payAccount->display() }}</b>@if($p->payAccount->account_name) · {{ $p->payAccount->account_name }}@endif <div class="small muted">Check this account's app or statement for the transfer.</div></dd>@endif<dt>Reference no.</dt><dd>{{ $p->reference ?: '—' }}</dd><dt>Payment date</dt><dd>{{ fmt_date($p->date) }}</dd><dt>Submitted</dt><dd>{{ fmt_datetime($p->submitted_at) }}</dd>
           <dt>Proof</dt><dd>@if($p->proof_path)<a href="{{ route('payments.proof', $p) }}" target="_blank">{{ $p->proof_name ?: 'View proof' }}</a>@elseif($p->proof_name){{ $p->proof_name }} <span class="small muted">(sample record — file not stored)</span>@else<span class="muted">None</span>@endif</dd>
           @if($p->notes)<dt>Notes</dt><dd>{{ $p->notes }}</dd>@endif
           <dt>Rental balance</dt><dd>{{ money($f['balance']) }} of {{ money($f['payable']) }} · {{ $f['status'] }}</dd></dl>

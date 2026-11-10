@@ -4,7 +4,17 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-Done: **payment channels without a gateway + PayMongo** (user request 2026-11-10; migration `2026_11_10_000400`).
+Done: **payment accounts list with on/off + monthly limits** (user request 2026-11-10; migration `2026_11_10_000500`).
+GCash caps monthly receiving, so PartyRent's collection accounts are now a list (`pay_accounts`, `PayAccount`) instead of single settings.
+- [x] Superadmin "Payment Accounts" page (`super.pay-accounts`): add/edit/QR/turn off/remove (remove only if unused)
+- [x] Optional `monthly_cap`: `receivedThisMonth` = pending + verified inflows this month; customer form hides (JS, `data-room`) and server refuses accounts that can't take the amount
+- [x] `payments.pay_account_id`: customer must pick the account for bank/debit when any are active; cashier record can set it; verification page shows "Paid to"
+- [x] Old `payGcash*/payBank*/payQrPath` settings migrated into accounts and deleted; QR route is now `payments.qr` per account
+- [x] Tests in `PaymentChannelsTest`; 66 green
+- [ ] Browser check
+
+### Previous: payment channels
+Payment channels without a gateway + PayMongo (user request 2026-11-10; migration `2026_11_10_000400`).
 - [x] Superadmin settings: PartyRent GCash / bank accounts + QR upload (`Settings::payAccounts`, `payments.qr`); pay modal shows them (it used to say "transfer to the supplier")
 - [x] Duplicate reference check: `payments.reference_key` (normalized), `Rentals::referenceUsed` on submit/cashier record, cashier can't verify a reference already verified (`Payment::duplicates`, warning on verification page). Refunds may reuse refs.
 - [x] PayMongo Checkout (`App\Domain\PayMongo`): method `online`, status `awaiting` until paid; verified automatically via return URL (`rentals.paymongo.return`) or signed webhook (`/webhooks/paymongo`, CSRF exempt). Mismatch → `pending` for cashier. Unpaid checkouts are expired + deleted when cancelled or replaced.
@@ -63,6 +73,7 @@ PartyRent, PartyRent holds the money and pays the supplier after the rental, min
 - [x] `PackagesTest`
 
 ## Notes (newest first)
+- 2026-11-10: PayMongo has paused new sign-ups; online payments stay hidden until the user gets keys. Dev DB: GCash cap 100k + Maya (off) added by tinker.
 - 2026-11-10: dev DB got demo PartyRent pay accounts via tinker (not reseeded). GD is not installed: tests use a base64 PNG, not `UploadedFile::fake()->image()`.
 - 2026-11-10: dev DB got its demo payouts additively (scratchpad `devpayouts.php`), not by reseeding; the browser run marked PO-10001 paid (ref GC-TEST-1) and set Juan's payout account to BPI.
 - 2026-11-10: escrow/payouts built; 51 tests green. Fixed a test-order bug: `Settings` static cache survived DB rollbacks between tests (`tests/TestCase.php` now flushes it). Deposits stay with PartyRent and are never paid out; damage compensation passes through with no commission.

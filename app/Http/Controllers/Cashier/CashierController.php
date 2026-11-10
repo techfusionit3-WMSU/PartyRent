@@ -32,7 +32,7 @@ class CashierController extends Controller
 
     public function verification(Request $request)
     {
-        $list = Payment::where('status', 'pending')->with(['rentalRequest.customer', 'rentalRequest.payments'])->orderBy('submitted_at')->get();
+        $list = Payment::where('status', 'pending')->with(['rentalRequest.customer', 'rentalRequest.payments', 'payAccount'])->orderBy('submitted_at')->get();
 
         return view('cashier.verification', ['list' => $list]);
     }
@@ -57,7 +57,7 @@ class CashierController extends Controller
         $r = $request->query('request') ? RentalRequest::where('code', strtoupper(trim($request->query('request'))))->with(['payments', 'customer'])->first() : null;
 
         return view('cashier.record', [
-            'r' => $r, 'code' => $request->query('request', ''),
+            'r' => $r, 'code' => $request->query('request', ''), 'accounts' => \App\Models\PayAccount::ordered()->get(),
             'open' => RentalRequest::whereIn('status', array_merge(['pending'], Finance::ACTIVE, ['completed', 'cancelled', 'declined']))->with('customer')->orderByDesc('created_at')->take(40)->get(),
         ]);
     }
@@ -72,7 +72,9 @@ class CashierController extends Controller
             'date' => 'required|date|before_or_equal:today',
             'reference' => 'required|string|max:80',
             'notes' => 'nullable|string|max:255',
+            'pay_account' => 'nullable|integer',
         ]);
+        $data['pay_account_id'] = $data['pay_account'] ?? null;
         $r = RentalRequest::where('code', $data['request'])->with('payments')->firstOrFail();
         $res = Rentals::cashierRecord($r, $data, $request->user());
         if (! $res['ok']) {

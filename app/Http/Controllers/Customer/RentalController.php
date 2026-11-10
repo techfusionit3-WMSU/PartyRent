@@ -6,8 +6,8 @@ use App\Domain\Finance;
 use App\Domain\PayMongo;
 use App\Domain\Rentals;
 use App\Domain\Reviews;
-use App\Domain\Settings;
 use App\Http\Controllers\Controller;
+use App\Models\PayAccount;
 use App\Models\Payment;
 use App\Models\RentalRequest;
 use App\Models\Review;
@@ -69,7 +69,7 @@ class RentalController extends Controller
 
         return view('customer.rental', [
             'r' => $r, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
-            'online' => PayMongo::enabled(), 'accounts' => Settings::payAccounts(), 'qr' => (bool) Settings::get('payQrPath'),
+            'online' => PayMongo::enabled(), 'accounts' => PayAccount::available(),
             'policy' => Rentals::cancelPolicy($r), 'reviewables' => $r->status === 'completed' ? Reviews::reviewables($r) : [],
         ]);
     }
@@ -100,7 +100,10 @@ class RentalController extends Controller
             'date' => 'nullable|date|before_or_equal:today',
             'notes' => 'nullable|string|max:255',
             'proof' => 'nullable|image|max:8192',
+            'pay_account' => 'nullable|integer',
         ]);
+        $data['pay_account_id'] = $data['pay_account'] ?? null;
+        unset($data['pay_account']);
         if ($data['method'] === 'online') {
             $res = PayMongo::start($r, array_intersect_key($data, array_flip(['type', 'amount', 'notes'])));
 

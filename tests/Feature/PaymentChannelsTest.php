@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Domain\Settings;
+use App\Models\PayAccount;
 use App\Models\Payment;
 use App\Models\RentalRequest;
 use App\Models\User;
@@ -41,58 +41,120 @@ class PaymentChannelsTest extends TestCase
         return UploadedFile::fake()->createWithContent($name, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='));
     }
 
-    /* ---------------- step 1: accounts, QR, duplicate references ---------------- */
+    /* ---------------- step 1: accounts, QR, monthly limits, duplicate references ---------------- */
 
-    public function test_customer_sees_partyrent_accounts_not_the_supplier(): void
+    private function acc(string $label): PayAccount
+    {
+        return PayAccount::where('label', $label)->firstOrFail();
+    }
+
+    private function super(): static
+    {
+        return $this->actingAs(User::whereJsonContains('roles', 'superadmin')->firstOrFail())->withSession(['mode' => 'superadmin']);
+    }
+
+    public function test_customer_sees_active_partyrent_accounts_not_the_supplier(): void
     {
         $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertOk()
             ->assertSee('Send your payment to PartyRent')->assertSee('0917 555 0142')->assertSee('0012 3456 7890')
+            ->assertDontSee('0918 555 0199') // Maya is switched off
             ->assertDontSee('using the account details they provided')
             ->assertDontSee('Pay online'); // PayMongo is off without a key
     }
 
-    public function test_superadmin_sets_accounts_and_qr(): void
+    public function test_superadmin_manages_accounts(): void
     {
         Storage::fake('local');
-        $base = ['platformName' => 'PartyRent', 'supportEmail' => 'support@partyrent.ph', 'supportPhone' => '1', 'overdueGraceDays' => 0, 'maxRentalDays' => 30, 'commissionPct' => 5];
-        $super = User::whereJsonContains('roles', 'superadmin')->firstOrFail();
-        $this->actingAs($super)->withSession(['mode' => 'superadmin'])->post('/superadmin/settings', $base + [
-            'payGcashNumber' => '0999 000 1111', 'payGcashName' => 'PR Inc', 'payBankAccountNo' => '', 'payQr' => self::png('qr.png'),
-        ])->assertSessionHas('success');
-        Settings::flush();
-        $this->assertSame('0999 000 1111', Settings::get('payGcashNumber'));
-        $this->assertSame([['label' => 'GCash', 'name' => 'PR Inc', 'number' => '0999 000 1111']], Settings::payAccounts()); // empty bank hidden
-        $qr = Settings::get('payQrPath');
-        Storage::disk('local')->assertExists($qr);
+        $this->super()->get('/superadmin/pay-accounts')->assertOk()->assertSee('GCash')->assertSee('Limit')->assertSee('Off');
+        $this->post('/superadmin/pay-accounts', ['type' => 'bank', 'label' => 'BPI QR Ph', 'account_no' => '', 'qr' => self::png('qr.png')])->assertSessionHas('success');
+        $bpi = $this->acc('BPI QR Ph');
+        Storage::disk('local')->assertExists($bpi->qr_path);
+        $this->post('/superadmin/pay-accounts', ['type' => 'bank', 'label' => 'Nothing'])->assertSessionHas('error'); // needs a number or a QR
 
-        $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertSee('0999 000 1111')->assertSee(route('payments.qr'));
-        $this->get('/pay-qr')->assertOk();
+        $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertSee('BPI QR Ph')->assertSee(route('payments.qr', $bpi));
+        $this->get(route('payments.qr', $bpi))->assertOk();
 
-        $this->actingAs($super)->withSession(['mode' => 'superadmin'])->post('/superadmin/settings', $base + ['payGcashNumber' => '0999 000 1111', 'payGcashName' => 'PR Inc', 'removeQr' => 1]);
-        Settings::flush();
-        $this->assertSame('', Settings::get('payQrPath'));
-        Storage::disk('local')->assertMissing($qr);
+        // edit: add a number, drop the QR
+        $old = $bpi->qr_path;
+        $this->super()->post("/superadmin/pay-accounts/{$bpi->id}", ['type' => 'bank', 'label' => 'BPI', 'account_no' => '1234', 'monthly_cap' => '', 'remove_qr' => 1])->assertSessionHas('success');
+        $bpi->refresh();
+        $this->assertSame(['BPI', '1234', null, null], [$bpi->label, $bpi->account_no, $bpi->qr_path, $bpi->monthly_cap]);
+        Storage::disk('local')->assertMissing($old);
+
+        // off → hidden from customers; removable while unused
+        $this->post("/superadmin/pay-accounts/{$bpi->id}/toggle");
+        $this->assertFalse($bpi->fresh()->active);
+        $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertDontSee('>BPI<', false);
+        $this->super()->post("/superadmin/pay-accounts/{$bpi->id}/delete")->assertSessionHas('success');
+        $this->assertNull($bpi->fresh());
+
+        // an account with payments can only be turned off
+        $gcash = $this->acc('GCash');
+        Payment::where('method', 'bank')->first()->update(['pay_account_id' => $gcash->id]);
+        $this->post("/superadmin/pay-accounts/{$gcash->id}/delete")->assertSessionHas('error');
+
+        // other roles can't manage accounts
+        $this->as('cashier@partyrent.ph', 'cashier')->get('/superadmin/pay-accounts')->assertRedirect(); // role middleware sends them home
+    }
+
+    public function test_monthly_limit_moves_customers_to_another_account(): void
+    {
+        $r = $this->req('PR-0003');
+        $amt = $r->fin()['upfront']['amount'];
+        $gcash = $this->acc('GCash');
+        $gcash->update(['monthly_cap' => $amt + 50]); // room for this payment and ₱50 more
+        $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertSee('data-room="'.round($amt + 50, 2).'"', false); // the form hides it per amount
+
+        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'reference' => 'GC-1', 'proof' => $this->proof()])
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'Choose which PartyRent account'));
+        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $this->acc('Maya')->id, 'reference' => 'GC-1', 'proof' => $this->proof()])
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'no longer accepting'));
+        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $gcash->id, 'reference' => 'GC-1', 'proof' => $this->proof()])
+            ->assertSessionHas('success');
+        $p = Payment::where('reference', 'GC-1')->firstOrFail();
+        $this->assertSame($gcash->id, $p->pay_account_id);
+        $this->assertEquals($amt, $gcash->receivedThisMonth()); // pending counts against the limit
+        $this->assertEquals(50, $gcash->room());
+
+        // ₱100 more won't fit GCash this month; BDO has no limit
+        $this->post('/rentals/PR-0003/payments', ['type' => 'full', 'amount' => 100, 'method' => 'bank', 'pay_account' => $gcash->id, 'reference' => 'GC-2', 'proof' => $this->proof()])
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'cannot take'));
+        $this->post('/rentals/PR-0003/payments', ['type' => 'full', 'amount' => 100, 'method' => 'bank', 'pay_account' => $this->acc('BDO')->id, 'reference' => 'BDO-2', 'proof' => $this->proof()])
+            ->assertSessionHas('success');
+
+        // the cashier sees where to look
+        $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertSee('Paid to')->assertSee('GCash 0917 555 0142');
+        $this->super()->get('/superadmin/pay-accounts')->assertSee(money(50).' left');
+
+        // a rejected payment frees the room again
+        $this->as('cashier@partyrent.ph', 'cashier')->post("/cashier/payments/{$p->code}/reject", ['reason' => 'not found']);
+        $this->assertEquals($amt + 50, $gcash->room());
     }
 
     public function test_a_reference_number_can_only_be_used_once(): void
     {
         $r = $this->req('PR-0003');
         $amt = $r->fin()['upfront']['amount'];
+        $bdo = $this->acc('BDO')->id;
         $this->as('jose@demo.ph', 'customer');
         // BDO-884120 is verified on TXN-10001; spacing and case don't matter
         foreach (['BDO-884120', 'bdo 884120'] as $ref) {
-            $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'reference' => $ref, 'proof' => $this->proof()])
+            $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $bdo, 'reference' => $ref, 'proof' => $this->proof()])
                 ->assertSessionHas('error', fn ($e) => str_contains($e, 'already used'));
         }
         // the rejected UB-22O1A9 can be reused (it never counted)
-        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'reference' => 'UB-22O1A9', 'proof' => $this->proof()])->assertSessionHas('success');
+        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $bdo, 'reference' => 'UB-22O1A9', 'proof' => $this->proof()])->assertSessionHas('success');
         // …but now it's pending, so a second submission is refused
-        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => 1, 'method' => 'bank', 'reference' => 'UB22O1A9', 'proof' => $this->proof()])->assertSessionHas('error');
+        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => 1, 'method' => 'bank', 'pay_account' => $bdo, 'reference' => 'UB22O1A9', 'proof' => $this->proof()])->assertSessionHas('error');
 
-        // the cashier's own bank records are checked too; refunds may reuse a reference
+        // the cashier's own bank records are checked too, and can say which account received it
         $this->as('cashier@partyrent.ph', 'cashier')
             ->post('/cashier/record', ['request' => 'PR-0001', 'type' => 'installment', 'method' => 'bank', 'amount' => 10, 'date' => today_iso(), 'reference' => 'BDO-884377'])
             ->assertSessionHas('error', fn ($e) => str_contains($e, 'already used'));
+        $this->get('/cashier/record?request=PR-0001')->assertSee('Received into');
+        $this->post('/cashier/record', ['request' => 'PR-0001', 'type' => 'installment', 'method' => 'bank', 'pay_account' => $bdo, 'amount' => 10, 'date' => today_iso(), 'reference' => 'BDO-NEW-1'])
+            ->assertSessionHas('success');
+        $this->assertSame($bdo, Payment::where('reference', 'BDO-NEW-1')->value('pay_account_id'));
     }
 
     public function test_cashier_cannot_verify_a_reused_reference(): void

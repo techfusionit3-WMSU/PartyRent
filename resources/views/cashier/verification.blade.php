@@ -10,6 +10,8 @@
       @php($r = $p->rentalRequest)
       @php($f = $r->fin())
       @php($over = in_array($p->type, \App\Domain\Finance::RENTAL_TYPES, true) && $p->amount > $f['balance'] + 0.001)
+      @php($dups = $p->duplicates())
+      @php($dupVerified = $dups->firstWhere('status', 'verified'))
       <div class="card">
         <div class="row wrap between top">
           <div><div class="row gap-sm"><b>{{ $p->code }}</b>@include('partials.badges', ['ver' => $p->status])<span class="badge b-gray plain">by {{ $p->recorded_by }}</span></div>
@@ -20,10 +22,13 @@
           <dt>Proof</dt><dd>@if($p->proof_path)<a href="{{ route('payments.proof', $p) }}" target="_blank">{{ $p->proof_name ?: 'View proof' }}</a>@elseif($p->proof_name){{ $p->proof_name }} <span class="small muted">(sample record — file not stored)</span>@else<span class="muted">None</span>@endif</dd>
           @if($p->notes)<dt>Notes</dt><dd>{{ $p->notes }}</dd>@endif
           <dt>Rental balance</dt><dd>{{ money($f['balance']) }} of {{ money($f['payable']) }} · {{ $f['status'] }}</dd></dl>
+        @if($p->gateway === 'paymongo')<div class="alert alert-info mt-1">{{ icon('card') }}<div>Paid online through PayMongo (payment <b>{{ $p->reference }}</b>@if($p->gateway_fee !== null), fee {{ money($p->gateway_fee) }}@endif). The money is already in PartyRent's PayMongo balance. If it can't be verified, refund it from the PayMongo dashboard and record the refund.</div></div>@endif
+        @if($dupVerified)<div class="alert alert-danger mt-1">{{ icon('alert') }}<div><b>Reference already used.</b> {{ $p->reference }} was verified on {{ $dupVerified->code }} ({{ $dupVerified->rentalRequest->code }}). This is probably a reused receipt. Reject it unless the bank shows two separate transfers.</div></div>
+        @elseif($dups->isNotEmpty())<div class="alert alert-warn mt-1">{{ icon('alert') }}<div><b>Same reference on another submission:</b> {{ $dups->map(fn ($d) => $d->code.' ('.$d->rentalRequest->code.')')->implode(', ') }}. Only one of them can be real.</div></div>@endif
         @if($over)<div class="alert alert-danger mt-1">{{ icon('alert') }}<div>This payment exceeds the remaining balance of {{ money($f['balance']) }}. Reject it or ask the customer to correct the amount.</div></div>@endif
         <div class="row wrap mt-2" style="justify-content:flex-end;gap:8px">
           <form method="POST" action="{{ route('cashier.reject', $p) }}" class="row" style="gap:6px">@csrf<input class="input input-sm" name="reason" required placeholder="Reason for rejection" style="width:260px" maxlength="500"><button class="btn btn-danger btn-sm">{{ icon('x') }}Reject</button></form>
-          <form method="POST" action="{{ route('cashier.verify', $p) }}" data-confirm="Verify {{ $p->code }} for {{ money($p->amount) }}? A receipt will be issued and the balance updated." data-confirm-title="Verify payment?" data-confirm-ok="Verify & issue receipt">@csrf<button class="btn btn-success btn-sm" @disabled($over)>{{ icon('check') }}Verify</button></form>
+          <form method="POST" action="{{ route('cashier.verify', $p) }}" data-confirm="Verify {{ $p->code }} for {{ money($p->amount) }}? A receipt will be issued and the balance updated." data-confirm-title="Verify payment?" data-confirm-ok="Verify & issue receipt">@csrf<button class="btn btn-success btn-sm" @disabled($over || $dupVerified)>{{ icon('check') }}Verify</button></form>
         </div>
       </div>
     @endforeach

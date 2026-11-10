@@ -17,7 +17,28 @@ class Settings
         'supportEmail' => 'support@partyrent.ph',
         'supportPhone' => '(02) 8123 4567',
         'commissionPct' => 5,
+        // PartyRent's own collection accounts, shown to customers who pay by transfer (step 1, no gateway)
+        'payGcashName' => '',
+        'payGcashNumber' => '',
+        'payBankName' => '',
+        'payBankAccountName' => '',
+        'payBankAccountNo' => '',
+        'payQrPath' => '',
     ];
+
+    /** Collection accounts customers transfer to; empty entries are left out. */
+    public static function payAccounts(): array
+    {
+        $acc = [];
+        if (self::get('payGcashNumber')) {
+            $acc[] = ['label' => 'GCash', 'name' => self::get('payGcashName'), 'number' => self::get('payGcashNumber')];
+        }
+        if (self::get('payBankAccountNo')) {
+            $acc[] = ['label' => self::get('payBankName') ?: 'Bank', 'name' => self::get('payBankAccountName'), 'number' => self::get('payBankAccountNo')];
+        }
+
+        return $acc;
+    }
 
     private static ?array $cache = null;
 

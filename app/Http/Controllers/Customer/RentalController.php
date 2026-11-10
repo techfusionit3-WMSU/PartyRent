@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Domain\Finance;
+use App\Domain\PayMongo;
 use App\Domain\Rentals;
 use App\Domain\Reviews;
+use App\Domain\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\RentalRequest;
@@ -67,6 +69,7 @@ class RentalController extends Controller
 
         return view('customer.rental', [
             'r' => $r, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
+            'online' => PayMongo::enabled(), 'accounts' => Settings::payAccounts(), 'qr' => (bool) Settings::get('payQrPath'),
             'policy' => Rentals::cancelPolicy($r), 'reviewables' => $r->status === 'completed' ? Reviews::reviewables($r) : [],
         ]);
     }
@@ -92,12 +95,17 @@ class RentalController extends Controller
         $data = $request->validate([
             'type' => 'required|in:reservation,down,installment,balance,full,deposit,compensation',
             'amount' => 'required|numeric|min:1',
-            'method' => 'required|in:cod,bank,debit',
+            'method' => 'required|in:cod,bank,debit,online',
             'reference' => 'nullable|string|max:80',
             'date' => 'nullable|date|before_or_equal:today',
             'notes' => 'nullable|string|max:255',
             'proof' => 'nullable|image|max:8192',
         ]);
+        if ($data['method'] === 'online') {
+            $res = PayMongo::start($r, array_intersect_key($data, array_flip(['type', 'amount', 'notes'])));
+
+            return $res['ok'] ? redirect()->away($res['url']) : back()->withInput()->with('error', $res['error']);
+        }
         if (! in_array($data['method'], $r->supplier->methods, true)) {
             return back()->with('error', 'This supplier does not accept that payment method.');
         }
@@ -116,6 +124,28 @@ class RentalController extends Controller
         }
 
         return back()->with('success', 'Payment submitted ('.$res['payment']->code.'). Waiting for cashier verification.');
+    }
+
+    /** Back from PayMongo's checkout page (or "Check status"): ask PayMongo whether it was paid. */
+    public function paymongoReturn(Request $request, RentalRequest $rentalRequest, Payment $payment)
+    {
+        $r = $this->own($request, $rentalRequest);
+        abort_unless($payment->rental_request_id === $r->id && $payment->gateway === 'paymongo', 404);
+        $state = PayMongo::sync($payment);
+        $back = redirect()->route('rentals.show', $r);
+        if ($state === 'unpaid' && $request->boolean('cancelled')) {
+            PayMongo::discard($payment);
+
+            return $back->with('warn', 'Online payment cancelled. Nothing was charged.');
+        }
+        $payment->refresh();
+
+        return match (true) {
+            $payment->status === 'verified' => $back->with('success', 'Payment of '.money($payment->amount).' received and verified. Receipt '.$payment->receipt_no.'.'),
+            $payment->status === 'pending' => $back->with('success', 'Payment received. Our cashier will confirm it shortly.'),
+            $state === 'error' => $back->with('warn', 'We could not check with PayMongo just now. If you paid, it will update shortly. Use "Check status" to try again.'),
+            default => $back->with('warn', 'We have not received this online payment yet. If you already paid, wait a minute and use "Check status".'),
+        };
     }
 
     public function review(Request $request, RentalRequest $rentalRequest)

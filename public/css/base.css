@@ -332,6 +332,11 @@ table.table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .scroll-x { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
 .upload-box { border: 2px dashed var(--line-2); border-radius: var(--radius); padding: 18px; text-align: center; color: var(--muted); cursor: pointer; background: var(--surface-2); }
 .upload-box:hover { border-color: var(--brand); color: var(--brand); }
+.pay-accounts { border: 1px solid var(--line-2); border-radius: var(--radius); padding: 12px; background: var(--surface-2); }
+.pay-account { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.pay-account > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pay-qr { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.pay-qr img { width: 140px; height: 140px; object-fit: contain; background: #fff; border-radius: 8px; border: 1px solid var(--line-2); flex: none; }
 .thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .thumbs img, .thumbs .t { width: 70px; height: 70px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); }
 

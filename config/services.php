@@ -18,6 +18,14 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    // Online payments (https://developers.paymongo.com). Leave the secret key empty to hide "Pay online".
+    'paymongo' => [
+        'secret_key' => env('PAYMONGO_SECRET_KEY'),
+        'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
+        'methods' => array_values(array_filter(explode(',', (string) env('PAYMONGO_METHODS', 'gcash,paymaya,card,qrph')))),
+        'base_url' => env('PAYMONGO_BASE_URL', 'https://api.paymongo.com/v1'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Domain\Finance;
 use App\Domain\Notifier;
+use App\Domain\PayMongo;
 use App\Domain\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\AppNotification;
@@ -15,6 +16,7 @@ use App\Models\RentalRequest;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 
@@ -184,7 +186,10 @@ class SuperController extends Controller
 
     public function settings()
     {
-        return view('super.settings', ['s' => array_merge(Settings::DEFAULTS, array_intersect_key(Settings::all(), Settings::DEFAULTS))]);
+        return view('super.settings', [
+            's' => array_merge(Settings::DEFAULTS, array_intersect_key(Settings::all(), Settings::DEFAULTS)),
+            'paymongo' => ['enabled' => PayMongo::enabled(), 'live' => PayMongo::liveMode(), 'webhook' => (string) config('services.paymongo.webhook_secret') !== '', 'methods' => config('services.paymongo.methods')],
+        ]);
     }
 
     public function updateSettings(Request $request)
@@ -192,7 +197,22 @@ class SuperController extends Controller
         $v = $request->validate([
             'platformName' => 'required|string|max:60', 'supportEmail' => 'required|email', 'supportPhone' => 'required|string|max:40',
             'overdueGraceDays' => 'required|integer|min:0|max:30', 'maxRentalDays' => 'required|integer|min:1|max:90', 'commissionPct' => 'required|numeric|min:0|max:50',
+            'payGcashName' => 'nullable|string|max:80', 'payGcashNumber' => 'nullable|string|max:40',
+            'payBankName' => 'nullable|string|max:60', 'payBankAccountName' => 'nullable|string|max:80', 'payBankAccountNo' => 'nullable|string|max:40',
         ]);
+        $request->validate(['payQr' => 'nullable|image|max:4096']);
+        foreach (['payGcashName', 'payGcashNumber', 'payBankName', 'payBankAccountName', 'payBankAccountNo'] as $k) {
+            $v[$k] = trim((string) ($v[$k] ?? ''));
+        }
+        $oldQr = (string) Settings::get('payQrPath');
+        if ($request->hasFile('payQr')) {
+            $v['payQrPath'] = $request->file('payQr')->store('settings', 'local');
+        } elseif ($request->boolean('removeQr')) {
+            $v['payQrPath'] = '';
+        }
+        if (isset($v['payQrPath']) && $oldQr !== '' && $oldQr !== $v['payQrPath']) {
+            Storage::disk('local')->delete($oldQr);
+        }
         $v['requireSupplierApproval'] = $request->boolean('requireSupplierApproval');
         $v['aiEnabled'] = $request->boolean('aiEnabled');
         $changes = [];
@@ -200,7 +220,7 @@ class SuperController extends Controller
             $old = Settings::get($k);
             if ($old != $val) {
                 $changes[] = $k.': '.json_encode($old).' → '.json_encode($val);
-                Settings::set($k, is_numeric($val) && ! is_bool($val) ? $val + 0 : $val);
+                Settings::set($k, is_numeric($val) && ! is_bool($val) && ! str_starts_with($k, 'pay') ? $val + 0 : $val);
             }
         }
         if ($changes) {

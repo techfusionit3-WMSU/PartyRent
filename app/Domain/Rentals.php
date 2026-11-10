@@ -695,8 +695,20 @@ class Rentals
         if (in_array($data['method'], ['bank', 'debit'], true) && trim((string) ($data['reference'] ?? '')) === '') {
             return 'Reference number is required for bank transfers and debit payments.';
         }
+        if (in_array($data['method'], Payment::REF_CHECKED, true) && in_array($data['type'], Payment::INFLOW, true) && self::referenceUsed((string) $data['reference'])) {
+            return 'Reference number '.trim((string) $data['reference']).' was already used for another payment. Check the number on your receipt.';
+        }
 
         return null;
+    }
+
+    /** A bank / e-wallet reference already on a live (pending or verified) inflow payment. Stops one receipt being reused. */
+    public static function referenceUsed(string $reference, ?int $exceptId = null): bool
+    {
+        $key = Payment::refKey($reference);
+
+        return $key !== null && Payment::where('reference_key', $key)->when($exceptId, fn ($q) => $q->whereKeyNot($exceptId))
+            ->whereIn('method', Payment::REF_CHECKED)->whereIn('type', Payment::INFLOW)->whereIn('status', ['pending', 'verified'])->exists();
     }
 
     /** Customer (or supplier on the customer's behalf) submits a payment — PENDING until a cashier verifies it. */
@@ -715,13 +727,18 @@ class Rentals
         if ($err = self::validatePayment($r, $data)) {
             return self::fail($err);
         }
+        $online = $data['method'] === 'online';
         $p = Payment::create([
             'code' => self::nextPaymentCode(), 'rental_request_id' => $r->id, 'type' => $data['type'], 'method' => $data['method'],
             'amount' => r2($data['amount']), 'date' => $data['date'] ?? today_iso(), 'submitted_at' => now(),
             'reference' => trim((string) ($data['reference'] ?? '')), 'proof_path' => $data['proof_path'] ?? null, 'proof_name' => $data['proof_name'] ?? null,
-            'notes' => $data['notes'] ?? null, 'status' => 'pending', 'recorded_by' => $source,
+            'notes' => $data['notes'] ?? null, 'status' => $online ? 'awaiting' : 'pending', 'recorded_by' => $source,
+            'gateway' => $online ? 'paymongo' : null,
         ]);
         $r->load('payments');
+        if ($online) {
+            return self::ok(['payment' => $p]); // nothing to verify or announce until PayMongo says it's paid
+        }
         self::changed($r);
         $cust = $r->customer;
         Notifier::notify('cashier', 'cashier', 'New payment submission', $cust->name.' · '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.' — pending verification.', self::link('cashier.verification'));
@@ -738,10 +755,22 @@ class Rentals
         if (! $by->hasPerm('payments.verify')) {
             return self::fail('You do not have permission to verify payments.');
         }
+        if ($dup = $p->duplicates()->firstWhere('status', 'verified')) {
+            return self::fail('Reference '.$p->reference.' was already verified on '.$dup->code.' ('.$dup->rentalRequest->code.'). Reject this one unless the bank shows two separate transfers.');
+        }
 
+        return self::confirmPayment($p, $by);
+    }
+
+    /**
+     * Mark a payment verified, issue the receipt and tell everyone. $by is the cashier, or null when
+     * PayMongo confirmed an online payment (then an "awaiting" payment may be confirmed directly).
+     */
+    public static function confirmPayment(Payment $p, ?User $by): array
+    {
         return DB::transaction(function () use ($p, $by) {
             $p = Payment::lockForUpdate()->find($p->id);
-            if (! $p || $p->status !== 'pending') {
+            if (! $p || ! ($p->status === 'pending' || ($by === null && $p->status === 'awaiting'))) {
                 return self::fail('Only pending payments can be verified.');
             }
             $r = $p->rentalRequest()->with('payments')->first();
@@ -750,7 +779,7 @@ class Rentals
                 return self::fail('This payment exceeds the remaining balance of '.money($before['balance']).'. Reject it or ask the customer to correct the amount.');
             }
             $p->status = 'verified';
-            $p->verified_by = $by->id;
+            $p->verified_by = $by?->id;
             $p->verified_at = now();
             self::issueReceipt($p);
             $p->save();
@@ -761,8 +790,8 @@ class Rentals
                 Notifier::notify($r->supplier->owner_id, 'supplier', 'Down payment received 💰', $r->code.': '.$after['upfront']['label'].' of '.money($after['upfront']['amount']).' verified by PartyRent. You can now accept the request.', self::link('supplier.requests.show', $r));
             }
             Notifier::notify($r->customer_id, 'customer', 'Payment verified ✅', money($p->amount).' for '.$r->code.' was verified. Receipt '.$p->receipt_no.'. Payment status: '.$after['status'].($after['balance'] > 0 ? ', balance '.money($after['balance']) : '').'.', self::link('rentals.show', $r));
-            Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment verified', money($p->amount).' for '.$r->code.' verified by cashier. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
-            Notifier::audit('Verified payment', $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
+            Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment verified', money($p->amount).' for '.$r->code.' verified by '.($by ? 'cashier' : 'PartyRent (paid online)').'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
+            Notifier::audit($by ? 'Verified payment' : 'Online payment confirmed by PayMongo', $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
 
             return self::ok(['payment' => $p]);
         });

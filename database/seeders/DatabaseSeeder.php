@@ -97,7 +97,8 @@ class DatabaseSeeder extends Seeder
 
     private function settings(): void
     {
-        foreach (Settings::DEFAULTS as $k => $v) {
+        $demoAccounts = ['payGcashName' => 'PartyRent Rentals Inc.', 'payGcashNumber' => '0917 555 0142', 'payBankName' => 'BDO', 'payBankAccountName' => 'PartyRent Rentals Inc.', 'payBankAccountNo' => '0012 3456 7890'];
+        foreach (array_merge(Settings::DEFAULTS, $demoAccounts) as $k => $v) {
             Setting::create(['key' => $k, 'value' => $v]);
         }
         Setting::create(['key' => 'permissions.admin', 'value' => array_keys(User::ADMIN_PERMS)]);

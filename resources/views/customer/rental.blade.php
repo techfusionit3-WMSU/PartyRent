@@ -115,24 +115,44 @@
     <div class="modal-body">
       <div class="field"><label>What are you paying for?</label><select class="input" name="type" id="payKind">@foreach($payTypes as $t)<option value="{{ $t[0] }}" data-amount="{{ $t[2] }}">{{ $t[1] }} — {{ money($t[2]) }}</option>@endforeach</select></div>
       <div class="form-grid"><div class="field"><label>Amount (₱)</label><input class="input" type="number" step="0.01" min="1" name="amount" id="payAmount" required value="{{ old('amount', $payTypes[0][2]) }}"></div>
-        <div class="field"><label>Payment method</label><select class="input" name="method" id="payMethod">@foreach($sup->methods as $m)<option value="{{ $m }}">{{ \App\Models\Payment::METHOD_LABEL[$m] ?? $m }}</option>@endforeach</select></div></div>
+        <div class="field"><label>Payment method</label><select class="input" name="method" id="payMethod">@if($online)<option value="online">Pay online: GCash, Maya, card (instant)</option>@endif @foreach($sup->methods as $m)<option value="{{ $m }}" @selected(old('method') === $m)>{{ \App\Models\Payment::METHOD_LABEL[$m] ?? $m }}</option>@endforeach</select></div></div>
+      @if($online)
+      <div id="onlineBox" class="alert alert-info mb-2">{{ icon('card') }}<div class="small">You'll go to <b>PayMongo's secure checkout</b> to pay with GCash, Maya, card or QR Ph. Your payment is <b>verified automatically</b>, so there's no need to upload a receipt. PayMongo emails you a receipt too.</div></div>
+      @endif
       <div id="bankBox">
-        <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">Transfer to <b>{{ $sup->name }}</b> using the account details they provided, then enter the reference number and upload your receipt.</div></div>
-        <div class="form-grid"><div class="field"><label>Reference number</label><input class="input" name="reference" placeholder="e.g. BDO-123456" maxlength="80"></div><div class="field"><label>Payment date</label><input class="input" type="date" name="date" value="{{ today_iso() }}" max="{{ today_iso() }}"></div></div>
+        <div class="pay-accounts mb-2">
+          <div class="small mb-1"><b>Send your payment to PartyRent</b> (not to {{ $sup->name }}), then enter the reference number and upload your receipt.</div>
+          @forelse($accounts as $a)
+            <div class="pay-account"><span class="badge b-sky plain">{{ $a['label'] }}</span><div><b>{{ $a['number'] }}</b>@if($a['name'])<div class="small muted">{{ $a['name'] }}</div>@endif</div><button type="button" class="btn btn-xs btn-ghost" data-copy="{{ $a['number'] }}">Copy</button></div>
+          @empty
+            @unless($qr)<div class="small muted">PartyRent's account details aren't posted yet. Contact {{ setting('supportPhone') }} or {{ setting('supportEmail') }} before paying.</div>@endunless
+          @endforelse
+          @if($qr)<div class="pay-qr"><img src="{{ route('payments.qr') }}" alt="PartyRent payment QR code" loading="lazy"><div class="small muted">Scan with GCash, Maya or your banking app (QR Ph).</div></div>@endif
+        </div>
+        <div class="form-grid"><div class="field"><label>Reference number</label><input class="input" name="reference" value="{{ old('reference') }}" placeholder="e.g. 1012 345 678901" maxlength="80"><div class="hint">Each reference number can be used only once.</div></div><div class="field"><label>Payment date</label><input class="input" type="date" name="date" value="{{ today_iso() }}" max="{{ today_iso() }}"></div></div>
         <div class="field"><label>Payment proof</label><label class="upload-box" for="proof">{{ icon('upload') }}<div class="small">Upload a screenshot or photo of the receipt (JPG/PNG, up to 8 MB)</div></label><input type="file" id="proof" name="proof" accept="image/*" hidden><div class="small muted" id="proofName"></div></div>
       </div>
       <div id="codBox" class="alert alert-warn hidden">{{ icon('cash') }}<div class="small"><b>Cash on Delivery:</b> hand the cash to the supplier's crew when the items arrive. They collect it for PartyRent and our cashier verifies it. You can also log it here with the amount you handed over.</div></div>
       <div class="field"><label>Notes (optional)</label><input class="input" name="notes" maxlength="255"></div>
-      <p class="small muted mb-0">You pay PartyRent, not the supplier directly. We hold your payment and only release it to the supplier after your rental is completed. Your payment shows as <b>Pending Verification</b> until our cashier confirms it, and does not reduce your balance until then.</p>
+      <p class="small muted mb-0">You pay PartyRent, not the supplier directly. We hold your payment and only release it to the supplier after your rental is completed. Transfers and cash show as <b>Pending Verification</b> until our cashier confirms them, and don't reduce your balance until then.</p>
     </div>
-    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary" type="submit" data-busy="Submitting…">Submit payment</button></div>
+    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary" type="submit" id="paySubmit" data-busy="Submitting…">Submit payment</button></div>
   </form>
 </div></div>
 @push('scripts')
 <script>
 (function () {
   var k = document.getElementById('payKind'), a = document.getElementById('payAmount'), m = document.getElementById('payMethod');
-  var sync = function () { var bank = m.value === 'bank' || m.value === 'debit'; document.getElementById('bankBox').classList.toggle('hidden', !bank); document.getElementById('codBox').classList.toggle('hidden', bank); };
+  var ob = document.getElementById('onlineBox'), btn = document.getElementById('paySubmit');
+  var sync = function () {
+    var bank = m.value === 'bank' || m.value === 'debit', online = m.value === 'online';
+    document.getElementById('bankBox').classList.toggle('hidden', !bank);
+    document.getElementById('codBox').classList.toggle('hidden', bank || online);
+    if (ob) ob.classList.toggle('hidden', !online);
+    btn.textContent = online ? 'Continue to payment' : 'Submit payment';
+    btn.dataset.busy = online ? 'Opening PayMongo…' : 'Submitting…';
+  };
+  document.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () { try { navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch (e) {} }); });
   k.addEventListener('change', function () { a.value = k.selectedOptions[0].dataset.amount; });
   m.addEventListener('change', sync); sync();
   document.getElementById('proof').addEventListener('change', function (e) { document.getElementById('proofName').textContent = e.target.files[0] ? 'Selected: ' + e.target.files[0].name : ''; });

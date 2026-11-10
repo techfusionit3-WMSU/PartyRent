@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{payment}/receipt', [PaymentFileController::class, 'receipt'])->name('payments.receipt');
     Route::post('/reviews/{review}/report', [ReviewController::class, 'report'])->middleware('throttle:10,1')->name('reviews.report');
     Route::get('/payments/{payment}/proof', [PaymentFileController::class, 'proof'])->name('payments.proof');
+    Route::get('/pay-qr', [PaymentFileController::class, 'qr'])->name('payments.qr');
     Route::post('/api/delivery-preview', [ApiController::class, 'deliveryPreview'])->name('api.delivery-preview');
 
     // Email verification: unverified customers can browse, but renting/selling needs a verified email.
@@ -88,6 +89,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/rentals/{rentalRequest}/submitted', [RentalController::class, 'confirmation'])->name('rentals.confirmation');
     Route::post('/rentals/{rentalRequest}/cancel', [RentalController::class, 'cancel'])->name('rentals.cancel');
     Route::post('/rentals/{rentalRequest}/payments', [RentalController::class, 'pay'])->name('rentals.pay');
+    Route::get('/rentals/{rentalRequest}/payments/{payment}/paymongo', [RentalController::class, 'paymongoReturn'])->name('rentals.paymongo.return');
     Route::post('/rentals/{rentalRequest}/review', [RentalController::class, 'review'])->name('rentals.review');
     Route::get('/my-payments', [RentalController::class, 'payments'])->name('customer.payments');
     Route::get('/profile', [RentalController::class, 'profile'])->name('profile');
@@ -202,3 +204,6 @@ Route::prefix('superadmin')->name('super.')->middleware(['auth', 'role:superadmi
     Route::get('/settings', [SuperController::class, 'settings'])->name('settings');
     Route::post('/settings', [SuperController::class, 'updateSettings'])->name('settings.update');
 });
+
+/* ---------- PayMongo webhook (no session; checked by signature; CSRF exempt in bootstrap/app.php) ---------- */
+Route::post('/webhooks/paymongo', \App\Http\Controllers\PayMongoWebhookController::class)->middleware('throttle:120,1')->name('webhooks.paymongo');

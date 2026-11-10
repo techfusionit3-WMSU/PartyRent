@@ -90,6 +90,9 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::post('/rentals/{rentalRequest}/cancel', [RentalController::class, 'cancel'])->name('rentals.cancel');
     Route::post('/rentals/{rentalRequest}/payments', [RentalController::class, 'pay'])->name('rentals.pay');
     Route::get('/rentals/{rentalRequest}/payments/{payment}/paymongo', [RentalController::class, 'paymongoReturn'])->name('rentals.paymongo.return');
+    // practice checkout (PAYMONGO_FAKE=true, never in production)
+    Route::get('/practice-checkout/{ref}', [\App\Http\Controllers\Customer\PracticeCheckoutController::class, 'show'])->name('paymongo.practice');
+    Route::post('/practice-checkout/{ref}', [\App\Http\Controllers\Customer\PracticeCheckoutController::class, 'act'])->name('paymongo.practice.act');
     Route::post('/rentals/{rentalRequest}/review', [RentalController::class, 'review'])->name('rentals.review');
     Route::get('/my-payments', [RentalController::class, 'payments'])->name('customer.payments');
     Route::get('/profile', [RentalController::class, 'profile'])->name('profile');

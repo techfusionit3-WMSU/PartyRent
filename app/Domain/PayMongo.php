@@ -4,9 +4,11 @@ namespace App\Domain;
 
 use App\Models\Payment;
 use App\Models\RentalRequest;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Online payments through PayMongo Checkout (GCash, Maya, cards, QR Ph).
@@ -20,14 +22,45 @@ use Illuminate\Support\Facades\Log;
  */
 class PayMongo
 {
+    /** Practice payment methods (same codes PayMongo uses for `source.type`). */
+    public const PRACTICE_METHODS = ['gcash' => 'GCash', 'paymaya' => 'Maya', 'card' => 'Card', 'qrph' => 'QR Ph'];
+
     public static function enabled(): bool
     {
-        return (string) config('services.paymongo.secret_key') !== '';
+        return (string) config('services.paymongo.secret_key') !== '' || self::practice();
+    }
+
+    /**
+     * Practice mode (PAYMONGO_FAKE=true, never in production): "Pay online" opens a built-in checkout
+     * page instead of PayMongo's. Everything after it (return URL, automatic verification, receipts,
+     * notifications) runs the same code as the real thing. Session state lives in the cache.
+     */
+    public static function practice(): bool
+    {
+        return (bool) config('services.paymongo.fake') && ! app()->isProduction();
     }
 
     public static function liveMode(): bool
     {
-        return str_starts_with((string) config('services.paymongo.secret_key'), 'sk_live_');
+        return ! self::practice() && str_starts_with((string) config('services.paymongo.secret_key'), 'sk_live_');
+    }
+
+    public static function practiceKey(string $ref): string
+    {
+        return 'paymongo-practice:'.$ref;
+    }
+
+    /** The practice "checkout session" for a reference, or null when it expired / never existed. */
+    public static function practiceSession(string $ref): ?array
+    {
+        return str_starts_with($ref, 'cs_practice_') ? Cache::get(self::practiceKey($ref)) : null;
+    }
+
+    public static function practiceUpdate(string $ref, array $changes): void
+    {
+        if ($s = self::practiceSession($ref)) {
+            Cache::put(self::practiceKey($ref), array_merge($s, $changes), now()->addDay());
+        }
     }
 
     private static function http()
@@ -66,6 +99,13 @@ class PayMongo
         }
         $p = $res['payment'];
         $u = $r->customer;
+        if (self::practice()) {
+            $ref = 'cs_practice_'.Str::lower(Str::random(16));
+            Cache::put(self::practiceKey($ref), ['payment' => $p->code, 'request' => $r->code, 'amount' => (float) $p->amount, 'label' => $p->typeLabel().' · '.$r->code, 'status' => 'unpaid'], now()->addDay());
+            $p->update(['gateway_ref' => $ref, 'gateway_url' => route('paymongo.practice', $ref)]);
+
+            return ['ok' => true, 'url' => $p->gateway_url, 'payment' => $p];
+        }
         try {
             $api = self::http()->post('/checkout_sessions', ['data' => ['attributes' => array_filter([
                 'line_items' => [['currency' => 'PHP', 'amount' => (int) round($p->amount * 100), 'name' => $p->typeLabel().' · '.$r->code, 'quantity' => 1]],
@@ -105,6 +145,18 @@ class PayMongo
         }
         if (! $p->gateway_ref || ! self::enabled()) {
             return 'error';
+        }
+        if (str_starts_with($p->gateway_ref, 'cs_practice_')) {
+            $s = self::practiceSession($p->gateway_ref);
+            if (! $s || $s['status'] !== 'paid') {
+                return 'unpaid';
+            }
+
+            // the same shape PayMongo returns for a paid checkout session
+            return self::settle($p, ['payments' => [['id' => $s['payId'], 'attributes' => [
+                'status' => 'paid', 'amount' => (int) round($s['paidAmount'] * 100), 'fee' => (int) round($s['paidAmount'] * 2.5),
+                'source' => ['type' => $s['method']],
+            ]]]]);
         }
         try {
             $res = self::http()->get('/checkout_sessions/'.$p->gateway_ref);
@@ -173,7 +225,9 @@ class PayMongo
         if ($p->status !== 'awaiting') {
             return;
         }
-        if ($p->gateway_ref && self::enabled()) {
+        if ($p->gateway_ref && str_starts_with($p->gateway_ref, 'cs_practice_')) {
+            Cache::forget(self::practiceKey($p->gateway_ref));
+        } elseif ($p->gateway_ref && self::enabled()) {
             try {
                 self::http()->post('/checkout_sessions/'.$p->gateway_ref.'/expire');
             } catch (\Throwable) {

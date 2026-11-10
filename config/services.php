@@ -22,6 +22,8 @@ return [
     'paymongo' => [
         'secret_key' => env('PAYMONGO_SECRET_KEY'),
         'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
+        // Practice mode: a built-in fake checkout (no account, no real money). Never works in production.
+        'fake' => (bool) env('PAYMONGO_FAKE', false),
         'methods' => array_values(array_filter(explode(',', (string) env('PAYMONGO_METHODS', 'gcash,paymaya,card,qrph')))),
         'base_url' => env('PAYMONGO_BASE_URL', 'https://api.paymongo.com/v1'),
     ],

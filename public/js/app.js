@@ -11,6 +11,10 @@
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const csrf = () => ($('meta[name="csrf-token"]') || {}).content || '';
+
+  // Pages restored from the back/forward cache carry an old CSRF token (e.g. after logging out),
+  // so their forms would fail with "Page Expired". Reload them to get a fresh token.
+  window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ICON = (window.PR && window.PR.icons) || {};
   const svg = (name, style) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (style ? ' style="' + style + '"' : '') + '>' + (ICON[name] || '') + '</svg>';

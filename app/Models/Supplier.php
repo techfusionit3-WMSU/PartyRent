@@ -17,6 +17,7 @@ class Supplier extends Model
             'arrangements' => 'array',
             'policy' => 'array',
             'delivery' => 'array',
+            'free_ship' => 'boolean',
             'address_parts' => 'array',
             'rating' => 'float', 'review_count' => 'integer',
             'lat' => 'float',
@@ -101,7 +102,8 @@ class Supplier extends Model
 
     /** Delivery settings with every key present (see Pricing::deliveryQuote for how they apply). */
     public const DELIVERY_DEFAULTS = [
-        'mode' => 'zones',          // zones | distance
+        'mode' => 'weight',         // weight (PartyRent standard rates, like Shopee) | zones | distance
+        'reach' => 'island',        // weight mode: how far you deliver — local (same province) | island (same island group) | inter (nationwide)
         'zones' => [],              // [{level: city|province|region, code, fee}] — most specific match wins
         'baseFee' => 0, 'perKm' => 0, 'freeKm' => 0, 'maxKm' => 0, // distance mode; maxKm 0 = no limit
         'freeOver' => 0,            // items subtotal at which the trip fee is waived; 0 = off

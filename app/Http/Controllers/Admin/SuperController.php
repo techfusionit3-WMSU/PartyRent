@@ -197,7 +197,17 @@ class SuperController extends Controller
         $v = $request->validate([
             'platformName' => 'required|string|max:60', 'supportEmail' => 'required|email', 'supportPhone' => 'required|string|max:40',
             'overdueGraceDays' => 'required|integer|min:0|max:30', 'maxRentalDays' => 'required|integer|min:1|max:90', 'commissionPct' => 'required|numeric|min:0|max:50',
+            'shipFirstKg' => 'sometimes|required|array', 'shipFirstKg.local' => 'sometimes|required|numeric|min:0|max:100000', 'shipFirstKg.island' => 'sometimes|required|numeric|min:0|max:100000', 'shipFirstKg.inter' => 'sometimes|required|numeric|min:0|max:100000',
+            'shipPerKg' => 'sometimes|required|array', 'shipPerKg.local' => 'sometimes|required|numeric|min:0|max:100000', 'shipPerKg.island' => 'sometimes|required|numeric|min:0|max:100000', 'shipPerKg.inter' => 'sometimes|required|numeric|min:0|max:100000',
+            'shipVolDivisor' => 'sometimes|required|integer|min:1000|max:10000', 'shipDefaultKg' => 'sometimes|required|numeric|min:0.1|max:1000',
+            'freeShipExtraPct' => 'sometimes|required|numeric|min:0|max:20', 'freeShipMinSpend' => 'sometimes|required|numeric|min:0', 'freeShipCap' => 'sometimes|required|numeric|min:0',
         ]);
+        foreach (array_intersect(['shipFirstKg', 'shipPerKg'], array_keys($v)) as $k) {
+            $v[$k] = array_map(fn ($x) => r2((float) $x), array_intersect_key($v[$k], array_flip(['local', 'island', 'inter'])));
+        }
+        if ($request->has('freeShipExtraPct')) { // the delivery cards are on the form
+            $v['freeShipEnabled'] = $request->boolean('freeShipEnabled');
+        }
         $v['requireSupplierApproval'] = $request->boolean('requireSupplierApproval');
         $v['aiEnabled'] = $request->boolean('aiEnabled');
         $changes = [];

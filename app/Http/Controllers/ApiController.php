@@ -127,6 +127,15 @@ class ApiController extends Controller
             return response()->json(['ok' => false, 'error' => $q['error']]);
         }
         $detail = collect($q['breakdown'])->map(fn ($b) => $b['label'].': '.money($b['amount']))->implode(' · ');
+        if ($q['mode'] === 'weight') {
+            $per = (float) (\App\Domain\Settings::get('shipPerKg')[$q['route']] ?? 0);
+
+            return response()->json([
+                'ok' => true, 'fee' => $q['fee'],
+                'text' => 'Delivery to '.$q['cityLabel'].': '.money($q['fee']).' for the first kg',
+                'detail' => 'Route: '.Pricing::TIER_LABEL[$q['route']].' · + '.money($per).' per extra kg'.($q['legs'] === 2 ? ' · charged each way' : ''),
+            ]);
+        }
 
         return response()->json([
             'ok' => true, 'fee' => $q['fee'], 'text' => 'Delivery to '.$q['cityLabel'].': '.money($q['fee']).($q['distanceKm'] !== null ? ' (~'.$q['distanceKm'].' km)' : ''),

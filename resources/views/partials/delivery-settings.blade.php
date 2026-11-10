@@ -23,9 +23,24 @@
   <h3 class="mb-1">Delivery rates</h3>
   <p class="small muted">Set where you deliver and how much it costs. Customers outside your coverage can still pick up (if you offer pickup).</p>
   <div class="row wrap gap-sm mb-2">
-    @foreach(['zones' => ['By area', 'A fee per region, province or city'], 'distance' => ['By distance', 'Base fee + rate per km from your shop']] as $m => [$l, $desc])
+    @foreach(['weight' => ['PartyRent standard rates', 'Like Shopee: by weight and route, no setup needed'], 'zones' => ['By area', 'Your own fee per region, province or city'], 'distance' => ['By distance', 'Your own base fee + rate per km']] as $m => [$l, $desc])
       <label class="card card-flat row grow" style="padding:10px 12px;cursor:pointer;min-width:220px"><input type="radio" name="delivery[mode]" value="{{ $m }}" @checked($mode === $m) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $desc }}</div></div></label>
     @endforeach
+  </div>
+
+  <div data-dmode="weight" class="{{ $mode === 'weight' ? '' : 'hidden' }}">
+    @php($S = \App\Domain\Settings::class)
+    @php($first = $S::get('shipFirstKg'))
+    @php($per = $S::get('shipPerKg'))
+    <p class="small muted">The fee is worked out from the weight of the items (or their size, if bigger) and how far the customer is. Set each product's weight and size in its form for accurate fees.</p>
+    <div class="table-wrap mb-1"><table class="table"><thead><tr><th>Route</th><th class="num">First kg</th><th class="num">Each extra kg</th></tr></thead><tbody>
+      @foreach(['local' => 'Same province (all of Metro Manila counts as one)', 'island' => 'Same island group (Luzon, Visayas or Mindanao)', 'inter' => 'Another island group'] as $t => $tl)
+        <tr><td>{{ $tl }}</td><td class="num">{{ money($first[$t] ?? 0) }}</td><td class="num">{{ money($per[$t] ?? 0) }}</td></tr>
+      @endforeach
+    </tbody></table></div>
+    <div class="field"><label>Deliver to</label><select class="input" name="delivery[reach]">
+      @foreach(['local' => 'My province only', 'island' => 'My island group (Luzon, Visayas or Mindanao)', 'inter' => 'Nationwide'] as $k => $l)<option value="{{ $k }}" @selected($dv('reach') === $k)>{{ $l }}</option>@endforeach
+    </select><div class="hint">Rates are set by PartyRent. You still make the delivery and the whole fee goes to you, with no commission.</div></div>
   </div>
 
   <div data-dmode="zones" class="{{ $mode === 'zones' ? '' : 'hidden' }}">
@@ -63,6 +78,13 @@
     <div class="field full"><label class="check"><input type="hidden" name="delivery[chargePerTrip]" value="0"><input type="checkbox" name="delivery[chargePerTrip]" value="1" @checked((string) (int) $dv('chargePerTrip') === '1')> Charge a separate trip for each block of non-consecutive rental dates</label></div>
   </div>
 
+  @if($S::get('freeShipEnabled'))
+  <div class="card card-flat mt-1" style="padding:12px">
+    <label class="check"><input type="hidden" name="free_ship" value="0"><input type="checkbox" name="free_ship" value="1" @checked((string) old('free_ship', ($freeShip ?? false) ? '1' : '0') === '1')> <b>Join the Free Shipping program</b></label>
+    <div class="small muted" style="padding-left:28px">Like Shopee's Free Shipping: customers who order at least {{ money($S::get('freeShipMinSpend')) }} in items from you get up to {{ money($S::get('freeShipCap')) }} off delivery, paid by PartyRent. Your shop shows a "Free Shipping" badge. In return, your commission is {{ rtrim(rtrim(number_format($S::get('freeShipExtraPct'), 2), '0'), '.') }}% higher on every order.</div>
+  </div>
+  @endif
+
   <div class="card card-flat soft mt-1" style="padding:12px">
     <div class="label mb-1">Preview</div>
     @include('partials.address-fields', ['key' => 'preview', 'value' => ['cityCode' => $previewCity ?? null], 'full' => false, 'required' => false, 'class' => 'preview-addr'])
@@ -75,7 +97,7 @@
   var box = document.getElementById('deliveryBox'); if (!box) return;
   var form = box.closest('form'), rows = document.getElementById('zoneRows'), next = {{ count($zoneRows) }};
   function modeSync() {
-    var m = (form.querySelector('[name="delivery[mode]"]:checked') || {}).value || 'zones';
+    var m = (form.querySelector('[name="delivery[mode]"]:checked') || {}).value || 'weight';
     box.querySelectorAll('[data-dmode]').forEach(function (d) { d.classList.toggle('hidden', d.dataset.dmode !== m); });
     var ful = (form.querySelector('[name="fulfillment"]:checked') || {}).value;
     box.classList.toggle('hidden', ful === 'pickup');

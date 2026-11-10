@@ -17,6 +17,16 @@ class Settings
         'supportEmail' => 'support@partyrent.ph',
         'supportPhone' => '(02) 8123 4567',
         'commissionPct' => 5,
+        // PartyRent standard delivery rates (weight-based, like Shopee): fee = first kg + each extra kg, by route
+        'shipFirstKg' => ['local' => 80, 'island' => 120, 'inter' => 180],   // covers the first kg
+        'shipPerKg' => ['local' => 10, 'island' => 20, 'inter' => 35],       // each additional kg (rounded up)
+        'shipVolDivisor' => 3500,      // size weight = L × W × H (cm) ÷ this
+        'shipDefaultKg' => 1,          // used for products with no weight yet
+        // Free Shipping program: suppliers who join pay extra commission; customers get a PartyRent-funded voucher
+        'freeShipEnabled' => true,
+        'freeShipExtraPct' => 3,
+        'freeShipMinSpend' => 1000,
+        'freeShipCap' => 200,
     ];
 
     private static ?array $cache = null;

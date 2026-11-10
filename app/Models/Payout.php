@@ -15,7 +15,7 @@ class Payout extends Model
     protected function casts(): array
     {
         return [
-            'income' => 'float', 'commission_pct' => 'float', 'commission' => 'float', 'compensation' => 'float', 'net' => 'float',
+            'income' => 'float', 'commission_pct' => 'float', 'commission' => 'float', 'delivery' => 'float', 'voucher' => 'float', 'compensation' => 'float', 'net' => 'float',
             'paid_at' => 'datetime',
         ];
     }
@@ -30,5 +30,14 @@ class Payout extends Model
     public function payer(): BelongsTo { return $this->belongsTo(User::class, 'paid_by'); }
 
     public function isPaid(): bool { return $this->status === 'paid'; }
+
+    /** Same shape as Payouts::breakdown(), from the frozen payout row. */
+    public function breakdown(): array
+    {
+        return [
+            'income' => $this->income, 'items' => r2($this->income - $this->delivery), 'delivery' => $this->delivery, 'voucher' => $this->voucher,
+            'pct' => $this->commission_pct, 'commission' => $this->commission, 'compensation' => $this->compensation, 'net' => $this->net,
+        ];
+    }
     public function methodLabel(): string { return self::METHOD_LABEL[$this->method] ?? '—'; }
 }

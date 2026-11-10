@@ -23,6 +23,7 @@ class Product extends Model
             'delivery' => 'boolean',
             'pickup' => 'boolean',
             'handling_fee' => 'float',
+            'weight_kg' => 'float', 'length_cm' => 'float', 'width_cm' => 'float', 'height_cm' => 'float',
             'perishable' => 'boolean',
             'lead_days' => 'integer',
             'shelf_life_days' => 'integer',

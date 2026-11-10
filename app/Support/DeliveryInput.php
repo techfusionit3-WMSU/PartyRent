@@ -18,7 +18,9 @@ class DeliveryInput
     {
         return [
             'delivery' => 'nullable|array',
-            'delivery.mode' => 'nullable|in:zones,distance',
+            'delivery.mode' => 'nullable|in:weight,zones,distance',
+            'delivery.reach' => 'nullable|in:local,island,inter',
+            'free_ship' => 'nullable|in:0,1',
             'delivery.zones' => 'nullable|array|max:60',
             'delivery.zones.*.regionCode' => 'nullable|string|max:12',
             'delivery.zones.*.provinceCode' => 'nullable|string|max:12',
@@ -67,9 +69,9 @@ class DeliveryInput
             $seen[$level.$code] = true;
             $zones[] = ['level' => $level, 'code' => $code, 'fee' => r2(max(0, (float) ($row['fee'] ?? 0)))];
         }
-        $mode = ($in['mode'] ?? 'zones') === 'distance' ? 'distance' : 'zones';
+        $mode = in_array($in['mode'] ?? '', ['weight', 'zones', 'distance'], true) ? $in['mode'] : 'weight';
         if ($strict && $fulfillment !== 'pickup' && $mode === 'zones' && ! $zones && ! $errors) {
-            $errors['delivery.zones'] = 'Add at least one delivery area, or switch to distance-based rates.';
+            $errors['delivery.zones'] = 'Add at least one delivery area, or switch to PartyRent standard rates or distance-based rates.';
         }
         if ($strict && $errors) {
             throw ValidationException::withMessages($errors);
@@ -77,6 +79,7 @@ class DeliveryInput
 
         return array_merge(Supplier::DELIVERY_DEFAULTS, [
             'mode' => $mode, 'zones' => $zones,
+            'reach' => in_array($in['reach'] ?? '', ['local', 'island', 'inter'], true) ? $in['reach'] : 'island',
             'baseFee' => $num('baseFee'), 'perKm' => $num('perKm'), 'freeKm' => $num('freeKm'), 'maxKm' => $num('maxKm'),
             'freeOver' => $num('freeOver'),
             'roundTrip' => ($in['roundTrip'] ?? '1') === '1', 'chargePerTrip' => ($in['chargePerTrip'] ?? '0') === '1',

@@ -14,10 +14,11 @@ use Illuminate\Support\Facades\DB;
  * Customers pay PartyRent, never the supplier directly. Verified payments stay with PartyRent while the
  * rental runs. When the rental is completed, PartyRent releases one payout to the supplier:
  *
- *   income        verified rental/sales payments − rental refunds
- *   commission    income × commissionPct (platform setting, frozen on the payout)
+ *   income        verified rental/sales payments − rental refunds, split into items + delivery
+ *   commission    items × commissionPct (platform setting, frozen on the payout); delivery pays no commission
+ *   voucher       PartyRent-funded Free Shipping voucher, paid to the supplier
  *   compensation  damage compensation (paid directly or deducted from the deposit), passed through with no fee
- *   net           income − commission + compensation
+ *   net           items − commission + delivery + voucher + compensation
  *
  * Security deposits are never supplier income: PartyRent holds them and returns them to the customer.
  * Cancelled requests where money was kept (e.g. a late-cancellation charge) are released by an admin
@@ -30,16 +31,30 @@ class Payouts
         return (float) Settings::get('commissionPct', 5);
     }
 
-    /** What a request is worth to its supplier, from verified payments. */
+    /**
+     * What a request is worth to its supplier, from verified payments (Shopee style):
+     *   items       paid money for items / packages / services — the only part that pays commission
+     *   delivery    paid money for the delivery fee — passed through, no commission
+     *   voucher     Free Shipping voucher PartyRent gave the customer, paid to the supplier once the rental is completed
+     *   commission  items × (commissionPct + Free Shipping program extra, frozen on the request at checkout)
+     */
     public static function breakdown(RentalRequest $r, ?float $pct = null): array
     {
         $f = $r->fin();
-        $pct ??= self::pct();
+        $p = $r->pricing ?? [];
+        $pct ??= r2(self::pct() + (float) ($p['commissionExtraPct'] ?? 0));
         $income = r2(max(0, $f['paidRental'] - $f['refunded']));
+        $delivery = r2(min($income, (float) ($p['deliveryFee'] ?? 0)));
+        $items = r2($income - $delivery);
+        $voucher = $r->status === 'completed' ? r2((float) ($p['delivery']['voucher'] ?? 0)) : 0.0;
         $comp = r2($f['compPaidDirect'] + $f['depositApplied']);
-        $commission = r2($income * $pct / 100);
+        $commission = r2($items * $pct / 100);
 
-        return ['income' => $income, 'pct' => $pct, 'commission' => $commission, 'compensation' => $comp, 'net' => r2($income - $commission + $comp)];
+        return [
+            'income' => $income, 'items' => $items, 'delivery' => $delivery, 'voucher' => $voucher,
+            'pct' => $pct, 'commission' => $commission, 'compensation' => $comp,
+            'net' => r2($items - $commission + $delivery + $voucher + $comp),
+        ];
     }
 
     /** Money PartyRent is holding for this request (shown to the supplier as "in escrow"). */
@@ -47,7 +62,7 @@ class Payouts
     {
         $b = self::breakdown($r);
 
-        return r2($b['income'] + $b['compensation']);
+        return r2($b['income'] + $b['voucher'] + $b['compensation']);
     }
 
     public static function nextCode(): string
@@ -77,7 +92,7 @@ class Payouts
         }
         $p = DB::transaction(fn () => Payout::create([
             'code' => self::nextCode(), 'supplier_id' => $r->supplier_id, 'rental_request_id' => $r->id,
-            'income' => $b['income'], 'commission_pct' => $b['pct'], 'commission' => $b['commission'], 'compensation' => $b['compensation'], 'net' => $b['net'],
+            'income' => $b['income'], 'commission_pct' => $b['pct'], 'commission' => $b['commission'], 'delivery' => $b['delivery'], 'voucher' => $b['voucher'], 'compensation' => $b['compensation'], 'net' => $b['net'],
             'status' => 'pending',
         ]));
         Notifier::notify($r->supplier->owner_id, 'supplier', 'Payout released', money($p->net).' for '.$r->code.' is ready and will be sent to your payout account ('.$p->code.').', route('supplier.payouts', [], false));

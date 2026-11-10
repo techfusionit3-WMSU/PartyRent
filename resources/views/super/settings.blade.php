@@ -6,7 +6,7 @@
   @csrf
   <div class="card"><h3>Platform</h3><div class="form-grid">
     <div class="field"><label>Platform name</label><input class="input" name="platformName" required value="{{ old('platformName', $s['platformName']) }}"></div>
-    <div class="field"><label>Commission (%)</label><input class="input" type="number" min="0" max="50" step="0.1" name="commissionPct" required value="{{ old('commissionPct', $s['commissionPct']) }}"><div class="hint">Deducted from supplier payouts when a rental is completed. Payouts already released keep their rate.</div></div>
+    <div class="field"><label>Commission (%)</label><input class="input" type="number" min="0" max="50" step="0.1" name="commissionPct" required value="{{ old('commissionPct', $s['commissionPct']) }}"><div class="hint">Taken from items only, like Shopee: delivery fees and damage charges pay no commission. Payouts already released keep their rate.</div></div>
     <div class="field"><label>Support email</label><input class="input" type="email" name="supportEmail" required value="{{ old('supportEmail', $s['supportEmail']) }}"></div>
     <div class="field"><label>Support phone</label><input class="input" name="supportPhone" required value="{{ old('supportPhone', $s['supportPhone']) }}"></div>
   </div></div>
@@ -16,6 +16,27 @@
   </div>
     <label class="check"><input type="checkbox" name="requireSupplierApproval" value="1" @checked($s['requireSupplierApproval'])> New suppliers need admin approval before going live</label>
     <label class="check"><input type="checkbox" name="aiEnabled" value="1" @checked($s['aiEnabled'])> PartyRent Assist (AI chat & planner) is enabled</label>
+  </div>
+  <div class="card"><h3>Delivery: PartyRent standard rates</h3>
+    <p class="small muted">Used by suppliers who choose "PartyRent standard rates" (like Shopee). Fee = first kg + each extra kg (rounded up), by route. A product's charged weight is its weight or its size weight (L × W × H ÷ divisor), whichever is bigger.</p>
+    <div class="table-wrap mb-1"><table class="table"><thead><tr><th>Route</th><th>First kg (₱)</th><th>Each extra kg (₱)</th></tr></thead><tbody>
+      @foreach(['local' => 'Same province (Metro Manila = one)', 'island' => 'Same island group', 'inter' => 'Another island group'] as $t => $tl)
+        <tr><td>{{ $tl }}</td><td><input class="input input-sm" type="number" min="0" step="0.01" name="shipFirstKg[{{ $t }}]" required value="{{ old('shipFirstKg.'.$t, $s['shipFirstKg'][$t] ?? 0) }}" aria-label="First kg, {{ $tl }}"></td><td><input class="input input-sm" type="number" min="0" step="0.01" name="shipPerKg[{{ $t }}]" required value="{{ old('shipPerKg.'.$t, $s['shipPerKg'][$t] ?? 0) }}" aria-label="Each extra kg, {{ $tl }}"></td></tr>
+      @endforeach
+    </tbody></table></div>
+    <div class="form-grid">
+      <div class="field"><label>Size weight divisor</label><input class="input" type="number" min="1000" max="10000" name="shipVolDivisor" required value="{{ old('shipVolDivisor', $s['shipVolDivisor']) }}"><div class="hint">L × W × H (cm) ÷ this = size weight in kg. Couriers commonly use 3500.</div></div>
+      <div class="field"><label>Weight for products with none set (kg)</label><input class="input" type="number" min="0.1" max="1000" step="0.1" name="shipDefaultKg" required value="{{ old('shipDefaultKg', $s['shipDefaultKg']) }}"></div>
+    </div>
+  </div>
+  <div class="card"><h3>Free Shipping program</h3>
+    <label class="check mb-1"><input type="checkbox" name="freeShipEnabled" value="1" @checked($s['freeShipEnabled'])> Program is on (suppliers can join; customers get vouchers)</label>
+    <p class="small muted">Like Shopee: suppliers who join pay extra commission. Their customers get a delivery voucher paid by PartyRent, and the supplier still receives the full delivery fee.</p>
+    <div class="form-grid">
+      <div class="field"><label>Extra commission for members (%)</label><input class="input" type="number" min="0" max="20" step="0.1" name="freeShipExtraPct" required value="{{ old('freeShipExtraPct', $s['freeShipExtraPct']) }}"></div>
+      <div class="field"><label>Minimum items total (₱)</label><input class="input" type="number" min="0" step="1" name="freeShipMinSpend" required value="{{ old('freeShipMinSpend', $s['freeShipMinSpend']) }}"></div>
+      <div class="field"><label>Voucher up to (₱)</label><input class="input" type="number" min="0" step="1" name="freeShipCap" required value="{{ old('freeShipCap', $s['freeShipCap']) }}"><div class="hint">Off the delivery fee. Handling fees are not covered.</div></div>
+    </div>
   </div>
   <div class="card"><h3>Where customers send payments</h3>
     <p class="small mb-0">{{ $accountCount }} active account{{ $accountCount === 1 ? '' : 's' }}. GCash, Maya and bank accounts, their QR codes and monthly limits are managed on <a href="{{ route('super.pay-accounts') }}">Payment accounts</a>.</p>
@@ -33,5 +54,5 @@
   </div>
   <div class="row"><button class="btn btn-primary btn-lg">Save settings</button></div>
 </form>
-<div class="card mt-3" style="max-width:760px"><h3>Demo data</h3><p class="small muted mb-0">To reset all data to the demo set, run <code>php artisan migrate:fresh --seed</code> on the server. This deletes every account and rental, so it isn't available from the web.</p></div>
+<div class="card mt-3" style="max-width:760px"><h3>Data reset</h3><p class="small muted mb-0">To start fresh, run <code>php artisan migrate:fresh --seed</code> on the server: it deletes every account and rental and keeps only the staff accounts, settings and categories. For the full demo set add <code>--seeder=DemoSeeder</code>. Neither is available from this page.</p></div>
 @endsection

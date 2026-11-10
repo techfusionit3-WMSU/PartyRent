@@ -11,6 +11,7 @@
       <div class="row wrap gap-sm"><span class="badge b-teal">{{ icon('truck', 'width:12px') }} {{ $s->fulfillmentLabel() }}{{ $s->offersDelivery() ? ' · '.$s->deliverySummary() : '' }}</span>
         @if($myCity && $s->offersDelivery())
           @php($reach = $s->deliveryTo($myCity))
+          @include('partials.free-ship-badge', ['s' => $s])
           @if($reach['ok'])<span class="badge b-green">Delivers to {{ \App\Domain\Locations::name($myCity) }} · {{ money_short($reach['fee']) }}</span>
           @elseif($s->fulfillment === 'both')<span class="badge b-gold">Pickup only in your area</span>
           @else<span class="badge b-red">Doesn't deliver to {{ \App\Domain\Locations::name($myCity) }}</span>@endif

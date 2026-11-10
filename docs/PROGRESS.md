@@ -4,6 +4,15 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
+**Shopee-style delivery + payouts** (user request 2026-11-10: "make it like shopee", chose all 4 parts):
+- [x] 1. No commission on delivery: `Payouts::breakdown` splits income into items vs delivery; commission only on items. Payouts table gets `delivery`, `voucher` columns.
+- [x] 2. Shopee-style payout breakdown on supplier Earnings page, admin payouts, supplier request page (Items − commission + delivery + voucher + damages = you receive).
+- [x] 3. Weight-based delivery: products get weight_kg + L/W/H cm (volumetric ÷ divisor); new delivery mode `weight` ("PartyRent standard rates"), route tier by origin/destination (same province / same island group / other island group), superadmin sets first-kg + per-kg rates. Kept area/distance as custom alternatives (tell user).
+- [x] 4. Free Shipping program: supplier opts in (`suppliers.free_ship`), pays +extra % commission; customer gets PartyRent-funded voucher off delivery (min spend, cap) — settings `freeShip*`. Voucher stored in delivery quote snapshot, paid to supplier in payout.
+- [x] `ShopeeDeliveryTest` (7 tests); 77 green. Migration `2026_11_10_000600`. Default delivery mode for NEW suppliers is now `weight`; saved suppliers keep their mode.
+- [ ] Browser check (supplier shop form, product form, payouts, superadmin settings, checkout voucher line), then push
+
+### Previous: pay at checkout
 Done: **pay at checkout** (user request 2026-11-10: "it goes to Request submitted without paying").
 Checkout now shows "Pay now to confirm" (`Finance::upfront` per payment method, `data-due-*`), a "Pay now with"
 choice (online via PayMongo/practice, or transfer), and the button "Place request & pay ₱X". After saving the

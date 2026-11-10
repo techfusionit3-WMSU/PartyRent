@@ -1,7 +1,7 @@
 @extends('layouts.dash', ['title' => 'Supplier Payouts', 'nav' => 'payouts'])
 
 @section('content')
-<div class="page-head"><div><h1>Supplier payouts</h1><p>Customers pay PartyRent. The money is held until the rental is completed, then released to the supplier minus the {{ rtrim(rtrim(number_format($pct, 2), '0'), '.') }}% platform commission. Damage compensation is passed through without a fee; security deposits are never paid out.</p></div></div>
+<div class="page-head"><div><h1>Supplier payouts</h1><p>Customers pay PartyRent. The money is held until the rental is completed, then released to the supplier. Like Shopee, the {{ rtrim(rtrim(number_format($pct, 2), '0'), '.') }}% platform commission is taken from items only (plus the Free Shipping program extra for suppliers who joined). Delivery fees, Free Shipping vouchers (paid by PartyRent) and damage compensation are passed through without a fee; security deposits are never paid out.</p></div></div>
 <div class="stats mb-3">
   @include('partials.stat', ['label' => 'Held for active rentals', 'value' => money_short($totals['escrow']), 'sub' => 'in escrow', 'icon' => 'shield', 'color' => 'teal'])
   @include('partials.stat', ['label' => 'To send', 'value' => money_short($totals['pending']), 'sub' => $pending->count().' released payout'.($pending->count() === 1 ? '' : 's'), 'icon' => 'cash', 'color' => 'gold', 'href' => route('admin.payouts', ['tab' => 'pending'])])
@@ -12,14 +12,15 @@
 <div class="card pad-0">
   @if($tab === 'pending')
     @if($pending->isEmpty())@include('partials.empty', ['emoji' => '✅', 'title' => 'Nothing to send', 'text' => 'Released payouts show here until you record the transfer.'])@else
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Payout</th><th>Supplier · account</th><th class="num">Income</th><th class="num">Commission</th><th class="num">Compensation</th><th class="num">Send</th><th>Record transfer</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Payout</th><th>Supplier · account</th><th class="num">Items</th><th class="num">Commission</th><th class="num">Delivery · damages</th><th class="num">Send</th><th>Record transfer</th></tr></thead><tbody>
       @foreach($pending as $p)<tr>
         <td data-label="Payout"><b>{{ $p->code }}</b><div class="small muted">{{ $p->rentalRequest->code }} · released {{ fmt_date($p->created_at->toDateString()) }}</div></td>
         <td data-label="Supplier"><b>{{ $p->supplier->name }}</b><div class="small {{ $p->supplier->hasPayoutAccount() ? 'muted' : '' }}" @unless($p->supplier->hasPayoutAccount()) style="color:var(--red)" @endunless>{{ $p->supplier->hasPayoutAccount() ? $p->supplier->payoutAccountLabel() : 'No payout account yet' }}</div></td>
-        <td data-label="Income" class="num">{{ money($p->income) }}</td>
+        @php($pb = $p->breakdown())
+        <td data-label="Items" class="num">{{ money($pb['items']) }}</td>
         <td data-label="Commission" class="num">− {{ money($p->commission) }}<div class="small muted">{{ rtrim(rtrim(number_format($p->commission_pct, 2), '0'), '.') }}%</div></td>
-        <td data-label="Compensation" class="num">{{ $p->compensation > 0 ? '+ '.money($p->compensation) : '—' }}</td>
-        <td data-label="Send" class="num"><b>{{ money($p->net) }}</b></td>
+        <td data-label="Delivery · damages" class="num">{{ $pb['delivery'] + $pb['voucher'] + $pb['compensation'] > 0 ? '+ '.money($pb['delivery'] + $pb['voucher'] + $pb['compensation']) : '—' }}@if($pb['voucher'] > 0)<div class="small muted">incl. {{ money($pb['voucher']) }} voucher</div>@endif</td>
+        <td data-label="Send" class="num"><details><summary><b>{{ money($p->net) }}</b></summary>@include('partials.payout-breakdown', ['b' => $pb, 'netLabel' => 'Send to supplier'])</details></td>
         <td data-label="Transfer">@if(! $p->supplier->hasPayoutAccount())<span class="small muted">Waiting for the supplier's payout account</span>@else<form method="POST" action="{{ route('admin.payouts.pay', $p) }}" class="row" style="gap:6px;flex-wrap:wrap">@csrf
           <select class="input input-sm" name="method" style="width:auto" aria-label="Method">@foreach(\App\Models\Payout::METHOD_LABEL as $k => $l)<option value="{{ $k }}" @selected($p->supplier->payout_method === $k)>{{ $l }}</option>@endforeach</select>
           <input class="input input-sm" name="reference" placeholder="Reference no." required maxlength="80" style="width:140px" aria-label="Reference number">
@@ -34,8 +35,8 @@
         <td data-label="Request"><b>{{ $r->code }}</b><div class="small muted">{{ $r->event_name }} · {{ $r->customer->name }}</div></td>
         <td data-label="Supplier">{{ $r->supplier->name }}</td>
         <td data-label="Status">@include('partials.badges', ['status' => $r->status])@if($r->payments->where('status', 'pending')->isNotEmpty())<div class="small" style="color:var(--red)">payment pending verification</div>@endif</td>
-        <td data-label="Held" class="num">{{ money($b['income'] + $b['compensation']) }}</td>
-        <td data-label="Payout" class="num"><b>{{ money($b['net']) }}</b><div class="small muted">after {{ money($b['commission']) }} commission</div></td>
+        <td data-label="Held" class="num">{{ money($b['income'] + $b['voucher'] + $b['compensation']) }}</td>
+        <td data-label="Payout" class="num"><details><summary><b>{{ money($b['net']) }}</b></summary>@include('partials.payout-breakdown', ['b' => $b, 'netLabel' => 'Supplier receives'])</details></td>
         <td><form method="POST" action="{{ route('admin.payouts.release', $r) }}">@csrf<button class="btn btn-sm">Release</button></form></td>
       </tr>@endforeach
     </tbody></table></div>@endif

@@ -27,7 +27,7 @@
   <div class="stack-sm">@foreach([['delivery', 'Delivery only', 'You bring items to the customer.'], ['pickup', 'Pickup only', 'Customers collect from your location.'], ['both', 'Both delivery and pickup', 'Let customers choose.']] as [$v, $l, $desc])
     <label class="card card-flat row" style="padding:12px 14px;cursor:pointer"><input type="radio" name="fulfillment" value="{{ $v }}" @checked($o('fulfillment', 'both') === $v) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $desc }}</div></div></label>
   @endforeach</div>{!! $err('fulfillment') !!}
-  @include('partials.delivery-settings', ['dl' => $d['delivery'] ?? null, 'previewCity' => $previewCity ?? null])
+  @include('partials.delivery-settings', ['dl' => $d['delivery'] ?? null, 'previewCity' => $previewCity ?? null, 'freeShip' => (bool) ($d['free_ship'] ?? false)])
 </section>
 <section data-step="3">
   <h2>Payments</h2>

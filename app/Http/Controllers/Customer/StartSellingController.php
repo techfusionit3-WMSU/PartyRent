@@ -156,6 +156,7 @@ class StartSellingController extends Controller
             'city' => Locations::name($addr['city_code']), ...$addr,
             'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1],
             'fulfillment' => $v['fulfillment'], 'delivery' => DeliveryInput::toSettings($v['delivery'] ?? [], $v['fulfillment']),
+            'free_ship' => $v['fulfillment'] !== 'pickup' && ($v['free_ship'] ?? '0') === '1',
             'methods' => array_values(array_unique($v['methods'])), 'arrangements' => array_values(array_unique($v['arrangements'])), 'policy' => $policy,
         ];
     }

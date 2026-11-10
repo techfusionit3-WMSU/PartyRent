@@ -325,7 +325,7 @@
   .day-row { position: relative; }
   .day-row > div[data-l]::before { content: attr(data-l); display: block; font-size: .68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; }
   .modal-backdrop { align-items: flex-end; padding: 0; }
-  .modal { max-width: 100% !important; border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 92vh; }
+  .modal { max-width: 100% !important; border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 92vh; max-height: 92dvh; }
   .icals .c { min-height: 64px; padding: 3px; }
   .icals .bar { display: none; }
   .icals .c .dn span.wk { display: none; }

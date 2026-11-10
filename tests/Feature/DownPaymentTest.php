@@ -49,7 +49,7 @@ class DownPaymentTest extends TestCase
         $this->assertSame('pending', $r->fresh()->status);
 
         // the customer is asked to pay; the deposit is not accepted yet
-        $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertOk()->assertSee('to confirm your request')->assertSee('needed before the supplier can accept');
+        $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertOk()->assertSee('to confirm your request')->assertSee(' (to confirm)');
         $this->post('/rentals/PR-0003/payments', ['type' => 'deposit', 'amount' => 100, 'method' => 'cod'])->assertSessionHas('error');
         $amt = $r->fin()['upfront']['amount'];
         $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'cod', 'reference' => 'cash at office'])->assertSessionHas('success');

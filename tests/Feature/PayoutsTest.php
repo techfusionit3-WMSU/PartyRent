@@ -59,6 +59,13 @@ class PayoutsTest extends TestCase
             $this->get('/admin/payouts?tab='.$tab)->assertOk();
         }
         $this->post("/admin/payouts/{$p->code}/pay", ['method' => 'gcash', 'reference' => ''])->assertSessionHasErrors('reference');
+        // no payout account yet → refused, and the supplier is reminded
+        $acct = $p->supplier->only(['payout_method', 'payout_bank', 'payout_account_name', 'payout_account_no']);
+        $p->supplier->update(['payout_method' => null]);
+        $this->get('/admin/payouts')->assertSee('Waiting for the supplier');
+        $this->post("/admin/payouts/{$p->code}/pay", ['method' => 'gcash', 'reference' => 'GC-1'])->assertSessionHas('error', fn ($e) => str_contains($e, 'payout account'));
+        $this->assertTrue(AppNotification::where('user_id', $p->supplier->owner_id)->where('title', 'Add your payout account')->exists());
+        $p->supplier->update(array_merge($acct, ['payout_method' => $acct['payout_method'] ?? 'gcash', 'payout_account_name' => $acct['payout_account_name'] ?? 'Owner', 'payout_account_no' => $acct['payout_account_no'] ?? '0917']));
         $this->post("/admin/payouts/{$p->code}/pay", ['method' => 'gcash', 'reference' => 'GC-778899'])->assertSessionHas('success');
         $p->refresh();
         $this->assertTrue($p->isPaid());

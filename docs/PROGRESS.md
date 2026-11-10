@@ -4,7 +4,7 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Escrow + supplier payouts (Shopee model)** (migration `2026_11_10_000200`, `App\Domain\Payouts`).
+Done: **escrow + supplier payouts (Shopee model)** (migration `2026_11_10_000200`, `App\Domain\Payouts`).
 User asked that the cashier not see supplier numbers and chose the full Shopee model: customers pay
 PartyRent, PartyRent holds the money and pays the supplier after the rental, minus `commissionPct`.
 
@@ -17,7 +17,9 @@ PartyRent, PartyRent holds the money and pays the supplier after the rental, min
 - [x] Customer/supplier wording: pay PartyRent; COD cash is collected for PartyRent
 - [x] Seeder: payout accounts for s1–s3, payouts for completed rentals (older ones paid)
 - [x] `PayoutsTest` + payout assertions in `RentalLifecycleTest`
-- [ ] Browser check of the new pages (dev DB needs `php artisan migrate:fresh --seed` for demo payouts — ask first)
+- [x] Browser check (headless Edge, `drv/payouts.js` in the session scratchpad): admin to send/paid/by supplier, mark paid, supplier page + account form (bank field toggles), request page note, phone width, cashier pages free of supplier names, cashier kept out of /admin/payouts
+- [x] Payouts can't be marked paid until the supplier has a payout account (supplier is reminded)
+- [x] Migration `2026_11_10_000300` adds `payouts.manage` to the stored default admin permissions
 
 ## Done
 - [x] Phase 2 (see `docs/PHASE2.md`)
@@ -37,6 +39,7 @@ PartyRent, PartyRent holds the money and pays the supplier after the rental, min
 - [x] `PackagesTest`
 
 ## Notes (newest first)
+- 2026-11-10: dev DB got its demo payouts additively (scratchpad `devpayouts.php`), not by reseeding; the browser run marked PO-10001 paid (ref GC-TEST-1) and set Juan's payout account to BPI.
 - 2026-11-10: escrow/payouts built; 51 tests green. Fixed a test-order bug: `Settings` static cache survived DB rollbacks between tests (`tests/TestCase.php` now flushes it). Deposits stay with PartyRent and are never paid out; damage compensation passes through with no commission.
 - 2026-11-10: packages/sale items finished and driven in headless Edge (playwright-core): sale form, builder, preview, publish, customer options, cart. Fixed: `[hidden]` lost to `.field{display:flex}`; cart package lines now show choices and price with the saved `sel`; warning when a fixed price exceeds the separate total. 47 tests green.
 - 2026-11-10: another session (4c1abe1) briefly worked the same task; user chose this session to continue. Its `CatalogController::restock` is the one kept.

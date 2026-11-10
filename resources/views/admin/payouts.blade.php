@@ -20,10 +20,10 @@
         <td data-label="Commission" class="num">− {{ money($p->commission) }}<div class="small muted">{{ rtrim(rtrim(number_format($p->commission_pct, 2), '0'), '.') }}%</div></td>
         <td data-label="Compensation" class="num">{{ $p->compensation > 0 ? '+ '.money($p->compensation) : '—' }}</td>
         <td data-label="Send" class="num"><b>{{ money($p->net) }}</b></td>
-        <td data-label="Transfer"><form method="POST" action="{{ route('admin.payouts.pay', $p) }}" class="row" style="gap:6px;flex-wrap:wrap">@csrf
+        <td data-label="Transfer">@if(! $p->supplier->hasPayoutAccount())<span class="small muted">Waiting for the supplier's payout account</span>@else<form method="POST" action="{{ route('admin.payouts.pay', $p) }}" class="row" style="gap:6px;flex-wrap:wrap">@csrf
           <select class="input input-sm" name="method" style="width:auto" aria-label="Method">@foreach(\App\Models\Payout::METHOD_LABEL as $k => $l)<option value="{{ $k }}" @selected($p->supplier->payout_method === $k)>{{ $l }}</option>@endforeach</select>
           <input class="input input-sm" name="reference" placeholder="Reference no." required maxlength="80" style="width:140px" aria-label="Reference number">
-          <button class="btn btn-sm btn-primary">Mark paid</button></form></td>
+          <button class="btn btn-sm btn-primary">Mark paid</button></form>@endif</td>
       </tr>@endforeach
     </tbody></table></div>@endif
   @elseif($tab === 'release')

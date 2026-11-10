@@ -90,6 +90,11 @@ class Payouts
         if ($p->isPaid()) {
             return ['ok' => false, 'error' => $p->code.' is already paid.'];
         }
+        if (! $p->supplier->hasPayoutAccount()) {
+            Notifier::notify($p->supplier->owner_id, 'supplier', 'Add your payout account', money($p->net).' ('.$p->code.') is ready for you. Add a GCash or bank account so PartyRent can send it.', route('supplier.payouts', [], false));
+
+            return ['ok' => false, 'error' => $p->supplier->name.' has not added a payout account yet. They were reminded to add one.'];
+        }
         if (! in_array($data['method'] ?? '', array_keys(Payout::METHOD_LABEL), true)) {
             return ['ok' => false, 'error' => 'Choose how the payout was sent.'];
         }

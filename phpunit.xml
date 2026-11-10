@@ -30,6 +30,10 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
+        <!-- tests set PayMongo up themselves; don't inherit the local .env keys or practice mode -->
+        <env name="PAYMONGO_SECRET_KEY" value=""/>
+        <env name="PAYMONGO_WEBHOOK_SECRET" value=""/>
+        <env name="PAYMONGO_FAKE" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>

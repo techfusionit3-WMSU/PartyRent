@@ -117,7 +117,7 @@
       <div class="form-grid"><div class="field"><label>Amount (₱)</label><input class="input" type="number" step="0.01" min="1" name="amount" id="payAmount" required value="{{ old('amount', $payTypes[0][2]) }}"></div>
         <div class="field"><label>Payment method</label><select class="input" name="method" id="payMethod">@if($online)<option value="online">Pay online: GCash, Maya, card (instant)</option>@endif @foreach($sup->methods as $m)<option value="{{ $m }}" @selected(old('method') === $m)>{{ \App\Models\Payment::METHOD_LABEL[$m] ?? $m }}</option>@endforeach</select></div></div>
       @if($online)
-      <div id="onlineBox" class="alert alert-info mb-2">{{ icon('card') }}<div class="small">@if(\App\Domain\PayMongo::practice())<b>Practice mode:</b> you'll go to a practice checkout page. No real money is charged. @endif You'll go to <b>PayMongo's secure checkout</b> to pay with GCash, Maya, card or QR Ph. Your payment is <b>verified automatically</b>, so there's no need to upload a receipt. PayMongo emails you a receipt too.</div></div>
+      <div id="onlineBox" class="alert alert-info mb-2">{{ icon('card') }}<div class="small">@if(\App\Domain\PayMongo::practice())<b>Practice mode:</b> you'll go to a practice checkout page that stands in for PayMongo. No real money is charged.@else You'll go to <b>PayMongo's secure checkout</b> to pay with GCash, Maya, card or QR Ph.@endif Your payment is <b>verified automatically</b>, so there's no need to upload a receipt. PayMongo emails you a receipt too.</div></div>
       @endif
       <div id="bankBox">
         <div class="pay-accounts mb-2">

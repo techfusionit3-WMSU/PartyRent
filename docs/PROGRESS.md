@@ -4,7 +4,16 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-Done: **payment accounts list with on/off + monthly limits** (user request 2026-11-10; migration `2026_11_10_000500`).
+Done: **PayMongo practice mode** (user request 2026-11-10). PayMongo has paused new sign-ups, so there are no keys.
+`PAYMONGO_FAKE=true` (set in the local `.env`; never active when `APP_ENV=production`) makes "Pay online" open a
+built-in practice checkout (`PracticeCheckoutController`, `customer/practice-checkout`) with Pay / fail / cancel.
+Paying redirects to the normal `rentals.paymongo.return`, and `PayMongo::sync` settles it from the cached practice
+session with the same `settle()` code, so verification, receipts and "Down payment received" behave as in production.
+- [x] `PracticeCheckoutTest` (Http::preventStrayRequests); 69 tests green
+- [x] Browser run (`drv/practice.js`): Maria paid PR-0005's ₱6,700 via practice GCash after one simulated failure; verified (OR-10023); Ana's Accept enabled
+- [ ] When PayMongo reopens sign-ups: put `sk_test_` key in `.env`, set `PAYMONGO_FAKE=false`, do a sandbox run
+
+### Previous: payment accounts list
 GCash caps monthly receiving, so PartyRent's collection accounts are now a list (`pay_accounts`, `PayAccount`) instead of single settings.
 - [x] Superadmin "Payment Accounts" page (`super.pay-accounts`): add/edit/QR/turn off/remove (remove only if unused)
 - [x] Optional `monthly_cap`: `receivedThisMonth` = pending + verified inflows this month; customer form hides (JS, `data-room`) and server refuses accounts that can't take the amount

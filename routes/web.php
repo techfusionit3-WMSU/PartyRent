@@ -101,6 +101,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/', [SupplierController::class, 'dashboard'])->name('dashboard');
     Route::get('/schedule', [SupplierController::class, 'schedule'])->name('schedule');
     Route::get('/payments', [SupplierController::class, 'payments'])->name('payments');
+    Route::get('/payouts', [\App\Http\Controllers\Supplier\PayoutController::class, 'index'])->name('payouts');
+    Route::put('/payouts/account', [\App\Http\Controllers\Supplier\PayoutController::class, 'updateAccount'])->name('payouts.account');
     Route::get('/reviews', [ReviewController::class, 'supplierIndex'])->name('reviews');
     Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])->name('reviews.reply');
     Route::get('/shop', [SupplierController::class, 'shop'])->name('shop');
@@ -168,6 +170,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
+    Route::get('/payouts', [\App\Http\Controllers\Admin\PayoutController::class, 'index'])->name('payouts');
+    Route::post('/payouts/release/{rentalRequest}', [\App\Http\Controllers\Admin\PayoutController::class, 'release'])->name('payouts.release');
+    Route::post('/payouts/{payout}/pay', [\App\Http\Controllers\Admin\PayoutController::class, 'pay'])->name('payouts.pay');
     Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
 
     Route::get('/listings', [AdminController::class, 'listings'])->name('listings');

@@ -13,7 +13,7 @@
       <div class="card">
         <div class="row wrap between top">
           <div><div class="row gap-sm"><b>{{ $p->code }}</b>@include('partials.badges', ['ver' => $p->status])<span class="badge b-gray plain">by {{ $p->recorded_by }}</span></div>
-            <div class="small muted mt-1">{{ $r->code }} · {{ $r->event_name }} · {{ $r->customer->name }} → {{ $r->supplier->name }}</div></div>
+            <div class="small muted mt-1">{{ $r->code }} · {{ $r->event_name }} · {{ $r->customer->name }}</div></div>
           <div class="right"><div class="price-lg">{{ money($p->amount) }}</div><div class="small muted">{{ $p->typeLabel() }} · {{ $p->methodLabel() }}</div></div>
         </div>
         <dl class="kv mt-2"><dt>Reference no.</dt><dd>{{ $p->reference ?: '—' }}</dd><dt>Payment date</dt><dd>{{ fmt_date($p->date) }}</dd><dt>Submitted</dt><dd>{{ fmt_datetime($p->submitted_at) }}</dd>

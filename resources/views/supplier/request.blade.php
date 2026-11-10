@@ -57,7 +57,7 @@
       </div>
     @endif
     <div class="card"><h3>Requested items & daily quantities</h3>@include('partials.lines-table', ['pricing' => $r->pricing])</div>
-    <div class="card"><div class="card-head"><h3>Payments</h3>@if($r->isActive())<button class="btn btn-sm" data-modal="cashModal">{{ icon('cash') }}Record cash payment</button>@endif</div>@include('partials.payment-history')<p class="small muted mt-1 mb-0">Payments you record are sent to the cashier for verification before they count toward the balance.</p></div>
+    <div class="card"><div class="card-head"><h3>Payments</h3>@if($r->isActive())<button class="btn btn-sm" data-modal="cashModal">{{ icon('cash') }}Record cash payment</button>@endif</div>@include('partials.payment-history')<p class="small muted mt-1 mb-0">Customers pay PartyRent. Cash you collect (e.g. on delivery) is collected for PartyRent: hand it over to the PartyRent cashier. It counts once verified.</p>@php($po = $r->payout)<div class="alert {{ $po ? ($po->isPaid() ? 'alert-success' : 'alert-info') : 'alert-info' }} mt-2 mb-0">{{ icon('cash') }}<div class="small">@if($po)<b>Payout {{ $po->code }}:</b> {{ money($po->net) }} {{ $po->isPaid() ? 'sent on '.fmt_date($po->paid_at->toDateString()).' ('.$po->methodLabel().' · '.$po->reference.')' : 'released — PartyRent is sending it to your payout account' }}. <a href="{{ route('supplier.payouts') }}">Earnings & payouts</a>@else @php($held = \App\Domain\Payouts::held($r))<b>Held by PartyRent:</b> {{ money($held) }}. {{ $r->status === 'completed' || $r->status === 'cancelled' ? 'PartyRent releases it after reviewing the request.' : 'Released to you, minus the platform commission, when the rental is completed.' }}@endif</div></div></div>
     @include('partials.inspection-report')
     <div class="card"><h3>Activity</h3>@include('partials.timeline')</div>
   </div>
@@ -144,7 +144,7 @@
 @if($r->isActive())
 <div class="modal-backdrop hidden" id="cashModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Record cash payment · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
   <form method="POST" action="{{ route('supplier.requests.cash', $r) }}">@csrf<div class="modal-body">
-    <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">Use this when the customer pays you in cash (e.g. Cash on Delivery). It is sent to the PartyRent cashier for verification and only counts once verified.</div></div>
+    <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">Use this when the customer pays you in cash (e.g. Cash on Delivery). You collect it for PartyRent: hand it over to the PartyRent cashier. It only counts once verified, and comes back to you in your payout when the rental is completed.</div></div>
     <div class="form-grid">
       <div class="field"><label>Payment type</label><select class="input" name="type">
         @if($f['balance'] - $f['pendingRental'] > 0)<option value="{{ $sug['type'] }}">{{ $sug['label'] }}</option><option value="balance">Remaining balance</option>@endif

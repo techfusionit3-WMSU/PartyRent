@@ -4,9 +4,20 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-Done: **sale items + custom packages** (migration `2026_11_10_000100`, `App\Domain\Packages`).
-Domain, pricing, inventory, stock deduction (`Rentals::deductSaleStock/restock/savePackage/...`) and
-routes exist; controllers + UI were never written.
+**Escrow + supplier payouts (Shopee model)** (migration `2026_11_10_000200`, `App\Domain\Payouts`).
+User asked that the cashier not see supplier numbers and chose the full Shopee model: customers pay
+PartyRent, PartyRent holds the money and pays the supplier after the rental, minus `commissionPct`.
+
+- [x] `payouts` table + `suppliers.payout_*` account fields; `Payout` model
+- [x] `Payouts::breakdown/held/release/markPaid/awaitingRelease/summary`; released automatically by `Rentals::completeRental`
+- [x] Cashier refunds blocked once a request's money is released
+- [x] Admin/superadmin "Supplier Payouts" page (`admin.payouts`, perm `payouts.manage`): to send / awaiting release / paid / by supplier
+- [x] Supplier "Earnings & Payouts" page + payout account form; request page shows held / payout status
+- [x] Cashier pages: no supplier names, no per-supplier chart, no supplier CSV column
+- [x] Customer/supplier wording: pay PartyRent; COD cash is collected for PartyRent
+- [x] Seeder: payout accounts for s1–s3, payouts for completed rentals (older ones paid)
+- [x] `PayoutsTest` + payout assertions in `RentalLifecycleTest`
+- [ ] Browser check of the new pages (dev DB needs `php artisan migrate:fresh --seed` for demo payouts — ask first)
 
 ## Done
 - [x] Phase 2 (see `docs/PHASE2.md`)
@@ -26,6 +37,7 @@ routes exist; controllers + UI were never written.
 - [x] `PackagesTest`
 
 ## Notes (newest first)
+- 2026-11-10: escrow/payouts built; 51 tests green. Fixed a test-order bug: `Settings` static cache survived DB rollbacks between tests (`tests/TestCase.php` now flushes it). Deposits stay with PartyRent and are never paid out; damage compensation passes through with no commission.
 - 2026-11-10: packages/sale items finished and driven in headless Edge (playwright-core): sale form, builder, preview, publish, customer options, cart. Fixed: `[hidden]` lost to `.field{display:flex}`; cart package lines now show choices and price with the saved `sel`; warning when a fixed price exceeds the separate total. 47 tests green.
 - 2026-11-10: another session (4c1abe1) briefly worked the same task; user chose this session to continue. Its `CatalogController::restock` is the one kept.
 - 2026-11-09 (pickup): routes in `routes/web.php` reference the missing controller methods above; editing a package is broken until the builder posts `components`/`pricing`.

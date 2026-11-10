@@ -50,10 +50,12 @@ class AppServiceProvider extends ServiceProvider
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
                 $badges['verification'] = Payment::where('status', 'pending')->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
+                $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();
             } elseif ($role === 'admin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
+                $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();
             }
             $view->with([
                 'shellUser' => $u,

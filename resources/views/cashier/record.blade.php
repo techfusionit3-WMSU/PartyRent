@@ -14,9 +14,9 @@
   <div class="grid grid-side">
     <form method="POST" action="{{ route('cashier.record.store') }}" class="card">
       @csrf <input type="hidden" name="request" value="{{ $r->code }}">
-      <h3>{{ $r->code }} · {{ $r->event_name }}</h3><p class="small muted">{{ $r->customer->name }} → {{ $r->supplier->name }} · @include('partials.badges', ['status' => $r->status])</p>
+      <h3>{{ $r->code }} · {{ $r->event_name }}</h3><p class="small muted">{{ $r->customer->name }} · @include('partials.badges', ['status' => $r->status])</p>
       <div class="form-grid">
-        <div class="field"><label>Type</label><select class="input" name="type">@foreach(\App\Models\Payment::TYPE_LABEL as $k => $l)@continue($k === 'deposit_refund')<option value="{{ $k }}" @selected(old('type') === $k)>{{ $l }}</option>@endforeach</select><div class="hint">Deposit refunds are created by the supplier when settling the deposit.</div></div>
+        <div class="field"><label>Type</label><select class="input" name="type">@foreach(\App\Models\Payment::TYPE_LABEL as $k => $l)@continue($k === 'deposit_refund')<option value="{{ $k }}" @selected(old('type') === $k)>{{ $l }}</option>@endforeach</select><div class="hint">Deposit refunds are created when the rental's deposit is settled after the return inspection.</div></div>
         <div class="field"><label>Method</label><select class="input" name="method"><option value="cash">Cash (over the counter)</option><option value="bank">Online bank transfer</option><option value="debit">Debit card</option></select></div>
         <div class="field"><label>Amount (₱)</label><input class="input" type="number" min="1" step="0.01" name="amount" required value="{{ old('amount', $f['balance'] ?: '') }}"></div>
         <div class="field"><label>Date</label><input class="input" type="date" name="date" value="{{ old('date', today_iso()) }}" max="{{ today_iso() }}" required></div>

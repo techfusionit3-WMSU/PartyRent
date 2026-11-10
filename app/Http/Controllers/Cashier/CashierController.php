@@ -15,7 +15,7 @@ class CashierController extends Controller
     {
         Rentals::scanOverdue();
         $T = today_iso();
-        $active = RentalRequest::whereIn('status', Finance::ACTIVE)->with(['payments', 'customer', 'supplier'])->get();
+        $active = RentalRequest::whereIn('status', Finance::ACTIVE)->with(['payments', 'customer'])->get();
         $today = Payment::where('status', 'verified')->whereDate('verified_at', $T)->get();
 
         return view('cashier.dashboard', [
@@ -32,7 +32,7 @@ class CashierController extends Controller
 
     public function verification(Request $request)
     {
-        $list = Payment::where('status', 'pending')->with(['rentalRequest.customer', 'rentalRequest.supplier', 'rentalRequest.payments'])->orderBy('submitted_at')->get();
+        $list = Payment::where('status', 'pending')->with(['rentalRequest.customer', 'rentalRequest.payments'])->orderBy('submitted_at')->get();
 
         return view('cashier.verification', ['list' => $list]);
     }
@@ -54,7 +54,7 @@ class CashierController extends Controller
 
     public function record(Request $request)
     {
-        $r = $request->query('request') ? RentalRequest::where('code', strtoupper(trim($request->query('request'))))->with(['payments', 'customer', 'supplier'])->first() : null;
+        $r = $request->query('request') ? RentalRequest::where('code', strtoupper(trim($request->query('request'))))->with(['payments', 'customer'])->first() : null;
 
         return view('cashier.record', [
             'r' => $r, 'code' => $request->query('request', ''),
@@ -85,7 +85,7 @@ class CashierController extends Controller
     public function balances(Request $request)
     {
         Rentals::scanOverdue();
-        $active = RentalRequest::whereIn('status', Finance::ACTIVE)->with(['payments', 'customer', 'supplier'])->orderBy('start_date')->get();
+        $active = RentalRequest::whereIn('status', Finance::ACTIVE)->with(['payments', 'customer'])->orderBy('start_date')->get();
 
         return view('cashier.balances', [
             'rows' => $active->filter(fn ($r) => $r->fin()['balance'] > 0 || $r->fin()['isOverdue'])->values(),
@@ -97,7 +97,7 @@ class CashierController extends Controller
     {
         abort_unless($request->user()->hasPerm('reports.view'), 403);
         $rg = \App\Support\Report::range($request);
-        $ver = Payment::where('status', 'verified')->whereBetween('date', [$rg['from'], $rg['to']])->with(['rentalRequest.supplier', 'verifier'])->get();
+        $ver = Payment::where('status', 'verified')->whereBetween('date', [$rg['from'], $rg['to']])->with(['rentalRequest', 'verifier'])->get();
         $rental = $ver->whereIn('type', Finance::RENTAL_TYPES);
         $days = date_range(diff_days($rg['from'], $rg['to']) > 45 ? add_days($rg['to'], -29) : $rg['from'], $rg['to']);
 
@@ -112,7 +112,6 @@ class CashierController extends Controller
             'daily' => array_map(fn ($d) => ['label' => (string) (int) substr($d, 8), 'value' => $rental->where('date', $d)->sum('amount')], $days),
             'byMethod' => collect(Payment::METHOD_LABEL)->map(fn ($l, $k) => ['label' => $l, 'value' => $rental->where('method', $k)->sum('amount')])->values(),
             'byType' => collect(Payment::TYPE_LABEL)->map(fn ($l, $k) => ['label' => $l, 'value' => $ver->where('type', $k)->sum('amount')])->filter(fn ($x) => $x['value'] > 0)->values(),
-            'bySupplier' => $rental->groupBy(fn ($p) => $p->rentalRequest->supplier->name)->map(fn ($g, $name) => ['label' => $name, 'value' => $g->sum('amount')])->sortByDesc('value')->values(),
             'byCashier' => $ver->where('recorded_by', '!=', 'supplier')->groupBy(fn ($p) => $p->verifier->name ?? 'System')->map(fn ($g, $name) => ['label' => $name, 'value' => $g->count()])->sortByDesc('value')->values(),
             'count' => $ver->count(),
         ]);
@@ -122,9 +121,9 @@ class CashierController extends Controller
     {
         abort_unless($request->user()->hasPerm('reports.view'), 403);
         $rg = \App\Support\Report::range($request);
-        $rows = [['Date', 'Transaction', 'Receipt', 'Request', 'Customer', 'Supplier', 'Type', 'Method', 'Reference', 'Amount', 'Status', 'Verified by', 'Verified at']];
-        Payment::whereBetween('date', [$rg['from'], $rg['to']])->with(['rentalRequest.customer', 'rentalRequest.supplier', 'verifier'])->orderBy('date')->orderBy('id')->each(function ($p) use (&$rows) {
-            $rows[] = [$p->date, $p->code, $p->receipt_no, $p->rentalRequest->code, $p->rentalRequest->customer->name, $p->rentalRequest->supplier->name, $p->typeLabel(), $p->methodLabel(), $p->reference, ($p->isOutflow() ? -1 : 1) * $p->amount, $p->status, $p->verifier->name ?? '', $p->verified_at?->toDateTimeString()];
+        $rows = [['Date', 'Transaction', 'Receipt', 'Request', 'Customer', 'Type', 'Method', 'Reference', 'Amount', 'Status', 'Verified by', 'Verified at']];
+        Payment::whereBetween('date', [$rg['from'], $rg['to']])->with(['rentalRequest.customer', 'verifier'])->orderBy('date')->orderBy('id')->each(function ($p) use (&$rows) {
+            $rows[] = [$p->date, $p->code, $p->receipt_no, $p->rentalRequest->code, $p->rentalRequest->customer->name, $p->typeLabel(), $p->methodLabel(), $p->reference, ($p->isOutflow() ? -1 : 1) * $p->amount, $p->status, $p->verifier->name ?? '', $p->verified_at?->toDateTimeString()];
         });
 
         return \App\Support\Report::csv('partyrent-payments-'.$rg['from'].'-to-'.$rg['to'].'.csv', $rows);

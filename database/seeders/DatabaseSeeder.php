@@ -88,6 +88,7 @@ class DatabaseSeeder extends Seeder
         $this->packages();
         $this->requests();
         $this->payments();
+        $this->payouts();
         $this->reviewsAndComplaints();
         $this->notifications();
         $this->audit();
@@ -369,6 +370,33 @@ class DatabaseSeeder extends Seeder
                 RequestEvent::create(['rental_request_id' => $r->id, 'status' => $h[0], 'user_id' => $this->U[$h[2]], 'note' => $h[3] ?? null, 'created_at' => $this->ts($h[1])]);
             }
             $this->R[$code] = $r->id;
+        }
+    }
+
+    /** Escrow: demo payout accounts, and payouts for the completed rentals (older ones already sent). */
+    private function payouts(): void
+    {
+        $accounts = [
+            's1' => ['gcash', null, 'Happy Moments Party Rentals', '0918 555 0202'],
+            's2' => ['bank', 'BDO', 'Celebration Hub Rentals', '0012 3456 7890'],
+            's3' => ['bank', 'BPI', 'Dream Events Supplies', '3141 5926 53'],
+        ];
+        foreach ($accounts as $k => [$m, $bank, $name, $no]) {
+            Supplier::whereKey($this->S[$k])->update(['payout_method' => $m, 'payout_bank' => $bank, 'payout_account_name' => $name, 'payout_account_no' => $no]);
+        }
+        foreach (RentalRequest::where('status', 'completed')->with(['payments', 'supplier'])->get() as $r) {
+            $b = \App\Domain\Payouts::breakdown($r);
+            if ($b['net'] <= 0) {
+                continue;
+            }
+            $done = Carbon::parse($r->completed_at);
+            $sent = $done->lt(Carbon::parse($this->D(-20)));
+            $sup = $r->supplier;
+            \App\Models\Payout::create([
+                'code' => \App\Domain\Payouts::nextCode(), 'supplier_id' => $r->supplier_id, 'rental_request_id' => $r->id,
+                'income' => $b['income'], 'commission_pct' => $b['pct'], 'commission' => $b['commission'], 'compensation' => $b['compensation'], 'net' => $b['net'],
+                'status' => $sent ? 'paid' : 'pending', 'created_at' => $done->copy()->setTime(18, 0), 'updated_at' => $done->copy()->setTime(18, 0),
+            ] + ($sent ? ['method' => $sup->payout_method ?: 'bank', 'reference' => 'GC'.str_pad((string) ($r->id * 7919), 8, '0', STR_PAD_LEFT), 'paid_at' => $done->copy()->addDays(2)->setTime(10, 0), 'paid_by' => $this->U['u12']] : []));
         }
     }
 

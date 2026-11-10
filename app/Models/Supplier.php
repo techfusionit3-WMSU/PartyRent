@@ -29,6 +29,14 @@ class Supplier extends Model
 
     public function owner(): BelongsTo { return $this->belongsTo(User::class, 'owner_id'); }
     public function products(): HasMany { return $this->hasMany(Product::class); }
+    public function payouts(): HasMany { return $this->hasMany(Payout::class); }
+
+    public function hasPayoutAccount(): bool { return (bool) $this->payout_method && $this->payout_account_name && $this->payout_account_no; }
+
+    public function payoutAccountLabel(): string
+    {
+        return $this->hasPayoutAccount() ? ($this->payout_method === 'gcash' ? 'GCash' : ($this->payout_bank ?: 'Bank')).' · '.$this->payout_account_name.' · '.$this->payout_account_no : 'Not set';
+    }
     public function packages(): HasMany { return $this->hasMany(Package::class); }
     public function rentalRequests(): HasMany { return $this->hasMany(RentalRequest::class); }
     public function reviews(): HasMany { return $this->hasMany(Review::class); }

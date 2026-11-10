@@ -27,6 +27,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         'listings.manage' => 'Hide / restore listings',
         'categories.manage' => 'Manage categories',
         'transactions.view' => 'View transactions & reservations',
+        'payouts.manage' => 'Release & send supplier payouts',
         'complaints.manage' => 'Handle complaints',
         'reports.view' => 'View reports',
     ];

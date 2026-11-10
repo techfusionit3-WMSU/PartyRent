@@ -55,6 +55,7 @@ class RentalRequest extends Model
 
     public function customer(): BelongsTo { return $this->belongsTo(User::class, 'customer_id'); }
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
+    public function payout(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(Payout::class); }
     public function payments(): HasMany { return $this->hasMany(Payment::class)->orderBy('submitted_at')->orderBy('id'); }
     public function events(): HasMany { return $this->hasMany(RequestEvent::class)->orderBy('id'); }
     public function reviews(): HasMany { return $this->hasMany(Review::class); }

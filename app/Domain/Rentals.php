@@ -315,7 +315,7 @@ class Rentals
             $saleNote = $saleLocked ? ' Items for sale ('.money($sales).') are no longer refundable because the supplier has started preparing them.' : '';
 
             return ['allowed' => true, 'free' => $free && ! $saleLocked, 'deadline' => $deadline, 'nonRefundable' => $saleLocked ? $sales : 0.0, 'note' => ($free
-                ? 'Free cancellation until '.fmt_date($deadline).'. Verified payments will be refunded by the supplier.'
+                ? 'Free cancellation until '.fmt_date($deadline).'. Verified payments will be refunded by PartyRent.'
                 : 'The free cancellation period ended on '.fmt_date($deadline).'. Per policy: '.$s->pol('cancellation', '')).$saleNote];
         }
 
@@ -333,6 +333,9 @@ class Rentals
         self::changed($r);
         $fin = $r->fin();
         Notifier::notify($r->supplier->owner_id, 'supplier', 'Customer cancellation', $r->customer->name.' cancelled '.$r->code.'. '.($fin['paidRental'] > 0 ? 'Verified payments of '.money($fin['paidRental']).' need refund review.' : 'No payments were made.'), self::link('supplier.requests.show', $r));
+        if ($fin['paidRental'] > 0) {
+            Notifier::notify('cashier', 'cashier', 'Refund review', $r->code.' was cancelled by the customer with '.money($fin['paidRental']).' paid. Record any refund due.', self::link('cashier.record', ['request' => $r->code]));
+        }
         Notifier::audit('Cancelled rental request', $r->code.' — '.($pol['free'] ? 'within free period' : 'after free period').($reason ? ' · '.$reason : ''));
 
         return self::ok();
@@ -642,8 +645,12 @@ class Rentals
         self::changed($r);
         Notifier::notify($r->customer_id, 'customer', 'Rental completed', $r->code.' is complete. Thank you for renting with '.$r->supplier->name.'! You can now leave a review.', self::link('rentals.show', $r));
         Notifier::audit('Completed rental', $r->code);
+        // escrow: PartyRent releases the supplier's money now (skipped if a payment is still pending —
+        // the request then waits in the admin's "awaiting release" list)
+        $r->load('payments');
+        $payout = Payouts::release($r);
 
-        return self::ok();
+        return self::ok(['payout' => $payout['payout'] ?? null]);
     }
 
     /* ================= PAYMENTS ================= */
@@ -773,6 +780,9 @@ class Rentals
         $f = $r->fin();
         if (! in_array($data['type'], array_merge(Finance::RENTAL_TYPES, ['deposit', 'compensation', 'refund']), true)) {
             return self::fail('Choose a payment type.');
+        }
+        if ($r->payout()->exists()) {
+            return self::fail('The money for '.$r->code.' was already released to the supplier ('.$r->payout->code.'). Ask an admin to handle any correction.');
         }
         if ($data['type'] === 'refund' && (float) $data['amount'] > $f['paidRental'] - $f['refunded'] + 0.001) {
             return self::fail('Refund cannot exceed verified rental payments ('.money($f['paidRental'] - $f['refunded']).').');

@@ -115,9 +115,9 @@
         <div class="form-grid"><div class="field"><label>Reference number</label><input class="input" name="reference" placeholder="e.g. BDO-123456" maxlength="80"></div><div class="field"><label>Payment date</label><input class="input" type="date" name="date" value="{{ today_iso() }}" max="{{ today_iso() }}"></div></div>
         <div class="field"><label>Payment proof</label><label class="upload-box" for="proof">{{ icon('upload') }}<div class="small">Upload a screenshot or photo of the receipt (JPG/PNG, up to 8 MB)</div></label><input type="file" id="proof" name="proof" accept="image/*" hidden><div class="small muted" id="proofName"></div></div>
       </div>
-      <div id="codBox" class="alert alert-warn hidden">{{ icon('cash') }}<div class="small"><b>Cash on Delivery:</b> pay the supplier when the items arrive. The supplier will record it and our cashier will verify it. You can also log it here with the amount you handed over.</div></div>
+      <div id="codBox" class="alert alert-warn hidden">{{ icon('cash') }}<div class="small"><b>Cash on Delivery:</b> hand the cash to the supplier's crew when the items arrive. They collect it for PartyRent and our cashier verifies it. You can also log it here with the amount you handed over.</div></div>
       <div class="field"><label>Notes (optional)</label><input class="input" name="notes" maxlength="255"></div>
-      <p class="small muted mb-0">Your payment will show as <b>Pending Verification</b> until our cashier confirms it. It does not reduce your balance until verified.</p>
+      <p class="small muted mb-0">You pay PartyRent, not the supplier directly. We hold your payment and only release it to the supplier after your rental is completed. Your payment shows as <b>Pending Verification</b> until our cashier confirms it, and does not reduce your balance until then.</p>
     </div>
     <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary" type="submit" data-busy="Submitting…">Submit payment</button></div>
   </form>

@@ -357,6 +357,12 @@
     $$('[data-map-view]').forEach(MapView);
     $$('[data-rentbox]').forEach(RentBox);
     $$('[data-pkg-config]').forEach(PackageConfig);
+
+    // supplier payout account: the bank name only applies to bank transfers
+    $$('[data-payout-method]').forEach(r => r.addEventListener('change', () => {
+        const box = $('[data-for-bank]');
+        if (box) box.hidden = r.value !== 'bank';
+    }));
     $$('[data-scheduler]').forEach(el => { if (!el.closest('[data-rentbox]')) Scheduler(el); });
     $$('[data-calendar]').forEach(el => { if (!$('[data-rentbox]')) Calendar(el); });
     // cart page: reload totals after the scheduler autosaves

@@ -47,18 +47,12 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame(0, CartLine::where('user_id', $maria->id)->count());
         $this->assertSame(15, inv()->availableOn($table->id, $d2)); // pending requests never consume stock
 
-        // 2. supplier accepts → stock is reserved per day
-        $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept", ['note' => 'See you!'])->assertSessionHas('success');
-        inv()->flush();
-        $this->assertSame('accepted', $r->fresh()->status);
-        $this->assertSame(11, inv()->availableOn($table->id, $d1));
-        $this->assertSame(9, inv()->availableOn($table->id, $d2));
+        // 2. the supplier cannot accept before the first payment (here: the full amount) is verified
+        $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept")->assertSessionHas('error', fn ($e) => str_contains($e, 'verified by the PartyRent cashier'));
+        $this->assertSame('pending', $r->fresh()->status);
+        $this->assertEquals(['amount' => 1800.0, 'type' => 'full', 'label' => 'Full payment'], $r->fresh()->fin()['upfront']);
 
-        // stock can no longer be reduced below what's reserved
-        $this->put("/supplier/products/{$table->id}", ['name' => $table->name, 'category_id' => $table->category_id, 'description' => $table->description, 'total_stock' => 3, 'unit' => $table->unit, 'condition' => 'Good', 'status' => 'published', 'tiers' => $table->tiers])
-            ->assertSessionHas('error');
-
-        // 3. customer pays in full by bank transfer (needs proof) → pending until verified
+        // 3. customer pays in full before acceptance by bank transfer (needs proof) → pending until verified
         $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 1800, 'method' => 'bank', 'reference' => 'BDO-1'])
             ->assertSessionHas('warn'); // proof missing
         // a real 1×1 PNG (the GD extension isn't required)
@@ -80,11 +74,26 @@ class RentalLifecycleTest extends TestCase
         $this->assertNotNull($pay->receipt_no);
         $this->assertSame('Fully Paid', $r->fresh()->fin()['status']);
 
+        $this->actingAs($cashier)->withSession(['mode' => 'cashier'])->post('/cashier/record', ['request' => $r->code, 'type' => 'deposit', 'method' => 'cash', 'amount' => 100, 'date' => today_iso(), 'reference' => 'OR-EARLY'])
+            ->assertSessionHas('error'); // the deposit comes after acceptance
+
+        // 5. now the supplier accepts → stock is reserved per day
+        $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept", ['note' => 'See you!'])->assertSessionHas('success');
+        inv()->flush();
+        $this->assertSame('accepted', $r->fresh()->status);
+        $this->assertSame(11, inv()->availableOn($table->id, $d1));
+        $this->assertSame(9, inv()->availableOn($table->id, $d2));
+
+        // stock can no longer be reduced below what's reserved
+        $this->put("/supplier/products/{$table->id}", ['name' => $table->name, 'category_id' => $table->category_id, 'description' => $table->description, 'total_stock' => 3, 'unit' => $table->unit, 'condition' => 'Good', 'status' => 'published', 'tiers' => $table->tiers])
+            ->assertSessionHas('error');
+
         // deposit via cashier, recorded offline
+        $this->actingAs($cashier)->withSession(['mode' => 'cashier']);
         $deposit = $r->fresh()->pricing['deposit'];
         $this->post('/cashier/record', ['request' => $r->code, 'type' => 'deposit', 'method' => 'cash', 'amount' => $deposit, 'date' => today_iso(), 'reference' => 'OR-TEST'])->assertSessionHas('success');
 
-        // 5. supplier moves it through fulfillment
+        // 6. supplier moves it through fulfillment
         $this->actingAs($juan)->withSession(['mode' => 'supplier']);
         foreach (['in_progress', 'ready_pickup'] as $to) {
             $this->post("/supplier/requests/{$r->code}/advance", ['to' => $to])->assertSessionHas('success');
@@ -93,7 +102,7 @@ class RentalLifecycleTest extends TestCase
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'ongoing', 'receivedBy' => 'Maria', 'releaseDate' => today_iso(), 'releaseQty' => '4 tables'])->assertSessionHas('success');
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'return_pending'])->assertSessionHas('success');
 
-        // 6. inspection: of 6 released, 5 returned (1 major damage), 1 missing, ₱500 replacement
+        // 7. inspection: of 6 released, 5 returned (1 major damage), 1 missing, ₱500 replacement
         $this->post("/supplier/requests/{$r->code}/inspection", ['returnDate' => today_iso(), 'items' => [$table->id => ['returned' => 5, 'good' => 4, 'minor' => 0, 'major' => 1, 'total' => 0, 'missing' => 1, 'repairFee' => 0, 'replaceFee' => 500]]])
             ->assertSessionHas('success');
         $table->refresh();
@@ -119,7 +128,7 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame('pending', $po->status);
         $this->assertEquals([1800.0, 90.0, 500.0, 2210.0], [$po->income, $po->commission, $po->compensation, $po->net]);
 
-        // 7. customer reviews
+        // 8. customer reviews
         $key = array_key_first(\App\Domain\Reviews::reviewables($r->fresh()));
         $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/review", ['reviews' => [$key => ['rating' => 5, 'comment' => 'Great tables, very sturdy!']]])->assertSessionHas('success');
         $this->assertDatabaseHas('reviews', ['rental_request_id' => $r->id, 'rating' => 5]);

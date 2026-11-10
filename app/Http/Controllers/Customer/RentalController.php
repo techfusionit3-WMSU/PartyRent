@@ -40,6 +40,14 @@ class RentalController extends Controller
         $r = $this->own($request, $rentalRequest);
         $f = $r->fin();
         $types = [];
+        if ($r->status === 'pending' && $f['upfrontLeft'] > 0.009) {
+            $up = $f['upfront'];
+            $types[] = [$up['type'], $up['label'].' (needed before the supplier can accept)', $f['upfrontLeft']];
+            $left = r2($f['balance'] - $f['pendingRental']);
+            if ($left > $f['upfrontLeft'] + 0.009) {
+                $types[] = ['full', 'Pay the full amount now', $left];
+            }
+        }
         if ($r->isActive()) {
             $sug = Finance::suggestedNext($r);
             $left = r2($f['balance'] - $f['pendingRental']);

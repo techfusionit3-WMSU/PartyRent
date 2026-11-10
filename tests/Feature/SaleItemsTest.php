@@ -104,6 +104,11 @@ class SaleItemsTest extends TestCase
         $r = RentalRequest::where('event_name', 'Cupcake Party')->firstOrFail();
         $this->assertEquals(6300.0, $r->pricing['total']); // 7 × 900, sold once (not per day)
 
+        // Cash on Delivery, full payment: the supplier's 30% down payment is paid upfront, the rest on delivery
+        $up = $r->fin()['upfront'];
+        $this->assertEquals(['amount' => 1890.0, 'type' => 'down', 'label' => 'Down payment (rest on delivery)'], $up);
+        $this->as('juan@demo.ph', 'supplier')->post("/supplier/requests/{$r->code}/accept")->assertSessionHas('error');
+        $this->as('cashier@partyrent.ph', 'cashier')->post('/cashier/record', ['request' => $r->code, 'type' => 'down', 'method' => 'cash', 'amount' => $up['amount'], 'date' => today_iso(), 'reference' => 'OR-DP1'])->assertSessionHas('success');
         $this->as('juan@demo.ph', 'supplier')->post("/supplier/requests/{$r->code}/accept")->assertSessionHas('success');
         inv()->flush();
         $this->assertSame(7, inv()->committedSale($p->id));

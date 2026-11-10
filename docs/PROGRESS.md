@@ -4,6 +4,21 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
+Done: **down payment before acceptance** (user request 2026-11-10). A supplier can accept a pending
+request only once the customer's first payment of the plan is verified by the cashier:
+`Finance::upfront` = reservation fee / down payment / 1st installment / full payment; Cash on Delivery +
+full payment pays the supplier's down % (default `DEFAULT_COD_DOWN_PCT` = 20) upfront.
+
+- [x] Payments allowed on pending requests (rental types only; deposit after acceptance)
+- [x] `acceptRequest` / `acceptReview` gate; supplier notified when the down payment is verified
+- [x] Decline with money paid → cashier "Refund due" + customer told; status "Refund Due" → "Refunded"
+- [x] Free cancellations never reach payouts (`awaitingRelease`, `release`)
+- [x] UI: customer pay-now alert + pay options, confirmation steps, supplier accept button/modal, requests list badges, cashier record list includes pending/declined
+- [x] Seeder: PR-0004 reservation fee verified, PR-0005 down payment pending
+- [x] `DownPaymentTest`; lifecycle + sale items tests pay before accepting
+- [ ] Browser check
+
+### Previous: escrow + payouts
 Done: **escrow + supplier payouts (Shopee model)** (migration `2026_11_10_000200`, `App\Domain\Payouts`).
 User asked that the cashier not see supplier numbers and chose the full Shopee model: customers pay
 PartyRent, PartyRent holds the money and pays the supplier after the rental, minus `commissionPct`.

@@ -304,7 +304,7 @@ class Rentals
         $s = $r->supplier;
         $days = (int) $s->pol('cancelDays', 0);
         if ($r->status === 'pending') {
-            return ['allowed' => true, 'free' => true, 'note' => 'This request has not been accepted yet, so it can be cancelled at no cost.'];
+            return ['allowed' => true, 'free' => true, 'note' => 'This request has not been accepted yet, so it can be cancelled at no cost. Anything you paid is refunded in full by PartyRent.'];
         }
         if (in_array($r->status, ['accepted', 'in_progress'], true)) {
             $deadline = add_days($r->start_date, -$days);
@@ -355,8 +355,11 @@ class Rentals
             $issues[] = 'Payment method "'.(Payment::METHOD_LABEL[$r->method] ?? $r->method).'" is no longer accepted.';
         }
         $schedule = Finance::schedule($r->pricing, today_iso(), $r->start_date, $r->method);
+        $f = $r->fin();
 
-        return ['check' => $chk, 'fresh' => $fresh, 'priceChanged' => abs($fresh['total'] - $r->pricing['total']) > 0.009, 'policyIssues' => $issues, 'schedule' => $schedule, 'canAccept' => $chk['ok'] && $r->status === 'pending'];
+        return ['check' => $chk, 'fresh' => $fresh, 'priceChanged' => abs($fresh['total'] - $r->pricing['total']) > 0.009, 'policyIssues' => $issues, 'schedule' => $schedule,
+            'upfront' => $f['upfront'], 'upfrontPaid' => (bool) $f['upfrontPaid'], 'paidRental' => $f['paidRental'], 'pendingRental' => $f['pendingRental'],
+            'canAccept' => $chk['ok'] && $r->status === 'pending' && $f['upfrontPaid']];
     }
 
     public static function acceptRequest(RentalRequest $r, ?string $note): array
@@ -369,7 +372,11 @@ class Rentals
                 return self::fail('Only pending requests can be accepted.');
             }
             inv()->flush();
+            $r->load('payments');
             $rev = self::acceptReview($r);
+            if (! $rev['upfrontPaid']) {
+                return self::fail('You can accept '.$r->code.' once the customer\'s '.strtolower($rev['upfront']['label']).' of '.money($rev['upfront']['amount']).' is verified by the PartyRent cashier'.($rev['pendingRental'] > 0 ? ' ('.money($rev['pendingRental']).' is waiting for verification).' : '. Nothing has been paid yet.'));
+            }
             if (! $rev['check']['ok']) {
                 return self::fail('Not enough stock on '.implode('; ', array_map(fn ($b) => fmt_date($b['date']).' ('.inv()->product($b['product_id'])->name.': need '.$b['requested'].', available '.$b['available'].')', $rev['check']['bad'])), ['conflict' => $rev['check']['bad']]);
             }
@@ -401,7 +408,11 @@ class Rentals
         $r->update(['status' => 'declined', 'decline_reason' => $reason]);
         self::history($r, 'declined', $reason);
         self::changed($r);
-        Notifier::notify($r->customer_id, 'customer', 'Request declined', $r->supplier->name.' declined '.$r->code.($reason ? ': '.$reason : '.'), self::link('rentals.show', $r));
+        $paid = $r->fin()['paidRental'];
+        Notifier::notify($r->customer_id, 'customer', 'Request declined', $r->supplier->name.' declined '.$r->code.($reason ? ': '.$reason : '.').($paid > 0 ? ' PartyRent will refund your '.money($paid).' in full.' : ''), self::link('rentals.show', $r));
+        if ($paid > 0) {
+            Notifier::notify('cashier', 'cashier', 'Refund due', $r->code.' was declined by the supplier. Refund the customer\'s '.money($paid).' in full.', self::link('cashier.record', ['request' => $r->code]));
+        }
         Notifier::audit('Declined rental request', $r->code.($reason ? ' — '.$reason : ''));
 
         return self::ok();
@@ -691,8 +702,12 @@ class Rentals
     /** Customer (or supplier on the customer's behalf) submits a payment — PENDING until a cashier verifies it. */
     public static function submitPayment(RentalRequest $r, array $data, string $source = 'customer'): array
     {
-        if (! in_array($r->status, Finance::ACTIVE, true) && $r->status !== 'completed') {
-            return self::fail('Payments can be made once the request is accepted.');
+        if ($r->status === 'pending') {
+            if (! in_array($data['type'], Finance::RENTAL_TYPES, true)) {
+                return self::fail('Before the supplier accepts, pay the '.strtolower($r->fin()['upfront']['label']).' first. The deposit is paid after acceptance.');
+            }
+        } elseif (! in_array($r->status, Finance::ACTIVE, true) && $r->status !== 'completed') {
+            return self::fail('This request is '.strtolower(RentalRequest::statusLabel($r->status)).', so no more payments can be made.');
         }
         if (! in_array($data['type'], array_merge(Finance::RENTAL_TYPES, ['deposit', 'compensation']), true)) {
             return self::fail('Choose what you are paying for.');
@@ -710,7 +725,7 @@ class Rentals
         self::changed($r);
         $cust = $r->customer;
         Notifier::notify('cashier', 'cashier', 'New payment submission', $cust->name.' · '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.' — pending verification.', self::link('cashier.verification'));
-        Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment submitted', $cust->name.' submitted '.money($p->amount).' for '.$r->code.'. Awaiting cashier verification.', self::link('supplier.requests.show', $r));
+        Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment submitted', $cust->name.' submitted '.money($p->amount).' for '.$r->code.'. Awaiting PartyRent cashier verification'.($r->status === 'pending' ? ' — you can accept once it is verified.' : '.'), self::link('supplier.requests.show', $r));
         if ($source === 'supplier') {
             Notifier::notify($r->customer_id, 'customer', 'Payment recorded', 'The supplier recorded your '.money($p->amount).' payment for '.$r->code.'. It will count once verified.', self::link('rentals.show', $r));
         }
@@ -742,6 +757,9 @@ class Rentals
             $r->load('payments');
             self::changed($r);
             $after = $r->fin();
+            if ($r->status === 'pending' && $after['upfrontPaid'] && ! $before['upfrontPaid']) {
+                Notifier::notify($r->supplier->owner_id, 'supplier', 'Down payment received 💰', $r->code.': '.$after['upfront']['label'].' of '.money($after['upfront']['amount']).' verified by PartyRent. You can now accept the request.', self::link('supplier.requests.show', $r));
+            }
             Notifier::notify($r->customer_id, 'customer', 'Payment verified ✅', money($p->amount).' for '.$r->code.' was verified. Receipt '.$p->receipt_no.'. Payment status: '.$after['status'].($after['balance'] > 0 ? ', balance '.money($after['balance']) : '').'.', self::link('rentals.show', $r));
             Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment verified', money($p->amount).' for '.$r->code.' verified by cashier. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
             Notifier::audit('Verified payment', $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
@@ -780,6 +798,12 @@ class Rentals
         $f = $r->fin();
         if (! in_array($data['type'], array_merge(Finance::RENTAL_TYPES, ['deposit', 'compensation', 'refund']), true)) {
             return self::fail('Choose a payment type.');
+        }
+        if ($r->status === 'pending' && ! in_array($data['type'], array_merge(Finance::RENTAL_TYPES, ['refund']), true)) {
+            return self::fail('Before acceptance only the '.strtolower($f['upfront']['label']).' (or a refund) can be recorded.');
+        }
+        if (in_array($r->status, ['declined', 'cancelled'], true) && $data['type'] !== 'refund') {
+            return self::fail($r->code.' is '.$r->status.': only refunds can be recorded.');
         }
         if ($r->payout()->exists()) {
             return self::fail('The money for '.$r->code.' was already released to the supplier ('.$r->payout->code.'). Ask an admin to handle any correction.');

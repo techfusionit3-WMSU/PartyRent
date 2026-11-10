@@ -62,6 +62,9 @@ class Payouts
         if (! in_array($r->status, ['completed', 'cancelled'], true)) {
             return ['ok' => false, 'error' => 'Payouts are released once the rental is completed.'];
         }
+        if ($r->status === 'cancelled' && $r->cancel_free) {
+            return ['ok' => false, 'error' => $r->code.' was cancelled for free: the customer is refunded in full, nothing goes to the supplier.'];
+        }
         if (Payout::where('rental_request_id', $r->id)->exists()) {
             return ['ok' => false, 'error' => 'This request was already released for payout.'];
         }
@@ -111,7 +114,7 @@ class Payouts
     /** Completed / cancelled requests holding money that has not been released yet. */
     public static function awaitingRelease(?int $supplierId = null): Collection
     {
-        return RentalRequest::whereIn('status', ['completed', 'cancelled'])
+        return RentalRequest::where(fn ($q) => $q->where('status', 'completed')->orWhere(fn ($c) => $c->where('status', 'cancelled')->where(fn ($f) => $f->whereNull('cancel_free')->orWhere('cancel_free', false))))
             ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
             ->whereNotIn('id', Payout::select('rental_request_id'))
             ->with(['payments', 'supplier', 'customer'])->orderBy('updated_at')->get()

@@ -15,7 +15,8 @@
 <div class="card mb-2">
   <div class="row wrap between">
     <div><b>Next step</b><div class="small muted">
-      @if($r->status === 'pending') Check the availability table, then accept or decline.
+      @if($r->status === 'pending' && ! $review['upfrontPaid']) Waiting for the customer's {{ strtolower($review['upfront']['label']) }} ({{ money($review['upfront']['amount']) }}).{{ $review['pendingRental'] > 0 ? ' '.money($review['pendingRental']).' was submitted and is waiting for PartyRent cashier verification.' : ' Nothing paid yet.' }} You can accept once it is verified.
+      @elseif($r->status === 'pending') {{ $review['upfront']['label'] }} received ({{ money($review['paidRental']) }} verified). Check the availability table, then accept or decline.
       @elseif($next || $r->status === 'inspection') {{ $hints[$r->status] ?? '' }}
       @else No further action. This request is {{ strtolower(\App\Models\RentalRequest::statusLabel($r->status)) }}.
       @endif
@@ -23,7 +24,7 @@
     <div class="btn-group">
       @if($r->status === 'pending')
         <button class="btn btn-danger" data-modal="declineModal">{{ icon('x') }}Decline</button>
-        <button class="btn btn-success" data-modal="acceptModal">{{ icon('check') }}Accept request</button>
+        <button class="btn btn-success" data-modal="acceptModal" @disabled(! $review['upfrontPaid']) @unless($review['upfrontPaid']) title="Available once the down payment is verified" @endunless>{{ icon('check') }}Accept request</button>
       @elseif($r->status === 'inspection')
         <button class="btn" data-modal="settleModal" @disabled($settleDisabled)>{{ icon('shield') }}Settle deposit</button>
         <form method="POST" action="{{ route('supplier.requests.complete', $r) }}">@csrf<button class="btn btn-primary">Complete rental</button></form>
@@ -79,6 +80,7 @@
 @if($review)
 <div class="modal-backdrop hidden" id="acceptModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Accept {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
   <form method="POST" action="{{ route('supplier.requests.accept', $r) }}">@csrf<div class="modal-body"><div class="stack-sm">
+    <div class="row">{{ $review['upfrontPaid'] ? '✅' : '❌' }}<b>{{ $review['upfront']['label'] }} received</b></div><div class="small muted" style="padding-left:28px">{{ $review['upfrontPaid'] ? money($review['paidRental']).' verified by PartyRent and held until the rental is completed.' : 'Required: '.money($review['upfront']['amount']).'. Verified so far: '.money($review['paidRental']).'.' }}</div>
     <div class="row">{{ $review['check']['ok'] ? '✅' : '❌' }}<b>1. Inventory re-checked for {{ count(date_range($r->start_date, $r->end_date)) }} date(s)</b></div>
     @if($review['check']['ok'])<div class="small muted" style="padding-left:28px">All quantities fit within available stock.</div>
     @else<div class="alert alert-danger">{{ icon('alert') }}<div>{!! collect($review['check']['bad'])->map(fn ($b) => e(fmt_date($b['date']).': '.inv()->product($b['product_id'])->name.' needs '.$b['requested'].', only '.$b['available'].' available'))->implode('<br>') !!}<br><b>Acceptance is blocked to prevent double-booking.</b> Decline, or ask the customer to change quantities.</div></div>@endif

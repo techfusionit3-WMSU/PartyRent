@@ -58,7 +58,7 @@ class CashierController extends Controller
 
         return view('cashier.record', [
             'r' => $r, 'code' => $request->query('request', ''),
-            'open' => RentalRequest::whereIn('status', array_merge(Finance::ACTIVE, ['completed', 'cancelled']))->with('customer')->orderByDesc('created_at')->take(40)->get(),
+            'open' => RentalRequest::whereIn('status', array_merge(['pending'], Finance::ACTIVE, ['completed', 'cancelled', 'declined']))->with('customer')->orderByDesc('created_at')->take(40)->get(),
         ]);
     }
 

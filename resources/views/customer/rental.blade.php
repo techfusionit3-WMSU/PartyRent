@@ -5,7 +5,13 @@
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@include('partials.badges', ['pay' => $f['status']])</div></div>
 <div class="card mb-2">@include('partials.progress')</div>
 @if($f['isOverdue'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div><b>Payment overdue.</b> Outstanding: {{ money($f['overdueAmount']) }}. Please settle as soon as possible to keep your reservation. The supplier will review overdue accounts according to their policy.</div></div>@endif
-@if($r->status === 'pending')<div class="alert alert-info mb-2">{{ icon('clock') }}<div>Waiting for <b>{{ $sup->name }}</b> to review your request. Items are not reserved until it is accepted.</div></div>@endif
+@if($r->status === 'pending')
+  @if(! $f['upfrontPaid'])
+    <div class="alert alert-warn mb-2">{{ icon('card') }}<div><b>Pay the {{ strtolower($f['upfront']['label']) }} of {{ money($f['upfront']['amount']) }} to confirm your request.</b> {{ $sup->name }} can only accept once PartyRent's cashier has verified it.@if($f['pendingRental'] > 0) Your {{ money($f['pendingRental']) }} payment is waiting for verification.@endif If the supplier declines, PartyRent refunds you in full. Items are not reserved until the request is accepted.@if($payTypes) <button class="btn btn-sm btn-primary mt-1" data-modal="payModal">Pay now</button>@endif</div></div>
+  @else
+    <div class="alert alert-info mb-2">{{ icon('clock') }}<div>Your {{ strtolower($f['upfront']['label']) }} is verified. Waiting for <b>{{ $sup->name }}</b> to accept. Items are not reserved until it is accepted; if they decline, PartyRent refunds you in full.</div></div>
+  @endif
+@endif
 
 <div class="grid grid-side">
   <div class="stack">

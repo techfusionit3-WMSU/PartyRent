@@ -102,7 +102,7 @@ class DatabaseSeeder extends Seeder
         }
         Setting::create(['key' => 'permissions.admin', 'value' => array_keys(User::ADMIN_PERMS)]);
         Setting::create(['key' => 'permissions.cashier', 'value' => array_keys(User::CASHIER_PERMS)]);
-        foreach (['seq.request' => 14, 'seq.payment' => 22, 'seq.receipt' => 10022, 'seq.complaint' => 3] as $k => $v) {
+        foreach (['seq.request' => 14, 'seq.payment' => 24, 'seq.receipt' => 10023, 'seq.complaint' => 3] as $k => $v) {
             Setting::create(['key' => $k, 'value' => $v]);
         }
         Settings::flush();
@@ -430,6 +430,10 @@ class DatabaseSeeder extends Seeder
         $pay('TXN-10019', 'PR-0013', 'full', 'bank', 5850, -1, 'pending', 'BDO-901233', ['proof_name' => 'bdo-online-receipt.png']);
         $pay('TXN-10020', 'PR-0012', 'full', 'cash', 900, -7, 'verified', 'CASH-0977');
         $pay('TXN-10021', 'PR-0012', 'refund', 'cash', 900, -5, 'verified', 'RF-0035', ['notes' => 'Cancelled within free cancellation window']);
+        // pending requests: suppliers accept only after the first payment is verified
+        $up = fn ($code) => \App\Domain\Finance::upfront(RentalRequest::with('supplier')->findOrFail($this->R[$code]))['amount'];
+        $pay('TXN-10023', 'PR-0004', 'reservation', 'bank', $up('PR-0004'), 0, 'verified', 'BPI-660218', ['proof_name' => 'bpi-reservation.jpg']);
+        $pay('TXN-10024', 'PR-0005', 'down', 'bank', $up('PR-0005'), 0, 'pending', 'BDO-771045', ['proof_name' => 'bdo-downpayment.png']);
     }
 
     private function reviewsAndComplaints(): void

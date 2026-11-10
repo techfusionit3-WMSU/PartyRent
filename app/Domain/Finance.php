@@ -17,7 +17,7 @@ class Finance
 
     public const STATUS_BADGE = [
         'Unpaid' => 'b-gray', 'Pending Verification' => 'b-gold', 'Partially Paid' => 'b-sky', 'Fully Paid' => 'b-green',
-        'Overdue' => 'b-red', 'Refunded' => 'b-purple', 'Partially Refunded' => 'b-purple',
+        'Overdue' => 'b-red', 'Refund Due' => 'b-red', 'Refunded' => 'b-purple', 'Partially Refunded' => 'b-purple',
     ];
 
     /**
@@ -72,6 +72,34 @@ class Finance
         return $items;
     }
 
+    /** Down payment % used for Cash-on-Delivery full-payment requests when the supplier has no down payment setting. */
+    public const DEFAULT_COD_DOWN_PCT = 20;
+
+    /**
+     * What the customer must pay (and the cashier verify) before the supplier may accept a request:
+     * the first payment of the chosen plan (reservation fee / down payment / 1st installment / full payment).
+     * Cash on Delivery with full payment pays the supplier's down payment % upfront and the rest on delivery.
+     */
+    public static function upfront(RentalRequest $req, ?array $p = null): array
+    {
+        $p ??= $req->pricing ?: Pricing::quoteRequest($req);
+        $first = self::schedule($p, today_iso(), $req->start_date, $req->method)[0] ?? null;
+        if ($first && $first['amount'] > 0 && ! ($p['arrangement'] === 'full' && $req->method === 'cod')) {
+            $k = $first['key'];
+            $type = $k === 'res' ? 'reservation' : ($k === 'down' ? 'down' : (str_starts_with($k, 'inst') ? 'installment' : 'full'));
+
+            return ['amount' => r2($first['amount']), 'type' => $type, 'label' => $first['label']];
+        }
+        $pol = $req->supplier?->policy ?? [];
+        $payable = (float) $p['payable'];
+        $value = (float) ($pol['downValue'] ?? 0);
+        $amount = ($pol['downType'] ?? 'percent') === 'fixed' && $value > 0
+            ? min($payable, $value)
+            : r2($payable * ($value > 0 ? $value : self::DEFAULT_COD_DOWN_PCT) / 100);
+
+        return ['amount' => r2($amount), 'type' => 'down', 'label' => 'Down payment (rest on delivery)'];
+    }
+
     public static function summary(RentalRequest $req): array
     {
         $p = $req->pricing ?: Pricing::quoteRequest($req);
@@ -106,8 +134,10 @@ class Finance
         $overdueItems = array_values(array_filter($sched, fn ($s) => $s['state'] === 'overdue'));
         $overdueAmount = $overdueItems ? r2(end($overdueItems)['cumulative'] - $paidRental) : 0.0;
 
-        if ($req->status === 'declined' || ($req->status === 'pending' && ! $paidRental && ! $pendingRental)) {
+        if (($req->status === 'declined' && ! $paidRental) || ($req->status === 'pending' && ! $paidRental && ! $pendingRental)) {
             $status = 'Unpaid';
+        } elseif ($req->status === 'declined' && $refunded < $paidRental - 0.001) {
+            $status = 'Refund Due';
         } elseif ($refunded > 0) {
             $status = $refunded >= $paidRental ? 'Refunded' : 'Partially Refunded';
         } elseif ($balance <= 0) {
@@ -133,6 +163,7 @@ class Finance
                 : 'Partially refunded';
         }
         $depositHeld = r2(max(0, $depositPaid - $depositRefunded - $depositApplied));
+        $up = $req->status === 'pending' ? self::upfront($req, $p) : null;
 
         return [
             'pricing' => $p, 'payments' => $pays, 'payable' => $payable, 'total' => (float) $p['total'],
@@ -143,6 +174,9 @@ class Finance
             'depositRequired' => $depositRequired, 'depositPaid' => $depositPaid, 'depositRefunded' => $depositRefunded,
             'depositApplied' => $depositApplied, 'depositHeld' => $depositHeld, 'depositStatus' => $depositStatus,
             'compensation' => $compensation, 'compensationDue' => $compensationDue, 'compPaidDirect' => $compPaidDirect,
+            // pending requests only: the payment needed before the supplier can accept
+            'upfront' => $up, 'upfrontPaid' => $up ? $paidRental >= $up['amount'] - 0.001 : null,
+            'upfrontLeft' => $up ? r2(max(0, $up['amount'] - $paidRental - $pendingRental)) : 0.0,
         ];
     }
 

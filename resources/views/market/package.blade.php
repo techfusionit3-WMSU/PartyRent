@@ -11,18 +11,18 @@
     <span class="badge b-pink plain">{{ $k->emoji }} Package</span>@foreach($k->events ?? [] as $e) <span class="badge b-gray plain">{{ $e }}</span>@endforeach
     <h1 class="mt-1">{{ $k->name }}</h1>
     <p>{{ $k->description }}</p>
-    <div><span class="price-lg">{{ money($k->price) }}</span> <span class="muted">/ package / day</span>@if($v['savings'] > 0) <span class="badge b-gold">Save {{ money($v['savings']) }} vs. renting separately</span>@endif</div>
-    <div class="card mt-2 pad-0"><div style="padding:14px 16px;border-bottom:1px solid var(--line)" class="strong">Included items</div>
-      @foreach($k->items as $it)@php($ip = inv()->product($it['product_id']))@if($ip)
-        <div class="row" style="padding:10px 16px;border-bottom:1px solid var(--line)">@include('partials.thumb', ['item' => $ip, 'cls' => 'sm'])<div class="grow"><a href="{{ route('products.show', $ip) }}">{{ $ip->name }}</a></div><b>× {{ $it['qty'] }}</b></div>
-      @endif @endforeach
-      <div class="small muted" style="padding:10px 16px">{{ $k->conditions }}</div>
+    <div><span class="price-lg" data-pkg-headline>{{ money($pp['package']) }}</span> <span class="muted">/ package{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : ' / day' }}</span>@if($pp['savings'] > 0) <span class="badge b-gold">Save {{ money($pp['savings']) }} vs. getting it separately</span>@endif</div>
+    @if($lead)<div class="alert alert-info mt-1">{{ icon('info') }}<div>Contains made-to-order items: book at least <b data-pkg-lead>{{ $lead }}</b> day(s) before your event.</div></div>@endif
+    <div class="card mt-2 pad-0" data-pkg-config data-package="{{ $k->id }}" data-quote="{{ route('api.package-quote') }}">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--line)" class="strong">What's in the package</div>
+      @include('market._package-contents', ['def' => $def, 'pp' => $pp, 'interactive' => ! $own])
+      @if($k->conditions)<div class="small muted" style="padding:10px 16px;border-top:1px solid var(--line)">{{ $k->conditions }}</div>@endif
     </div>
     <form class="card soft mt-2" method="POST" action="{{ route('cart.add') }}">
       @csrf
-      <input type="hidden" name="type" value="package"><input type="hidden" name="ref_id" value="{{ $k->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}">
-      <div class="form-grid"><div class="field"><label for="ps">Start date</label><input type="date" class="input" id="ps" min="{{ today_iso() }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input type="date" class="input" id="pe" min="{{ today_iso() }}" value="{{ $end }}"></div></div>
-      <div data-scheduler data-type="package" data-ref="{{ $k->id }}" data-days='@json((object) $days)' data-siblings='@json($siblings)' data-sync="#daysInput"></div>
+      <input type="hidden" name="type" value="package"><input type="hidden" name="ref_id" value="{{ $k->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}"><input type="hidden" name="sel" id="selInput" value="{{ json_encode($pp['sel']) }}">
+      <div class="form-grid"><div class="field"><label for="ps">Start date</label><input type="date" class="input" id="ps" min="{{ add_days(today_iso(), $lead) }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input type="date" class="input" id="pe" min="{{ add_days(today_iso(), $lead) }}" value="{{ $end }}"></div></div>
+      <div data-scheduler data-type="package" data-ref="{{ $k->id }}" data-sel='@json($pp['sel'])' data-days='@json((object) $days)' data-siblings='@json($siblings)' data-sync="#daysInput"></div>
       @if($own)
         <div class="alert alert-info mt-2">{{ icon('info') }}<div>This is your own package.</div></div>
       @else

@@ -107,14 +107,14 @@
           data-siblings='[...]' data-sync="#hiddenInput" data-save="/cart/5"></div>  */
   function Scheduler(el, opts) {
     opts = opts || {};
-    const st = { type: el.dataset.type, ref: +el.dataset.ref, days: JSON.parse(el.dataset.days || '{}'), siblings: JSON.parse(el.dataset.siblings || '[]') };
+    const st = { type: el.dataset.type, ref: +el.dataset.ref, days: JSON.parse(el.dataset.days || '{}'), siblings: JSON.parse(el.dataset.siblings || '[]'), sel: JSON.parse(el.dataset.sel || 'null') };
     let timer = null, last = null;
     const sync = () => { const t = el.dataset.sync && $(el.dataset.sync); if (t) t.value = JSON.stringify(st.days); };
     const save = () => { if (!el.dataset.save) return; clearTimeout(timer); timer = setTimeout(async () => { try { await api(el.dataset.save, { method: 'PATCH', body: JSON.stringify({ days: st.days }) }); el.dispatchEvent(new CustomEvent('pr:saved', { bubbles: true })); } catch (err) { toast('Could not save: ' + err.message, 'error'); } }, 450); };
     async function refresh() {
       sync();
       let r;
-      try { r = await api(window.PR.routes.schedule, { method: 'POST', body: JSON.stringify({ type: st.type, ref_id: st.ref, days: st.days, siblings: st.siblings }) }); }
+      try { r = await api(window.PR.routes.schedule, { method: 'POST', body: JSON.stringify({ type: st.type, ref_id: st.ref, days: st.days, siblings: st.siblings, sel: st.sel }) }); }
       catch (err) { el.innerHTML = '<div class="alert alert-danger">' + svg('alert') + '<div>' + esc(err.message) + '</div></div>'; return; }
       last = r;
       const rows = r.rows.map(x => '<div class="day-row ' + (x.ok ? '' : 'bad') + '" data-date="' + x.date + '"><div class="dl">' + esc(x.label) + (x.past ? ' <span class="badge b-red">Past date</span>' : '') + '</div>' +
@@ -126,7 +126,7 @@
       const first = Object.keys(st.days).sort()[0];
       el.innerHTML = '<div class="day-editor"><div class="day-row head"><div>Date</div><div>Requested qty</div><div>Available</div><div>Daily rate</div><div>Daily subtotal</div><div></div></div>' + (rows || '<div class="empty small" style="padding:18px">No dates yet — add a rental date below.</div>') + '</div>' +
         '<div class="row wrap mt-1" style="gap:8px"><input type="date" class="input input-sm" style="width:auto" data-newdate min="' + r.today + '" aria-label="Add a rental date"><button type="button" class="btn btn-sm" data-adddate>' + svg('plus') + 'Add date</button><span class="grow"></span><div class="row" style="gap:6px"><span class="small muted">Same qty for all:</span><input type="number" min="1" class="input input-sm" style="width:80px" data-allqty value="' + (first ? st.days[first] : 1) + '" aria-label="Quantity for all dates"><button type="button" class="btn btn-sm btn-outline" data-applyall>Apply</button></div></div>' +
-        '<div class="row between mt-1"><div class="small">' + (r.ok ? '<span style="color:var(--green)">' + svg('check', 'width:15px;vertical-align:-3px') + ' All dates available</span>' : '<span style="color:var(--red)">' + svg('alert', 'width:15px;vertical-align:-3px') + ' Fix the highlighted dates before requesting</span>') + '</div><div class="strong">Line total: <span class="price">' + esc(r.totalText) + '</span></div></div>';
+        '<div class="row between mt-1"><div class="small">' + (r.ok ? '<span style="color:var(--green)">' + svg('check', 'width:15px;vertical-align:-3px') + ' All dates available</span>' : '<span style="color:var(--red)">' + svg('alert', 'width:15px;vertical-align:-3px') + ' ' + esc(r.lead || 'Fix the highlighted dates before requesting') + '</span>') + '</div><div class="strong">Line total: <span class="price">' + esc(r.totalText) + '</span>' + (r.once > 0 ? '<div class="small muted" style="font-weight:400">incl. ' + esc(r.onceText) + ' once for consumables &amp; services</div>' : '') + '</div></div>';
       el.dispatchEvent(new CustomEvent('pr:schedule', { bubbles: true, detail: r }));
       if (opts.onChange) opts.onChange(r, st);
     }
@@ -148,7 +148,38 @@
     });
     el.addEventListener('change', e => { const i = e.target.closest('[data-qty]'); if (!i) return; const d = i.closest('.day-row').dataset.date; st.days[d] = Math.max(0, Math.floor(+i.value || 0)); changed(); });
     refresh();
-    return { state: st, refresh, setDays(days) { st.days = days; refresh(); }, last: () => last };
+    const self = { state: st, refresh, setDays(days) { st.days = days; refresh(); }, setSel(sel) { st.sel = sel; refresh(); }, last: () => last };
+    el._scheduler = self;
+    return self;
+  }
+
+  /* ---------- package configurator ----------
+     <div data-pkg-config data-package="id" data-quote="/api/package-quote"> around market/_package-contents.
+     Choices, add-ons and guests → re-quote, update prices, the hidden #selInput and the scheduler. */
+  function PackageConfig(box) {
+    let timer = null;
+    const read = () => {
+      const sel = { choices: {}, addons: [], guests: null };
+      $$('[data-sel-choice]:checked', box).forEach(i => { sel.choices[i.dataset.selChoice] = +i.value; });
+      $$('[data-sel-addon]:checked', box).forEach(i => sel.addons.push(+i.value));
+      const g = $('[data-sel-guests]', box); if (g) sel.guests = Math.max(1, Math.floor(+g.value || 0));
+      return sel;
+    };
+    const set = (sel, txt) => { $$(sel, document).forEach(x => { x.textContent = txt; }); };
+    async function quote() {
+      let r;
+      try { r = await api(box.dataset.quote, { method: 'POST', body: JSON.stringify({ package_id: +box.dataset.package, sel: read() }) }); }
+      catch (err) { return toast(err.message, 'error'); }
+      const g = $('[data-sel-guests]', box); if (g && r.sel.guests != null && +g.value !== r.sel.guests) g.value = r.sel.guests;
+      set('[data-pkg-price]', r.packageText); set('[data-pkg-headline]', r.packageText); set('[data-pkg-lead]', r.leadDays);
+      const split = $('[data-pkg-split]', box);
+      if (split) split.textContent = r.perDay > 0 && r.once > 0 ? r.perDayText + ' per day for rentals + ' + r.onceText + ' once for consumables & services' : (r.once > 0 ? 'Charged once (consumables & services)' : 'Per package, per day');
+      const sv = $('[data-pkg-savings]', box); if (sv) sv.textContent = r.savings > 0 ? 'Save ' + r.savingsText + ' vs. ' + r.separateText + ' separately' : '';
+      const hidden = $('#selInput'); if (hidden) hidden.value = JSON.stringify(r.sel);
+      $$('#ps, #pe').forEach(i => { i.min = r.earliest; });
+      const sch = $('[data-scheduler][data-type="package"]'); if (sch && sch._scheduler) sch._scheduler.setSel(r.sel);
+    }
+    box.addEventListener('change', e => { if (e.target.closest('[data-sel-choice],[data-sel-addon],[data-sel-guests]')) { clearTimeout(timer); timer = setTimeout(quote, 150); } });
   }
 
   /* ---------- availability calendar ---------- */
@@ -325,6 +356,7 @@
     $$('[data-map-picker]').forEach(MapPicker);
     $$('[data-map-view]').forEach(MapView);
     $$('[data-rentbox]').forEach(RentBox);
+    $$('[data-pkg-config]').forEach(PackageConfig);
     $$('[data-scheduler]').forEach(el => { if (!el.closest('[data-rentbox]')) Scheduler(el); });
     $$('[data-calendar]').forEach(el => { if (!$('[data-rentbox]')) Calendar(el); });
     // cart page: reload totals after the scheduler autosaves

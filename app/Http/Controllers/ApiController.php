@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Locations;
+use App\Domain\Packages;
 use App\Domain\Pricing;
 use App\Domain\Rentals;
 use App\Models\Supplier;
@@ -24,6 +25,7 @@ class ApiController extends Controller
             'ref_id' => 'required|integer',
             'days' => 'array',
             'siblings' => 'array',
+            'sel' => 'nullable|array',
         ]);
         $item = $data['type'] === 'package' ? inv()->package($data['ref_id']) : inv()->product($data['ref_id']);
         abort_unless($item, 404);
@@ -35,11 +37,14 @@ class ApiController extends Controller
             }
         }
         ksort($days);
-        $self = ['id' => '__self', 'type' => $data['type'], 'ref_id' => (int) $data['ref_id'], 'days' => $days];
+        $def = $data['type'] === 'package' ? Packages::def($item) : null;
+        $sel = $def ? Packages::cleanSel($def, $data['sel'] ?? null) : null;
+        $pp = $def ? Packages::price($def, $sel) : null;
+        $self = ['id' => '__self', 'type' => $data['type'], 'ref_id' => (int) $data['ref_id'], 'days' => $days] + ($sel ? ['sel' => $sel] : []);
         $siblings = [];
         foreach ($data['siblings'] ?? [] as $i => $s) {
             if (isset($s['type'], $s['ref_id'], $s['days']) && is_array($s['days'])) {
-                $siblings[] = ['id' => 's'.$i, 'type' => $s['type'] === 'package' ? 'package' : 'item', 'ref_id' => (int) $s['ref_id'], 'days' => Rentals::cleanDays($s['days'])];
+                $siblings[] = ['id' => 's'.$i, 'type' => $s['type'] === 'package' ? 'package' : 'item', 'ref_id' => (int) $s['ref_id'], 'days' => Rentals::cleanDays($s['days'])] + (is_array($s['sel'] ?? null) ? ['sel' => $s['sel']] : []);
             }
         }
         $chk = inv()->check(array_merge($siblings, [$self]));
@@ -50,7 +55,7 @@ class ApiController extends Controller
         foreach ($days as $d => $q) {
             $info = $mine[$d] ?? ['ok' => true, 'available' => 0];
             if ($data['type'] === 'package') {
-                $unit = (float) $item->price;
+                $unit = $pp['perDay'];
                 $tier = null;
             } else {
                 $unit = Pricing::unitPrice($item, $q);
@@ -61,14 +66,42 @@ class ApiController extends Controller
             $total += $sub;
             $rows[] = ['date' => $d, 'label' => fmt_day($d), 'qty' => $q, 'available' => $info['available'], 'ok' => $info['ok'] && $d >= $today, 'past' => $d < $today, 'unit' => $unit, 'unitText' => money($unit), 'tier' => $tier, 'subtotal' => $sub, 'subtotalText' => money($sub)];
         }
-        $okAll = $chk['ok'] && ! array_filter(array_keys($days), fn ($d) => $d < $today) && array_sum($days) > 0;
+        $once = 0.0;
+        if ($pp && $pp['once'] > 0 && $days && max($days) > 0) {
+            $once = r2($pp['once'] * max($days)); // consumables + services: once, for the peak number of packages
+            $total += $once;
+        }
+        if ($e = Rentals::leadTimeError($self)) {
+            $lead = $e;
+        }
+        $okAll = $chk['ok'] && empty($lead) && ! array_filter(array_keys($days), fn ($d) => $d < $today) && array_sum($days) > 0;
         $bad = array_map(fn ($b) => ['date' => fmt_date($b['date'], false), 'name' => inv()->product($b['product_id'])?->name, 'available' => $b['available']], $chk['bad']);
 
         return response()->json([
             'rows' => $rows, 'ok' => $okAll, 'total' => r2($total), 'totalText' => money($total),
             'unitWord' => $data['type'] === 'package' ? 'package' : $item->unitWord(),
             'minAvailable' => $data['type'] === 'item' && $days ? inv()->minAvailable($item->id, array_keys($days)) : null,
+            'once' => $once, 'onceText' => money($once), 'lead' => $lead ?? null,
             'bad' => $bad, 'maxDays' => (int) setting('maxRentalDays', 30), 'today' => $today,
+        ]);
+    }
+
+    /** Customer package configurator: price, contents and lead time for a selection (one package, one day). */
+    public function packageQuote(Request $request): JsonResponse
+    {
+        $data = $request->validate(['package_id' => 'required|integer', 'sel' => 'nullable|array']);
+        $k = inv()->package($data['package_id']);
+        abort_unless($k && $k->active && ! $k->is_draft, 404);
+        $def = Packages::def($k);
+        $pp = Packages::price($def, $data['sel'] ?? null);
+        $lead = Packages::leadDays($def, $pp['sel']);
+
+        return response()->json([
+            'sel' => $pp['sel'], 'package' => $pp['package'], 'packageText' => money($pp['package']),
+            'perDay' => $pp['perDay'], 'perDayText' => money($pp['perDay']), 'once' => $pp['once'], 'onceText' => money($pp['once']),
+            'savings' => $pp['savings'], 'savingsText' => money($pp['savings']), 'separateText' => money($pp['separate']),
+            'summary' => Packages::describe($def, $pp['sel']),
+            'leadDays' => $lead, 'earliest' => $lead ? add_days(today_iso(), $lead) : today_iso(),
         ]);
     }
 

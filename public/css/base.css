@@ -393,3 +393,14 @@ table.table { width: 100%; border-collapse: collapse; font-size: .88rem; }
   .printable, .printable * { visibility: visible; }
   .printable { position: absolute; left: 0; top: 0; width: 100%; }
 }
+
+/* package contents / configurator */
+.pkg-contents { display: flex; flex-direction: column; }
+.pkg-sec { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.pkg-sec:last-child { border-bottom: 0; }
+.pkg-row { gap: 10px; padding: 6px 0; align-items: center; }
+label.pkg-row { cursor: pointer; }
+.pkg-total { background: var(--surface-2); }
+.pkg-comp { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.pkg-comp .head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.pkg-comp .opts { border-left: 3px solid var(--line); padding-left: 10px; margin-top: 6px; }

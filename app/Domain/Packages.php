@@ -360,6 +360,9 @@ class Packages
                 default => [],
             };
             foreach ($pids as $pid) {
+                if (! $pid) {
+                    return $fail($label.': choose an item.');
+                }
                 if (! isset($own[$pid])) {
                     return $fail($label.': packages can only contain your own listings.');
                 }

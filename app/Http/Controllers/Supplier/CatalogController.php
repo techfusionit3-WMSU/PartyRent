@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Supplier;
 
 use App\Domain\Ai;
 use App\Domain\Notifier;
+use App\Domain\Packages;
 use App\Domain\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
@@ -11,6 +12,7 @@ use App\Models\Hold;
 use App\Models\Package;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CatalogController extends Controller
 {
@@ -163,47 +165,148 @@ class CatalogController extends Controller
 
     /* ---------- packages ---------- */
 
+    private function ownPackage(Request $r, Package $k): Package
+    {
+        abort_unless($k->supplier_id === $this->sup($r)->id, 404);
+
+        return $k;
+    }
+
     public function packages(Request $request)
     {
-        return view('supplier.packages', ['list' => Package::where('supplier_id', $this->sup($request)->id)->with('supplier')->latest()->get()]);
+        $list = Package::where('supplier_id', $this->sup($request)->id)->with('supplier')->orderBy('sort')->orderBy('id')->get();
+
+        return view('supplier.packages', ['list' => $list]);
+    }
+
+    private function packageForm(Request $request, Package $k)
+    {
+        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->orderBy('name')->get();
+
+        return view('supplier.package-form', [
+            'k' => $k, 'events' => array_keys(Ai::EVENTS), 'modes' => Packages::MODES,
+            'def' => $k->exists ? Packages::def($k) : Packages::normalize(['pricing' => ['mode' => 'sum_discount', 'discountPct' => 10], 'components' => []]),
+            'prods' => $prods->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'type' => $p->listing_type, 'price' => $p->basePrice(), 'unit' => $p->unitWord(), 'stock' => $p->total_stock])->values(),
+        ]);
     }
 
     public function createPackage(Request $request)
     {
-        return view('supplier.package-form', ['k' => new Package(['items' => [], 'events' => [], 'active' => true, 'emoji' => '🎉']), 'prods' => Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->orderBy('name')->get(), 'events' => array_keys(Ai::EVENTS)]);
+        return $this->packageForm($request, new Package(['events' => [], 'active' => true, 'emoji' => '🎉']));
     }
 
     public function editPackage(Request $request, Package $package)
     {
-        abort_unless($package->supplier_id === $this->sup($request)->id, 404);
+        return $this->packageForm($request, $this->ownPackage($request, $package));
+    }
 
-        return view('supplier.package-form', ['k' => $package, 'prods' => Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->orderBy('name')->get(), 'events' => array_keys(Ai::EVENTS)]);
+    /** The builder posts the definition (pricing, components, guests) as one JSON field. */
+    private function defInput(Request $request): array
+    {
+        $raw = $request->input('def');
+        $d = is_array($raw) ? $raw : json_decode((string) $raw, true);
+        if (! is_array($d)) {
+            throw ValidationException::withMessages(['def' => 'The package contents could not be read. Reload the page and try again.']);
+        }
+
+        return ['pricing' => (array) ($d['pricing'] ?? []), 'components' => array_values((array) ($d['components'] ?? [])), 'minGuests' => $d['minGuests'] ?? null, 'maxGuests' => $d['maxGuests'] ?? null];
     }
 
     private function packageData(Request $request): array
     {
         $v = $request->validate([
             'name' => 'required|string|min:3|max:120', 'emoji' => 'nullable|string|max:16', 'description' => 'required|string|max:2000',
-            'price' => 'required|numeric|min:1', 'conditions' => 'nullable|string|max:1000', 'events' => 'nullable|array',
-            'items' => 'array', 'items.*.product_id' => 'nullable|integer', 'items.*.qty' => 'nullable|integer|min:1', 'active' => 'nullable|boolean',
+            'conditions' => 'nullable|string|max:1000', 'events' => 'nullable|array', 'events.*' => 'string|max:40',
+            'def' => 'required', 'draft' => 'nullable|boolean',
         ]);
 
-        return ['name' => $v['name'], 'emoji' => $v['emoji'] ?: '🎉', 'description' => $v['description'], 'price' => (float) $v['price'], 'conditions' => $v['conditions'] ?? '', 'events' => $v['events'] ?? [], 'items' => $v['items'] ?? [], 'active' => $request->boolean('active')];
+        return array_merge($this->defInput($request), [
+            'name' => trim($v['name']), 'emoji' => $v['emoji'] ?? '', 'description' => trim($v['description']), 'conditions' => trim((string) ($v['conditions'] ?? '')),
+            'events' => $v['events'] ?? [], 'draft' => $request->boolean('draft'),
+        ]);
     }
 
     public function storePackage(Request $request)
     {
         $res = Rentals::savePackage($this->sup($request), $this->packageData($request));
+        if (! $res['ok']) {
+            return back()->withInput()->with('error', $res['error']);
+        }
 
-        return $res['ok'] ? redirect()->route('supplier.packages')->with('success', 'Package saved.') : back()->withInput()->with('error', $res['error']);
+        return redirect()->route('supplier.packages')->with('success', $res['package']->is_draft ? 'Draft saved. Customers cannot see it until you publish it.' : 'Package published.');
     }
 
     public function updatePackage(Request $request, Package $package)
     {
-        abort_unless($package->supplier_id === $this->sup($request)->id, 404);
-        $res = Rentals::savePackage($this->sup($request), $this->packageData($request), $package);
+        $res = Rentals::savePackage($this->sup($request), $this->packageData($request), $this->ownPackage($request, $package));
+        if (! $res['ok']) {
+            return back()->withInput()->with('error', $res['error']);
+        }
 
-        return $res['ok'] ? redirect()->route('supplier.packages')->with('success', 'Package updated.') : back()->withInput()->with('error', $res['error']);
+        return redirect()->route('supplier.packages')->with('success', $res['package']->is_draft ? 'Draft saved.' : 'Package updated. Requests already booked keep the contents and price they were booked with.');
+    }
+
+    /** Live price + warnings while the supplier edits (default options, or a sample selection). */
+    public function packagePrice(Request $request)
+    {
+        $v = Packages::validate($this->sup($request), $this->defInput($request));
+        $def = $v['def'];
+        $pp = Packages::price($def, (array) $request->input('sel', []) ?: null);
+
+        return response()->json([
+            'ok' => $v['ok'], 'error' => $v['error'], 'warnings' => $def['components'] ? Packages::stockWarnings($def) : [],
+            'package' => $pp['package'], 'packageText' => money($pp['package']), 'perDayText' => money($pp['perDay']), 'onceText' => money($pp['once']),
+            'separateText' => money($pp['separate']), 'savings' => $pp['savings'], 'savingsText' => money($pp['savings']),
+            'usesGuests' => Packages::usesGuests($def), 'guests' => $pp['sel']['guests'],
+            'rows' => array_map(fn ($r) => ['group' => $r['group'], 'kind' => $r['kind'], 'name' => $r['name'], 'qty' => $r['qty'], 'cost' => money($r['cost']), 'charge' => money($r['charge'])], $pp['rows']),
+        ]);
+    }
+
+    /** What the customer will see (contents + choices), rendered from the unsaved definition. */
+    public function previewPackage(Request $request)
+    {
+        $def = Packages::validate($this->sup($request), $this->defInput($request))['def'];
+        $def['name'] = (string) $request->input('name', '');
+
+        return view('market._package-contents', ['def' => $def, 'pp' => Packages::price($def), 'interactive' => false]);
+    }
+
+    public function duplicatePackage(Request $request, Package $package)
+    {
+        $copy = Rentals::duplicatePackage($this->ownPackage($request, $package));
+        Notifier::audit('Duplicated package', $package->name);
+
+        return redirect()->route('supplier.packages.edit', $copy)->with('success', 'Copy created as a draft. Rename it and publish when ready.');
+    }
+
+    public function movePackage(Request $request, Package $package)
+    {
+        $dir = $request->validate(['dir' => 'required|in:up,down'])['dir'];
+        Rentals::movePackage($this->ownPackage($request, $package), $dir);
+
+        return back();
+    }
+
+    public function packageActive(Request $request, Package $package)
+    {
+        $k = $this->ownPackage($request, $package);
+        if ($k->is_draft) {
+            return back()->with('error', 'Open the draft and publish it first.');
+        }
+        $k->update(['active' => ! $k->active]);
+        inv()->flush();
+        Notifier::audit($k->active ? 'Activated package' : 'Deactivated package', $k->name);
+
+        return back()->with('success', $k->name.($k->active ? ' is visible to customers again.' : ' is hidden from customers.'));
+    }
+
+    public function deletePackage(Request $request, Package $package)
+    {
+        $k = $this->ownPackage($request, $package);
+        $name = $k->name;
+        Rentals::deletePackage($k);
+
+        return redirect()->route('supplier.packages')->with('success', $name.' deleted. Booked requests keep their copy of it.');
     }
 
     /* ---------- inventory ---------- */

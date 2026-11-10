@@ -174,7 +174,7 @@ class MarketController extends Controller
 
         return view('market.supplier', [
             's' => $supplier, 'items' => $items, 'own' => $own,
-            'pkgs' => $supplier->packages()->where('active', true)->with('supplier')->get(),
+            'pkgs' => $supplier->packages()->where('active', true)->where('is_draft', false)->orderBy('sort')->with('supplier')->get(),
             'reviews' => Review::visible()->where('supplier_id', $supplier->id)->with(['customer', 'product', 'package'])->latest()->get(),
             'tab' => $request->query('tab', 'items'), 'catFilter' => $request->query('category'),
         ]);
@@ -184,7 +184,8 @@ class MarketController extends Controller
     {
         abort_unless($product->status === 'published' && $product->supplier->status === 'approved', 404);
         $today = today_iso();
-        $start = $request->query('start') && $request->query('start') >= $today ? $request->query('start') : add_days($today, 7);
+        $earliest = add_days($today, $product->isSale() ? (int) $product->lead_days : 0);
+        $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : max(add_days($today, 7), $earliest);
         $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : $start;
         $qty = max(1, (int) ($request->query('qty') ?: min(10, max(1, $product->total_stock))));
         $live = $this->live();
@@ -225,14 +226,18 @@ class MarketController extends Controller
 
     public function package(Request $request, Package $package)
     {
-        abort_unless($package->active && $package->supplier->status === 'approved', 404);
+        abort_unless($package->active && ! $package->is_draft && $package->supplier->status === 'approved', 404);
+        $def = \App\Domain\Packages::def($package);
+        $pp = \App\Domain\Packages::price($def);
+        $lead = \App\Domain\Packages::leadDays($def, $pp['sel']);
         $today = today_iso();
-        $start = $request->query('start') && $request->query('start') >= $today ? $request->query('start') : add_days($today, 7);
+        $earliest = add_days($today, $lead);
+        $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : max(add_days($today, 7), $earliest);
         $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : $start;
         $u = $request->user();
 
         return view('market.package', [
-            'k' => $package, 'sup' => $package->supplier, 'v' => \App\Domain\Pricing::packageValue($package),
+            'k' => $package, 'sup' => $package->supplier, 'def' => $def, 'pp' => $pp, 'lead' => $lead,
             'start' => $start, 'end' => $end, 'days' => array_fill_keys(date_range($start, $end), 1),
             'own' => $u && $package->supplier->owner_id === $u->id,
             'reviews' => $package->reviews()->visible()->with(['customer', 'package', 'supplier'])->latest()->get(),

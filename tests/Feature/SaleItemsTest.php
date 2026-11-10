@@ -49,6 +49,7 @@ class SaleItemsTest extends TestCase
         $this->assertSame(2, $p->shelf_life_days);
         $this->assertSame(3, $p->lead_days);
         $this->assertSame('per tray', $p->priceUnitLabel());
+        $this->get('/products/'.$p->id)->assertOk()->assertSee('Cupcake Tray');
 
         // a rental unit sent with a sale item falls back to a sale unit, and rental items ignore the sale fields
         $q = $this->createSaleItem(['name' => 'Balloon Bundle', 'unit' => 'set / day', 'perishable' => null]);

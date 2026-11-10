@@ -41,8 +41,9 @@ class CartController extends Controller
 
     public function add(Request $request)
     {
-        $data = $request->validate(['type' => 'required|in:item,package', 'ref_id' => 'required|integer', 'days' => 'required|string|max:5000', 'then' => 'nullable|in:list,checkout']);
-        $res = Rentals::addToCart($request->user(), $data['type'], (int) $data['ref_id'], (array) json_decode($data['days'], true));
+        $data = $request->validate(['type' => 'required|in:item,package', 'ref_id' => 'required|integer', 'days' => 'required|string|max:5000', 'sel' => 'nullable|string|max:5000', 'then' => 'nullable|in:list,checkout']);
+        $sel = json_decode((string) ($data['sel'] ?? ''), true);
+        $res = Rentals::addToCart($request->user(), $data['type'], (int) $data['ref_id'], (array) json_decode($data['days'], true), is_array($sel) ? $sel : null);
         if (! $res['ok']) {
             return back()->with('error', $res['error']);
         }

@@ -34,6 +34,9 @@
         <env name="PAYMONGO_SECRET_KEY" value=""/>
         <env name="PAYMONGO_WEBHOOK_SECRET" value=""/>
         <env name="PAYMONGO_FAKE" value="false"/>
+        <env name="XENDIT_SECRET_KEY" value=""/>
+        <env name="XENDIT_CALLBACK_TOKEN" value=""/>
+        <env name="PAYMENT_GATEWAY" value=""/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>

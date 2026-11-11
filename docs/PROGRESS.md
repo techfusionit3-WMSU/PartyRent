@@ -4,7 +4,12 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Xendit as the online payment gateway** (user request 2026-11-11: PayMongo has no keys, "use a different gateway").
+**Weight & size auto-fill on the product form** (user request 2026-11-11: L/W/H confusing for suppliers; no API).
+- [x] `App\Domain\ItemSizes`: ~40 typical party items (keywords EN/Filipino, kg, packed L×W×H) + category fallback. Form suggests from name/category, fills empty fields, never overwrites typed values; "Use this" + "Or pick a similar item"; plain labels Length/Width/Height.
+- [x] `ItemSizesTest`; phpunit.xml blanks `XENDIT_*` so tests never use the real key; 85 green. Browser-checked (throwaway SQLite, port 8032).
+
+### Previous: Xendit
+(user request 2026-11-11: PayMongo has no keys, "use a different gateway").
 - [x] `App\Domain\OnlinePay` picks the gateway (Xendit when `XENDIT_SECRET_KEY` is set, unless `PAYMENT_GATEWAY=paymongo`; else PayMongo / practice) and holds the shared `start` / `sync` / `discard` / `settle`. Payments keep their `gateway`, so old checkouts still work.
 - [x] `App\Domain\Xendit`: hosted Invoice (`POST /v2/invoices`, external_id = payment code), sync via `GET /v2/invoices/{id}`, cancel via `POST /invoices/{id}/expire!`, callback `/webhooks/xendit` checked with `x-callback-token` = `XENDIT_CALLBACK_TOKEN`.
 - [x] Return route renamed `rentals.paymongo.return` → `rentals.online.return` (`/payments/{p}/online`); texts gateway-neutral; superadmin settings shows Xendit status + webhook URL.

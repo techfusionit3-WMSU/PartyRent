@@ -137,7 +137,7 @@ class ShopeeDeliveryTest extends TestCase
         $this->actingAs($owner)->withSession(['mode' => 'supplier']);
         $this->get('/supplier/shop')->assertOk()->assertSee('PartyRent standard rates')->assertSee('Join the Free Shipping program');
         $p = $this->supplier('Party Essentials')->products()->firstOrFail();
-        $this->get('/supplier/products/'.$p->id.'/edit')->assertOk()->assertSee('Weight per unit (kg)');
+        $this->get('/supplier/products/'.$p->id.'/edit')->assertOk()->assertSee('Weight of one piece (kg)');
         $this->get('/supplier/payouts')->assertOk()->assertSee('You receive');
 
         $this->post('/api/delivery-preview', ['city' => self::CEBU_CITY, 'fulfillment' => 'both', 'shop_addr' => ['cityCode' => self::QC], 'delivery' => ['mode' => 'weight', 'reach' => 'inter']])

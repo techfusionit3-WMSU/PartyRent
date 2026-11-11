@@ -51,7 +51,10 @@ class AiController extends Controller
 
         return view('market.ai', [
             'q' => $q, 'filters' => $filters, 'plan' => $plan, 'examples' => $examples,
-            'cats' => Category::pluck('name', 'id'), 'cities' => collect(Locations::cities())->pluck('name')->unique()->sort()->values(),
+            'cats' => Category::pluck('name', 'id'),
+            // Suggest only cities where an approved supplier is based, busiest first.
+            'cities' => Supplier::approved()->whereNotNull('city')->where('city', '!=', '')->pluck('city')
+                ->countBy()->sortDesc(),
         ]);
     }
 
@@ -105,7 +108,7 @@ class AiController extends Controller
             inv()->flush();
         }
         if (! $added) {
-            return back()->with('warn', $skipped ? implode(' ', $skipped) : 'Tick at least one suggested item.');
+            return back()->with('warn', $skipped ? implode(' ', $skipped) : 'Nothing was added — check the box beside at least one suggested item first.');
         }
         $msg = $added.' item'.($added > 1 ? 's' : '').' added to your Rental List. Nothing has been requested yet.';
 

@@ -212,6 +212,7 @@ class SuperController extends Controller
         }
         $v['requireSupplierApproval'] = $request->boolean('requireSupplierApproval');
         $v['aiEnabled'] = $request->boolean('aiEnabled');
+        $v['payoutAuto'] = $request->boolean('payoutAuto');
         $changes = [];
         foreach ($v as $k => $val) {
             $old = Settings::get($k);

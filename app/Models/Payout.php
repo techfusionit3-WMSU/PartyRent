@@ -30,6 +30,7 @@ class Payout extends Model
     public function payer(): BelongsTo { return $this->belongsTo(User::class, 'paid_by'); }
 
     public function isPaid(): bool { return $this->status === 'paid'; }
+    public function isSending(): bool { return $this->status === 'sending'; }
 
     /** Same shape as Payouts::breakdown(), from the frozen payout row. */
     public function breakdown(): array

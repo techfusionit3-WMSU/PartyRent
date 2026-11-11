@@ -4,7 +4,15 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Weight & size auto-fill on the product form** (user request 2026-11-11: L/W/H confusing for suppliers; no API).
+**Supplier payouts through Xendit** (user request 2026-11-11: "is it not automated?").
+- [x] `App\Domain\XenditPayouts`: `POST /v2/payouts` (channel PH_GCASH or bank from `BANKS`), status pending → sending → paid; failure → back to pending with reason. Sync on admin payouts page load + "Check status"; payout webhook events go to the same `/webhooks/xendit`.
+- [x] Admin payouts: "Send via Xendit" (manual "Mark paid" kept under "Sent it by hand instead?"). Superadmin setting `payoutAuto` sends on release (release already happens when a rental completes).
+- [x] Supplier payout form: bank is a dropdown of supported banks. Migration `2026_11_11_000100`.
+- [x] `XenditPayoutsTest` (5); 90 green.
+- [ ] User: new Xendit key with Money-in + Money-out WRITE → verify channel codes (GET /payouts_channels) + a real test-mode payout.
+
+### Previous: weight & size auto-fill
+(user request 2026-11-11: L/W/H confusing for suppliers; no API).
 - [x] `App\Domain\ItemSizes`: ~40 typical party items (keywords EN/Filipino, kg, packed L×W×H) + category fallback. Form suggests from name/category, fills empty fields, never overwrites typed values; "Use this" + "Or pick a similar item"; plain labels Length/Width/Height.
 - [x] `ItemSizesTest`; phpunit.xml blanks `XENDIT_*` so tests never use the real key; 85 green. Browser-checked (throwaway SQLite, port 8032).
 

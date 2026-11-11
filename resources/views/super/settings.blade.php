@@ -55,6 +55,10 @@
       <p class="small muted mb-0">Off. To turn it on, put your Xendit secret key in <code>.env</code> as <code>XENDIT_SECRET_KEY</code> (the <code>xnd_development_…</code> key is free to test with), then reload.</p>
     @endif
   </div>
+  <div class="card"><h3>Supplier payouts</h3>
+    <label class="check"><input type="checkbox" name="payoutAuto" value="1" @checked($s['payoutAuto']) @disabled(! \App\Domain\XenditPayouts::enabled())> Send payouts automatically through Xendit</label>
+    <p class="small muted mb-0 mt-1">@if(\App\Domain\XenditPayouts::enabled())When a rental is completed, the supplier's share goes straight to their GCash or bank account, like Shopee. Off: admins click <b>Send via Xendit</b> on Supplier payouts. Needs a Xendit key with <b>Money-out: Write</b>.@else Needs Xendit (<code>XENDIT_SECRET_KEY</code>). Until then, admins send payouts by hand and record the reference.@endif</p>
+  </div>
   <div class="row"><button class="btn btn-primary btn-lg">Save settings</button></div>
 </form>
 <div class="card mt-3" style="max-width:760px"><h3>Data reset</h3><p class="small muted mb-0">To start fresh, run <code>php artisan migrate:fresh --seed</code> on the server: it deletes every account and rental and keeps only the staff accounts, settings and categories. For the full demo set add <code>--seeder=DemoSeeder</code>. Neither is available from this page.</p></div>

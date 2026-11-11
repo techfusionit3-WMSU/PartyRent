@@ -21,10 +21,20 @@
         <td data-label="Commission" class="num">− {{ money($p->commission) }}<div class="small muted">{{ rtrim(rtrim(number_format($p->commission_pct, 2), '0'), '.') }}%</div></td>
         <td data-label="Delivery · damages" class="num">{{ $pb['delivery'] + $pb['voucher'] + $pb['compensation'] > 0 ? '+ '.money($pb['delivery'] + $pb['voucher'] + $pb['compensation']) : '—' }}@if($pb['voucher'] > 0)<div class="small muted">incl. {{ money($pb['voucher']) }} voucher</div>@endif</td>
         <td data-label="Send" class="num"><b>{{ money($p->net) }}</b></td>
-        <td data-label="Transfer">@if(! $p->supplier->hasPayoutAccount())<span class="small muted">Waiting for the supplier's payout account</span>@else<form method="POST" action="{{ route('admin.payouts.pay', $p) }}" class="row" style="gap:6px;flex-wrap:wrap">@csrf
+        <td data-label="Transfer">@if($p->isSending())
+          <span class="badge b-gold">Sending via Xendit</span><div class="small muted mt-1">{{ $p->gateway_ref }}</div>
+          <form method="POST" action="{{ route('admin.payouts.check', $p) }}" class="mt-1">@csrf<button class="btn btn-xs">{{ icon('refresh') }}Check status</button></form>
+        @elseif(! $p->supplier->hasPayoutAccount())<span class="small muted">Waiting for the supplier's payout account</span>@else
+          @if($p->failure)<div class="small mb-1" style="color:var(--red)">Last try failed: {{ $p->failure }}</div>@endif
+          @if($xendit)@php($ch = \App\Domain\XenditPayouts::channel($p->supplier))
+            @if($ch)<form method="POST" action="{{ route('admin.payouts.send', $p) }}">@csrf<button class="btn btn-sm btn-primary">{{ icon('send') }}Send via Xendit</button></form>
+            @else<div class="small muted">Xendit can't send to "{{ $p->supplier->payout_bank }}". Send it by hand.</div>@endif
+          @endif
+          <details class="mt-1" @unless($xendit) open @endunless><summary class="small muted">{{ $xendit ? 'Sent it by hand instead?' : 'Record the transfer' }}</summary>
+          <form method="POST" action="{{ route('admin.payouts.pay', $p) }}" class="row mt-1" style="gap:6px;flex-wrap:wrap">@csrf
           <select class="input input-sm" name="method" style="width:auto" aria-label="Method">@foreach(\App\Models\Payout::METHOD_LABEL as $k => $l)<option value="{{ $k }}" @selected($p->supplier->payout_method === $k)>{{ $l }}</option>@endforeach</select>
           <input class="input input-sm" name="reference" placeholder="Reference no." required maxlength="80" style="width:140px" aria-label="Reference number">
-          <button class="btn btn-sm btn-primary">Mark paid</button></form>@endif</td>
+          <button class="btn btn-sm">Mark paid</button></form></details>@endif</td>
       </tr>@endforeach
     </tbody></table></div>@endif
   @elseif($tab === 'release')
@@ -43,7 +53,7 @@
   @elseif($tab === 'paid')
     @if($paid->isEmpty())@include('partials.empty', ['text' => 'No payouts sent yet.'])@else
     <div class="table-wrap"><table class="table cards"><thead><tr><th>Paid</th><th>Payout</th><th>Supplier</th><th>Method · reference</th><th class="num">Commission</th><th class="num">Net sent</th><th>By</th></tr></thead><tbody>
-      @foreach($paid as $p)<tr><td data-label="Paid">{{ fmt_date($p->paid_at->toDateString()) }}</td><td data-label="Payout"><b>{{ $p->code }}</b><div class="small muted">{{ $p->rentalRequest->code }}</div></td><td data-label="Supplier">{{ $p->supplier->name }}</td><td data-label="Reference">{{ $p->methodLabel() }} · {{ $p->reference }}</td><td data-label="Commission" class="num">{{ money($p->commission) }}</td><td data-label="Net" class="num"><b>{{ money($p->net) }}</b></td><td data-label="By">{{ $p->payer->name ?? '—' }}</td></tr>@endforeach
+      @foreach($paid as $p)<tr><td data-label="Paid">{{ fmt_date($p->paid_at->toDateString()) }}</td><td data-label="Payout"><b>{{ $p->code }}</b><div class="small muted">{{ $p->rentalRequest->code }}</div></td><td data-label="Supplier">{{ $p->supplier->name }}</td><td data-label="Reference">{{ $p->methodLabel() }}{{ $p->gateway === 'xendit' ? ' via Xendit' : '' }} · {{ $p->reference }}</td><td data-label="Commission" class="num">{{ money($p->commission) }}</td><td data-label="Net" class="num"><b>{{ money($p->net) }}</b></td><td data-label="By">{{ $p->payer->name ?? ($p->gateway === 'xendit' ? 'Automatic' : '—') }}</td></tr>@endforeach
     </tbody></table></div>@endif
   @else
     @if($suppliers->isEmpty())@include('partials.empty', ['text' => 'No supplier money on the platform yet.'])@else

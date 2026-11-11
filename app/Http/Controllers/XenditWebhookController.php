@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Xendit;
 use Illuminate\Http\Request;
 
-/** Receives Xendit invoice callbacks (set https://<your-domain>/webhooks/xendit as the "Invoices paid" URL). */
+/** Receives Xendit callbacks: invoices ("Invoice paid") and payouts ("Payout"). Set both to https://<your-domain>/webhooks/xendit. */
 class XenditWebhookController extends Controller
 {
     public function __invoke(Request $request)
@@ -14,6 +14,11 @@ class XenditWebhookController extends Controller
             return response()->json(['error' => 'invalid token'], 401);
         }
 
-        return response()->json(['result' => Xendit::handleCallback((array) $request->json()->all())]);
+        $body = (array) $request->json()->all();
+        $result = str_starts_with((string) ($body['event'] ?? ''), 'payout.')
+            ? \App\Domain\XenditPayouts::handleCallback($body)
+            : Xendit::handleCallback($body);
+
+        return response()->json(['result' => $result]);
     }
 }

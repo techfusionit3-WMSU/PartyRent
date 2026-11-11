@@ -178,6 +178,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/payouts', [\App\Http\Controllers\Admin\PayoutController::class, 'index'])->name('payouts');
     Route::post('/payouts/release/{rentalRequest}', [\App\Http\Controllers\Admin\PayoutController::class, 'release'])->name('payouts.release');
     Route::post('/payouts/{payout}/pay', [\App\Http\Controllers\Admin\PayoutController::class, 'pay'])->name('payouts.pay');
+    Route::post('/payouts/{payout}/send', [\App\Http\Controllers\Admin\PayoutController::class, 'send'])->name('payouts.send');
+    Route::post('/payouts/{payout}/check', [\App\Http\Controllers\Admin\PayoutController::class, 'check'])->name('payouts.check');
     Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
 
     Route::get('/listings', [AdminController::class, 'listings'])->name('listings');

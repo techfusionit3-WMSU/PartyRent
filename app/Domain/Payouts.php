@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Security deposits are never supplier income: PartyRent holds them and returns them to the customer.
  * Cancelled requests where money was kept (e.g. a late-cancellation charge) are released by an admin
- * once refunds are settled. The owner/admin side marks payouts as paid with a GCash/bank reference.
+ * once refunds are settled. The admin sends payouts through Xendit (XenditPayouts) or by hand and records the reference.
  */
 class Payouts
 {
@@ -98,6 +98,7 @@ class Payouts
         Notifier::notify($r->supplier->owner_id, 'supplier', 'Payout released', money($p->net).' for '.$r->code.' is ready and will be sent to your payout account ('.$p->code.').', route('supplier.payouts', [], false));
         Notifier::notify('admin', 'admin', 'Payout to send', $r->supplier->name.' · '.money($p->net).' for '.$r->code.' ('.$p->code.').', route('admin.payouts', [], false));
         Notifier::audit('Released payout', $p->code.' · '.$r->code.' · '.money($p->net).' net ('.money($p->commission).' commission)');
+        XenditPayouts::autoSend($p); // automatic payouts (superadmin setting), like Shopee
 
         return ['ok' => true, 'payout' => $p];
     }
@@ -107,6 +108,9 @@ class Payouts
     {
         if ($p->isPaid()) {
             return ['ok' => false, 'error' => $p->code.' is already paid.'];
+        }
+        if ($p->status === 'sending') {
+            return ['ok' => false, 'error' => $p->code.' is being sent through Xendit. Use "Check status" instead.'];
         }
         if (! $p->supplier->hasPayoutAccount()) {
             Notifier::notify($p->supplier->owner_id, 'supplier', 'Add your payout account', money($p->net).' ('.$p->code.') is ready for you. Add a GCash or bank account so PartyRent can send it.', route('supplier.payouts', [], false));
@@ -119,7 +123,7 @@ class Payouts
         if (trim((string) ($data['reference'] ?? '')) === '') {
             return ['ok' => false, 'error' => 'Enter the transfer reference number.'];
         }
-        $p->update(['status' => 'paid', 'method' => $data['method'], 'reference' => trim($data['reference']), 'notes' => $data['notes'] ?? null, 'paid_at' => now(), 'paid_by' => $by->id]);
+        $p->update(['status' => 'paid', 'failure' => null, 'method' => $data['method'], 'reference' => trim($data['reference']), 'notes' => $data['notes'] ?? null, 'paid_at' => now(), 'paid_by' => $by->id]);
         Notifier::notify($p->supplier->owner_id, 'supplier', 'Payout sent 💸', money($p->net).' was sent to your '.$p->methodLabel().' account. Reference '.$p->reference.' ('.$p->code.').', route('supplier.payouts', [], false));
         Notifier::audit('Paid payout', $p->code.' · '.$p->supplier->name.' · '.money($p->net).' · '.$p->reference, $by);
 

@@ -24,6 +24,7 @@ class Settings
         'shipDefaultKg' => 1,          // used for products with no weight yet
         // Free Shipping program: suppliers who join pay extra commission; customers get a PartyRent-funded voucher
         'freeShipEnabled' => true,
+        'payoutAuto' => false, // send supplier payouts through Xendit as soon as they are released
         'freeShipExtraPct' => 3,
         'freeShipMinSpend' => 1000,
         'freeShipCap' => 200,

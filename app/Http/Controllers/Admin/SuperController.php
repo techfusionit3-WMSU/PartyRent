@@ -188,6 +188,8 @@ class SuperController extends Controller
         return view('super.settings', [
             's' => array_merge(Settings::DEFAULTS, array_intersect_key(Settings::all(), Settings::DEFAULTS)),
             'accountCount' => \App\Models\PayAccount::where('active', true)->count(),
+            'gateway' => \App\Domain\OnlinePay::gateway(),
+            'xendit' => ['enabled' => \App\Domain\Xendit::enabled(), 'live' => \App\Domain\Xendit::liveMode(), 'webhook' => (string) config('services.xendit.callback_token') !== '', 'methods' => config('services.xendit.methods')],
             'paymongo' => ['enabled' => PayMongo::enabled(), 'live' => PayMongo::liveMode(), 'webhook' => (string) config('services.paymongo.webhook_secret') !== '', 'methods' => config('services.paymongo.methods')],
         ]);
     }

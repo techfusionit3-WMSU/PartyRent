@@ -55,8 +55,8 @@ class PracticeCheckoutTest extends TestCase
 
         // pay with Maya → back to the normal return URL → verified automatically
         $this->post('/practice-checkout/'.$p->gateway_ref, ['action' => 'pay', 'method' => 'paymaya'])
-            ->assertRedirect(route('rentals.paymongo.return', [$r, $p]));
-        $this->get(route('rentals.paymongo.return', [$r, $p]))->assertSessionHas('success', fn ($m) => str_contains($m, 'verified'));
+            ->assertRedirect(route('rentals.online.return', [$r, $p]));
+        $this->get(route('rentals.online.return', [$r, $p]))->assertSessionHas('success', fn ($m) => str_contains($m, 'verified'));
         $p->refresh();
         $this->assertSame('verified', $p->status);
         $this->assertStringStartsWith('pay_practice_', $p->reference);
@@ -77,8 +77,8 @@ class PracticeCheckoutTest extends TestCase
         $this->get('/practice-checkout/cs_practice_nope')->assertNotFound();
 
         $this->as('jose@demo.ph', 'customer')->post('/practice-checkout/'.$p->gateway_ref, ['action' => 'cancel'])
-            ->assertRedirect(route('rentals.paymongo.return', [$r, $p, 'cancelled' => 1]));
-        $this->get(route('rentals.paymongo.return', [$r, $p, 'cancelled' => 1]))->assertSessionHas('warn');
+            ->assertRedirect(route('rentals.online.return', [$r, $p, 'cancelled' => 1]));
+        $this->get(route('rentals.online.return', [$r, $p, 'cancelled' => 1]))->assertSessionHas('warn');
         $this->assertNull(Payment::find($p->id));
     }
 

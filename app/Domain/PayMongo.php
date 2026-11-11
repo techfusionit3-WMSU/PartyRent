@@ -5,7 +5,6 @@ namespace App\Domain;
 use App\Models\Payment;
 use App\Models\RentalRequest;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -13,7 +12,7 @@ use Illuminate\Support\Str;
 /**
  * Online payments through PayMongo Checkout (GCash, Maya, cards, QR Ph).
  *
- * Flow: the customer starts a payment → a Payment row is created with status "awaiting" and a hosted
+ * Flow (see OnlinePay): the customer starts a payment → a Payment row is created with status "awaiting" and a hosted
  * checkout session → the customer pays on PayMongo's page → PayMongo sends them back (return URL) and/or
  * calls the webhook → we read the session, and if it is paid the payment is verified automatically
  * (receipt issued, no cashier step). The money lands in PartyRent's PayMongo balance; supplier payouts
@@ -76,28 +75,9 @@ class PayMongo
         return $e ? ($e['detail'] ?? $e['code'] ?? 'unknown error') : 'HTTP '.$res->status();
     }
 
-    /** Start an online payment: returns ['ok' => true, 'url' => checkout page] or ['ok' => false, 'error' => …]. */
-    public static function start(RentalRequest $r, array $data): array
+    /** Create the checkout session (or practice session) for an awaiting payment made by OnlinePay::start. */
+    public static function open(RentalRequest $r, Payment $p): array
     {
-        if (! self::enabled()) {
-            return ['ok' => false, 'error' => 'Online payment is not available right now. Please pay by transfer.'];
-        }
-        if ((float) ($data['amount'] ?? 0) < 20) {
-            return ['ok' => false, 'error' => 'Online payments must be at least ₱20.00.'];
-        }
-        // An earlier unfinished checkout for this request: settle it if it was paid, otherwise close it.
-        foreach ($r->payments()->where('status', 'awaiting')->get() as $old) {
-            if (self::sync($old) === 'unpaid') {
-                self::discard($old);
-            }
-        }
-        $r->load('payments');
-
-        $res = Rentals::submitPayment($r, ['method' => 'online', 'reference' => ''] + $data, 'customer');
-        if (! $res['ok']) {
-            return $res;
-        }
-        $p = $res['payment'];
         $u = $r->customer;
         if (self::practice()) {
             $ref = 'cs_practice_'.Str::lower(Str::random(16));
@@ -112,8 +92,8 @@ class PayMongo
                 'payment_method_types' => config('services.paymongo.methods'),
                 'description' => Settings::get('platformName').' '.$r->code.' · '.$r->event_name,
                 'reference_number' => $p->code,
-                'success_url' => route('rentals.paymongo.return', [$r, $p]),
-                'cancel_url' => route('rentals.paymongo.return', [$r, $p, 'cancelled' => 1]),
+                'success_url' => route('rentals.online.return', [$r, $p]),
+                'cancel_url' => route('rentals.online.return', [$r, $p, 'cancelled' => 1]),
                 'send_email_receipt' => true,
                 'show_description' => true,
                 'show_line_items' => true,
@@ -186,37 +166,15 @@ class PayMongo
             return 'unpaid';
         }
         $a = $paid['attributes'];
+        $source = $a['source']['type'] ?? null;
 
-        return DB::transaction(function () use ($p, $paid, $a) {
-            $p = Payment::lockForUpdate()->find($p->id);
-            if (! $p || $p->status !== 'awaiting') {
-                return 'done'; // already handled (return URL and webhook can both arrive)
-            }
-            $received = round(((int) ($a['amount'] ?? 0)) / 100, 2);
-            $source = $a['source']['type'] ?? null;
-            $p->fill([
-                'reference' => (string) $paid['id'],
-                'gateway_fee' => isset($a['fee']) ? round(((int) $a['fee']) / 100, 2) : null,
-                'date' => today_iso(),
-                'notes' => trim(($p->notes ? $p->notes.' · ' : '').'Paid online'.($source ? ' via '.(['paymaya' => 'Maya', 'gcash' => 'GCash', 'card' => 'card', 'qrph' => 'QR Ph', 'grab_pay' => 'GrabPay'][$source] ?? $source) : '')),
-            ])->save();
-
-            $why = abs($received - $p->amount) > 0.009 ? 'PayMongo received '.money($received).' instead of '.money($p->amount).'.' : null;
-            if (! $why) {
-                $res = Rentals::confirmPayment($p, null);
-                if ($res['ok']) {
-                    return 'verified';
-                }
-                $why = $res['error'];
-            }
-            // Money was taken but the payment can't count as-is: hand it to the cashier.
-            $p->update(['status' => 'pending', 'notes' => $p->notes.' · Needs review: '.$why]);
-            $r = $p->rentalRequest;
-            Notifier::notify('cashier', 'cashier', 'Online payment needs review', $p->code.' for '.$r->code.' was paid through PayMongo but could not be verified automatically: '.$why, route('cashier.verification'));
-            Notifier::notify($r->customer_id, 'customer', 'Payment received', 'We received your online payment of '.money($received).' for '.$r->code.'. Our cashier will confirm it shortly.', route('rentals.show', $r));
-
-            return 'review';
-        });
+        return OnlinePay::settle(
+            $p,
+            (string) $paid['id'],
+            round(((int) ($a['amount'] ?? 0)) / 100, 2),
+            isset($a['fee']) ? round(((int) $a['fee']) / 100, 2) : null,
+            $source ? (['paymaya' => 'Maya', 'gcash' => 'GCash', 'card' => 'card', 'qrph' => 'QR Ph', 'grab_pay' => 'GrabPay'][$source] ?? $source) : null,
+        );
     }
 
     /** Close an unpaid checkout so it can't be paid later, and drop the row (no money moved). */

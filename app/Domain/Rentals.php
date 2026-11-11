@@ -747,11 +747,11 @@ class Rentals
             'amount' => r2($data['amount']), 'date' => $data['date'] ?? today_iso(), 'submitted_at' => now(),
             'reference' => trim((string) ($data['reference'] ?? '')), 'proof_path' => $data['proof_path'] ?? null, 'proof_name' => $data['proof_name'] ?? null,
             'notes' => $data['notes'] ?? null, 'status' => $online ? 'awaiting' : 'pending', 'recorded_by' => $source,
-            'gateway' => $online ? 'paymongo' : null,
+            'gateway' => $online ? ($data['gateway'] ?? 'paymongo') : null,
         ]);
         $r->load('payments');
         if ($online) {
-            return self::ok(['payment' => $p]); // nothing to verify or announce until PayMongo says it's paid
+            return self::ok(['payment' => $p]); // nothing to verify or announce until the gateway says it's paid
         }
         self::changed($r);
         $cust = $r->customer;
@@ -778,7 +778,7 @@ class Rentals
 
     /**
      * Mark a payment verified, issue the receipt and tell everyone. $by is the cashier, or null when
-     * PayMongo confirmed an online payment (then an "awaiting" payment may be confirmed directly).
+     * the gateway confirmed an online payment (then an "awaiting" payment may be confirmed directly).
      */
     public static function confirmPayment(Payment $p, ?User $by): array
     {
@@ -805,7 +805,7 @@ class Rentals
             }
             Notifier::notify($r->customer_id, 'customer', 'Payment verified ✅', money($p->amount).' for '.$r->code.' was verified. Receipt '.$p->receipt_no.'. Payment status: '.$after['status'].($after['balance'] > 0 ? ', balance '.money($after['balance']) : '').'.', self::link('rentals.show', $r));
             Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment verified', money($p->amount).' for '.$r->code.' verified by '.($by ? 'cashier' : 'PartyRent (paid online)').'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
-            Notifier::audit($by ? 'Verified payment' : 'Online payment confirmed by PayMongo', $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
+            Notifier::audit($by ? 'Verified payment' : 'Online payment confirmed by '.OnlinePay::name($p->gateway), $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
 
             return self::ok(['payment' => $p]);
         });

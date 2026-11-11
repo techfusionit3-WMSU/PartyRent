@@ -40,7 +40,7 @@ class PracticeCheckoutController extends Controller
     {
         [$s, $p] = $this->load($request, $ref);
         $data = $request->validate(['action' => 'required|in:pay,fail,cancel', 'method' => 'nullable|in:'.implode(',', array_keys(PayMongo::PRACTICE_METHODS))]);
-        $return = fn (array $q = []) => redirect()->route('rentals.paymongo.return', array_merge([$p->rentalRequest, $p], $q));
+        $return = fn (array $q = []) => redirect()->route('rentals.online.return', array_merge([$p->rentalRequest, $p], $q));
 
         if ($data['action'] === 'cancel') {
             return $return(['cancelled' => 1]);

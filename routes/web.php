@@ -89,7 +89,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/rentals/{rentalRequest}/submitted', [RentalController::class, 'confirmation'])->name('rentals.confirmation');
     Route::post('/rentals/{rentalRequest}/cancel', [RentalController::class, 'cancel'])->name('rentals.cancel');
     Route::post('/rentals/{rentalRequest}/payments', [RentalController::class, 'pay'])->name('rentals.pay');
-    Route::get('/rentals/{rentalRequest}/payments/{payment}/paymongo', [RentalController::class, 'paymongoReturn'])->name('rentals.paymongo.return');
+    Route::get('/rentals/{rentalRequest}/payments/{payment}/online', [RentalController::class, 'onlineReturn'])->name('rentals.online.return');
     // practice checkout (PAYMONGO_FAKE=true, never in production)
     Route::get('/practice-checkout/{ref}', [\App\Http\Controllers\Customer\PracticeCheckoutController::class, 'show'])->name('paymongo.practice');
     Route::post('/practice-checkout/{ref}', [\App\Http\Controllers\Customer\PracticeCheckoutController::class, 'act'])->name('paymongo.practice.act');
@@ -213,5 +213,6 @@ Route::prefix('superadmin')->name('super.')->middleware(['auth', 'role:superadmi
     Route::post('/pay-accounts/{payAccount}/delete', [\App\Http\Controllers\Admin\PayAccountController::class, 'destroy'])->name('pay-accounts.delete');
 });
 
-/* ---------- PayMongo webhook (no session; checked by signature; CSRF exempt in bootstrap/app.php) ---------- */
+/* ---------- Payment gateway webhooks (no session; checked by signature; CSRF exempt in bootstrap/app.php) ---------- */
 Route::post('/webhooks/paymongo', \App\Http\Controllers\PayMongoWebhookController::class)->middleware('throttle:120,1')->name('webhooks.paymongo');
+Route::post('/webhooks/xendit', \App\Http\Controllers\XenditWebhookController::class)->middleware('throttle:120,1')->name('webhooks.xendit');

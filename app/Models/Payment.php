@@ -15,7 +15,7 @@ class Payment extends Model
 
     public const METHOD_LABEL = [
         'cod' => 'Cash on Delivery', 'cash' => 'Cash (Over the Counter)', 'bank' => 'Bank Transfer / GCash / Maya', 'debit' => 'Debit Card',
-        'online' => 'Online (PayMongo)',
+        'online' => 'Online (GCash, Maya, card)',
     ];
 
     /** Methods whose reference number comes from a bank or e-wallet and must not be reused. */

@@ -18,6 +18,21 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    // "Pay online": Xendit is used when its key is set (PAYMENT_GATEWAY=paymongo prefers PayMongo when both are set).
+    'online' => [
+        'gateway' => env('PAYMENT_GATEWAY', ''),
+    ],
+
+    // Xendit Invoices (https://developers.xendit.co). Keys: dashboard.xendit.co → Settings → API keys.
+    'xendit' => [
+        'secret_key' => env('XENDIT_SECRET_KEY'),
+        // Settings → Webhooks → "Webhook verification token"; sent with every callback as x-callback-token.
+        'callback_token' => env('XENDIT_CALLBACK_TOKEN'),
+        // Empty = every channel activated in the dashboard. E.g. GCASH,PAYMAYA,GRABPAY,QRPH,CREDIT_CARD
+        'methods' => array_values(array_filter(explode(',', (string) env('XENDIT_METHODS', '')))),
+        'base_url' => env('XENDIT_BASE_URL', 'https://api.xendit.co'),
+    ],
+
     // Online payments (https://developers.paymongo.com). Leave the secret key empty to hide "Pay online".
     'paymongo' => [
         'secret_key' => env('PAYMONGO_SECRET_KEY'),

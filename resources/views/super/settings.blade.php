@@ -41,15 +41,18 @@
   <div class="card"><h3>Where customers send payments</h3>
     <p class="small mb-0">{{ $accountCount }} active account{{ $accountCount === 1 ? '' : 's' }}. GCash, Maya and bank accounts, their QR codes and monthly limits are managed on <a href="{{ route('super.pay-accounts') }}">Payment accounts</a>.</p>
   </div>
-  <div class="card"><h3>Online payments (PayMongo)</h3>
-    @if(\App\Domain\PayMongo::practice())
-      <p class="small mb-1"><span class="badge b-purple">Practice mode</span> <b>Pay online</b> opens a built-in practice checkout with Pay / Fail buttons. No PayMongo account, no real money. Everything after paying (automatic verification, receipts, the supplier's "Down payment received") works like the real thing.</p>
-      <p class="small muted mb-0">Turn it off with <code>PAYMONGO_FAKE=false</code> in <code>.env</code> once you have a PayMongo key. Practice mode never runs on a production server.</p>
-    @elseif($paymongo['enabled'])
-      <p class="small mb-1"><span class="badge {{ $paymongo['live'] ? 'b-green' : 'b-gold' }}">{{ $paymongo['live'] ? 'Live' : 'Test mode' }}</span> Customers see <b>Pay online</b> ({{ implode(', ', $paymongo['methods']) }}). Paid checkouts are verified automatically; no cashier step.</p>
+  <div class="card"><h3>Online payments</h3>
+    @if($gateway === 'xendit')
+      <p class="small mb-1"><span class="badge {{ $xendit['live'] ? 'b-green' : 'b-gold' }}">{{ $xendit['live'] ? 'Live' : 'Test mode' }}</span> <b>Xendit.</b> Customers see <b>Pay online</b> ({{ $xendit['methods'] ? implode(', ', $xendit['methods']) : 'every channel turned on in your Xendit dashboard' }}). Paid invoices are verified automatically, with no cashier step.</p>
+      <p class="small muted mb-0">Webhook: in the Xendit dashboard (Settings → Webhooks) set <b>Invoices → Invoice paid</b> to <code>{{ route('webhooks.xendit') }}</code> and copy the verification token into <code>XENDIT_CALLBACK_TOKEN</code>. {{ $xendit['webhook'] ? 'Callback token is set.' : 'Callback token is not set yet. Payments still confirm when the customer returns from checkout.' }}</p>
+    @elseif(\App\Domain\OnlinePay::practice())
+      <p class="small mb-1"><span class="badge b-purple">Practice mode</span> <b>Pay online</b> opens a built-in practice checkout with Pay / Fail buttons. No gateway account, no real money. Everything after paying (automatic verification, receipts, the supplier's "Down payment received") works like the real thing.</p>
+      <p class="small muted mb-0">To take real payments, sign up at Xendit and put your secret key in <code>.env</code> as <code>XENDIT_SECRET_KEY</code> (the <code>xnd_development_…</code> key is free to test with). It replaces practice mode as soon as it is set. Practice mode never runs on a production server.</p>
+    @elseif($gateway === 'paymongo')
+      <p class="small mb-1"><span class="badge {{ $paymongo['live'] ? 'b-green' : 'b-gold' }}">{{ $paymongo['live'] ? 'Live' : 'Test mode' }}</span> <b>PayMongo.</b> Customers see <b>Pay online</b> ({{ implode(', ', $paymongo['methods']) }}). Paid checkouts are verified automatically, with no cashier step.</p>
       <p class="small muted mb-0">Webhook: register <code>{{ route('webhooks.paymongo') }}</code> for <code>checkout_session.payment.paid</code> in the PayMongo dashboard, then set <code>PAYMONGO_WEBHOOK_SECRET</code>. {{ $paymongo['webhook'] ? 'Webhook secret is set.' : 'Webhook secret is not set yet. Payments still confirm when the customer returns from checkout.' }}</p>
     @else
-      <p class="small muted mb-0">Off. To turn it on, put your PayMongo secret key in <code>.env</code> as <code>PAYMONGO_SECRET_KEY</code> (use the <code>sk_test_…</code> key to try it for free), then reload.</p>
+      <p class="small muted mb-0">Off. To turn it on, put your Xendit secret key in <code>.env</code> as <code>XENDIT_SECRET_KEY</code> (the <code>xnd_development_…</code> key is free to test with), then reload.</p>
     @endif
   </div>
   <div class="row"><button class="btn btn-primary btn-lg">Save settings</button></div>

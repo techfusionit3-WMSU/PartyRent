@@ -221,12 +221,12 @@ class PaymentChannelsTest extends TestCase
         $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertDontSee($p->code); // not the cashier's job
 
         // back from checkout before paying
-        $this->as('jose@demo.ph', 'customer')->get("/rentals/PR-0003/payments/{$p->code}/paymongo")->assertSessionHas('warn');
+        $this->as('jose@demo.ph', 'customer')->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('warn');
         $this->get('/rentals/PR-0003')->assertSee('Continue payment')->assertSee('Check status');
 
         // paid
         $this->paymongo($this->paid($amt));
-        $this->get("/rentals/PR-0003/payments/{$p->code}/paymongo")->assertRedirect('/rentals/PR-0003')->assertSessionHas('success', fn ($m) => str_contains($m, 'verified'));
+        $this->get("/rentals/PR-0003/payments/{$p->code}/online")->assertRedirect('/rentals/PR-0003')->assertSessionHas('success', fn ($m) => str_contains($m, 'verified'));
         $p->refresh();
         $this->assertSame(['verified', 'pay_test_9', 25.0], [$p->status, $p->reference, $p->gateway_fee]);
         $this->assertNotNull($p->receipt_no);
@@ -234,7 +234,7 @@ class PaymentChannelsTest extends TestCase
         $this->assertTrue($r->fresh()->fin()['upfrontPaid']);
 
         // a second return (or the webhook) changes nothing
-        $this->get("/rentals/PR-0003/payments/{$p->code}/paymongo")->assertSessionHas('success');
+        $this->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('success');
         $this->assertSame(1, Payment::where('receipt_no', $p->receipt_no)->count());
     }
 
@@ -244,7 +244,7 @@ class PaymentChannelsTest extends TestCase
         $amt = $this->req('PR-0003')->fin()['upfront']['amount'];
         $this->as('jose@demo.ph', 'customer')->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
         $p = Payment::where('gateway', 'paymongo')->firstOrFail();
-        $this->get("/rentals/PR-0003/payments/{$p->code}/paymongo?cancelled=1")->assertSessionHas('warn', fn ($m) => str_contains($m, 'Nothing was charged'));
+        $this->get("/rentals/PR-0003/payments/{$p->code}/online?cancelled=1")->assertSessionHas('warn', fn ($m) => str_contains($m, 'Nothing was charged'));
         $this->assertNull($p->fresh());
         Http::assertSent(fn ($q) => str_ends_with($q->url(), '/checkout_sessions/cs_test_1/expire'));
     }
@@ -287,7 +287,7 @@ class PaymentChannelsTest extends TestCase
         $p = Payment::where('gateway', 'paymongo')->firstOrFail();
 
         $this->paymongo($this->paid($amt - 5)); // PayMongo reports a different amount
-        $this->get("/rentals/PR-0003/payments/{$p->code}/paymongo")->assertSessionHas('success', fn ($m) => str_contains($m, 'cashier'));
+        $this->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('success', fn ($m) => str_contains($m, 'cashier'));
         $p->refresh();
         $this->assertSame('pending', $p->status);
         $this->assertStringContainsString('Needs review', $p->notes);

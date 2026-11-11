@@ -4,7 +4,15 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Shopee-style delivery + payouts** (user request 2026-11-10: "make it like shopee", chose all 4 parts):
+**Xendit as the online payment gateway** (user request 2026-11-11: PayMongo has no keys, "use a different gateway").
+- [x] `App\Domain\OnlinePay` picks the gateway (Xendit when `XENDIT_SECRET_KEY` is set, unless `PAYMENT_GATEWAY=paymongo`; else PayMongo / practice) and holds the shared `start` / `sync` / `discard` / `settle`. Payments keep their `gateway`, so old checkouts still work.
+- [x] `App\Domain\Xendit`: hosted Invoice (`POST /v2/invoices`, external_id = payment code), sync via `GET /v2/invoices/{id}`, cancel via `POST /invoices/{id}/expire!`, callback `/webhooks/xendit` checked with `x-callback-token` = `XENDIT_CALLBACK_TOKEN`.
+- [x] Return route renamed `rentals.paymongo.return` → `rentals.online.return` (`/payments/{p}/online`); texts gateway-neutral; superadmin settings shows Xendit status + webhook URL.
+- [x] `XenditTest` (6, Http::fake); 83 green.
+- [ ] User: sign up at dashboard.xendit.co, put `xnd_development_…` in `.env` → do a real test-mode payment. Webhook needs a public URL (localhost: return URL covers it).
+
+### Previous: Shopee-style delivery + payouts
+(user request 2026-11-10: "make it like shopee", chose all 4 parts):
 - [x] 1. No commission on delivery: `Payouts::breakdown` splits income into items vs delivery; commission only on items. Payouts table gets `delivery`, `voucher` columns.
 - [x] 2. Shopee-style payout breakdown on supplier Earnings page, admin payouts, supplier request page (Items − commission + delivery + voucher + damages = you receive).
 - [x] 3. Weight-based delivery: products get weight_kg + L/W/H cm (volumetric ÷ divisor); new delivery mode `weight` ("PartyRent standard rates"), route tier by origin/destination (same province / same island group / other island group), superadmin sets first-kg + per-kg rates. Kept area/distance as custom alternatives (tell user).

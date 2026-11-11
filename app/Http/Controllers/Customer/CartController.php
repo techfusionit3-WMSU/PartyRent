@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Customer;
 use App\Domain\Ai;
 use App\Domain\Finance;
 use App\Domain\Locations;
-use App\Domain\PayMongo;
+use App\Domain\OnlinePay;
 use App\Domain\Pricing;
 use App\Domain\Rentals;
 use App\Http\Controllers\Controller;
@@ -147,7 +147,7 @@ class CartController extends Controller
             'dates' => $dates, 'st' => $st, 'quote' => $quote, 'city' => $city,
             'check' => inv()->check($clean),
             'schedule' => Finance::schedule($quote, today_iso(), $dates[0], $supplier->methods[0]),
-            'due' => $due, 'online' => PayMongo::enabled(),
+            'due' => $due, 'online' => OnlinePay::enabled(),
         ];
     }
 
@@ -182,8 +182,8 @@ class CartController extends Controller
         // Like a marketplace checkout: go straight to paying the amount that confirms the request.
         $r = $res['request']->fresh(['payments', 'supplier', 'customer']);
         $up = $r->fin()['upfront'];
-        if (($data['payWith'] ?? 'transfer') === 'online' && PayMongo::enabled()) {
-            $pay = PayMongo::start($r, ['type' => $up['type'], 'amount' => $up['amount']]);
+        if (($data['payWith'] ?? 'transfer') === 'online' && OnlinePay::enabled()) {
+            $pay = OnlinePay::start($r, ['type' => $up['type'], 'amount' => $up['amount']]);
             if ($pay['ok']) {
                 return redirect()->away($pay['url']);
             }

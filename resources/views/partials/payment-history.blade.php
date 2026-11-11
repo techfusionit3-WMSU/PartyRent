@@ -11,7 +11,7 @@
         <td data-label="Amount" class="num"><b>{{ $p->isOutflow() ? '− ' : '' }}{{ money($p->amount) }}</b></td>
         <td data-label="Status">@include('partials.badges', ['ver' => $p->status])@if($p->reject_reason)<div class="small" style="color:var(--red)">{{ $p->reject_reason }}</div>@endif</td>
         <td data-label="">@if($p->receipt_no)<a class="btn btn-xs" href="{{ route('payments.receipt', $p) }}" target="_blank">{{ $p->receipt_no }}</a>@endif @if($p->proof_path)<a class="btn btn-xs btn-ghost" href="{{ route('payments.proof', $p) }}" target="_blank">Proof</a>@endif
-          @if($p->status === 'awaiting' && $p->gateway_url && auth()->id() === $r->customer_id)<a class="btn btn-xs btn-primary" href="{{ $p->gateway_url }}">Continue payment</a> <a class="btn btn-xs" href="{{ route('rentals.paymongo.return', [$r, $p]) }}">Check status</a>@endif</td>
+          @if($p->status === 'awaiting' && $p->gateway_url && auth()->id() === $r->customer_id)<a class="btn btn-xs btn-primary" href="{{ $p->gateway_url }}">Continue payment</a> <a class="btn btn-xs" href="{{ route('rentals.online.return', [$r, $p]) }}">Check status</a>@endif</td>
       </tr>
     @endforeach
   </tbody></table></div>

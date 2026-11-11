@@ -67,7 +67,7 @@
     <div id="sumBox">@include('customer._checkout-summary', ['q' => $q, 'schedule' => $schedule, 'due' => $due])</div>
     <div class="field mt-2"><label>Pay now with</label>
       <div class="stack-sm">
-        @if($online)<label class="card card-flat row" style="padding:10px 12px;gap:8px"><input type="radio" name="payWith" value="online" @checked(old('payWith', 'online') === 'online')><div><b>Pay online</b><div class="small muted">{{ \App\Domain\PayMongo::practice() ? 'Practice checkout (no real money)' : 'GCash, Maya, card or QR Ph. Verified instantly.' }}</div></div></label>@endif
+        @if($online)<label class="card card-flat row" style="padding:10px 12px;gap:8px"><input type="radio" name="payWith" value="online" @checked(old('payWith', 'online') === 'online')><div><b>Pay online</b><div class="small muted">{{ \App\Domain\OnlinePay::practice() ? 'Practice checkout (no real money)' : 'GCash, Maya, card or QR Ph. Verified instantly.' }}</div></div></label>@endif
         <label class="card card-flat row" style="padding:10px 12px;gap:8px"><input type="radio" name="payWith" value="transfer" @checked(! $online || old('payWith') === 'transfer')><div><b>Bank / GCash transfer</b><div class="small muted">Send to a PartyRent account and upload the receipt. Verified by our cashier.</div></div></label>
       </div>
     </div>

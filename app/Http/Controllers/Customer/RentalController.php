@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Domain\Finance;
-use App\Domain\PayMongo;
+use App\Domain\OnlinePay;
 use App\Domain\Rentals;
 use App\Domain\Reviews;
 use App\Http\Controllers\Controller;
@@ -69,7 +69,7 @@ class RentalController extends Controller
 
         return view('customer.rental', [
             'r' => $r, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
-            'online' => PayMongo::enabled(), 'accounts' => PayAccount::available(),
+            'online' => OnlinePay::enabled(), 'accounts' => PayAccount::available(),
             'policy' => Rentals::cancelPolicy($r), 'reviewables' => $r->status === 'completed' ? Reviews::reviewables($r) : [],
         ]);
     }
@@ -105,7 +105,7 @@ class RentalController extends Controller
         $data['pay_account_id'] = $data['pay_account'] ?? null;
         unset($data['pay_account']);
         if ($data['method'] === 'online') {
-            $res = PayMongo::start($r, array_intersect_key($data, array_flip(['type', 'amount', 'notes'])));
+            $res = OnlinePay::start($r, array_intersect_key($data, array_flip(['type', 'amount', 'notes'])));
 
             return $res['ok'] ? redirect()->away($res['url']) : back()->withInput()->with('error', $res['error']);
         }
@@ -129,15 +129,15 @@ class RentalController extends Controller
         return back()->with('success', 'Payment submitted ('.$res['payment']->code.'). Waiting for cashier verification.');
     }
 
-    /** Back from PayMongo's checkout page (or "Check status"): ask PayMongo whether it was paid. */
-    public function paymongoReturn(Request $request, RentalRequest $rentalRequest, Payment $payment)
+    /** Back from the gateway's checkout page (or "Check status"): ask the gateway whether it was paid. */
+    public function onlineReturn(Request $request, RentalRequest $rentalRequest, Payment $payment)
     {
         $r = $this->own($request, $rentalRequest);
-        abort_unless($payment->rental_request_id === $r->id && $payment->gateway === 'paymongo', 404);
-        $state = PayMongo::sync($payment);
+        abort_unless($payment->rental_request_id === $r->id && $payment->gateway !== null, 404);
+        $state = OnlinePay::sync($payment);
         $back = redirect()->route('rentals.show', $r);
         if ($state === 'unpaid' && $request->boolean('cancelled')) {
-            PayMongo::discard($payment);
+            OnlinePay::discard($payment);
 
             return $back->with('warn', 'Online payment cancelled. Nothing was charged.');
         }
@@ -146,7 +146,7 @@ class RentalController extends Controller
         return match (true) {
             $payment->status === 'verified' => $back->with('success', 'Payment of '.money($payment->amount).' received and verified. Receipt '.$payment->receipt_no.'.'),
             $payment->status === 'pending' => $back->with('success', 'Payment received. Our cashier will confirm it shortly.'),
-            $state === 'error' => $back->with('warn', 'We could not check with PayMongo just now. If you paid, it will update shortly. Use "Check status" to try again.'),
+            $state === 'error' => $back->with('warn', 'We could not check with '.OnlinePay::name($payment->gateway).' just now. If you paid, it will update shortly. Use "Check status" to try again.'),
             default => $back->with('warn', 'We have not received this online payment yet. If you already paid, wait a minute and use "Check status".'),
         };
     }

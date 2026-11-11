@@ -3,7 +3,7 @@
 @section('body')
 <div style="min-height:100vh;background:var(--surface-2, #F6F4FA);padding:24px 16px">
   <div style="max-width:460px;margin:0 auto">
-    <div class="alert alert-warn mb-2">{{ icon('alert') }}<div class="small"><b>Practice mode.</b> This page stands in for PayMongo's checkout while there is no PayMongo account. No real money is charged.</div></div>
+    <div class="alert alert-warn mb-2">{{ icon('alert') }}<div class="small"><b>Practice mode.</b> This page stands in for the real online checkout (Xendit or PayMongo) while no gateway key is set. No real money is charged.</div></div>
     <div class="card">
       <div class="small muted">Pay {{ setting('platformName', 'PartyRent') }}</div>
       <h2 class="mb-0" style="margin-top:4px">{{ money($s['amount']) }}</h2>

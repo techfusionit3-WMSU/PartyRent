@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="page-head"><div><h1>System settings</h1><p>Platform-wide rules. Every change is written to the audit log.</p></div></div>
-<form method="POST" action="{{ route('super.settings.update') }}" class="stack" style="max-width:760px">
+<form method="POST" action="{{ route('super.settings.update') }}" class="stack" style="max-width:760px" data-confirm-title="Save system settings?" data-confirm="These settings affect every user on the platform." data-confirm-ok="Save">
   @csrf
   <div class="card"><h3>Platform</h3><div class="form-grid">
     <div class="field"><label>Platform name</label><input class="input" name="platformName" required value="{{ old('platformName', $s['platformName']) }}"></div>

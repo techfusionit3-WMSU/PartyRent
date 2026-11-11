@@ -28,7 +28,7 @@
       <thead><tr><th>Package</th><th>Supplier</th><th class="num">Items</th><th class="num">Price / day</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $k)
         <tr><td data-label="Package"><b>{{ $k->emoji }} {{ $k->name }}</b></td><td data-label="Supplier">{{ $k->supplier->name }}</td><td data-label="Items" class="num">{{ count($k->items) }}</td><td data-label="Price" class="num">{{ money($k->price) }}</td><td data-label="Status"><span class="badge {{ $k->active ? 'b-green' : 'b-red' }}">{{ $k->active ? 'Active' : 'Hidden' }}</span></td>
-          <td>@if($canManage)<form method="POST" action="{{ route('admin.packages.status', $k) }}">@csrf<button class="btn btn-xs {{ $k->active ? 'btn-danger' : '' }}">{{ $k->active ? 'Hide' : 'Restore' }}</button></form>@endif</td></tr>
+          <td>@if($canManage)<form method="POST" action="{{ route('admin.packages.status', $k) }}" @if($k->active) data-confirm-title="Hide {{ $k->name }}?" data-confirm="It disappears from the marketplace. Requests already booked keep their copy." data-confirm-ok="Hide" data-danger @endif>@csrf<button class="btn btn-xs {{ $k->active ? 'btn-danger' : '' }}">{{ $k->active ? 'Hide' : 'Restore' }}</button></form>@endif</td></tr>
       @endforeach</tbody>
     @endif
   </table></div><div style="padding:12px 16px">{{ $list->links('pagination::simple-default') }}</div>@endif

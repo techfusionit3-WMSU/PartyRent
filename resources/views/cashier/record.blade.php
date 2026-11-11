@@ -12,7 +12,7 @@
 @if($r)
   @php($f = $r->fin())
   <div class="grid grid-side">
-    <form method="POST" action="{{ route('cashier.record.store') }}" class="card">
+    <form method="POST" action="{{ route('cashier.record.store') }}" class="card" data-confirm-title="Record this payment?" data-confirm="It is recorded as verified, a receipt is issued, and it is added to the audit trail." data-confirm-ok="Record">
       @csrf <input type="hidden" name="request" value="{{ $r->code }}">
       <h3>{{ $r->code }} · {{ $r->event_name }}</h3><p class="small muted">{{ $r->customer->name }} · @include('partials.badges', ['status' => $r->status])</p>
       <div class="form-grid">

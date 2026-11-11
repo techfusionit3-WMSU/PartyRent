@@ -108,7 +108,7 @@
 
 @if($r->status === 'return_pending')
 <div class="modal-backdrop hidden" id="inspectModal"><div class="modal lg" role="dialog" aria-modal="true"><div class="modal-head"><h3>Return inspection · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.inspection', $r) }}" enctype="multipart/form-data">@csrf<div class="modal-body">
+  <form method="POST" action="{{ route('supplier.requests.inspection', $r) }}" enctype="multipart/form-data" id="inspForm">@csrf<div class="modal-body">
     <p class="small muted">Count returned units and classify their condition. Damaged (major/total) and missing units are removed from available stock; minor damage goes to a 3-day maintenance hold. Fees are entered by you — never by AI.</p>
     <div class="field"><label>Return date</label><input class="input" type="date" name="returnDate" value="{{ today_iso() }}" required style="max-width:200px"></div>
     @foreach(inv()->saleDemand($r->lines) as $spid => $sq)
@@ -161,4 +161,22 @@
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Submit for verification</button></div></form>
 </div></div>
 @endif
+@push('scripts')
+<script>
+// Like the prototype: warn when units are damaged or missing but no fee was entered.
+(function () {
+  var f = document.getElementById('inspForm'); if (!f) return;
+  f.addEventListener('submit', function () {
+    if (f.dataset.confirmed) return;
+    var sum = function (re) { var t = 0; f.querySelectorAll('input').forEach(function (i) { if (re.test(i.name)) t += +i.value || 0; }); return t; };
+    var dmg = sum(/\[(minor|major|total|missing)\]$/), fees = sum(/\[(repairFee|replaceFee)\]$/);
+    if (dmg > 0 && fees <= 0) {
+      f.dataset.confirmTitle = 'No fees entered';
+      f.dataset.confirm = dmg + ' unit(s) are damaged or missing but no compensation was entered. Continue without charging the customer?';
+      f.dataset.confirmOk = 'Continue';
+    } else { delete f.dataset.confirm; }
+  });
+})();
+</script>
+@endpush
 @endsection

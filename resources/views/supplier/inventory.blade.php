@@ -47,7 +47,7 @@
     <h4 class="mt-3">Maintenance & set-aside holds</h4>
     @forelse($p->holds as $h)
       <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><div><span class="badge {{ $h->type === 'setaside' ? 'b-purple' : 'b-gold' }}">{{ $h->type === 'setaside' ? 'Set aside' : 'Maintenance' }}</span> <b>{{ $h->qty }}</b> units · {{ fmt_date($h->start_date) }} – {{ $h->end_date ? fmt_date($h->end_date) : 'until released' }}<div class="small muted">{{ $h->note }}</div></div>
-        <form method="POST" action="{{ route('supplier.inventory.release', $h) }}">@csrf @method('DELETE')<button class="btn btn-xs btn-ghost">Release</button></form></div>
+        <form method="POST" action="{{ route('supplier.inventory.release', $h) }}" data-confirm-title="Release hold?" data-confirm="These units return to available stock." data-confirm-ok="Release">@csrf @method('DELETE')<button class="btn btn-xs btn-ghost">Release</button></form></div>
     @empty <p class="small muted">No holds.</p> @endforelse
     <form method="POST" action="{{ route('supplier.inventory.hold', $p) }}" class="card card-flat mt-2" style="padding:14px">@csrf
       <div class="form-grid">

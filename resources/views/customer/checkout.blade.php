@@ -6,7 +6,7 @@
 <div class="page-head"><div><h1>Rental request</h1><p>Request to <b>{{ $s->name }}</b> · {{ fmt_range($dates[0], end($dates)) }}</p></div></div>
 
 {{-- Changing delivery/arrangement reloads the quote from the server (GET), keeping what was typed via old() on submit errors. --}}
-<form method="POST" action="{{ route('checkout.submit', $s) }}" class="grid grid-side" id="cf">
+<form method="POST" action="{{ route('checkout.submit', $s) }}" class="grid grid-side" id="cf" data-confirm-title="Submit rental request?" data-confirm="Send this request to {{ $s->name }}? Next you pay the amount due now. The supplier reviews availability and responds. Nothing is reserved until they accept." data-confirm-ok="Submit request">
   @csrf
   <div class="stack">
     <div class="card"><h3>1 · Event details</h3><div class="form-grid">
@@ -90,7 +90,7 @@
     // carry the currently chosen city into the reloaded page
     var c = el('addr[cityCode]'); if (c && c.value) { var u = new URL(a.href); u.searchParams.set('city', c.value); a.href = u.toString(); }
   }); });
-  f.addEventListener('submit', function () { try { sessionStorage.removeItem(key); } catch (e) {} });
+  f.addEventListener('submit', function () { if (!f.dataset.confirmed) return; try { sessionStorage.removeItem(key); } catch (e) {} });
 
   // "Pay now" amount follows the payment method (Cash on Delivery + full payment pays only a down payment now).
   var syncDue = function () {

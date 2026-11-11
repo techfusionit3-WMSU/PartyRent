@@ -80,6 +80,12 @@
   }
   function valid() {
     var ok = true; steps[step].querySelectorAll('input,select,textarea').forEach(function (i) { if (i.closest('.is-closed, .hidden')) return; if (!i.checkValidity()) { ok = false; i.closest('.field') && i.closest('.field').classList.add('invalid'); } else { i.closest('.field') && i.closest('.field').classList.remove('invalid'); } });
+    if (step === 2) {
+      // Same rules the server checks on submit, shown here instead of after "Submit application".
+      var ful = checked('fulfillment'), type = checked('location_type') || 'shop';
+      if (type === 'none' && ful !== 'delivery') { ok = false; window.PRUI.toast('Without a pickup location you can only offer delivery. Choose "Delivery only", or pick a different location type in step 2.', 'error'); }
+      else if (ful !== 'delivery' && type !== 'none' && !(val('lat') && val('lng'))) { window.PRUI.toast('Drop a pin on the map so customers who pick up can find you.', 'error'); step = 1; draw(); window.scrollTo({ top: 0, behavior: 'smooth' }); return false; }
+    }
     if (step === 3) { if (!f.querySelector('[name="methods[]"]:checked')) { ok = false; window.PRUI.toast('Select at least one payment method.', 'error'); } if (!f.querySelector('[name="arrangements[]"]:checked')) { ok = false; window.PRUI.toast('Select at least one payment arrangement.', 'error'); } }
     return ok;
   }

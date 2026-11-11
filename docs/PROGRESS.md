@@ -9,7 +9,8 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [x] `App\Domain\Xendit`: hosted Invoice (`POST /v2/invoices`, external_id = payment code), sync via `GET /v2/invoices/{id}`, cancel via `POST /invoices/{id}/expire!`, callback `/webhooks/xendit` checked with `x-callback-token` = `XENDIT_CALLBACK_TOKEN`.
 - [x] Return route renamed `rentals.paymongo.return` → `rentals.online.return` (`/payments/{p}/online`); texts gateway-neutral; superadmin settings shows Xendit status + webhook URL.
 - [x] `XenditTest` (6, Http::fake); 83 green.
-- [ ] User: sign up at dashboard.xendit.co, put `xnd_development_…` in `.env` → do a real test-mode payment. Webhook needs a public URL (localhost: return URL covers it).
+- [x] Test key in local `.env` (2026-11-11); API check: invoice created (GCash, Maya, GrabPay, ShopeePay, QR, direct debit) + expired OK.
+- [ ] User: real test-mode payment through the app. Webhook needs a public URL (localhost: return URL covers it).
 
 ### Previous: Shopee-style delivery + payouts
 (user request 2026-11-10: "make it like shopee", chose all 4 parts):

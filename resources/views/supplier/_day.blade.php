@@ -11,7 +11,7 @@
 <div class="label mt-2 mb-1">Bookings this day</div>
 @forelse($bookings as $x)
   @if($x['r'])
-    <a class="row between" href="{{ route('supplier.requests.show', $x['r']) }}" style="padding:8px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><div><b>{{ $x['r']->code }}</b> · {{ $x['qty'] }} units<div class="small muted">{{ $x['r']->customer->name }} · {{ $x['r']->event_name }}</div></div><span class="badge {{ $x['kind'] === 'Accepted' ? 'b-sky' : 'b-gold' }}">{{ $x['kind'] }}</span></a>
+    <a class="row between" href="{{ route('supplier.requests.show', $x['r']) }}" style="padding:8px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><div><b>{{ $x['r']->code }}</b> · {{ $x['qty'] }} units<div class="small muted">{{ $x['r']->customer->name }} · {{ $x['r']->event_name }}</div></div><span class="badge {{ $x['kind'] === 'Booked' ? 'b-sky' : 'b-gold' }}">{{ $x['kind'] }}</span></a>
   @endif
 @empty
   <p class="small muted">No bookings.</p>

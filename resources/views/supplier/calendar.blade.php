@@ -33,7 +33,7 @@
         @endforeach
       </div>
     @endif
-    <div class="legend mt-2"><span><i style="background:var(--green-50)"></i>Plenty free</span><span><i style="background:var(--gold-50)"></i>Low (&lt;25%)</span><span><i style="background:var(--red-50)"></i>Fully booked</span><span><i style="background:var(--purple-50)"></i>Accepted reservations</span><span><i style="background:var(--gold-50);border:1px dashed #B45309"></i>Pending requests</span><span><i style="background:#F1EEF4"></i>Maintenance</span><span><i style="background:var(--teal-50)"></i>Returns</span></div>
+    <div class="legend mt-2"><span><i style="background:var(--green-50)"></i>Plenty free</span><span><i style="background:var(--gold-50)"></i>Low (&lt;25%)</span><span><i style="background:var(--red-50)"></i>Fully booked</span><span><i style="background:var(--purple-50)"></i>Booked rentals</span><span><i style="background:var(--gold-50);border:1px dashed #B45309"></i>Pending requests</span><span><i style="background:#F1EEF4"></i>Maintenance</span><span><i style="background:var(--teal-50)"></i>Returns</span></div>
   </div>
   <aside class="card">@include('supplier._day', ['d' => $sel, 'b' => $selB, 'bookings' => $bookings])</aside>
 </div>

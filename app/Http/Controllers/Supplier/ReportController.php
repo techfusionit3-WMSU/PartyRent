@@ -60,7 +60,7 @@ class ReportController extends Controller
         $cells = array_map(fn ($d) => ['d' => $d, 'b' => inv()->breakdown($p->id, $d), 'in' => $month === null || (int) substr($d, 5, 2) === $month, 'ret' => $returns[$d] ?? 0], $days);
         $selB = inv()->breakdown($p->id, $sel);
         $bookings = collect(array_merge(
-            array_map(fn ($x) => $x + ['kind' => 'Accepted'], $selB['reservedRefs']),
+            array_map(fn ($x) => $x + ['kind' => 'Booked'], $selB['reservedRefs']),
             array_map(fn ($x) => $x + ['kind' => 'Pending'], $selB['pendingRefs'])
         ))->map(fn ($x) => $x + ['r' => RentalRequest::with('customer')->find($x['request_id'])]);
 

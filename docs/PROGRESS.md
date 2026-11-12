@@ -4,7 +4,24 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Supplier payouts through Xendit** (user request 2026-11-11: "is it not automated?").
+**Business accounts, hourly rentals, item value, simpler dashboard** (user request 2026-11-12). Decisions:
+- Business cashiers do NOT take cash: PartyRent collects every payment (Xendit / transfer).
+- Rent by time: customer picks ANY start/end time; DB must refuse overlapping bookings (+ supplier buffer).
+- Current supplier setup = **Personal** account; add a **Business** type (permits, shop staff incl. cashier,
+  event packages with stages + services + tiers + add-ons).
+- UI name for suppliers: **Rental Partner** (code keeps `supplier`).
+- Simpler supplier dashboard (only important things). Down payment paid + accepted shows as
+  "Booked" + "Partially Paid", not "Accepted"/"Reserved".
+Build order:
+- [x] A. Status wording (Booked) + minimal supplier dashboard
+- [ ] B. Replacement value per product → inspection pre-fills charges (missing/total 100%, major 50%), cap; shown to customers
+- [ ] C. Rename Supplier → Rental Partner in UI text
+- [ ] D. Account type Personal/Business on apply (+ business docs), shop staff (manager/cashier/warehouse/coordinator)
+- [ ] E. Rent by time (rental_mode day|hour, min hours, buffer, hourly rate; overlap check)
+- [ ] F. Business event packages: stages, services (teams/day), tiers, add-ons, milestones
+
+### Previous: Supplier payouts through Xendit
+(user request 2026-11-11: "is it not automated?").
 - [x] `App\Domain\XenditPayouts`: `POST /v2/payouts` (channel PH_GCASH or bank from `BANKS`), status pending → sending → paid; failure → back to pending with reason. Sync on admin payouts page load + "Check status"; payout webhook events go to the same `/webhooks/xendit`.
 - [x] Admin payouts: "Send via Xendit" (manual "Mark paid" kept under "Sent it by hand instead?"). Superadmin setting `payoutAuto` sends on release (release already happens when a rental completes).
 - [x] Supplier payout form: bank is a dropdown of supported banks. Migration `2026_11_11_000100`.

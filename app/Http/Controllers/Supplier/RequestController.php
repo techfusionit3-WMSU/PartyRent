@@ -67,7 +67,7 @@ class RequestController extends Controller
         $r = $this->own($request, $rentalRequest);
         $res = Rentals::acceptRequest($r, trim((string) $request->input('note', '')) ?: null);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $r->code.' accepted. Stock reserved and customer notified.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $r->code.' booked. Items are set aside and the customer was notified.' : $res['error']);
     }
 
     public function decline(Request $request, RentalRequest $rentalRequest)

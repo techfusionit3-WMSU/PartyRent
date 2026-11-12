@@ -14,6 +14,10 @@ use Illuminate\Http\Request;
 
 class SupplierController extends Controller
 {
+    /**
+     * Minimal dashboard: what needs doing now, four key numbers, and what's coming up.
+     * Charts and detailed counts live on Reports / Inventory.
+     */
     public function dashboard(Request $request)
     {
         $sup = $request->user()->supplier;
@@ -21,35 +25,42 @@ class SupplierController extends Controller
         $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
         $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->get();
         inv()->primeProducts($prods);
-        $snap = $prods->reject->isSale()->map(fn ($p) => inv()->breakdown($p->id, $T)); // date-based stock: rental items only
-        $fins = $reqs->filter(fn ($r) => $r->isActive() || $r->status === 'completed')->map(fn ($r) => $r->fin());
-        $pend = $reqs->where('status', 'pending');
+        $snap = $prods->reject->isSale()->map(fn ($p) => inv()->breakdown($p->id, $T));
         $ids = $reqs->pluck('id');
         $ver = Payment::whereIn('rental_request_id', $ids)->where('status', 'verified')->get();
-        $revBy = fn (string $m) => $ver->filter(fn ($p) => str_starts_with($p->date, $m) && in_array($p->type, Finance::RENTAL_TYPES, true))->sum('amount') - $ver->filter(fn ($p) => str_starts_with($p->date, $m) && $p->type === 'refund')->sum('amount');
-        $months = collect(range(5, 0))->map(fn ($i) => Carbon::parse($T)->startOfMonth()->subMonths($i))->map(fn ($d) => ['key' => $d->format('Y-m'), 'label' => $d->format('M')]);
-        $units = [];
-        foreach ($reqs->whereNotIn('status', ['declined', 'cancelled', 'pending']) as $r) {
-            foreach (inv()->demandMap($r->lines) as $m) {
-                foreach ($m as $pid => $q) {
-                    $units[$pid] = ($units[$pid] ?? 0) + $q;
-                }
-            }
-        }
-        arsort($units);
-        $pendingPay = Payment::whereIn('rental_request_id', $ids)->where('status', 'pending')->get();
+
+        $pend = $reqs->where('status', 'pending');
+        $toReview = $pend->filter(fn ($r) => $r->fin()['upfrontPaid'] !== false); // null = nothing to pay upfront
+        $booked = ['accepted', 'in_progress', 'ready_pickup', 'out_delivery'];
+        $out = $reqs->filter(fn ($r) => in_array($r->status, $booked, true) && $r->start_date <= $T);
+        $returns = $reqs->filter(fn ($r) => ($r->status === 'ongoing' && $r->end_date < $T) || $r->status === 'return_pending');
+        $overdue = $reqs->filter(fn ($r) => $r->isActive() && $r->fin()['isOverdue']);
+        $conflicted = $pend->filter(fn ($r) => inv()->check($r->lines, $r->id)['bad']);
+        $lowStock = $prods->filter->isLowStock()->values();
+        $link = fn ($r) => '<a href="'.e(route('supplier.requests.show', $r)).'">'.e($r->code).'</a>';
+        $list = fn ($c) => $c->take(4)->map($link)->implode(', ').($c->count() > 4 ? ' +'.($c->count() - 4).' more' : '');
+
+        $todo = array_values(array_filter([
+            $toReview->count() ? ['icon' => 'clock', 'tone' => 'gold', 'title' => $toReview->count().' request'.($toReview->count() > 1 ? 's' : '').' ready to accept', 'body' => 'Down payment received. '.$list($toReview), 'href' => route('supplier.requests'), 'cta' => 'Review'] : null,
+            $conflicted->count() ? ['icon' => 'alert', 'tone' => 'red', 'title' => 'Not enough stock for '.$conflicted->count().' request'.($conflicted->count() > 1 ? 's' : ''), 'body' => $list($conflicted), 'href' => route('supplier.requests'), 'cta' => 'Check'] : null,
+            $out->count() ? ['icon' => 'truck', 'tone' => 'teal', 'title' => $out->count().' rental'.($out->count() > 1 ? 's' : '').' to deliver or hand over', 'body' => $list($out), 'href' => route('supplier.schedule'), 'cta' => 'Open schedule'] : null,
+            $returns->count() ? ['icon' => 'box', 'tone' => 'purple', 'title' => $returns->count().' return'.($returns->count() > 1 ? 's' : '').' to receive and check', 'body' => $list($returns), 'href' => route('supplier.schedule'), 'cta' => 'Open schedule'] : null,
+            $overdue->count() ? ['icon' => 'card', 'tone' => 'red', 'title' => $overdue->count().' customer'.($overdue->count() > 1 ? 's are' : ' is').' late paying', 'body' => $list($overdue), 'href' => route('supplier.payments', ['tab' => 'overdue']), 'cta' => 'See payments'] : null,
+            $lowStock->count() ? ['icon' => 'alert', 'tone' => 'gold', 'title' => 'Running low: '.$lowStock->pluck('name')->take(3)->implode(', '), 'body' => 'Restock these sale items.', 'href' => route('supplier.inventory'), 'cta' => 'Inventory'] : null,
+        ]));
+
+        $month = substr($T, 0, 7);
+        $split = Finance::incomeSplit($ver->filter(fn ($p) => str_starts_with($p->date, $month))->load('rentalRequest'));
 
         return view('supplier.dashboard', [
-            'sup' => $sup, 'reqs' => $reqs, 'prods' => $prods, 'snap' => $snap, 'fins' => $fins, 'pend' => $pend,
-            'conflicted' => $pend->filter(fn ($r) => inv()->check($r->lines, $r->id)['bad']),
-            'upcoming' => $reqs->whereIn('status', ['accepted', 'in_progress', 'ready_pickup', 'out_delivery'])->sortBy('start_date')->take(6),
-            'monthly' => $months->map(fn ($m) => ['label' => $m['label'], 'value' => $reqs->filter(fn ($r) => $r->created_at->format('Y-m') === $m['key'])->count()]),
-            'revenue' => $months->map(fn ($m) => ['label' => $m['label'], 'value' => $revBy($m['key'])]),
-            'thisMonth' => $revBy(substr($T, 0, 7)),
-            'monthSplit' => Finance::incomeSplit($ver->filter(fn ($p) => str_starts_with($p->date, substr($T, 0, 7)))->load('rentalRequest')),
-            'lowStock' => $prods->filter->isLowStock()->values(),
-            'topUnits' => collect(array_slice($units, 0, 6, true))->map(fn ($v, $pid) => ['label' => inv()->product($pid)?->name, 'value' => $v])->values(),
-            'pendingPay' => $pendingPay,
+            'sup' => $sup, 'todo' => $todo,
+            'waiting' => $pend->count() - $toReview->count(),
+            'toReview' => $toReview->count(),
+            'active' => $reqs->filter->isActive()->count(),
+            'earned' => $split['rental'] + $split['sales'],
+            'available' => $snap->sum('available'),
+            'items' => $prods->where('status', 'published')->count(),
+            'upcoming' => $reqs->filter(fn ($r) => in_array($r->status, $booked, true) && $r->start_date >= $T && $r->start_date <= add_days($T, 14))->sortBy('start_date')->take(6),
         ]);
     }
 

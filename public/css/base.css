@@ -430,3 +430,15 @@ label.pkg-row { cursor: pointer; }
 
 /* the hidden attribute always wins over component display rules (.field, .row, …) */
 [hidden] { display: none !important; }
+
+/* Supplier dashboard "Needs your attention" rows */
+.todo-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.todo-row:last-of-type { border-bottom: 0; }
+.todo-row .grow { flex: 1; min-width: 0; }
+.todo-ico { width: 36px; height: 36px; flex: none; border-radius: 10px; display: grid; place-items: center; background: var(--brand-50); color: var(--brand); }
+.todo-ico svg { width: 18px; height: 18px; }
+.todo-ico.t-gold { background: var(--gold-50); color: #B45309; }
+.todo-ico.t-red { background: var(--red-50); color: var(--red); }
+.todo-ico.t-teal { background: var(--teal-50); color: var(--teal); }
+.todo-ico.t-purple { background: var(--purple-50); color: var(--purple); }
+@media (max-width: 520px) { .todo-row { flex-wrap: wrap; } .todo-row .btn { margin-left: 48px; } }

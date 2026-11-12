@@ -47,7 +47,7 @@
   <div class="stack">
     @if($showAvail)
       <div class="card"><div class="card-head"><h3>Date-by-date availability check</h3>
-        @if($r->status === 'pending'){!! $conflicts ? '<span class="badge b-red">Cannot accept: insufficient stock</span>' : '<span class="badge b-green">All dates can be accommodated</span>' !!}@else<span class="badge b-sky">Reserved</span>@endif</div>
+        @if($r->status === 'pending'){!! $conflicts ? '<span class="badge b-red">Cannot accept: insufficient stock</span>' : '<span class="badge b-green">All dates can be accommodated</span>' !!}@else<span class="badge b-sky">Booked</span>@endif</div>
         <p class="small muted">Available = total − other accepted reservations − damaged − missing − maintenance − set-aside. Other pending requests are shown as potential conflicts and do not consume stock.</p>
         <div class="table-wrap"><table class="table cards"><thead><tr><th>Date</th><th>Item</th><th class="num">Requested</th><th class="num">Available</th><th class="num">Other pending</th><th>Result</th></tr></thead><tbody>
           @foreach($availRows as $x)

@@ -44,12 +44,16 @@ class Inventory
     /** @var array<int, array{id:int,status:string,map:array}>|null */
     private ?array $demands = null;
 
+    /** @var array<string, ?int> "supplierId|service name" => teams per day */
+    private array $caps = [];
+
     public function flush(): void
     {
         $this->products = [];
         $this->packages = [];
         $this->holds = null;
         $this->demands = null;
+        $this->caps = [];
     }
 
     /* ---------------- lookups ---------------- */
@@ -215,7 +219,7 @@ class Inventory
             $rows = RentalRequest::whereIn('status', array_merge(RentalRequest::RESERVING, ['pending']))
                 ->get(['id', 'status', 'lines']);
             foreach ($rows as $r) {
-                $this->demands[] = ['id' => $r->id, 'code' => null, 'status' => $r->status, 'map' => $this->demandMap($r->lines ?? []), 'sale' => $this->saleDemand($r->lines ?? []), 'slots' => $this->slots($r->lines ?? [])];
+                $this->demands[] = ['id' => $r->id, 'code' => null, 'status' => $r->status, 'map' => $this->demandMap($r->lines ?? []), 'sale' => $this->saleDemand($r->lines ?? []), 'slots' => $this->slots($r->lines ?? []), 'svc' => $this->serviceDemand($r->lines ?? [])];
             }
         }
 
@@ -239,6 +243,44 @@ class Inventory
         }
 
         return ['total' => $total, 'refs' => $refs];
+    }
+
+    /** Services booked through package lines: [date => ["supplierId|name" => [name, qty]]]. */
+    public function serviceDemand(array $lines): array
+    {
+        $out = [];
+        foreach ($lines as $l) {
+            if (($l['type'] ?? '') !== 'package' || ! ($def = $this->lineDef($l))) {
+                continue;
+            }
+            $sid = $this->package($l['ref_id'])?->supplier_id;
+            foreach (Packages::limitedServices($def) as $k => [$name, $qty]) {
+                foreach (array_filter(array_map('intval', $l['days'] ?? [])) as $date => $n) {
+                    $key = $sid.'|'.$k;
+                    $out[$date][$key] = [$name, ($out[$date][$key][1] ?? 0) + $qty * $n];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /** Teams per day for a service: the lowest limit set on any of the shop's packages (null = no limit). */
+    public function serviceCap(string $key): ?int
+    {
+        if (! array_key_exists($key, $this->caps)) {
+            [$sid, $name] = explode('|', $key, 2);
+            $cap = null;
+            foreach (Package::where('supplier_id', (int) $sid)->get() as $k) {
+                $t = Packages::limitedServices(Packages::def($k))[$name][2] ?? null;
+                if ($t !== null) {
+                    $cap = $cap === null ? $t : min($cap, $t);
+                }
+            }
+            $this->caps[$key] = $cap;
+        }
+
+        return $this->caps[$key];
     }
 
     /** Timed (hourly) bookings of lines: list of [productId, date, fromMin, toMin, qty]. */
@@ -481,6 +523,30 @@ class Inventory
                 $badSale[$pid] = true;
             }
         }
+        // Services with a daily team limit (videographer, host…), counted across every booked request.
+        $badSvc = [];
+        foreach ($this->serviceDemand($lines) as $date => $svcs) {
+            foreach ($svcs as $key => [$name, $q]) {
+                if (($cap = $this->serviceCap($key)) === null) {
+                    continue;
+                }
+                $used = 0;
+                foreach ($this->openDemands() as $d) {
+                    if ($d['id'] !== $excludeId && in_array($d['status'], RentalRequest::RESERVING, true)) {
+                        $used += $d['svc'][$date][$key][1] ?? 0;
+                    }
+                }
+                $free = max(0, $cap - $used);
+                $rows[] = ['date' => $date, 'product_id' => 0, 'service' => $name, 'name' => $name, 'requested' => $q, 'available' => $free, 'ok' => $q <= $free];
+                if ($q > $free) {
+                    $badSvc[$date.'|'.$key] = true;
+                }
+            }
+        }
+        foreach ($rows as &$row) {
+            $row['name'] ??= $this->product($row['product_id'])?->name ?? 'Item';
+        }
+        unset($row);
         $bad = array_values(array_filter($rows, fn ($r) => ! $r['ok']));
         $badKeys = [];
         foreach ($bad as $b) {
@@ -493,8 +559,13 @@ class Inventory
             $lid = (string) ($l['id'] ?? '');
             $byLine[$lid] = [];
             $saleBad = (bool) array_intersect_key($this->saleUnitsForLine($l), $badSale);
+            $svcKeys = ($l['type'] ?? '') === 'package' && ($ld = $this->lineDef($l))
+                ? array_map(fn ($k) => $this->package($l['ref_id'])?->supplier_id.'|'.$k, array_keys(Packages::limitedServices($ld))) : [];
             foreach (array_keys($l['days'] ?? []) as $date) {
                 $conflict = $saleBad;
+                foreach ($svcKeys as $sk) {
+                    $conflict = $conflict || isset($badSvc[$date.'|'.$sk]);
+                }
                 foreach (array_keys($this->unitsForLine($l, $date)) as $pid) {
                     if (isset($badKeys[$date.'|'.$pid])) {
                         $conflict = true;

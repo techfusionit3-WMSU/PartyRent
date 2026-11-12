@@ -75,7 +75,7 @@ class ApiController extends Controller
             $lead = $e;
         }
         $okAll = $chk['ok'] && empty($lead) && ! array_filter(array_keys($days), fn ($d) => $d < $today) && array_sum($days) > 0;
-        $bad = array_map(fn ($b) => ['date' => fmt_date($b['date'], false), 'name' => inv()->product($b['product_id'])?->name, 'available' => $b['available']], $chk['bad']);
+        $bad = array_map(fn ($b) => ['date' => fmt_date($b['date'], false), 'name' => $b['name'], 'available' => $b['available']], $chk['bad']);
 
         return response()->json([
             'rows' => $rows, 'ok' => $okAll, 'total' => r2($total), 'totalText' => money($total),

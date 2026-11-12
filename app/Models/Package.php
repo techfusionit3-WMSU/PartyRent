@@ -19,7 +19,7 @@ class Package extends Model
     protected function casts(): array
     {
         return [
-            'items' => 'array', 'events' => 'array', 'images' => 'array', 'components' => 'array', 'pricing' => 'array',
+            'items' => 'array', 'events' => 'array', 'images' => 'array', 'components' => 'array', 'pricing' => 'array', 'stages' => 'array',
             'active' => 'boolean', 'is_draft' => 'boolean', 'price' => 'float', 'min_guests' => 'integer', 'max_guests' => 'integer',
         ];
     }

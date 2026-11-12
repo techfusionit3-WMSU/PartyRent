@@ -10,6 +10,10 @@
   <div data-rentbox data-type="package" data-max-days="{{ setting('maxRentalDays', 30) }}">
     <span class="badge b-pink plain">{{ $k->emoji }} Package</span>@foreach($k->events ?? [] as $e) <span class="badge b-gray plain">{{ $e }}</span>@endforeach
     <h1 class="mt-1">{{ $k->name }}</h1>
+    @if($k->tier_group)
+      @php($tiers = \App\Models\Package::where('supplier_id', $k->supplier_id)->where('tier_group', $k->tier_group)->where('active', true)->where('is_draft', false)->get()->sortBy(fn ($t) => \App\Domain\Packages::headlinePrice(\App\Domain\Packages::def($t))))
+      @if($tiers->count() > 1)<div class="tabs mb-1" aria-label="{{ $k->tier_group }} tiers">@foreach($tiers as $t)<a class="tab {{ $t->id === $k->id ? 'active' : '' }}" href="{{ route('packages.show', $t) }}">{{ $t->tier_label ?: $t->name }}<span class="count">{{ money_short(\App\Domain\Packages::headlinePrice(\App\Domain\Packages::def($t))) }}</span></a>@endforeach</div>@endif
+    @endif
     <p>{{ $k->description }}</p>
     <div><span class="price-lg" data-pkg-headline>{{ money($pp['package']) }}</span> <span class="muted">/ package{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : ' / day' }}</span>@if($pp['savings'] > 0) <span class="badge b-gold">Save {{ money($pp['savings']) }} vs. getting it separately</span>@endif</div>
     @if($lead)<div class="alert alert-info mt-1">{{ icon('info') }}<div>Contains made-to-order items: book at least <b data-pkg-lead>{{ $lead }}</b> day(s) before your event.</div></div>@endif
@@ -22,6 +26,14 @@
       @csrf
       <input type="hidden" name="type" value="package"><input type="hidden" name="ref_id" value="{{ $k->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}"><input type="hidden" name="sel" id="selInput" value="{{ json_encode($pp['sel']) }}">
       <div class="form-grid"><div class="field"><label for="ps">Start date</label><input type="date" class="input" id="ps" min="{{ add_days(today_iso(), $lead) }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input type="date" class="input" id="pe" min="{{ add_days(today_iso(), $lead) }}" value="{{ $end }}"></div></div>
+      @if($def['stages'])
+        <div class="mb-2" id="stageBox"><div class="label mb-1">Your event schedule</div>
+          @foreach($def['stages'] as $i => $st)
+            <div class="form-grid" style="grid-template-columns:1fr 2fr"><div class="field"><label class="small" for="stT{{ $i }}">{{ $st['name'] }} · time</label><input class="input input-sm" type="time" id="stT{{ $i }}" data-stage-time="{{ $i }}"></div><div class="field"><label class="small" for="stV{{ $i }}">Venue</label><input class="input input-sm" id="stV{{ $i }}" data-stage-venue="{{ $i }}" maxlength="160" placeholder="{{ $st['hint'] ?: 'e.g. church, hall, home address' }}"></div></div>
+          @endforeach
+          <div class="hint">You can leave these blank and agree on them with the rental partner later.</div>
+        </div>
+      @endif
       <div data-scheduler data-type="package" data-ref="{{ $k->id }}" data-sel='@json($pp['sel'])' data-days='@json((object) $days)' data-siblings='@json($siblings)' data-sync="#daysInput"></div>
       @if($own)
         <div class="alert alert-info mt-2">{{ icon('info') }}<div>This is your own package.</div></div>
@@ -33,4 +45,22 @@
   </div>
 </div>
 <div class="section">@include('partials.reviews-block', ['reviews' => $reviews, 'showItem' => false, 'title' => 'Customer reviews', 'emptyText' => 'No one has reviewed this package yet.'])</div>
+@if($def['stages'])
+@push('scripts')
+<script>
+// Stage times and venues ride along in the package selection (sel.stages).
+(function () {
+  var box = document.getElementById('stageBox'); if (!box) return;
+  box.closest('form').addEventListener('submit', function () {
+    var input = document.getElementById('selInput'), sel = {};
+    try { sel = JSON.parse(input.value || '{}') || {}; } catch (e) {}
+    sel.stages = Array.prototype.map.call(box.querySelectorAll('[data-stage-time]'), function (t) {
+      var i = t.dataset.stageTime; return { time: t.value, venue: box.querySelector('[data-stage-venue="' + i + '"]').value };
+    });
+    input.value = JSON.stringify(sel);
+  }, true);
+})();
+</script>
+@endpush
+@endif
 @endsection

@@ -19,8 +19,11 @@ use App\Models\Supplier;
  *     {kind: choice,  label, pick: 1, options: [{productId, qty, priceDelta, perGuest?}]}
  *   ]
  *   minGuests, maxGuests   with perGuest set, qty = ceil(perGuest × guests)
+ *   stages     [{name, hint}]  e.g. Preparation / Ceremony / Reception; any component may carry `stage` (index)
+ *   service.teamsPerDay        how many of this service the shop can do on one date (null = no limit)
  *
- * Selection ("sel") saved on the cart / request line: {choices: {componentIndex: optionIndex}, addons: [componentIndex], guests}
+ * Selection ("sel") saved on the cart / request line: {choices: {componentIndex: optionIndex}, addons: [componentIndex], guests,
+ *   stages: [{time: "HH:MM"|"", venue}] one per package stage}
  *
  * Pricing of ONE package:
  *   fixed         price per day covers everything included (at minGuests and the first option of each choice)
@@ -49,7 +52,7 @@ class Packages
         return self::normalize([
             'id' => $k->id, 'name' => $k->name, 'emoji' => $k->emoji,
             'pricing' => $k->pricing ?: ['mode' => 'fixed', 'price' => (float) $k->price, 'discountPct' => 0],
-            'components' => $components, 'minGuests' => $k->min_guests, 'maxGuests' => $k->max_guests,
+            'components' => $components, 'minGuests' => $k->min_guests, 'maxGuests' => $k->max_guests, 'stages' => $k->stages ?? [],
         ]);
     }
 
@@ -58,12 +61,17 @@ class Packages
         $p = $d['pricing'] ?? [];
         $mode = array_key_exists($p['mode'] ?? '', self::MODES) ? $p['mode'] : 'fixed';
         $num = fn ($v, $min = 0) => max($min, (float) ($v ?? 0));
+        $stages = array_slice(array_values(array_map(fn ($s) => [
+            'name' => mb_substr(trim((string) ($s['name'] ?? '')), 0, 60), 'hint' => mb_substr(trim((string) ($s['hint'] ?? '')), 0, 120),
+        ], array_filter((array) ($d['stages'] ?? []), 'is_array'))), 0, 8);
         $comps = [];
         foreach (array_values($d['components'] ?? []) as $c) {
+            $raw = $c;
             $kind = $c['kind'] ?? 'rent';
             $c = match ($kind) {
                 'rent', 'sale' => ['kind' => $kind, 'productId' => (int) ($c['productId'] ?? 0), 'qty' => max(1, (int) ($c['qty'] ?? 1)), 'perGuest' => ($c['perGuest'] ?? null) ? $num($c['perGuest']) : null],
-                'service' => ['kind' => 'service', 'name' => trim((string) ($c['name'] ?? '')), 'price' => r2($num($c['price'] ?? 0)), 'qty' => max(1, (int) ($c['qty'] ?? 1)), 'unit' => trim((string) ($c['unit'] ?? '')) ?: 'service'],
+                'service' => ['kind' => 'service', 'name' => trim((string) ($c['name'] ?? '')), 'price' => r2($num($c['price'] ?? 0)), 'qty' => max(1, (int) ($c['qty'] ?? 1)), 'unit' => trim((string) ($c['unit'] ?? '')) ?: 'service',
+                    'teamsPerDay' => ($c['teamsPerDay'] ?? null) ? max(1, (int) $c['teamsPerDay']) : null],
                 'addon' => [
                     'kind' => 'addon', 'productId' => ($c['productId'] ?? null) ? (int) $c['productId'] : null, 'name' => trim((string) ($c['name'] ?? $c['service'] ?? '')),
                     'price' => isset($c['price']) && $c['price'] !== '' && $c['price'] !== null ? r2($num($c['price'])) : null,
@@ -76,6 +84,8 @@ class Packages
                 default => null,
             };
             if ($c) {
+                $st = $raw['stage'] ?? null;
+                $c['stage'] = $st !== null && $st !== '' && isset($stages[(int) $st]) ? (int) $st : null;
                 $comps[] = $c;
             }
         }
@@ -94,8 +104,22 @@ class Packages
         return [
             'id' => $d['id'] ?? null, 'name' => $d['name'] ?? '', 'emoji' => $d['emoji'] ?? '🎉',
             'pricing' => ['mode' => $mode, 'price' => r2($num($p['price'] ?? 0)), 'discountPct' => min(90, $num($p['discountPct'] ?? 0))],
-            'components' => $comps, 'minGuests' => $min, 'maxGuests' => $max,
+            'components' => $comps, 'minGuests' => $min, 'maxGuests' => $max, 'stages' => $stages,
         ];
+    }
+
+    /** Services of one package with a daily team limit: [lower-case name => [name, qty in one package, teamsPerDay]]. */
+    public static function limitedServices(array $def): array
+    {
+        $out = [];
+        foreach ($def['components'] as $c) {
+            if ($c['kind'] === 'service' && $c['name'] !== '') {
+                $k = mb_strtolower($c['name']);
+                $out[$k] = [$c['name'], ($out[$k][1] ?? 0) + $c['qty'], $c['teamsPerDay'] ?? null];
+            }
+        }
+
+        return $out;
     }
 
     /** Frozen copy stored on a booked line, so later edits never change that booking. */
@@ -125,6 +149,9 @@ class Packages
     public static function defaultSel(array $def): array
     {
         $sel = ['choices' => [], 'addons' => [], 'guests' => self::usesGuests($def) ? ($def['minGuests'] ?? 50) : null];
+        if ($def['stages'] ?? []) {
+            $sel['stages'] = array_fill(0, count($def['stages']), ['time' => '', 'venue' => '']);
+        }
         foreach ($def['components'] as $i => $c) {
             if ($c['kind'] === 'choice' && $c['options']) {
                 $sel['choices'][$i] = 0;
@@ -145,6 +172,14 @@ class Packages
             return $base;
         }
         $out = ['choices' => [], 'addons' => [], 'guests' => null];
+        if ($def['stages'] ?? []) {
+            $out['stages'] = [];
+            foreach (array_keys($def['stages']) as $i) {
+                $s = (array) ($sel['stages'][$i] ?? []);
+                $t = (string) ($s['time'] ?? '');
+                $out['stages'][$i] = ['time' => Hours::toMin($t) !== null && strlen($t) === 5 ? $t : '', 'venue' => mb_substr(trim((string) ($s['venue'] ?? '')), 0, 160)];
+            }
+        }
         foreach ($def['components'] as $i => $c) {
             if ($c['kind'] === 'choice' && $c['options']) {
                 $pick = (int) ($sel['choices'][$i] ?? $sel['choices'][(string) $i] ?? 0);
@@ -311,6 +346,11 @@ class Packages
         if ($sel['guests']) {
             $out[] = $sel['guests'].' guests';
         }
+        foreach ($def['stages'] ?? [] as $i => $st) {
+            $info = array_filter([($t = $sel['stages'][$i]['time'] ?? '') !== '' ? Hours::fmt(Hours::toMin($t)) : '', $sel['stages'][$i]['venue'] ?? '']);
+            $what = array_map($fmt, array_filter($rows, fn ($r) => isset($r['index']) && ($def['components'][$r['index']]['stage'] ?? null) === $i));
+            $out[] = $st['name'].($info ? ' ('.implode(', ', $info).')' : '').($what ? ': '.implode(', ', $what) : '');
+        }
 
         return $out;
     }
@@ -349,6 +389,11 @@ class Packages
         if (! $def['components']) {
             return $fail('Add at least one component to the package.');
         }
+        foreach ($def['stages'] as $n => $st) {
+            if ($st['name'] === '') {
+                return $fail('Stage '.($n + 1).' needs a name (e.g. Ceremony), or remove it.');
+            }
+        }
         $own = Product::where('supplier_id', $s->id)->where('status', '!=', 'archived')->pluck('listing_type', 'id')->all();
         $hasStock = false;
         foreach ($def['components'] as $n => $c) {
@@ -370,6 +415,9 @@ class Packages
             if (in_array($c['kind'], ['rent', 'sale'], true) && $own[$c['productId']] !== $c['kind']) {
                 $c['kind'] = $own[$c['productId']]; // trust the product's listing type
                 $def['components'][$n] = $c;
+            }
+            if ($c['kind'] === 'service' && $c['teamsPerDay'] !== null && $c['teamsPerDay'] < $c['qty']) {
+                return $fail($label.' ("'.$c['name'].'"): teams per day must be at least the quantity in one package.');
             }
             if ($c['kind'] === 'service' && ($c['name'] === '' || $c['price'] <= 0)) {
                 return $fail($label.': a service needs a name and a price.');

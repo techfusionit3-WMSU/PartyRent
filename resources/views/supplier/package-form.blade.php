@@ -1,7 +1,8 @@
 @extends('layouts.dash', ['title' => $k->exists ? 'Edit package' : 'New package', 'nav' => 'packages'])
 
 @php($oldDef = old('def') ? json_decode(old('def'), true) : null)
-@php($startDef = is_array($oldDef) ? $oldDef : ['pricing' => $def['pricing'], 'components' => $def['components'], 'minGuests' => $def['minGuests'], 'maxGuests' => $def['maxGuests']])
+@php($startDef = is_array($oldDef) ? $oldDef : ['pricing' => $def['pricing'], 'components' => $def['components'], 'minGuests' => $def['minGuests'], 'maxGuests' => $def['maxGuests'], 'stages' => $def['stages'] ?? []])
+@php($groups = \App\Models\Package::where('supplier_id', $k->supplier_id ?? auth()->user()->shop()->id)->whereNotNull('tier_group')->distinct()->pluck('tier_group'))
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.packages') }}">Packages</a> / {{ $k->exists ? $k->name : 'New package' }}</div>
 <div class="page-head"><div><h1>{{ $k->exists ? 'Edit '.$k->name : 'New package' }}</h1><p>Mix your rental items, consumables and services, let customers pick options, and choose how the package is priced. Requests already booked keep the version they were booked with.</p></div>
@@ -19,6 +20,18 @@
       <div class="field"><label for="pkDesc">Description</label><textarea class="input" id="pkDesc" name="description" required>{{ old('description', $k->description) }}</textarea></div>
       <div class="field"><label for="pkCond">Conditions</label><textarea class="input" id="pkCond" name="conditions" placeholder="e.g. Setup included with delivery. Food is prepared the morning of the event.">{{ old('conditions', $k->conditions) }}</textarea></div>
       <div class="field"><label>Events</label><div class="row wrap gap-sm">@foreach($events as $e)@php($on = in_array($e, old('events', $k->events ?? []), true))<label class="chip {{ $on ? 'active' : '' }}"><input type="checkbox" name="events[]" value="{{ $e }}" @checked($on) hidden>{{ $e }}</label>@endforeach</div></div>
+    </div>
+
+    <div class="card"><h3>Tier <span class="small muted">(optional)</span></h3>
+      <p class="small muted">Offer Silver, Gold and Platinum versions of the same package. Packages with the same group name show a tier switch for customers. Tip: build one, then use Duplicate on the Packages page for the next tier.</p>
+      <div class="form-grid"><div class="field"><label for="tierGroup">Group name</label><input class="input" id="tierGroup" name="tier_group" maxlength="60" list="tierGroups" value="{{ old('tier_group', $k->tier_group) }}" placeholder="e.g. Wedding"><datalist id="tierGroups">@foreach($groups as $g)<option value="{{ $g }}">@endforeach</datalist></div>
+        <div class="field"><label for="tierLabel">Tier name</label><input class="input" id="tierLabel" name="tier_label" maxlength="30" value="{{ old('tier_label', $k->tier_label) }}" placeholder="e.g. Gold"></div></div>
+    </div>
+
+    <div class="card"><h3>Stages <span class="small muted">(optional)</span></h3>
+      <p class="small muted">For events with parts, like a wedding: Preparation, Ceremony, Reception. Put each item or service in a stage below; customers give every stage its own time and venue when they book.</p>
+      <div id="stages"></div>
+      <button type="button" class="btn btn-sm mt-1" id="addStage">{{ icon('plus') }}Add stage</button>
     </div>
 
     <div class="card"><h3>What's inside</h3>
@@ -109,13 +122,30 @@
     return '';
   }
 
+  // Teams-per-day limit for services, and which stage a component belongs to.
+  function extra(c, i) {
+    var out = '';
+    if (c.kind === 'service') out += '<div class="form-grid" style="grid-template-columns:1fr 2fr">' + num(i + '.teamsPerDay', c.teamsPerDay, 'min="1" placeholder="No limit"', 'Teams per day') + '<div class="hint" style="align-self:end">How many of this service you can do on one date (e.g. 2 photo teams). Extra bookings that day are refused.</div></div>';
+    if ((def.stages || []).length) out += '<div class="field" style="max-width:260px"><label class="small">Stage</label><select class="input input-sm" data-k="' + i + '.stage"><option value="">Whole event</option>' +
+      def.stages.map(function (s, j) { return '<option value="' + j + '"' + (c.stage === j ? ' selected' : '') + '>' + esc(s.name || 'Stage ' + (j + 1)) + '</option>'; }).join('') + '</select></div>';
+    return out;
+  }
+  function renderStages() {
+    def.stages = def.stages || [];
+    $('#stages').innerHTML = def.stages.map(function (s, j) {
+      return '<div class="form-grid" style="grid-template-columns:1fr 2fr auto;align-items:end"><div class="field"><label class="small">Stage ' + (j + 1) + '</label><input class="input input-sm" data-st="' + j + '.name" value="' + esc(s.name) + '" placeholder="e.g. Ceremony"></div>' +
+        '<div class="field"><label class="small">Note for the customer (optional)</label><input class="input input-sm" data-st="' + j + '.hint" value="' + esc(s.hint) + '" placeholder="e.g. usually 2–3 hours, at the church"></div>' +
+        '<div class="field"><button type="button" class="btn btn-xs btn-ghost" data-rmstage="' + j + '" aria-label="Remove stage">✕</button></div></div>';
+    }).join('') || '<div class="small muted">No stages: everything is for the whole event.</div>';
+  }
   function render() {
+    renderStages();
     var wrap = $('#comps');
     wrap.innerHTML = def.components.length ? def.components.map(function (c, i) {
       return '<div class="pkg-comp"><div class="head"><span class="badge ' + BADGE[c.kind] + '">' + LABEL[c.kind] + '</span><span class="grow"></span>' +
         '<button type="button" class="btn btn-xs btn-ghost" data-mv="' + i + '.-1" aria-label="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
         '<button type="button" class="btn btn-xs btn-ghost" data-mv="' + i + '.1" aria-label="Move down"' + (i === def.components.length - 1 ? ' disabled' : '') + '>↓</button>' +
-        '<button type="button" class="btn btn-xs btn-ghost" data-rm="' + i + '" aria-label="Remove component">✕</button></div>' + body(c, i) + '</div>';
+        '<button type="button" class="btn btn-xs btn-ghost" data-rm="' + i + '" aria-label="Remove component">✕</button></div>' + body(c, i) + extra(c, i) + '</div>';
     }).join('') : '<div class="empty small" style="padding:18px">Nothing inside yet. Add a rental item, consumable or service below.</div>';
     $('#pMode').value = def.pricing.mode;
     $('#pPrice').value = def.pricing.price || '';
@@ -150,11 +180,13 @@
 
   var form = document.getElementById('pkgForm');
   form.addEventListener('input', function (e) {
-    var t = e.target, k = t.getAttribute('data-k');
+    var t = e.target, k = t.getAttribute('data-k'), st = t.getAttribute('data-st');
+    if (st) { var sp = st.split('.'); def.stages[+sp[0]][sp[1]] = t.value; changed(); return; }
     if (k) {
       var v = t.type === 'checkbox' ? t.checked : (t.type === 'number' ? (t.value === '' ? null : +t.value) : t.value);
       if (t.tagName === 'SELECT') v = t.value === '' ? null : +t.value;
       setPath(k, v);
+      if (t.tagName === 'SELECT' && /\.stage$/.test(k)) { changed(); return; }
       if (t.tagName === 'SELECT' && /^\d+\.productId$/.test(k)) render(); // add-on switches between product and custom service
       else changed();
       return;
@@ -173,6 +205,12 @@
       var blank = { rent: { kind: 'rent', productId: null, qty: 1 }, sale: { kind: 'sale', productId: null, qty: 1 }, service: { kind: 'service', name: '', price: null, qty: 1, unit: 'service' },
         choice: { kind: 'choice', label: '', options: [{ productId: null, qty: 1, priceDelta: 0 }, { productId: null, qty: 1, priceDelta: 0 }] }, addon: { kind: 'addon', productId: null, name: '', price: null, qty: 1, default: false } }[a];
       def.components.push(blank); render(); return;
+    }
+    if (b.id === 'addStage') { (def.stages = def.stages || []).push({ name: '', hint: '' }); render(); return; }
+    if (b.hasAttribute('data-rmstage')) {
+      var r = +b.getAttribute('data-rmstage'); def.stages.splice(r, 1);
+      def.components.forEach(function (c) { if (c.stage === r) c.stage = null; else if (c.stage > r) c.stage--; });
+      render(); return;
     }
     if (b.hasAttribute('data-rm')) { def.components.splice(+b.getAttribute('data-rm'), 1); render(); return; }
     if (b.hasAttribute('data-mv')) { var m = b.getAttribute('data-mv').split('.'), i = +m[0], j = i + (+m[1]); var tmp = def.components[i]; def.components[i] = def.components[j]; def.components[j] = tmp; render(); return; }

@@ -57,7 +57,7 @@
     </div>
 
     <div class="card"><h3>4 · Review items & daily quantities</h3>
-      @if(! $check['ok'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div>Stock changed: {{ collect($check['bad'])->map(fn ($b) => inv()->product($b['product_id'])->name.' on '.fmt_date($b['date']).' (only '.$b['available'].' left)')->implode('; ') }}. <a href="{{ route('cart') }}">Edit in Rental List</a></div></div>@endif
+      @if(! $check['ok'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div>Stock changed: {{ collect($check['bad'])->map(fn ($b) => $b['name'].' on '.fmt_date($b['date']).' (only '.$b['available'].' left)')->implode('; ') }}. <a href="{{ route('cart') }}">Edit in Rental List</a></div></div>@endif
       @include('partials.lines-table', ['pricing' => $q])
     </div>
   </div>

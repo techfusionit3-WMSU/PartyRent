@@ -115,8 +115,8 @@ class Rentals
     private static function stockError(array $chk, bool $withCart): string
     {
         $bad = implode(', ', array_map(fn ($b) => ! empty($b['sale'])
-            ? (inv()->product($b['product_id'])?->name ?? 'Item').' (only '.$b['available'].' in stock)'
-            : fmt_date($b['date']).' (available '.$b['available'].')', $chk['bad']));
+            ? $b['name'].' (only '.$b['available'].' in stock)'
+            : (! empty($b['service']) ? $b['service'].' on '.fmt_date($b['date']).' (fully booked: '.$b['available'].' team'.($b['available'] === 1 ? '' : 's').' free)' : fmt_date($b['date']).' (available '.$b['available'].')'), $chk['bad']));
 
         return 'Not enough stock: '.$bad.($withCart ? ', including items already in your Rental List.' : '.');
     }
@@ -388,7 +388,7 @@ class Rentals
                 return self::fail('You can accept '.$r->code.' once the customer\'s '.strtolower($rev['upfront']['label']).' of '.money($rev['upfront']['amount']).' is verified by the PartyRent cashier'.($rev['pendingRental'] > 0 ? ' ('.money($rev['pendingRental']).' is waiting for verification).' : '. Nothing has been paid yet.'));
             }
             if (! $rev['check']['ok']) {
-                return self::fail('Not enough stock on '.implode('; ', array_map(fn ($b) => fmt_date($b['date']).' ('.inv()->product($b['product_id'])->name.': need '.$b['requested'].', available '.$b['available'].')', $rev['check']['bad'])), ['conflict' => $rev['check']['bad']]);
+                return self::fail('Not enough stock on '.implode('; ', array_map(fn ($b) => fmt_date($b['date']).' ('.$b['name'].': need '.$b['requested'].', available '.$b['available'].')', $rev['check']['bad'])), ['conflict' => $rev['check']['bad']]);
             }
             $r->update(['status' => 'accepted', 'accepted_at' => today_iso(), 'supplier_notes' => $note ?: $r->supplier_notes]);
             self::history($r, 'accepted', $note ?: 'Request accepted');
@@ -1121,6 +1121,7 @@ class Rentals
             'name' => trim($data['name']), 'emoji' => ($data['emoji'] ?? '') ?: '🎉', 'description' => (string) ($data['description'] ?? ''),
             'conditions' => (string) ($data['conditions'] ?? ''), 'events' => array_values($data['events'] ?? []),
             'components' => $def['components'], 'pricing' => $def['pricing'], 'min_guests' => $def['minGuests'], 'max_guests' => $def['maxGuests'],
+            'stages' => $def['stages'] ?: null, 'tier_group' => $data['tier_group'] ?? null, 'tier_label' => ($data['tier_group'] ?? null) ? ($data['tier_label'] ?? null) : null,
             'is_draft' => (bool) ($data['draft'] ?? false),
         ];
         if (isset($data['images'])) {

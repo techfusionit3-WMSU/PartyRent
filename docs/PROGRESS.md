@@ -28,7 +28,13 @@ Build order:
   `check()` uses it for timed lines. Date-level views (calendar, holds, stock edits) still count all bookings that day.
   Product page hourly box + `GET /api/slots` (booked times). Price = tier price/h × hours × qty. `HourlyRentalTest` (6).
   NOT done: late-return charge per hour; hourly items inside packages count as whole day; times on supplier schedule page.
-- [ ] F. Business event packages: stages, services (teams/day), tiers, add-ons, milestones
+- [x] F. Business event packages: stages, services (teams/day), tiers, add-ons, milestones
+  Migration `2026_11_12_000400` (packages.stages, tier_group, tier_label). Def gains `stages` [{name,hint}], component
+  `stage` index, service `teamsPerDay`; sel gains `stages` [{time, venue}] (customer fills on package page; shown via
+  `Packages::describe`). `Inventory::serviceDemand/serviceCap` + check() rows {service, name} (all bad rows now carry
+  `name`). Tier switch on package page (same supplier + tier_group). Add-ons/choices/guests already existed;
+  milestones = existing Installment arrangement. `EventPackagesTest` (4); 108 green.
+- [ ] Browser check of A–F (none of it has been clicked through yet).
 
 ### Previous: Supplier payouts through Xendit
 (user request 2026-11-11: "is it not automated?").

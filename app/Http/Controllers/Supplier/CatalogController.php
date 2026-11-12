@@ -225,7 +225,7 @@ class CatalogController extends Controller
             throw ValidationException::withMessages(['def' => 'The package contents could not be read. Reload the page and try again.']);
         }
 
-        return ['pricing' => (array) ($d['pricing'] ?? []), 'components' => array_values((array) ($d['components'] ?? [])), 'minGuests' => $d['minGuests'] ?? null, 'maxGuests' => $d['maxGuests'] ?? null];
+        return ['pricing' => (array) ($d['pricing'] ?? []), 'components' => array_values((array) ($d['components'] ?? [])), 'minGuests' => $d['minGuests'] ?? null, 'maxGuests' => $d['maxGuests'] ?? null, 'stages' => array_values((array) ($d['stages'] ?? []))];
     }
 
     private function packageData(Request $request): array
@@ -234,11 +234,13 @@ class CatalogController extends Controller
             'name' => 'required|string|min:3|max:120', 'emoji' => 'nullable|string|max:16', 'description' => 'required|string|max:2000',
             'conditions' => 'nullable|string|max:1000', 'events' => 'nullable|array', 'events.*' => 'string|max:40',
             'def' => 'required', 'draft' => 'nullable|boolean',
+            'tier_group' => 'nullable|string|max:60', 'tier_label' => 'nullable|string|max:30',
         ]);
 
         return array_merge($this->defInput($request), [
             'name' => trim($v['name']), 'emoji' => $v['emoji'] ?? '', 'description' => trim($v['description']), 'conditions' => trim((string) ($v['conditions'] ?? '')),
             'events' => $v['events'] ?? [], 'draft' => $request->boolean('draft'),
+            'tier_group' => trim((string) ($v['tier_group'] ?? '')) ?: null, 'tier_label' => trim((string) ($v['tier_label'] ?? '')) ?: null,
         ]);
     }
 

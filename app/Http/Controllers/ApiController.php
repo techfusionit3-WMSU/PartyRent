@@ -144,6 +144,21 @@ class ApiController extends Controller
     }
 
     /** Month availability for a product or package. */
+    /** Hourly item: booked times on a date, and how many units are free for a chosen window. */
+    public function slots(Request $request): JsonResponse
+    {
+        $data = $request->validate(['id' => 'required|integer', 'date' => 'required|date_format:Y-m-d', 'from' => 'nullable|string|max:5', 'to' => 'nullable|string|max:5']);
+        $p = inv()->product($data['id']);
+        abort_unless($p && $p->isHourly() && $p->status === 'published', 404);
+        $w = \App\Domain\Hours::window(['from' => $data['from'] ?? null, 'to' => $data['to'] ?? null]);
+        $busy = array_map(fn ($s) => $s + ['label' => \App\Domain\Hours::fmt($s['from']).' – '.\App\Domain\Hours::fmt($s['to'])], inv()->busySlots($p->id, $data['date']));
+
+        return response()->json([
+            'busy' => $busy, 'buffer' => (int) $p->buffer_min, 'minHours' => (float) $p->min_hours,
+            'available' => $w ? inv()->availableAt($p->id, $data['date'], $w[0], $w[1]) : null,
+        ]);
+    }
+
     public function calendar(Request $request): JsonResponse
     {
         $data = $request->validate(['kind' => 'required|in:item,package', 'id' => 'required|integer', 'month' => ['required', 'regex:/^\d{4}-\d{2}$/'], 'need' => 'nullable|integer|min:1']);

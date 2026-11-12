@@ -29,7 +29,7 @@
       </div>
       <div class="field"><label>Suitable events</label><div class="row wrap gap-sm">@foreach($events as $e)@php($on = in_array($e, old('events', $p->events ?? []), true))<label class="chip {{ $on ? 'active' : '' }}"><input type="checkbox" name="events[]" value="{{ $e }}" @checked($on) hidden>{{ $e }}</label>@endforeach</div></div>
     </div>
-    <div class="card"><h3>Quantity-based pricing <span data-for="rent">(per day)</span><span data-for="sale">(per unit sold)</span></h3>
+    <div class="card"><h3>Quantity-based pricing <span data-for="rent"><span data-mode-for="day">(per day)</span><span data-mode-for="hour">(per hour)</span></span><span data-for="sale">(per unit sold)</span></h3>
       <p class="small muted">The first tier starts at 1. Each tier starts right after the previous one ends; leave the last tier's maximum empty.</p>
       <div id="tiers">
         @foreach($tiers as $i => $t)
@@ -58,7 +58,16 @@
   </div>
   <aside class="card sticky-side"><h3>Stock & visibility</h3>
     <div class="field"><label><span data-for="rent">Total stock (units you own)</span><span data-for="sale">Stock on hand</span></label><input class="input" type="number" min="0" name="total_stock" required value="{{ old('total_stock', $p->total_stock ?? 0) }}"><div class="hint" data-for="rent">Reducing stock is blocked if it would break accepted reservations.</div><div class="hint" data-for="sale">Goes down when an order is released. Add stock later with Restock on the Inventory page.</div></div>
-    <div class="field" data-for="rent"><label>Rental unit</label><select class="input" name="unit">@foreach(['piece / day', 'set / day', 'unit / day', 'pair / day', 'panel / day', 'kit / day', 'system / day'] as $un)<option @selected(old('unit', $p->unit) === $un)>{{ $un }}</option>@endforeach</select></div>
+    @php($mode = old('rental_mode', $p->rental_mode ?? 'day'))
+    <div class="field" data-for="rent"><label>How is it rented?</label>
+      <div class="stack-sm">@foreach([['day', 'Per day', 'Booked for whole dates. Tables, chairs, tents, linens.'], ['hour', 'By the hour', 'Booked for a start and end time; the rest of the day can be rented to someone else. Photo booths, sound systems, bouncy castles.']] as [$v, $l, $desc])
+        <label class="card card-flat row" style="padding:10px 12px;cursor:pointer;align-items:flex-start"><input type="radio" name="rental_mode" value="{{ $v }}" @checked($mode === $v) style="accent-color:var(--brand);width:18px;height:18px;margin-top:3px"><div><b>{{ $l }}</b><div class="small muted">{{ $desc }}</div></div></label>
+      @endforeach</div></div>
+    <div class="form-grid" data-for="rent" data-mode-for="hour">
+      <div class="field"><label for="min_hours">Minimum hours</label><input class="input" type="number" id="min_hours" name="min_hours" min="0.5" max="24" step="0.5" value="{{ old('min_hours', $p->min_hours ?? 3) }}">@error('min_hours')<div class="error-text">{{ $message }}</div>@enderror</div>
+      <div class="field"><label for="buffer_min">Gap between bookings (minutes)</label><input class="input" type="number" id="buffer_min" name="buffer_min" min="0" max="480" step="15" value="{{ old('buffer_min', $p->buffer_min ?? 60) }}"><div class="hint">Time to pack up, travel and clean before the next booking.</div>@error('buffer_min')<div class="error-text">{{ $message }}</div>@enderror</div>
+    </div>
+    <div class="field" data-for="rent"><label>Rental unit</label><select class="input" name="unit">@foreach(['piece', 'set', 'unit', 'pair', 'panel', 'kit', 'system'] as $un)<option value="{{ $un }} / day" @selected(explode(' /', old('unit', $p->unit ?? ''))[0] === $un)>{{ $un }}</option>@endforeach</select><div class="hint">Saved as "per day" or "per hour" depending on how it is rented.</div></div>
     <div class="field" data-for="sale"><label>Sold per</label><select class="input" name="unit">@foreach(\App\Models\Product::SALE_UNITS as $un)<option @selected(old('unit', $p->unit) === $un)>{{ $un }}</option>@endforeach</select></div>
     <div class="field" data-for="rent"><label for="replacement_value">Replacement value per piece (₱) <span class="muted">(recommended)</span></label><input class="input" type="number" min="0" step="0.01" id="replacement_value" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}" placeholder="e.g. 850">
       <div class="hint">How much it would cost you to buy one new today. Used for damage charges: lost or destroyed = this amount, major damage = {{ setting('majorDamagePct', 50) }}% of it. Customers see it before booking, and charges can never be more than this.</div>@error('replacement_value')<div class="error-text">{{ $message }}</div>@enderror</div>
@@ -86,6 +95,15 @@
   </aside>
 </form>
 @push('scripts')
+<script>
+// Per day / by the hour: show the hourly settings only when needed.
+(function () {
+  var radios = document.querySelectorAll('input[name="rental_mode"]'); if (!radios.length) return;
+  function draw() { var m = (document.querySelector('input[name="rental_mode"]:checked') || {}).value || 'day';
+    document.querySelectorAll('[data-mode-for]').forEach(function (el) { el.hidden = el.dataset.modeFor !== m; }); }
+  radios.forEach(function (r) { r.addEventListener('change', draw); }); draw();
+})();
+</script>
 <script>
 (function () {
   var form = document.getElementById('productForm'), perish = document.getElementById('perishable');

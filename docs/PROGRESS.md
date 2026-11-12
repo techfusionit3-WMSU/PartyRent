@@ -22,7 +22,12 @@ Build order:
   admin "Business checks" tab for Personal→Business upgrades; approving a business application verifies it. Staff see the owner's
   supplier notifications. `ShopStaffs::add` creates an account + emails a set-password link. `BusinessAccountsTest` (5); 98 green.
   NOTE: the rename script once turned `'supplier.'` into `'rental partner.'` in new code — fixed; committed code audited clean.
-- [ ] E. Rent by time (rental_mode day|hour, min hours, buffer, hourly rate; overlap check)
+- [x] E. Rent by time (rental_mode day|hour, min hours, buffer, hourly rate; overlap check)
+  Migration `2026_11_12_000300`; `App\Domain\Hours`; line key `time` {from,to} (cart_lines.time, request lines).
+  `Inventory::availableAt` = total − unusable − whole-day demand − PEAK of overlapping windows (± buffer);
+  `check()` uses it for timed lines. Date-level views (calendar, holds, stock edits) still count all bookings that day.
+  Product page hourly box + `GET /api/slots` (booked times). Price = tier price/h × hours × qty. `HourlyRentalTest` (6).
+  NOT done: late-return charge per hour; hourly items inside packages count as whole day; times on supplier schedule page.
 - [ ] F. Business event packages: stages, services (teams/day), tiers, add-ons, milestones
 
 ### Previous: Supplier payouts through Xendit

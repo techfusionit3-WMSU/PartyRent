@@ -125,7 +125,7 @@ class Rentals
      * Add a line, merging with an existing line for the same item (a package only merges when the
      * customer picked the same options). Checks stock combined with the supplier's other cart lines.
      */
-    public static function addToCart(User $u, string $type, int $refId, array $days, ?array $sel = null): array
+    public static function addToCart(User $u, string $type, int $refId, array $days, ?array $sel = null, ?array $time = null): array
     {
         $item = $type === 'package' ? Package::find($refId) : Product::find($refId);
         if (! $item || ($type === 'package' ? ! $item->active || $item->is_draft : $item->status !== 'published')) {
@@ -145,7 +145,12 @@ class Rentals
             return self::fail('Maximum of '.Settings::get('maxRentalDays', 30).' rental dates per item.');
         }
         $sel = $type === 'package' ? Packages::cleanSel(Packages::def($item), $sel) : null;
-        $new = ['id' => '__new', 'type' => $type, 'ref_id' => $refId, 'days' => $days] + ($sel ? ['sel' => $sel] : []);
+        $hourly = $type === 'item' && $item->isHourly();
+        $time = $hourly ? ['from' => (string) ($time['from'] ?? ''), 'to' => (string) ($time['to'] ?? '')] : null;
+        if ($hourly && ($e = Hours::error($item, $days, $time))) {
+            return self::fail($e);
+        }
+        $new = ['id' => '__new', 'type' => $type, 'ref_id' => $refId, 'days' => $days] + ($sel ? ['sel' => $sel] : []) + ($time ? ['time' => $time] : []);
         if ($e = self::leadTimeError($new)) {
             return self::fail($e);
         }
@@ -155,7 +160,8 @@ class Rentals
             return self::fail(self::stockError($chk, (bool) $existing));
         }
         $line = CartLine::where('user_id', $u->id)->where('type', $type)->where('ref_id', $refId)->get()
-            ->first(fn ($c) => $type !== 'package' || Packages::cleanSel(Packages::def($item), $c->sel) == $sel);
+            ->first(fn ($c) => ($type !== 'package' || Packages::cleanSel(Packages::def($item), $c->sel) == $sel) && $c->time == $time
+                && (! $hourly || array_keys(array_filter($c->days ?? [])) === array_keys($days)));
         if ($line) {
             $merged = $line->days;
             foreach ($days as $d => $q) {
@@ -164,7 +170,7 @@ class Rentals
             ksort($merged);
             $line->update(['days' => $merged]);
         } else {
-            CartLine::create(['user_id' => $u->id, 'supplier_id' => $item->supplier_id, 'type' => $type, 'ref_id' => $refId, 'days' => $days, 'sel' => $sel]);
+            CartLine::create(['user_id' => $u->id, 'supplier_id' => $item->supplier_id, 'type' => $type, 'ref_id' => $refId, 'days' => $days, 'sel' => $sel, 'time' => $time]);
         }
 
         return self::ok(['name' => $item->name, 'supplier_id' => $item->supplier_id]);
@@ -186,6 +192,9 @@ class Rentals
             return self::fail('Maximum of '.Settings::get('maxRentalDays', 30).' rental dates per item.');
         }
         ksort($clean);
+        if ($line->time && count(array_filter($clean)) > 1) {
+            return self::fail('Items rented by the hour are booked for one date. Add the item again for another date.');
+        }
         if ($e = self::leadTimeError(array_merge($line->toLine(), ['days' => $clean]))) {
             return self::fail($e);
         }
@@ -216,7 +225,7 @@ class Rentals
         foreach (self::cartLinesFor($u, $s->id) as $l) {
             $days = self::cleanDays($l['days']);
             if ($days) {
-                $line = ['id' => 'l'.$i++, 'type' => $l['type'], 'ref_id' => $l['ref_id'], 'days' => $days];
+                $line = ['id' => 'l'.$i++, 'type' => $l['type'], 'ref_id' => $l['ref_id'], 'days' => $days] + (! empty($l['time']) ? ['time' => $l['time']] : []);
                 if ($l['type'] === 'package' && ($k = Package::find($l['ref_id']))) {
                     // freeze the package as booked: later edits by the supplier never change this request
                     $line['snap'] = Packages::snapshot($k);

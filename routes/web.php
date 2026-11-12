@@ -34,6 +34,7 @@ Route::post('/ai/chat', [AiController::class, 'chat'])->middleware('throttle:30,
 
 /* ---------- live availability / pricing (JSON, read-only) ---------- */
 Route::get('/api/calendar', [ApiController::class, 'calendar'])->name('api.calendar');
+Route::get('/api/slots', [ApiController::class, 'slots'])->name('api.slots');
 Route::post('/api/schedule', [ApiController::class, 'schedule'])->name('api.schedule');
 Route::get('/api/locations', [ApiController::class, 'locations'])->name('api.locations');
 Route::post('/api/package-quote', [ApiController::class, 'packageQuote'])->name('api.package-quote');

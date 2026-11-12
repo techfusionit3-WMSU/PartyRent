@@ -48,11 +48,13 @@
           @php($siblings = collect($g['lines'])->reject(fn ($x) => $x['id'] === $l['id'])->values()->all())
           <div class="cart-line">
             <div class="cl-top">@include('partials.thumb', ['item' => $item])<div class="grow"><div class="row between top"><div><a class="strong" href="{{ $l['type'] === 'package' ? route('packages.show', $item) : route('products.show', $item) }}">{{ $item->name }}</a>@if($l['type'] === 'package') <span class="badge b-pink plain">Package</span>@endif
-              <div class="small muted">{{ $ds ? count($ds).' date'.(count($ds) > 1 ? 's' : '').' · '.fmt_range($ds[0], end($ds)) : 'No dates' }}{{ $l['type'] === 'item' && count($item->tiers) > 1 ? ' · tiered pricing applies per day' : '' }}</div>
+              @php($win = \App\Domain\Hours::lineWindow($l))
+              @if($win)<div class="small"><b>{{ fmt_date($ds[0] ?? today_iso()) }}</b> · {{ \App\Domain\Hours::label($l['time']) }} · {{ array_sum($l['days']) }} {{ $item->unitWord() }}{{ array_sum($l['days']) > 1 ? 's' : '' }}</div><div class="small muted">Rented by the hour. To change the time, remove it and add it again.</div>
+              @else<div class="small muted">{{ $ds ? count($ds).' date'.(count($ds) > 1 ? 's' : '').' · '.fmt_range($ds[0], end($ds)) : 'No dates' }}{{ $l['type'] === 'item' && count($item->tiers) > 1 ? ' · tiered pricing applies per day' : '' }}</div>@endif
               @if($l['type'] === 'package')@foreach(\App\Domain\Packages::describe(\App\Domain\Packages::def($item), $l['sel'] ?? null) as $d)<div class="small muted">{{ $d }}</div>@endforeach @endif</div>
               <form method="POST" action="{{ route('cart.remove', $lineId) }}" data-confirm="Remove this item and its schedule from your rental list?" data-confirm-title="Remove item?" data-confirm-ok="Remove" data-danger>@csrf @method('DELETE')<button class="btn btn-xs btn-ghost">{{ icon('trash') }}Remove</button></form>
             </div></div></div>
-            <div class="mt-1" data-scheduler data-type="{{ $l['type'] }}" data-ref="{{ $l['ref_id'] }}" data-days='@json((object) $l['days'])' @if($l['type'] === 'package') data-sel='@json(\App\Domain\Packages::cleanSel(\App\Domain\Packages::def($item), $l['sel'] ?? null))' @endif data-siblings='@json($siblings)' data-save="{{ route('cart.update', $lineId) }}"></div>
+            @unless($win)<div class="mt-1" data-scheduler data-type="{{ $l['type'] }}" data-ref="{{ $l['ref_id'] }}" data-days='@json((object) $l['days'])' @if($l['type'] === 'package') data-sel='@json(\App\Domain\Packages::cleanSel(\App\Domain\Packages::def($item), $l['sel'] ?? null))' @endif data-siblings='@json($siblings)' data-save="{{ route('cart.update', $lineId) }}"></div>@endunless
           </div>
         @endforeach
       </div>

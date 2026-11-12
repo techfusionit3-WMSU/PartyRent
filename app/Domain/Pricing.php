@@ -104,13 +104,20 @@ class Pricing
                 'sale' => $total, 'total' => $total,
             ]);
         }
+        // Hourly items: the tier price is per hour, so one unit costs price × hours of the booking.
+        $hours = $p && $p->isHourly() ? Hours::length($line['time'] ?? null) : 0.0;
         foreach ($days as $date => $qty) {
             $unit = $p ? self::unitPrice($p, $qty) : 0.0;
-            $base['days'][] = ['date' => $date, 'qty' => $qty, 'unit' => $unit, 'subtotal' => r2($unit * $qty)];
+            $row = ['date' => $date, 'qty' => $qty, 'unit' => $hours ? r2($unit * $hours) : $unit];
+            if ($hours) {
+                $row += ['hourly' => $unit, 'hours' => $hours, 'time' => $line['time']];
+            }
+            $base['days'][] = $row + ['subtotal' => r2($row['unit'] * $qty)];
         }
         $rent = r2(array_sum(array_column($base['days'], 'subtotal')));
+        $name = ($p?->name ?? 'Item').($hours ? ' · '.Hours::label($line['time']) : '');
 
-        return array_merge($base, ['kind' => 'rent', 'name' => $p?->name ?? 'Item', 'rent' => $rent, 'total' => $rent]);
+        return array_merge($base, ['kind' => 'rent', 'name' => $name, 'rent' => $rent, 'total' => $rent] + ($hours ? ['time' => $line['time'], 'hours' => $hours] : []));
     }
 
     /** Supplier policy → amounts for a rental total. */

@@ -16,7 +16,7 @@
     <div class="mt-2"><span class="price-lg">{{ money($p->basePrice()) }}</span> <span class="muted">/ {{ $p->unit }}</span></div>
     @if(! $p->isSale() && $p->replacement_value)<div class="small muted mt-1">{{ icon('info') }} Replacement value: <b>{{ money($p->replacement_value) }}</b> per piece. This is the most you would pay if one is lost or destroyed.</div>@endif
     @if(count($p->tiers) > 1)
-      <div class="mt-1"><div class="small strong mb-1">Quantity-based pricing (per day)</div><div class="tiers">
+      <div class="mt-1"><div class="small strong mb-1">Quantity-based pricing ({{ $p->isHourly() ? 'per hour' : 'per day' }})</div><div class="tiers">
         @foreach(\App\Domain\Pricing::sortedTiers($p) as $t)<div class="tier" data-tier data-min="{{ $t['min'] }}" data-max="{{ $t['max'] }}"><b>{{ money($t['price']) }}</b>{{ $t['min'] }}{{ $t['max'] ? '–'.$t['max'] : '+' }} pcs</div>@endforeach
       </div></div>
     @endif
@@ -26,6 +26,63 @@
       @foreach($p->themes ?? [] as $t)<span class="tag">{{ $t }}</span>@endforeach
     </div>
 
+    @if($p->isHourly())
+    {{-- Rented by the hour: one date, a start and end time, a quantity. --}}
+    <form class="card soft" method="POST" action="{{ route('cart.add') }}" id="hourForm" data-slots="{{ route('api.slots') }}" data-id="{{ $p->id }}" data-tiers='@json(\App\Domain\Pricing::sortedTiers($p))' data-min-hours="{{ (float) $p->min_hours }}">
+      @csrf
+      <input type="hidden" name="type" value="item"><input type="hidden" name="ref_id" value="{{ $p->id }}"><input type="hidden" name="days" id="hDays" value="{}"><input type="hidden" name="from" id="hFromV"><input type="hidden" name="to" id="hToV">
+      <div class="form-grid">
+        <div class="field"><label for="hDate">Date</label><input class="input" type="date" id="hDate" min="{{ today_iso() }}" value="{{ $start }}" required></div>
+        <div class="field"><label for="hQty">Quantity</label><input class="input" type="number" id="hQty" min="1" max="{{ $p->total_stock }}" value="1" required></div>
+        <div class="field"><label for="hFrom">Start time</label><input class="input" type="time" id="hFrom" step="900" value="{{ old('from', '14:00') }}" required></div>
+        <div class="field"><label for="hTo">End time</label><input class="input" type="time" id="hTo" step="900" value="{{ old('to', sprintf('%02d:00', min(24, 14 + (int) ceil((float) $p->min_hours)))) }}" required></div>
+      </div>
+      <p class="small muted mb-1">Minimum {{ rtrim(rtrim(number_format((float) $p->min_hours, 1), '0'), '.') }} hours. The rental partner keeps {{ (int) $p->buffer_min }} minutes free before and after each booking for set-up and travel.</p>
+      <div id="hBusy" class="small mb-1"></div>
+      <div class="sum-line total"><span>Estimated rental <span class="small muted" id="hHours"></span></span><span class="price" id="hEst"></span></div>
+      @if($own)
+        <div class="alert alert-info">{{ icon('info') }}<div>This is your own listing. <a href="{{ route('supplier.products.edit', $p) }}">Edit in Rental Partner Mode</a></div></div>
+      @else
+        <div class="row wrap mt-1"><button class="btn btn-outline btn-lg grow" name="then" value="list">{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout">Request Rental</button></div>
+      @endif
+      <p class="small muted mt-1 mb-0">The time is only held once the rental partner accepts your request.</p>
+    </form>
+    @push('scripts')
+    <script>
+    (function () {
+      var f = document.getElementById('hourForm'); if (!f) return;
+      var $ = function (id) { return document.getElementById(id); };
+      var tiers = JSON.parse(f.dataset.tiers || '[]'), minH = +f.dataset.minHours || 0, timer;
+      function mins(v) { var m = /^(\d{2}):(\d{2})$/.exec(v || ''); return m ? +m[1] * 60 + +m[2] : null; }
+      function price(q) { var t = tiers.filter(function (t) { return q >= t.min && (!t.max || q <= t.max); })[0] || tiers[0]; return t ? +t.price : 0; }
+      function peso(n) { return '₱' + (Math.round(n * 100) / 100).toLocaleString('en-PH', { maximumFractionDigits: 2 }); }
+      function draw() {
+        var q = Math.max(1, +$('hQty').value || 1), a = mins($('hFrom').value), b = mins($('hTo').value);
+        if (b === 0) b = 1440; // 12:00 AM end = midnight
+        var h = a !== null && b !== null && b > a ? (b - a) / 60 : 0;
+        $('hFromV').value = $('hFrom').value; $('hToV').value = $('hTo').value === '00:00' ? '24:00' : $('hTo').value;
+        $('hDays').value = JSON.stringify($('hDate').value ? (function () { var o = {}; o[$('hDate').value] = q; return o; })() : {});
+        $('hHours').textContent = h ? '(' + h + ' h × ' + q + ')' : '';
+        $('hEst').textContent = h ? peso(price(q) * h * q) : '—';
+        clearTimeout(timer); timer = setTimeout(check, 250);
+        if (h && h < minH) $('hHours').textContent += ' · minimum ' + minH + ' h';
+      }
+      function check() {
+        if (!$('hDate').value) return;
+        fetch(f.dataset.slots + '?id=' + f.dataset.id + '&date=' + $('hDate').value + '&from=' + $('hFromV').value + '&to=' + $('hToV').value, { headers: { Accept: 'application/json' } })
+          .then(function (r) { return r.json(); }).then(function (d) {
+            var html = d.busy.length ? 'Already booked that day: ' + d.busy.map(function (s) { return '<span class="badge b-gray plain">' + s.label + ' · ' + s.qty + '</span>'; }).join(' ') : '<span style="color:var(--green)">No bookings yet on this date.</span>';
+            if (d.available !== null) html += '<div class="mt-1 strong" style="color:' + (d.available >= (+$('hQty').value || 1) ? 'var(--green)' : 'var(--red)') + '">' + d.available + ' free for your time</div>';
+            $('hBusy').innerHTML = html;
+          }).catch(function () {});
+      }
+      f.addEventListener('submit', draw);
+      ['hDate', 'hQty', 'hFrom', 'hTo'].forEach(function (id) { $(id).addEventListener('input', draw); });
+      draw();
+    })();
+    </script>
+    @endpush
+    @else
     <form class="card soft" method="POST" action="{{ route('cart.add') }}">
       @csrf
       <input type="hidden" name="type" value="item"><input type="hidden" name="ref_id" value="{{ $p->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}">
@@ -46,6 +103,7 @@
       @endif
       <p class="small muted mt-1 mb-0">Submitting a request does not reserve the items until the rental partner accepts it.</p>
     </form>
+    @endif
 
     <div class="card mt-2">
       <div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }}</div></div><a class="btn btn-sm" href="{{ route('suppliers.show', $sup) }}">View Rental Partner Profile</a></div>

@@ -74,6 +74,9 @@ class CatalogController extends Controller
             'handling_fee' => 'nullable|numeric|min:0|max:1000000',
             'handling_per' => 'nullable|in:line,unit',
             'replacement_value' => 'nullable|numeric|min:0|max:100000000',
+            'rental_mode' => 'nullable|in:day,hour',
+            'min_hours' => 'nullable|numeric|min:0.5|max:24',
+            'buffer_min' => 'nullable|integer|min:0|max:480',
             'weight_kg' => 'nullable|numeric|min:0|max:10000',
             'length_cm' => 'nullable|numeric|min:0|max:10000',
             'width_cm' => 'nullable|numeric|min:0|max:10000',
@@ -97,6 +100,9 @@ class CatalogController extends Controller
         $unit = $sale
             ? (in_array($v['unit'], Product::SALE_UNITS, true) ? $v['unit'] : 'pc')
             : (str_contains($v['unit'], '/') ? $v['unit'] : 'piece / day');
+        if (! $sale) { // "piece / day" or "piece / hour", following how the item is rented
+            $unit = trim(explode('/', $unit)[0]).' / '.(($v['rental_mode'] ?? 'day') === 'hour' ? 'hour' : 'day');
+        }
 
         return [
             'listing_type' => $sale ? 'sale' : 'rent',
@@ -110,6 +116,8 @@ class CatalogController extends Controller
             'delivery' => $request->boolean('delivery'), 'pickup' => true,
             'handling_fee' => r2($v['handling_fee'] ?? 0), 'handling_per' => $v['handling_per'] ?? 'line',
             'replacement_value' => $sale ? null : (($v['replacement_value'] ?? null) ? r2($v['replacement_value']) : null),
+            'rental_mode' => ! $sale && ($v['rental_mode'] ?? 'day') === 'hour' ? 'hour' : 'day',
+            'min_hours' => (float) ($v['min_hours'] ?? 1) ?: 1, 'buffer_min' => (int) ($v['buffer_min'] ?? 60),
             'weight_kg' => ($v['weight_kg'] ?? null) ?: null, 'length_cm' => ($v['length_cm'] ?? null) ?: null,
             'width_cm' => ($v['width_cm'] ?? null) ?: null, 'height_cm' => ($v['height_cm'] ?? null) ?: null,
             'listing_type' => $sale ? 'sale' : 'rent',

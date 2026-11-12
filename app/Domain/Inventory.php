@@ -20,6 +20,11 @@ use App\Models\RentalRequest;
  *   Committed = units in accepted requests not yet released; on release the units are deducted
  *               from stock on hand for good (Rentals::advance → 'ongoing').
  *
+ * Hourly rental items (products.rental_mode = hour): a line with a `time` window only blocks the units
+ * during that window plus the item's buffer, so the rest of the day stays bookable:
+ *   AvailableAt(date, from–to) = Total − Unusable(date) − WholeDay(date) − PeakOverlapping(from−buffer … to+buffer)
+ * Date-level figures (calendars, holds, stock edits) still count every booking on the date, which is the safe side.
+ *
  * Pending requests never consume stock; they are reported as potential conflicts only.
  *
  * Registered as a singleton, so lookups are memoized for the current HTTP request.
@@ -86,9 +91,12 @@ class Inventory
     /** Display name of a line's item or package. */
     public function itemName(array $line): string
     {
-        return $line['type'] === 'package'
-            ? ($this->package($line['ref_id'])?->name ?? 'Package')
-            : ($this->product($line['ref_id'])?->name ?? 'Item');
+        if ($line['type'] === 'package') {
+            return $this->package($line['ref_id'])?->name ?? 'Package';
+        }
+        $name = $this->product($line['ref_id'])?->name ?? 'Item';
+
+        return Hours::lineWindow($line) ? $name.' · '.Hours::label($line['time']) : $name;
     }
 
     /* ---------------- demand ---------------- */
@@ -207,7 +215,7 @@ class Inventory
             $rows = RentalRequest::whereIn('status', array_merge(RentalRequest::RESERVING, ['pending']))
                 ->get(['id', 'status', 'lines']);
             foreach ($rows as $r) {
-                $this->demands[] = ['id' => $r->id, 'code' => null, 'status' => $r->status, 'map' => $this->demandMap($r->lines ?? []), 'sale' => $this->saleDemand($r->lines ?? [])];
+                $this->demands[] = ['id' => $r->id, 'code' => null, 'status' => $r->status, 'map' => $this->demandMap($r->lines ?? []), 'sale' => $this->saleDemand($r->lines ?? []), 'slots' => $this->slots($r->lines ?? [])];
             }
         }
 
@@ -231,6 +239,83 @@ class Inventory
         }
 
         return ['total' => $total, 'refs' => $refs];
+    }
+
+    /** Timed (hourly) bookings of lines: list of [productId, date, fromMin, toMin, qty]. */
+    public function slots(array $lines): array
+    {
+        $out = [];
+        foreach ($lines as $l) {
+            if ($w = Hours::lineWindow($l)) {
+                foreach (array_filter(array_map('intval', $l['days'] ?? [])) as $date => $q) {
+                    $out[] = [(int) $l['ref_id'], $date, $w[0], $w[1], $q];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Units of an hourly item free for a time window on a date.
+     * $extra = more [from, to, qty] windows of the same item in the request being checked (they compete too).
+     */
+    public function availableAt(int $pid, string $date, int $from, int $to, ?int $excludeId = null, array $extra = [], array $statuses = RentalRequest::RESERVING): int
+    {
+        $p = $this->product($pid);
+        if (! $p) {
+            return 0;
+        }
+        $buf = (int) $p->buffer_min;
+        $wholeDay = 0;
+        $timed = [];
+        foreach ($this->openDemands() as $d) {
+            if ($d['id'] === $excludeId || ! in_array($d['status'], $statuses, true)) {
+                continue;
+            }
+            $onDate = $d['map'][$date][$pid] ?? 0;
+            foreach ($d['slots'] as [$sp, $sd, $sf, $st, $sq]) {
+                if ($sp === $pid && $sd === $date) {
+                    $onDate -= $sq;
+                    if ($sf < $to + $buf && $st > $from - $buf) {
+                        $timed[] = [$sf - $buf, $st + $buf, $sq];
+                    }
+                }
+            }
+            $wholeDay += max(0, $onDate);
+        }
+        foreach ($extra as [$ef, $et, $eq]) {
+            if ($ef < $to + $buf && $et > $from - $buf) {
+                $timed[] = [$ef - $buf, $et + $buf, $eq];
+            }
+        }
+        $h = $this->holdsOn($pid, $date);
+
+        return max(0, $p->total_stock - $p->damaged - $p->missing - $h['maintenance'] - $h['setaside'] - $wholeDay - Hours::peak($timed));
+    }
+
+    /** Booked times of an hourly item on a date (booked requests only), for customers picking a time. */
+    public function busySlots(int $pid, string $date): array
+    {
+        $out = [];
+        foreach ($this->openDemands() as $d) {
+            if (! in_array($d['status'], RentalRequest::RESERVING, true)) {
+                continue;
+            }
+            $timed = 0;
+            foreach ($d['slots'] as [$sp, $sd, $sf, $st, $sq]) {
+                if ($sp === $pid && $sd === $date) {
+                    $out[] = ['from' => $sf, 'to' => $st, 'qty' => $sq];
+                    $timed += $sq;
+                }
+            }
+            if (($whole = ($d['map'][$date][$pid] ?? 0) - $timed) > 0) {
+                $out[] = ['from' => 0, 'to' => 1440, 'qty' => $whole];
+            }
+        }
+        usort($out, fn ($a, $b) => $a['from'] <=> $b['from']);
+
+        return $out;
     }
 
     public function reservedOn(int $pid, string $date, ?int $excludeId = null): int
@@ -359,12 +444,31 @@ class Inventory
      */
     public function check(array $lines, ?int $excludeId = null): array
     {
-        $map = $this->demandMap($lines);
+        // Hourly lines are checked against their time window below, not against the whole date.
+        $timedLines = array_filter($lines, fn ($l) => Hours::lineWindow($l) !== null);
+        $map = $this->demandMap(array_filter($lines, fn ($l) => Hours::lineWindow($l) === null));
         $rows = [];
         foreach ($map as $date => $pids) {
             foreach ($pids as $pid => $requested) {
                 $available = $this->availableOn($pid, $date, $excludeId);
                 $rows[] = ['date' => $date, 'product_id' => $pid, 'requested' => $requested, 'available' => $available, 'ok' => $requested <= $available];
+            }
+        }
+        $timedAvail = [];
+        foreach ($timedLines as $i => $l) {
+            [$f, $t] = Hours::lineWindow($l);
+            $pid = (int) $l['ref_id'];
+            foreach (array_filter(array_map('intval', $l['days'] ?? [])) as $date => $q) {
+                // other windows of this item in the same request compete for the same units
+                $extra = [];
+                foreach ($timedLines as $j => $o) {
+                    if ($j !== $i && (int) $o['ref_id'] === $pid && (int) ($o['days'][$date] ?? 0) > 0) {
+                        $extra[] = [...Hours::lineWindow($o), (int) $o['days'][$date]];
+                    }
+                }
+                $available = max(0, $this->availableAt($pid, $date, $f, $t, $excludeId, $extra) - ($map[$date][$pid] ?? 0));
+                $timedAvail[(string) ($l['id'] ?? '')][$date] = $available;
+                $rows[] = ['date' => $date, 'product_id' => $pid, 'requested' => $q, 'available' => $available, 'ok' => $q <= $available, 'time' => $l['time']];
             }
         }
         // Sale items: the total across all lines against stock on hand (shown on the first date they are needed).
@@ -380,7 +484,9 @@ class Inventory
         $bad = array_values(array_filter($rows, fn ($r) => ! $r['ok']));
         $badKeys = [];
         foreach ($bad as $b) {
-            $badKeys[$b['date'].'|'.$b['product_id']] = true;
+            if (empty($b['time'])) {
+                $badKeys[$b['date'].'|'.$b['product_id']] = true;
+            }
         }
         $byLine = [];
         foreach ($lines as $l) {
@@ -393,6 +499,13 @@ class Inventory
                     if (isset($badKeys[$date.'|'.$pid])) {
                         $conflict = true;
                     }
+                }
+                if (isset($timedAvail[$lid][$date])) {
+                    $avail = $timedAvail[$lid][$date];
+                    $conflict = $conflict || (int) $l['days'][$date] > $avail;
+                    $byLine[$lid][$date] = ['ok' => ! $conflict, 'available' => $avail, 'requested' => (int) $l['days'][$date]];
+
+                    continue;
                 }
                 $avail = $l['type'] === 'package'
                     ? $this->packageAvailableOn((int) $l['ref_id'], $date, $excludeId, $l['sel'] ?? null, ! empty($l['snap']) ? Packages::def($l['snap']) : null)

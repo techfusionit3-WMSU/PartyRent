@@ -24,6 +24,7 @@ class Product extends Model
             'pickup' => 'boolean',
             'handling_fee' => 'float',
             'replacement_value' => 'float',
+            'min_hours' => 'float', 'buffer_min' => 'integer',
             'weight_kg' => 'float', 'length_cm' => 'float', 'width_cm' => 'float', 'height_cm' => 'float',
             'perishable' => 'boolean',
             'lead_days' => 'integer',
@@ -42,6 +43,12 @@ class Product extends Model
     public function isSale(): bool
     {
         return $this->listing_type === 'sale';
+    }
+
+    /** Rented by the hour: booked for a start–end time on one date, priced per hour. */
+    public function isHourly(): bool
+    {
+        return ! $this->isSale() && $this->rental_mode === 'hour';
     }
 
     /** For sale items `total_stock` is the stock on hand. */

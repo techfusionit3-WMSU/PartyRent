@@ -37,7 +37,7 @@ class PayoutsTest extends TestCase
                 $this->assertStringNotContainsString(e($name), $html, "$url shows supplier $name");
             }
         }
-        $this->get('/cashier/reports')->assertDontSee('collections by supplier');
+        $this->get('/cashier/reports')->assertDontSee('collections by rental partner');
         $csv = $this->get('/cashier/reports.csv')->assertOk()->streamedContent();
         $this->assertStringNotContainsString('Supplier', strtok($csv, "\n"));
 
@@ -64,7 +64,7 @@ class PayoutsTest extends TestCase
         // no payout account yet → refused, and the supplier is reminded
         $acct = $p->supplier->only(['payout_method', 'payout_bank', 'payout_account_name', 'payout_account_no']);
         $p->supplier->update(['payout_method' => null]);
-        $this->get('/admin/payouts')->assertSee('Waiting for the supplier');
+        $this->get('/admin/payouts')->assertSee('Waiting for the rental partner');
         $this->post("/admin/payouts/{$p->code}/pay", ['method' => 'gcash', 'reference' => 'GC-1'])->assertSessionHas('error', fn ($e) => str_contains($e, 'payout account'));
         $this->assertTrue(AppNotification::where('user_id', $p->supplier->owner_id)->where('title', 'Add your payout account')->exists());
         $p->supplier->update(array_merge($acct, ['payout_method' => $acct['payout_method'] ?? 'gcash', 'payout_account_name' => $acct['payout_account_name'] ?? 'Owner', 'payout_account_no' => $acct['payout_account_no'] ?? '0917']));

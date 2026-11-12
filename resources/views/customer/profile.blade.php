@@ -9,7 +9,7 @@
   </div>
   <div class="row wrap">
     @if($sup && $sup->status === 'approved')
-      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="btn btn-primary">{{ icon('swap') }}Switch to Supplier Mode</button></form>
+      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="btn btn-primary">{{ icon('swap') }}Switch to Rental Partner Mode</button></form>
     @else
       <a class="btn btn-primary" href="{{ route('start-selling') }}">{{ icon('store') }}{{ $sup ? 'View application' : 'Start Selling' }}</a>
     @endif

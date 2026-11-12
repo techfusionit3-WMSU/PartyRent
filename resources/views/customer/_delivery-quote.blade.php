@@ -1,4 +1,4 @@
-{{-- Delivery fee breakdown (or why delivery isn't possible). $d = Pricing::deliveryQuote() result, $s = supplier. --}}
+{{-- Delivery fee breakdown (or why delivery isn't possible). $d = Pricing::deliveryQuote() result, $s = rental partner. --}}
 @if(! $d)
 @elseif($d['ok'])
   <div class="card card-flat soft" style="padding:12px 14px">

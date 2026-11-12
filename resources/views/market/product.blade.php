@@ -40,15 +40,15 @@
       <div id="altBox"></div>
       <div class="sum-line total"><span>Estimated rental</span><span class="price" id="est"></span></div>
       @if($own)
-        <div class="alert alert-info">{{ icon('info') }}<div>This is your own listing. <a href="{{ route('supplier.products.edit', $p) }}">Edit in Supplier Mode</a></div></div>
+        <div class="alert alert-info">{{ icon('info') }}<div>This is your own listing. <a href="{{ route('supplier.products.edit', $p) }}">Edit in Rental Partner Mode</a></div></div>
       @else
         <div class="row wrap mt-1"><button class="btn btn-outline btn-lg grow" name="then" value="list" data-rent-submit>{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout" data-rent-submit>Request Rental</button></div>
       @endif
-      <p class="small muted mt-1 mb-0">Submitting a request does not reserve the items until the supplier accepts it.</p>
+      <p class="small muted mt-1 mb-0">Submitting a request does not reserve the items until the rental partner accepts it.</p>
     </form>
 
     <div class="card mt-2">
-      <div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }}</div></div><a class="btn btn-sm" href="{{ route('suppliers.show', $sup) }}">View Supplier Profile</a></div>
+      <div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }}</div></div><a class="btn btn-sm" href="{{ route('suppliers.show', $sup) }}">View Rental Partner Profile</a></div>
       <hr>
       <dl class="kv">
         @php($myCity = customer_city())

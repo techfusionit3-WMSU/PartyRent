@@ -24,9 +24,9 @@
     <div class="field"><label>Start date</label><input class="input" type="date" name="start" min="{{ today_iso() }}" value="{{ $f['start'] }}"></div>
     <div class="field"><label>End date</label><input class="input" type="date" name="end" min="{{ today_iso() }}" value="{{ $f['end'] }}"></div>
     <div class="field"><label>Location type</label><select class="input" name="locationType"><option value="">Not specified</option><option @selected($f['locationType'] === 'Outdoor')>Outdoor</option><option @selected($f['locationType'] === 'Indoor')>Indoor</option></select></div>
-    <div class="field"><label for="aiCity">Preferred supplier city</label><input class="input" id="aiCity" name="city" list="aiCities" autocomplete="off" value="{{ $f['city'] }}" placeholder="Anywhere — start typing a city">
-      <datalist id="aiCities">@foreach($cities as $c => $n)<option value="{{ $c }}">{{ $n }} supplier{{ $n > 1 ? 's' : '' }}</option>@endforeach</datalist>
-      <span class="small muted">Leave blank to see suppliers from anywhere.</span></div>
+    <div class="field"><label for="aiCity">Preferred rental partner city</label><input class="input" id="aiCity" name="city" list="aiCities" autocomplete="off" value="{{ $f['city'] }}" placeholder="Anywhere — start typing a city">
+      <datalist id="aiCities">@foreach($cities as $c => $n)<option value="{{ $c }}">{{ $n }} rental partner{{ $n > 1 ? 's' : '' }}</option>@endforeach</datalist>
+      <span class="small muted">Leave blank to see rental partners from anywhere.</span></div>
     <div class="field"><label>Budget (optional)</label><input class="input" type="number" min="0" name="budget" value="{{ $f['budget'] }}" placeholder="₱"></div>
     <div class="field"><label>Fulfillment</label><select class="input" name="delivery"><option value="">Either</option><option value="1" @selected($f['delivery'] === true)>Delivery</option><option value="0" @selected($f['delivery'] === false)>Pickup</option></select></div>
     <div class="field full"><label>Colors</label><div class="row wrap gap-sm">@foreach(array_keys(\App\Domain\Ai::COLORS) as $c)<label class="chip {{ in_array($c, $f['colors'], true) ? 'active' : '' }}"><input type="checkbox" name="colors[]" value="{{ $c }}" @checked(in_array($c, $f['colors'], true)) hidden><span class="swatch" style="background:{{ color_hex($c) }}"></span> {{ $c }}</label>@endforeach</div></div>
@@ -68,10 +68,10 @@
   @php($pickable = collect($plan['rows'])->filter(fn ($r) => $r['best'])->count())
   <div class="row wrap between" style="padding:16px 18px;border-top:1px solid var(--line)">
     @if($pickable)
-      <span class="small muted"><b>Check the box</b> beside each suggested item you want, then add them to your Rental List. Prices come from each supplier's listing; you can change per-day quantities later in your Rental List.</span>
+      <span class="small muted"><b>Check the box</b> beside each suggested item you want, then add them to your Rental List. Prices come from each rental partner's listing; you can change per-day quantities later in your Rental List.</span>
       <div class="right"><button class="btn btn-primary" id="aiAdd">{{ icon('cart') }}Add checked items to Rental List</button><div class="small" id="aiAddHint" style="color:var(--red,#dc2626)" hidden>Check the box beside at least one item first.</div></div>
     @else
-      <span class="small muted">No suppliers have listed these items yet, so there's nothing to add. Try other items above, or browse all listings.</span>
+      <span class="small muted">No rental partners have listed these items yet, so there's nothing to add. Try other items above, or browse all listings.</span>
       <button class="btn btn-primary" type="button" disabled>{{ icon('cart') }}Nothing to add yet</button>
     @endif
   </div>

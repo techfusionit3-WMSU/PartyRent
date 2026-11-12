@@ -6,13 +6,13 @@
   <div>
     <span class="badge plain" style="background:rgba(255,255,255,.2);color:#fff">{{ icon('sparkle', 'width:14px') }} AI-assisted party rentals</span>
     <h1 class="mt-1">{{ auth()->check() ? 'Hi '.auth()->user()->firstName().', what are we celebrating?' : 'Rent everything your party needs.' }}</h1>
-    <p>Chairs, tables, tents, sound, lights and décor from trusted local suppliers — with real-time availability for every date.</p>
+    <p>Chairs, tables, tents, sound, lights and décor from trusted local rental partners — with real-time availability for every date.</p>
     <form class="hero-ai mt-2" method="GET" action="{{ route('ai') }}">
       <label for="heroAi" class="small strong" style="display:block;margin-bottom:6px">Describe your event — English or Filipino</label>
       <textarea id="heroAi" name="q" placeholder="e.g. Outdoor birthday party for 50 guests, need chairs, tables, a tent, pink decorations and a sound system on {{ fmt_date(add_days(today_iso(), 13), false) }}"></textarea>
       <div class="row wrap mt-1"><button class="btn btn-lg" style="background:#fff;color:var(--brand);border-color:#fff">{{ icon('sparkle') }}Plan with AI</button><a class="btn btn-lg" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.6)" href="{{ route('browse') }}">Browse all items</a></div>
     </form>
-    <div class="hero-stats"><div><b>{{ $sups->count() }}</b><span>verified suppliers</span></div><div><b>{{ $prods->count() }}</b><span>rental items</span></div><div><b>{{ $pkgs->count() }}</b><span>party packages</span></div></div>
+    <div class="hero-stats"><div><b>{{ $sups->count() }}</b><span>verified rental partners</span></div><div><b>{{ $prods->count() }}</b><span>rental items</span></div><div><b>{{ $pkgs->count() }}</b><span>party packages</span></div></div>
   </div>
   <div class="hero-art">🎉<div style="font-size:3.4rem;margin-top:-10px">🎈🪑🎪</div></div>
 </section>
@@ -57,7 +57,7 @@
   <div class="product-grid">@foreach($pkgs->take(4) as $k)@include('partials.package-card', ['k' => $k])@endforeach</div>
 </section>
 
-<section class="section"><div class="section-title"><h2>Featured suppliers</h2><a class="small strong" href="{{ route('suppliers.index') }}">All suppliers</a></div>
+<section class="section"><div class="section-title"><h2>Featured rental partners</h2><a class="small strong" href="{{ route('suppliers.index') }}">All rental partners</a></div>
   <div class="grid grid-3">@foreach($sups->sortByDesc('rating')->take(3) as $s)@include('partials.supplier-card', ['s' => $s])@endforeach</div>
 </section>
 

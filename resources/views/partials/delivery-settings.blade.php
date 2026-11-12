@@ -1,5 +1,5 @@
 {{--
-  Supplier delivery settings (inside shop-fields step 2). $dl = current settings (Supplier::DELIVERY_DEFAULTS shape).
+  Rental Partner delivery settings (inside shop-fields step 2). $dl = current settings (Supplier::DELIVERY_DEFAULTS shape).
   Zone rows reuse the address picker with optional province/city: the deepest place picked is the zone.
 --}}
 @php

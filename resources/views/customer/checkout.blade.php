@@ -6,7 +6,7 @@
 <div class="page-head"><div><h1>Rental request</h1><p>Request to <b>{{ $s->name }}</b> · {{ fmt_range($dates[0], end($dates)) }}</p></div></div>
 
 {{-- Changing delivery/arrangement reloads the quote from the server (GET), keeping what was typed via old() on submit errors. --}}
-<form method="POST" action="{{ route('checkout.submit', $s) }}" class="grid grid-side" id="cf" data-confirm-title="Submit rental request?" data-confirm="Send this request to {{ $s->name }}? Next you pay the amount due now. The supplier reviews availability and responds. Nothing is reserved until they accept." data-confirm-ok="Submit request">
+<form method="POST" action="{{ route('checkout.submit', $s) }}" class="grid grid-side" id="cf" data-confirm-title="Submit rental request?" data-confirm="Send this request to {{ $s->name }}? Next you pay the amount due now. The rental partner reviews availability and responds. Nothing is reserved until they accept." data-confirm-ok="Submit request">
   @csrf
   <div class="stack">
     <div class="card"><h3>1 · Event details</h3><div class="form-grid">
@@ -74,8 +74,8 @@
     <label class="check mt-2"><input type="checkbox" name="agree" value="1" required> I agree to {{ $s->name }}'s cancellation, return and rental policies.</label>
     @error('agree')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
     <button class="btn btn-primary btn-lg btn-block mt-1" type="submit" id="submitReq" data-busy="Placing request…" data-stock-ok="{{ $check['ok'] ? 1 : 0 }}" @disabled(! $check['ok'] || $deliveryBlocked)>Place request &amp; pay <span data-due-amount-btn>{{ money(reset($due)['amount']) }}</span></button>
-    <p class="small mt-1 mb-0 {{ $deliveryBlocked ? '' : 'hidden' }}" id="blockedNote" style="color:var(--red)">Choose an address this supplier delivers to, or switch to pickup.</p>
-    <p class="small muted mt-1 mb-0">Your request stays <b>Pending</b> until you pay and the supplier accepts it. Items are reserved once it is accepted.</p>
+    <p class="small mt-1 mb-0 {{ $deliveryBlocked ? '' : 'hidden' }}" id="blockedNote" style="color:var(--red)">Choose an address this rental partner delivers to, or switch to pickup.</p>
+    <p class="small muted mt-1 mb-0">Your request stays <b>Pending</b> until you pay and the rental partner accepts it. Items are reserved once it is accepted.</p>
   </aside>
 </form>
 @push('scripts')

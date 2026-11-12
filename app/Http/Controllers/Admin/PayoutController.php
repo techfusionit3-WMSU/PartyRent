@@ -58,7 +58,7 @@ class PayoutController extends Controller
         }
 
         return back()->with($res['state'] === 'failed' ? 'error' : 'success', match ($res['state']) {
-            'paid' => $payout->code.': '.money($payout->net).' sent to '.$payout->supplier->name.' through Xendit. The supplier was notified.',
+            'paid' => $payout->code.': '.money($payout->net).' sent to '.$payout->supplier->name.' through Xendit. The rental partner was notified.',
             'failed' => $payout->code.' failed in Xendit: '.$payout->fresh()->failure,
             default => $payout->code.' is on its way: Xendit is sending '.money($payout->net).' to '.$payout->supplier->name.'. It shows as Paid once it arrives.',
         });
@@ -70,7 +70,7 @@ class PayoutController extends Controller
         $state = XenditPayouts::sync($payout);
 
         return back()->with($state === 'failed' ? 'error' : 'success', match ($state) {
-            'paid' => $payout->code.' arrived. The supplier was notified.',
+            'paid' => $payout->code.' arrived. The rental partner was notified.',
             'failed' => $payout->code.' failed: '.$payout->fresh()->failure,
             'error' => 'Could not reach Xendit just now. Try again in a moment.',
             default => $payout->code.' is still being processed by Xendit.',
@@ -83,6 +83,6 @@ class PayoutController extends Controller
         $data = $request->validate(['method' => 'required|in:gcash,bank', 'reference' => 'required|string|max:80', 'notes' => 'nullable|string|max:255']);
         $res = Payouts::markPaid($payout, $data, $request->user());
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $payout->code.' marked as paid. The supplier was notified.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $payout->code.' marked as paid. The rental partner was notified.' : $res['error']);
     }
 }

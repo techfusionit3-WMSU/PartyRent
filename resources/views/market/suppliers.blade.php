@@ -1,8 +1,8 @@
-@extends('layouts.market', ['title' => 'Party suppliers', 'nav' => 'suppliers'])
+@extends('layouts.market', ['title' => 'Party rental partners', 'nav' => 'suppliers'])
 
 @section('content')
-<div class="page-head"><div><h1>Party suppliers</h1><p>Verified local rental shops on PartyRent.</p></div>
-  <form class="row wrap" method="GET"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search suppliers or city" style="width:220px" aria-label="Search suppliers"><select class="input input-sm" name="f" style="width:auto" aria-label="Fulfillment" data-autosubmit><option value="">All fulfillment</option><option value="delivery" @selected($f === 'delivery')>Offers delivery</option><option value="pickup" @selected($f === 'pickup')>Offers pickup</option></select><button class="btn btn-sm">Search</button></form>
+<div class="page-head"><div><h1>Party rental partners</h1><p>Verified local rental shops on PartyRent.</p></div>
+  <form class="row wrap" method="GET"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search rental partners or city" style="width:220px" aria-label="Search rental partners"><select class="input input-sm" name="f" style="width:auto" aria-label="Fulfillment" data-autosubmit><option value="">All fulfillment</option><option value="delivery" @selected($f === 'delivery')>Offers delivery</option><option value="pickup" @selected($f === 'pickup')>Offers pickup</option></select><button class="btn btn-sm">Search</button></form>
 </div>
 <div class="grid grid-2">
   @forelse($list as $s)
@@ -12,7 +12,7 @@
       <div class="row between mt-1"><span class="small muted">{{ $s->products->count() }} items · {{ $s->packages_count }} packages</span><a class="btn btn-sm btn-outline" href="{{ route('suppliers.show', $s) }}">Visit shop</a></div>
     </div>
   @empty
-    @include('partials.empty', ['emoji' => '🏪', 'title' => 'No suppliers found', 'text' => 'Try another search.'])
+    @include('partials.empty', ['emoji' => '🏪', 'title' => 'No rental partners found', 'text' => 'Try another search.'])
   @endforelse
 </div>
 @endsection

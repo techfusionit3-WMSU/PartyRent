@@ -20,14 +20,14 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     public const ADMIN_PERMS = [
         'customers.view' => 'View customer accounts',
         'customers.manage' => 'Activate / suspend customers',
-        'suppliers.view' => 'View supplier accounts',
-        'suppliers.manage' => 'Activate / suspend suppliers',
-        'applications.review' => 'Approve / reject supplier applications',
+        'suppliers.view' => 'View rental partner accounts',
+        'suppliers.manage' => 'Activate / suspend rental partners',
+        'applications.review' => 'Approve / reject rental partner applications',
         'listings.view' => 'View product listings',
         'listings.manage' => 'Hide / restore listings',
         'categories.manage' => 'Manage categories',
         'transactions.view' => 'View transactions & reservations',
-        'payouts.manage' => 'Release & send supplier payouts',
+        'payouts.manage' => 'Release & send rental partner payouts',
         'complaints.manage' => 'Handle complaints',
         'reports.view' => 'View reports',
     ];

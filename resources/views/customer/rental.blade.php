@@ -4,10 +4,10 @@
 <div class="crumbs"><a href="{{ route('rentals.index') }}">My Rentals</a> / {{ $r->code }}</div>
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@include('partials.badges', ['pay' => $f['status']])</div></div>
 <div class="card mb-2">@include('partials.progress')</div>
-@if($f['isOverdue'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div><b>Payment overdue.</b> Outstanding: {{ money($f['overdueAmount']) }}. Please settle as soon as possible to keep your reservation. The supplier will review overdue accounts according to their policy.</div></div>@endif
+@if($f['isOverdue'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div><b>Payment overdue.</b> Outstanding: {{ money($f['overdueAmount']) }}. Please settle as soon as possible to keep your reservation. The rental partner will review overdue accounts according to their policy.</div></div>@endif
 @if($r->status === 'pending')
   @if(! $f['upfrontPaid'])
-    <div class="alert alert-warn mb-2">{{ icon('card') }}<div><b>Pay the {{ strtolower($f['upfront']['label']) }} of {{ money($f['upfront']['amount']) }} to confirm your request.</b> {{ $sup->name }} can only accept once PartyRent's cashier has verified it.@if($f['pendingRental'] > 0) Your {{ money($f['pendingRental']) }} payment is waiting for verification.@endif If the supplier declines, PartyRent refunds you in full. Items are not reserved until the request is accepted.@if($payTypes) <button class="btn btn-sm btn-primary mt-1" data-modal="payModal">Pay now</button>@endif</div></div>
+    <div class="alert alert-warn mb-2">{{ icon('card') }}<div><b>Pay the {{ strtolower($f['upfront']['label']) }} of {{ money($f['upfront']['amount']) }} to confirm your request.</b> {{ $sup->name }} can only accept once PartyRent's cashier has verified it.@if($f['pendingRental'] > 0) Your {{ money($f['pendingRental']) }} payment is waiting for verification.@endif If the rental partner declines, PartyRent refunds you in full. Items are not reserved until the request is accepted.@if($payTypes) <button class="btn btn-sm btn-primary mt-1" data-modal="payModal">Pay now</button>@endif</div></div>
   @else
     <div class="alert alert-info mb-2">{{ icon('clock') }}<div>Your {{ strtolower($f['upfront']['label']) }} is verified. Waiting for <b>{{ $sup->name }}</b> to accept. Items are not reserved until it is accepted; if they decline, PartyRent refunds you in full.</div></div>
   @endif
@@ -138,9 +138,9 @@
         <div class="form-grid"><div class="field"><label>Reference number</label><input class="input" name="reference" value="{{ old('reference') }}" placeholder="e.g. 1012 345 678901" maxlength="80"><div class="hint">Each reference number can be used only once.</div></div><div class="field"><label>Payment date</label><input class="input" type="date" name="date" value="{{ today_iso() }}" max="{{ today_iso() }}"></div></div>
         <div class="field"><label>Payment proof</label><label class="upload-box" for="proof">{{ icon('upload') }}<div class="small">Upload a screenshot or photo of the receipt (JPG/PNG, up to 8 MB)</div></label><input type="file" id="proof" name="proof" accept="image/*" hidden><div class="small muted" id="proofName"></div></div>
       </div>
-      <div id="codBox" class="alert alert-warn hidden">{{ icon('cash') }}<div class="small"><b>Cash on Delivery:</b> hand the cash to the supplier's crew when the items arrive. They collect it for PartyRent and our cashier verifies it. You can also log it here with the amount you handed over.</div></div>
+      <div id="codBox" class="alert alert-warn hidden">{{ icon('cash') }}<div class="small"><b>Cash on Delivery:</b> hand the cash to the rental partner's crew when the items arrive. They collect it for PartyRent and our cashier verifies it. You can also log it here with the amount you handed over.</div></div>
       <div class="field"><label>Notes (optional)</label><input class="input" name="notes" maxlength="255"></div>
-      <p class="small muted mb-0">You pay PartyRent, not the supplier directly. We hold your payment and only release it to the supplier after your rental is completed. Transfers and cash show as <b>Pending Verification</b> until our cashier confirms them, and don't reduce your balance until then.</p>
+      <p class="small muted mb-0">You pay PartyRent, not the rental partner directly. We hold your payment and only release it to the rental partner after your rental is completed. Transfers and cash show as <b>Pending Verification</b> until our cashier confirms them, and don't reduce your balance until then.</p>
     </div>
     <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary" type="submit" id="paySubmit" data-busy="Submitting…">Submit payment</button></div>
   </form>

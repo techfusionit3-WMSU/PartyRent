@@ -1,4 +1,4 @@
-@extends('layouts.auth', ['title' => 'Verify your email', 'heading' => 'One last step.', 'sub' => 'Confirm your email so suppliers can reach you about your bookings, and so only you can recover this account.'])
+@extends('layouts.auth', ['title' => 'Verify your email', 'heading' => 'One last step.', 'sub' => 'Confirm your email so rental partners can reach you about your bookings, and so only you can recover this account.'])
 
 @section('content')
 <h1>Check your inbox</h1>

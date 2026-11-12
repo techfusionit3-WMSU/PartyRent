@@ -226,7 +226,7 @@ class Rentals
             }
         }
         if (! $lines) {
-            return self::fail('There are no items for this supplier in your rental list.');
+            return self::fail('There are no items for this rental partner in your rental list.');
         }
         foreach ($lines as $l) {
             if ($e = self::leadTimeError($l)) {
@@ -255,7 +255,7 @@ class Rentals
             return self::fail($s->name.' offers delivery only.');
         }
         if (! in_array($form['arrangement'], $s->arrangements, true) || ! in_array($form['method'], $s->methods, true)) {
-            return self::fail('Choose a payment arrangement and method this supplier accepts.');
+            return self::fail('Choose a payment arrangement and method this rental partner accepts.');
         }
         $addr = $form['fulfillment'] === 'delivery' ? Locations::cleanAddress($form['addr'] ?? []) : null;
         if ($addr && ! $addr['cityCode']) {
@@ -313,14 +313,14 @@ class Rentals
             // Consumables are refundable only until the supplier starts preparing the order.
             $sales = (float) ($r->pricing['salesSubtotal'] ?? 0);
             $saleLocked = $sales > 0 && $r->status === 'in_progress';
-            $saleNote = $saleLocked ? ' Items for sale ('.money($sales).') are no longer refundable because the supplier has started preparing them.' : '';
+            $saleNote = $saleLocked ? ' Items for sale ('.money($sales).') are no longer refundable because the rental partner has started preparing them.' : '';
 
             return ['allowed' => true, 'free' => $free && ! $saleLocked, 'deadline' => $deadline, 'nonRefundable' => $saleLocked ? $sales : 0.0, 'note' => ($free
                 ? 'Free cancellation until '.fmt_date($deadline).'. Verified payments will be refunded by PartyRent.'
                 : 'The free cancellation period ended on '.fmt_date($deadline).'. Per policy: '.$s->pol('cancellation', '')).$saleNote];
         }
 
-        return ['allowed' => false, 'free' => false, 'note' => 'Items have already been released or the rental is closed, so it can no longer be cancelled online. Please contact the supplier.'];
+        return ['allowed' => false, 'free' => false, 'note' => 'Items have already been released or the rental is closed, so it can no longer be cancelled online. Please contact the rental partner.'];
     }
 
     public static function cancelRequest(RentalRequest $r, string $reason): array
@@ -412,7 +412,7 @@ class Rentals
         $paid = $r->fin()['paidRental'];
         Notifier::notify($r->customer_id, 'customer', 'Request declined', $r->supplier->name.' declined '.$r->code.($reason ? ': '.$reason : '.').($paid > 0 ? ' PartyRent will refund your '.money($paid).' in full.' : ''), self::link('rentals.show', $r));
         if ($paid > 0) {
-            Notifier::notify('cashier', 'cashier', 'Refund due', $r->code.' was declined by the supplier. Refund the customer\'s '.money($paid).' in full.', self::link('cashier.record', ['request' => $r->code]));
+            Notifier::notify('cashier', 'cashier', 'Refund due', $r->code.' was declined by the rental partner. Refund the customer\'s '.money($paid).' in full.', self::link('cashier.record', ['request' => $r->code]));
         }
         Notifier::audit('Declined rental request', $r->code.($reason ? ' — '.$reason : ''));
 
@@ -586,7 +586,7 @@ class Rentals
             self::history($r, 'inspection', $comp > 0 ? 'Damage/missing items recorded: '.money($comp) : 'All items returned in good condition');
         });
         self::changed($r);
-        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? 'Damage report' : 'Return inspection done', $comp > 0 ? 'The supplier recorded damaged/missing items for '.$r->code.'. Compensation: '.money($comp).'. View the report for details.' : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
+        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? 'Damage report' : 'Return inspection done', $comp > 0 ? 'The rental partner recorded damaged/missing items for '.$r->code.'. Compensation: '.money($comp).'. View the report for details.' : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
         Notifier::audit('Recorded return inspection', $r->code.' · compensation '.money($comp));
 
         return self::ok();
@@ -725,7 +725,7 @@ class Rentals
     {
         if ($r->status === 'pending') {
             if (! in_array($data['type'], Finance::RENTAL_TYPES, true)) {
-                return self::fail('Before the supplier accepts, pay the '.strtolower($r->fin()['upfront']['label']).' first. The deposit is paid after acceptance.');
+                return self::fail('Before the rental partner accepts, pay the '.strtolower($r->fin()['upfront']['label']).' first. The deposit is paid after acceptance.');
             }
         } elseif (! in_array($r->status, Finance::ACTIVE, true) && $r->status !== 'completed') {
             return self::fail('This request is '.strtolower(RentalRequest::statusLabel($r->status)).', so no more payments can be made.');
@@ -763,7 +763,7 @@ class Rentals
         Notifier::notify('cashier', 'cashier', 'New payment submission', $cust->name.' · '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.' — pending verification.', self::link('cashier.verification'));
         Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment submitted', $cust->name.' submitted '.money($p->amount).' for '.$r->code.'. Awaiting PartyRent cashier verification'.($r->status === 'pending' ? ' — you can accept once it is verified.' : '.'), self::link('supplier.requests.show', $r));
         if ($source === 'supplier') {
-            Notifier::notify($r->customer_id, 'customer', 'Payment recorded', 'The supplier recorded your '.money($p->amount).' payment for '.$r->code.'. It will count once verified.', self::link('rentals.show', $r));
+            Notifier::notify($r->customer_id, 'customer', 'Payment recorded', 'The rental partner recorded your '.money($p->amount).' payment for '.$r->code.'. It will count once verified.', self::link('rentals.show', $r));
         }
 
         return self::ok(['payment' => $p]);
@@ -854,7 +854,7 @@ class Rentals
             return self::fail($r->code.' is '.$r->status.': only refunds can be recorded.');
         }
         if ($r->payout()->exists()) {
-            return self::fail('The money for '.$r->code.' was already released to the supplier ('.$r->payout->code.'). Ask an admin to handle any correction.');
+            return self::fail('The money for '.$r->code.' was already released to the rental partner ('.$r->payout->code.'). Ask an admin to handle any correction.');
         }
         if ($data['type'] === 'refund' && (float) $data['amount'] > $f['paidRental'] - $f['refunded'] + 0.001) {
             return self::fail('Refund cannot exceed verified rental payments ('.money($f['paidRental'] - $f['refunded']).').');
@@ -919,7 +919,7 @@ class Rentals
     {
         $existing = $u->supplier;
         if ($existing && $existing->status !== 'rejected') {
-            return self::fail('You already have a supplier profile ('.$existing->status.').');
+            return self::fail('You already have a rental partner profile ('.$existing->status.').');
         }
         $needsReview = (bool) Settings::get('requireSupplierApproval', true);
         $attrs = array_merge($data, [
@@ -928,12 +928,12 @@ class Rentals
         ]);
         $s = $existing ? tap($existing)->update($attrs) : Supplier::create(array_merge(['rating' => 0], $attrs));
         if ($needsReview) {
-            Notifier::notify('admin', 'admin', 'New supplier application', $u->name.' applied to open '.$s->name.'.', '');
-            Notifier::notify($u, 'customer', 'Application submitted', 'Your supplier application for '.$s->name.' is pending review. We will notify you once it is approved.', self::link('start-selling'));
+            Notifier::notify('admin', 'admin', 'New rental partner application', $u->name.' applied to open '.$s->name.'.', '');
+            Notifier::notify($u, 'customer', 'Application submitted', 'Your rental partner application for '.$s->name.' is pending review. We will notify you once it is approved.', self::link('start-selling'));
         } else {
-            Notifier::notify($u, 'customer', 'Your shop is live!', $s->name.' is approved. Switch to Supplier Mode to add your first product.', self::link('supplier.dashboard'));
+            Notifier::notify($u, 'customer', 'Your shop is live!', $s->name.' is approved. Switch to Rental Partner Mode to add your first product.', self::link('supplier.dashboard'));
         }
-        Notifier::audit('Submitted supplier application', $s->name, $u);
+        Notifier::audit('Submitted rental partner application', $s->name, $u);
 
         return self::ok(['supplier' => $s]);
     }
@@ -950,8 +950,8 @@ class Rentals
             return self::fail('Please state the reason for rejection.');
         }
         $s->update(['status' => $approve ? 'approved' : 'rejected', 'reviewed_at' => now(), 'reviewed_by' => $by->id, 'reject_reason' => $approve ? null : $reason, 'approved_at' => $approve ? now() : null]);
-        Notifier::notify($s->owner_id, 'customer', $approve ? 'Supplier application approved 🎉' : 'Supplier application rejected', $approve ? $s->name.' is approved! Use "Switch to Supplier Mode" in your profile menu to start listing items.' : 'Your application for '.$s->name.' was not approved: '.$reason.'. You may update and resubmit.', self::link('start-selling'));
-        Notifier::audit($approve ? 'Approved supplier application' : 'Rejected supplier application', $s->name.($reason ? ' — '.$reason : ''), $by);
+        Notifier::notify($s->owner_id, 'customer', $approve ? 'Rental Partner application approved 🎉' : 'Rental Partner application rejected', $approve ? $s->name.' is approved! Use "Switch to Rental Partner Mode" in your profile menu to start listing items.' : 'Your application for '.$s->name.' was not approved: '.$reason.'. You may update and resubmit.', self::link('start-selling'));
+        Notifier::audit($approve ? 'Approved rental partner application' : 'Rejected rental partner application', $s->name.($reason ? ' — '.$reason : ''), $by);
 
         return self::ok();
     }

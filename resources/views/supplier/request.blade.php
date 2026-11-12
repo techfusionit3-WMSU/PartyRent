@@ -165,7 +165,7 @@
 @endif
 @push('scripts')
 <script>
-// Pre-fill charges from the replacement value until the supplier types their own amount.
+// Pre-fill charges from the replacement value until the rental partner types their own amount.
 (function () {
   document.querySelectorAll('[data-insp]').forEach(function (box) {
     var v = +box.dataset.value || 0; if (!v) return;

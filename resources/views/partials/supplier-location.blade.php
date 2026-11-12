@@ -1,6 +1,6 @@
 {{--
-  Where a supplier operates from, with privacy rules applied.
-  $s = supplier; $reveal = true when this viewer may see the exact spot (the owner, staff, or a customer
+  Where a rental partner operates from, with privacy rules applied.
+  $s = rental partner; $reveal = true when this viewer may see the exact spot (the owner, staff, or a customer
   whose pickup request was accepted). Home-based sellers otherwise show only a circle around their city.
 --}}
 @php

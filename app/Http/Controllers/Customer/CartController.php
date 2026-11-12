@@ -111,7 +111,7 @@ class CartController extends Controller
     {
         $lines = Rentals::cartLinesFor($request->user(), $supplier->id);
         if (! $lines) {
-            return 'Your rental list has no items from this supplier.';
+            return 'Your rental list has no items from this rental partner.';
         }
         $dates = collect($lines)->flatMap(fn ($l) => array_keys(Rentals::cleanDays($l['days'])))->unique()->sort()->values()->all();
         if (! $dates) {

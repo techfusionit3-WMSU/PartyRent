@@ -1,9 +1,9 @@
-{{-- Payment summary card: customer, supplier, cashier and admin all see the same numbers. --}}
+{{-- Payment summary card: customer, rental partner, cashier and admin all see the same numbers. --}}
 @php($f = $r->fin())
 @php($p = $f['pricing'])
 <div class="row between mb-1"><h3 class="mb-0">Payment summary</h3>@include('partials.badges', ['pay' => $f['status']])</div>
 @include('partials.subtotals', ['p' => $p])
-{{-- Delivery comes from the snapshot frozen at submission, never from the supplier's current rates. --}}
+{{-- Delivery comes from the snapshot frozen at submission, never from the rental partner's current rates. --}}
 @php($dl = $p['delivery'] ?? null)
 @if($p['deliveryFee'] || ($dl['ok'] ?? false))
   <div class="sum-line"><span class="muted">Delivery{{ ! empty($dl['cityLabel']) ? ' to '.$dl['cityLabel'] : '' }}{{ ! empty($dl['waived']) ? ' (free)' : '' }}</span><span>{{ money($p['deliveryFee']) }}</span></div>
@@ -33,7 +33,7 @@
     @endforeach
   </div>
 @elseif($r->status === 'pending')
-  <div class="alert alert-info mt-2">{{ icon('info') }}<div>Payment requirements will be generated once the supplier accepts this request.</div></div>
+  <div class="alert alert-info mt-2">{{ icon('info') }}<div>Payment requirements will be generated once the rental partner accepts this request.</div></div>
 @endif
 
 <div class="card card-flat soft mt-2" style="padding:14px">

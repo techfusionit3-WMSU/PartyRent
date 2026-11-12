@@ -3,7 +3,7 @@
 @php
     $opt = fn ($v, $l, $cur) => '<option value="'.e($v).'"'.((string) $v === (string) $cur ? ' selected' : '').'>'.e($l).'</option>';
     $qs = fn (array $over) => route('browse', array_filter(array_merge($st, $over), fn ($v) => $v !== '' && $v !== null && $v !== 'recommended' && $v !== 'items'));
-    $labels = ['q' => 'Keyword', 'category' => 'Category', 'supplier' => 'Supplier', 'city' => 'Location', 'event' => 'Event', 'color' => 'Color', 'theme' => 'Theme', 'min' => 'Min ₱', 'max' => 'Max ₱', 'start' => 'From', 'end' => 'To', 'qty' => 'Qty', 'avail' => 'Available only', 'delivery' => 'Delivery', 'pickup' => 'Pickup', 'rating' => 'Rating ≥'];
+    $labels = ['q' => 'Keyword', 'category' => 'Category', 'supplier' => 'Rental Partner', 'city' => 'Location', 'event' => 'Event', 'color' => 'Color', 'theme' => 'Theme', 'min' => 'Min ₱', 'max' => 'Max ₱', 'start' => 'From', 'end' => 'To', 'qty' => 'Qty', 'avail' => 'Available only', 'delivery' => 'Delivery', 'pickup' => 'Pickup', 'rating' => 'Rating ≥'];
 @endphp
 
 @section('content')

@@ -7,7 +7,7 @@
   <form method="POST" action="{{ route('admin.complaints.store') }}" class="mt-2">@csrf
     <div class="grid grid-2">
       <div class="field"><label for="c-rep">Reported by</label><select class="input" id="c-rep" name="reporter_id" required>@foreach($customers as $u)<option value="{{ $u->id }}" @selected(old('reporter_id') == $u->id)>{{ $u->name }} · {{ $u->email }}</option>@endforeach</select></div>
-      <div class="field"><label for="c-sup">About supplier (optional)</label><select class="input" id="c-sup" name="against_supplier_id"><option value="">—</option>@foreach($suppliers as $s)<option value="{{ $s->id }}" @selected(old('against_supplier_id') == $s->id)>{{ $s->name }}</option>@endforeach</select></div>
+      <div class="field"><label for="c-sup">About rental partner (optional)</label><select class="input" id="c-sup" name="against_supplier_id"><option value="">—</option>@foreach($suppliers as $s)<option value="{{ $s->id }}" @selected(old('against_supplier_id') == $s->id)>{{ $s->name }}</option>@endforeach</select></div>
       <div class="field"><label for="c-req">Rental request code (optional)</label><input class="input" id="c-req" name="request_code" value="{{ old('request_code') }}" placeholder="PR-0001">@error('request_code')<div class="err">No request with that code.</div>@enderror</div>
       <div class="field"><label for="c-pri">Priority</label><select class="input" id="c-pri" name="priority">@foreach(['normal' => 'Normal', 'high' => 'High', 'low' => 'Low'] as $k => $l)<option value="{{ $k }}" @selected(old('priority') === $k)>{{ $l }}</option>@endforeach</select></div>
     </div>

@@ -7,7 +7,7 @@
   @foreach($list as $u)
     <tr>
       <td data-label="User"><div class="row"><span class="avatar">{{ $u->initials() }}</span><div><b>{{ $u->name }}</b><div class="small muted">{{ $u->email }}</div></div></div></td>
-      <td data-label="Roles">{{ implode(', ', array_map('ucfirst', $u->roles)) }}{{ $u->supplier ? ' + Supplier ('.$u->supplier->status.')' : '' }}</td>
+      <td data-label="Roles">{{ implode(', ', array_map('ucfirst', $u->roles)) }}{{ $u->supplier ? ' + Rental Partner ('.$u->supplier->status.')' : '' }}</td>
       <td data-label="Last sign-in"><span class="small">{{ $u->last_login_at ? fmt_datetime($u->last_login_at) : '—' }}</span></td>
       <td data-label="Joined">{{ fmt_date($u->created_at) }}</td>
       <td data-label="Status"><span class="badge {{ $u->status === 'active' ? 'b-green' : 'b-red' }}">{{ ucfirst($u->status) }}</span></td>

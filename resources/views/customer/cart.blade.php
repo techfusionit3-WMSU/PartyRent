@@ -6,14 +6,14 @@
   <div class="card">@include('partials.empty', ['emoji' => '🛒', 'title' => 'Your rental list is empty', 'text' => 'Add items or packages, then set the dates and quantities for each day.', 'action' => '<div class="row wrap" style="justify-content:center"><a class="btn btn-primary" href="'.route('browse').'">Browse supplies</a><a class="btn" href="'.route('ai').'">'.icon('sparkle').'Plan with AI</a></div>'])</div>
 @else
 <div class="page-head"><div><h1>Rental List</h1><p>Set a different quantity for each date if you need to. Availability is checked day by day and changes save automatically.</p></div>
-  <div class="row">@if(count($groups) > 1)<a class="btn btn-sm" href="{{ route('cart', ['compare' => 1]) }}">{{ icon('layers') }}Compare suppliers</a>@endif<a class="btn btn-sm btn-ghost" href="{{ route('browse') }}">{{ icon('plus') }}Add more items</a></div>
+  <div class="row">@if(count($groups) > 1)<a class="btn btn-sm" href="{{ route('cart', ['compare' => 1]) }}">{{ icon('layers') }}Compare rental partners</a>@endif<a class="btn btn-sm btn-ghost" href="{{ route('browse') }}">{{ icon('plus') }}Add more items</a></div>
 </div>
 
 @if($compare && count($groups) > 1)
-  <div class="card mb-2"><div class="card-head"><h3>Compare suppliers in your list</h3><a class="btn btn-xs btn-ghost" href="{{ route('cart') }}">Close</a></div>
+  <div class="card mb-2"><div class="card-head"><h3>Compare rental partners in your list</h3><a class="btn btn-xs btn-ghost" href="{{ route('cart') }}">Close</a></div>
     <div class="table-wrap"><table class="table cards"><thead><tr><th>Supplier</th><th class="num">Items</th><th>Delivery</th><th>Payment options</th><th class="num">Deposit</th><th>Availability</th></tr></thead><tbody>
       @foreach($groups as $g)
-        <tr><td data-label="Supplier"><b>{{ $g['supplier']->name }}</b><div class="small muted">{{ $g['supplier']->city }} · ★ {{ rating_text($g['supplier']) }}</div></td><td data-label="Items" class="num">{{ money($g['quote']['itemsSubtotal']) }}</td><td data-label="Delivery">{{ $g['supplier']->fulfillmentLabel() }}@if($g['delivery'])<div class="small muted">{{ $g['delivery']['ok'] ? 'Est. '.money($g['delivery']['fee']) : ($g['delivery']['code'] === 'no_city' ? $g['supplier']->deliverySummary() : 'Pickup only in your area') }}</div>@endif</td><td data-label="Payment">{!! collect($g['supplier']->arrangements)->map(fn ($a) => e(\App\Models\Payment::ARR_LABEL[$a]))->implode('<br>') !!}</td><td data-label="Deposit" class="num">{{ money($g['compareQuote']['deposit']) }}</td><td data-label="Availability">@if($g['check']['ok'])<span class="badge b-green">All dates OK</span>@else<span class="badge b-red">Conflicts</span>@endif</td></tr>
+        <tr><td data-label="Rental Partner"><b>{{ $g['supplier']->name }}</b><div class="small muted">{{ $g['supplier']->city }} · ★ {{ rating_text($g['supplier']) }}</div></td><td data-label="Items" class="num">{{ money($g['quote']['itemsSubtotal']) }}</td><td data-label="Delivery">{{ $g['supplier']->fulfillmentLabel() }}@if($g['delivery'])<div class="small muted">{{ $g['delivery']['ok'] ? 'Est. '.money($g['delivery']['fee']) : ($g['delivery']['code'] === 'no_city' ? $g['supplier']->deliverySummary() : 'Pickup only in your area') }}</div>@endif</td><td data-label="Payment">{!! collect($g['supplier']->arrangements)->map(fn ($a) => e(\App\Models\Payment::ARR_LABEL[$a]))->implode('<br>') !!}</td><td data-label="Deposit" class="num">{{ money($g['compareQuote']['deposit']) }}</td><td data-label="Availability">@if($g['check']['ok'])<span class="badge b-green">All dates OK</span>@else<span class="badge b-red">Conflicts</span>@endif</td></tr>
       @endforeach
     </tbody></table></div>
   </div>
@@ -27,7 +27,7 @@
         <div class="cg-head">
           <div class="row"><div class="logo-tile" style="width:42px;height:42px;font-size:1.3rem;background:{{ $s->color }}1a">{{ $s->logo }}</div><div><a class="strong" href="{{ route('suppliers.show', $s) }}">{{ $s->name }}</a><div class="small muted">{{ $s->city }} · {{ $s->fulfillmentLabel() }}</div></div></div>
           <div class="row"><div class="right"><div class="small muted">Subtotal</div><b class="price">{{ money($g['quote']['itemsSubtotal']) }}</b></div>
-            @if($g['check']['ok'])<a class="btn btn-primary btn-sm" href="{{ route('checkout', $s) }}">Request from this supplier</a>@else<button class="btn btn-primary btn-sm" disabled>Request from this supplier</button>@endif
+            @if($g['check']['ok'])<a class="btn btn-primary btn-sm" href="{{ route('checkout', $s) }}">Request from this rental partner</a>@else<button class="btn btn-primary btn-sm" disabled>Request from this rental partner</button>@endif
           </div>
         </div>
         @php($dq = $g['delivery'])
@@ -64,8 +64,8 @@
     <div class="sum-line total"><span>Items total</span><span class="price">{{ money(collect($groups)->sum(fn ($g) => $g['quote']['itemsSubtotal'])) }}</span></div>
     @php($estDelivery = collect($groups)->sum(fn ($g) => ($g['delivery']['ok'] ?? false) ? $g['delivery']['fee'] : 0))
     @if($estDelivery > 0)<div class="sum-line"><span class="muted">Est. delivery{{ $city ? ' to '.\App\Domain\Locations::name($city) : '' }}</span><span>{{ money($estDelivery) }}</span></div>@endif
-    <p class="small muted">{{ $city ? 'Delivery estimates use your saved city; you can change the address at checkout.' : 'Set your city in your profile to see delivery estimates.' }} Deposits and payment schedules are shown at checkout. Each supplier receives its own request.</p>
-    <div class="alert alert-info">{{ icon('info') }}<div class="small">Items in your list are <b>not reserved</b>. Stock is only reserved when a supplier accepts your request.</div></div>
+    <p class="small muted">{{ $city ? 'Delivery estimates use your saved city; you can change the address at checkout.' : 'Set your city in your profile to see delivery estimates.' }} Deposits and payment schedules are shown at checkout. Each rental partner receives its own request.</p>
+    <div class="alert alert-info">{{ icon('info') }}<div class="small">Items in your list are <b>not reserved</b>. Stock is only reserved when a rental partner accepts your request.</div></div>
   </aside>
 </div>
 @endif

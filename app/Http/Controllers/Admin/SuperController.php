@@ -82,10 +82,10 @@ class SuperController extends Controller
                 ['Pending requests with stock conflicts', $conflicts, route('admin.transactions', ['status' => 'pending'])],
                 ['Overdue payments', $reqs->filter(fn ($r) => $r->isActive() && $r->fin()['isOverdue'])->count(), route('cashier.balances', ['tab' => 'overdue'])],
                 ['Late returns (past end date)', $lateReturns, route('admin.transactions', ['status' => 'ongoing'])],
-                ['Supplier applications waiting', Supplier::where('status', 'pending')->count(), route('admin.applications')],
+                ['Rental Partner applications waiting', Supplier::where('status', 'pending')->count(), route('admin.applications')],
             ],
             'counts' => [
-                'Users' => User::count(), 'Suspended users' => User::where('status', 'suspended')->count(), 'Suppliers' => Supplier::count(),
+                'Users' => User::count(), 'Suspended users' => User::where('status', 'suspended')->count(), 'Rental Partners' => Supplier::count(),
                 'Products' => Product::count(), 'Rental requests' => RentalRequest::count(), 'Payments' => Payment::count(),
                 'Open cart lines' => CartLine::count(), 'Notifications' => AppNotification::count(), 'Audit entries' => AuditLog::count(),
             ],

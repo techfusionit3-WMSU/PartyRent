@@ -1,4 +1,4 @@
-{{-- Supplier profile fields, shared by Start Selling (wizard steps) and Shop Profile. $d = attributes, $p = policy --}}
+{{-- Rental Partner profile fields, shared by Start Selling (wizard steps) and Shop Profile. $d = attributes, $p = policy --}}
 @php
     $o = fn ($k, $def = null) => old($k, $d[$k] ?? $def);
     $po = fn ($k) => old($k, $p[$k] ?? null);

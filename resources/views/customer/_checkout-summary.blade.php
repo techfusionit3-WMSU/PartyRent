@@ -16,12 +16,12 @@
 @endif
 <div class="sum-line"><span class="muted">Security deposit <span class="badge b-purple plain">refundable</span></span><span>{{ money($q['deposit']) }}</span></div>
 <div class="small muted">{{ ($q['rentalSubtotal'] ?? 1) > 0 ? 'Collected separately from rental charges and returned after inspection.' : 'No deposit: nothing in this order is returned.' }}</div>
-@if(($q['salesSubtotal'] ?? 0) > 0)<div class="alert alert-info mt-1">{{ icon('info') }}<div class="small">Items for sale ({{ money($q['salesSubtotal']) }}) are consumed and not returned. They are refundable only until the supplier starts preparing your order; after that they are non-refundable.</div></div>@endif
+@if(($q['salesSubtotal'] ?? 0) > 0)<div class="alert alert-info mt-1">{{ icon('info') }}<div class="small">Items for sale ({{ money($q['salesSubtotal']) }}) are consumed and not returned. They are refundable only until the rental partner starts preparing your order; after that they are non-refundable.</div></div>@endif
 @isset($due)
   @php($first = reset($due))
   <div class="card card-flat mt-2" style="padding:12px 14px;border-color:var(--brand)" data-due-box @foreach($due as $m => $d) data-due-{{ $m }}="{{ $d['label'] }}|{{ money($d['amount']) }}" @endforeach>
     <div class="sum-line strong"><span>Pay now to confirm<br><span class="small muted" data-due-label>{{ $first['label'] }}</span></span><span class="price" data-due-amount>{{ money($first['amount']) }}</span></div>
-    <div class="small muted">Paid to PartyRent and held until your rental is completed. Refunded in full if the supplier declines.</div>
+    <div class="small muted">Paid to PartyRent and held until your rental is completed. Refunded in full if the rental partner declines.</div>
   </div>
 @endisset
 <div class="label mt-2 mb-1">Expected schedule (if accepted today)</div>

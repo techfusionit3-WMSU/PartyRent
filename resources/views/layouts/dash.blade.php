@@ -28,7 +28,18 @@
         ['System'], ['audit', 'admin.audit', 'file', 'Audit Logs'], ['settings', 'super.settings', 'settings', 'System Settings'], ['notifications', 'notifications', 'bell', 'Notifications'],
     ], 'bottom' => [['dashboard', 'super.dashboard', 'grid', 'Home'], ['monitoring', 'super.monitoring', 'activity', 'Monitor'], ['admins', 'super.admins', 'shield', 'Admins'], ['audit', 'admin.audit', 'file', 'Audit']]];
     $cfg = $NAV[$role] ?? $NAV['admin'];
-    $sup = $role === 'supplier' ? $shellUser->supplier : null;
+    $sup = $role === 'supplier' ? $shellUser->shop() : null;
+    if ($sup) {
+        // Business owners get a Staff page; staff only see the pages their role can open.
+        if ($sup->isVerifiedBusiness()) {
+            $at = array_search(['Shop'], $cfg['items'], true);
+            array_splice($cfg['items'], $at + 1, 0, [['staff', 'supplier.staff', 'users', 'Staff & Roles']]);
+        }
+        $keep = fn ($it) => count($it) === 1 || $shellUser->canShop($it[1]);
+        $items = array_values(array_filter($cfg['items'], $keep));
+        $cfg['items'] = array_values(array_filter($items, fn ($it, $i) => count($it) > 1 || (isset($items[$i + 1]) && count($items[$i + 1]) > 1), ARRAY_FILTER_USE_BOTH));
+        $cfg['bottom'] = array_values(array_filter($cfg['bottom'], fn ($it) => $shellUser->canShop($it[1])));
+    }
     $nav = $nav ?? '';
 @endphp
 

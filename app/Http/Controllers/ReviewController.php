@@ -15,7 +15,7 @@ class ReviewController extends Controller
 
     public function supplierIndex(Request $request)
     {
-        $sup = $request->user()->supplier;
+        $sup = $request->user()->shop();
         $all = Review::where('supplier_id', $sup->id)->with(['customer', 'product', 'package'])->latest()->get();
         $tab = in_array($request->query('tab'), ['unreplied', 'all', 'hidden'], true) ? $request->query('tab') : 'unreplied';
         $visible = $all->whereNull('hidden_at');

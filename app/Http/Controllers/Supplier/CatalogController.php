@@ -18,7 +18,7 @@ class CatalogController extends Controller
 {
     private function sup(Request $r)
     {
-        return $r->user()->supplier;
+        return $r->user()->shop();
     }
 
     private function ownProduct(Request $r, Product $p): Product

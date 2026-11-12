@@ -17,6 +17,9 @@ class StartSellingController extends Controller
     {
         $u = $request->user();
         $existing = $u->supplier;
+        if (! $existing && $u->staffOf) {
+            return redirect()->route('profile')->with('error', 'You work for '.$u->staffOf->supplier->name.'. Ask them to remove you before opening your own shop.');
+        }
         if ($existing && $existing->status !== 'rejected' && ! $request->boolean('edit')) {
             return view('customer.application-status', ['sp' => $existing]);
         }
@@ -37,13 +40,50 @@ class StartSellingController extends Controller
 
     public function submit(Request $request)
     {
+        if ($request->user()->staffOf) {
+            return back()->with('error', 'Staff of another shop cannot open their own shop.');
+        }
         $v = $request->validate(self::rules(), self::messages());
-        $res = Rentals::submitApplication($request->user(), self::toAttributes($v));
+        $attrs = self::toAttributes($v);
+        $biz = self::business($request, $request->user()->supplier);
+        $res = Rentals::submitApplication($request->user(), $attrs + $biz);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }
 
         return redirect()->route('start-selling')->with('success', $res['supplier']->status === 'approved' ? 'Your shop is approved!' : 'Application submitted for review.');
+    }
+
+    /**
+     * Personal / Business choice and business documents → supplier attributes.
+     * A business is checked by an admin (biz_status pending) before it can add staff.
+     */
+    public static function business(Request $request, ?\App\Models\Supplier $existing): array
+    {
+        $type = $request->input('account_type', 'personal');
+        $hasDoc = (bool) $existing?->biz_doc_path;
+        $v = $request->validate([
+            'account_type' => 'nullable|in:personal,business',
+            'biz_reg_type' => 'required_if:account_type,business|nullable|in:'.implode(',', array_keys(\App\Models\Supplier::REG_TYPES)),
+            'biz_reg_no' => 'required_if:account_type,business|nullable|string|max:60',
+            'biz_tin' => ['required_if:account_type,business', 'nullable', 'regex:/^\d{3}-?\d{3}-?\d{3}(-?\d{3,5})?$/'],
+            'biz_doc' => [($type === 'business' && ! $hasDoc) ? 'required' : 'nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:8192'],
+        ], [
+            'biz_reg_type.required_if' => 'Choose where the business is registered.',
+            'biz_reg_no.required_if' => 'Enter the registration number.',
+            'biz_tin.required_if' => 'Enter the business TIN.',
+            'biz_tin.regex' => 'Enter the TIN like 123-456-789-000.',
+            'biz_doc.required' => 'Upload the business permit or registration certificate.',
+        ]);
+        if (($v['account_type'] ?? 'personal') !== 'business') {
+            return ['account_type' => 'personal', 'biz_status' => null];
+        }
+        $doc = $request->hasFile('biz_doc') ? $request->file('biz_doc')->store('business-docs', 'local') : $existing?->biz_doc_path;
+
+        return [
+            'account_type' => 'business', 'biz_reg_type' => $v['biz_reg_type'], 'biz_reg_no' => trim($v['biz_reg_no']), 'biz_tin' => trim($v['biz_tin']),
+            'biz_doc_path' => $doc, 'biz_status' => 'pending', 'biz_reject_reason' => null, 'biz_verified_at' => null,
+        ];
     }
 
     /** Validation shared with the supplier's Shop Profile page. */

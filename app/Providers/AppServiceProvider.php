@@ -40,19 +40,19 @@ class AppServiceProvider extends ServiceProvider
             $role = $u->activeRole(session('mode'));
             $notifs = Notifier::for($u, session('mode'));
             $badges = [];
-            if ($role === 'supplier' && $u->supplier) {
-                $badges['requests'] = RentalRequest::where('supplier_id', $u->supplier->id)->where('status', 'pending')->count();
-                $badges['reviews'] = Review::visible()->where('supplier_id', $u->supplier->id)->whereNull('reply')->count();
+            if ($role === 'supplier' && ($shop = $u->shop())) {
+                $badges['requests'] = RentalRequest::where('supplier_id', $shop->id)->where('status', 'pending')->count();
+                $badges['reviews'] = Review::visible()->where('supplier_id', $shop->id)->whereNull('reply')->count();
             } elseif ($role === 'cashier') {
                 $badges['verification'] = Payment::where('status', 'pending')->count();
             } elseif ($role === 'superadmin') {
-                $badges['applications'] = Supplier::where('status', 'pending')->count();
+                $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
                 $badges['verification'] = Payment::where('status', 'pending')->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
                 $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();
             } elseif ($role === 'admin') {
-                $badges['applications'] = Supplier::where('status', 'pending')->count();
+                $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
                 $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();

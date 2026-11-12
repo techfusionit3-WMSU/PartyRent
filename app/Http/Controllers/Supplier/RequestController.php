@@ -13,7 +13,7 @@ class RequestController extends Controller
 {
     private function own(Request $request, RentalRequest $r): RentalRequest
     {
-        abort_unless($r->supplier_id === $request->user()->supplier?->id, 404);
+        abort_unless($r->supplier_id === $request->user()->shop()?->id, 404);
         $r->load(['payments', 'supplier', 'customer']);
 
         return $r;
@@ -26,7 +26,7 @@ class RequestController extends Controller
 
     public function index(Request $request)
     {
-        $sid = $request->user()->supplier->id;
+        $sid = $request->user()->shop()->id;
         $tab = array_key_exists($request->query('tab'), self::GROUPS) ? $request->query('tab') : 'pending';
         $q = mb_strtolower((string) $request->query('q', ''));
         $all = RentalRequest::where('supplier_id', $sid)->with(['customer', 'payments'])->get();

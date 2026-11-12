@@ -16,6 +16,7 @@ class PaymentFileController extends Controller
         $r = $payment->rentalRequest;
         $allowed = $r->customer_id === $u->id
             || $r->supplier->owner_id === $u->id
+            || $u->shop()?->id === $r->supplier_id
             || $u->hasPerm('payments.view')
             || $u->hasPerm('transactions.view');
         abort_unless($allowed, 404);

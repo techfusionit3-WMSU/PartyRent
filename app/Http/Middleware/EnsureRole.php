@@ -28,7 +28,7 @@ class EnsureRole
 
         $active = $u->activeRole(session('mode'));
         if (in_array($active, $roles, true) || (in_array('staff', $roles, true) && $u->isStaff())) {
-            return $next($request);
+            return $active === 'supplier' ? $this->shopPage($request, $next) : $next($request);
         }
 
         if (in_array('customer', $roles, true) && ! $u->isStaff()) {
@@ -40,12 +40,27 @@ class EnsureRole
             if ($u->isApprovedSupplier()) {
                 session(['mode' => 'supplier']);
 
-                return $next($request);
+                return $this->shopPage($request, $next);
             }
 
             return redirect()->route('start-selling');
         }
 
         return redirect()->route($u->homeRoute(session('mode')));
+    }
+
+    /** Business staff only open the pages their role allows (owners open everything). */
+    private function shopPage(Request $request, Closure $next): Response
+    {
+        $name = (string) $request->route()?->getName();
+        if (! str_starts_with($name, 'supplier.') || $request->user()->canShop($name)) {
+            return $next($request);
+        }
+        $msg = 'Your role ('.\App\Models\ShopStaff::ROLES[$request->user()->shopRole()][0].') cannot open that page. Ask the shop owner.';
+        if ($request->expectsJson()) {
+            abort(403, $msg);
+        }
+
+        return redirect()->route('supplier.dashboard')->with('error', $msg);
     }
 }

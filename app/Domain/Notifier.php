@@ -41,6 +41,10 @@ class Notifier
             ->where(function ($q) use ($u, $role) {
                 $q->where(fn ($d) => $d->where('user_id', $u->id)->where('scope', $role))
                     ->orWhere('role', $role);
+                // Business staff see the shop's notifications (sent to the owner).
+                if ($role === 'supplier' && ($shop = $u->shop()) && $shop->owner_id !== $u->id) {
+                    $q->orWhere(fn ($d) => $d->where('user_id', $shop->owner_id)->where('scope', 'supplier'));
+                }
                 if ($role === 'superadmin') {
                     $q->orWhere('role', 'admin');
                 }

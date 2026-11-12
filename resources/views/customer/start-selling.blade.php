@@ -3,10 +3,10 @@
 @section('content')
 <div class="page-head"><div><h1>Start Selling on PartyRent</h1><p>Turn your party supplies into income — using your existing account.
   @if($existing && $existing->status === 'rejected')<span class="badge b-red">Previous application rejected: {{ $existing->reject_reason }}</span>@endif</p></div></div>
-<div class="wizard-steps" id="wsteps">@foreach(['Business info', 'Contact', 'Fulfillment', 'Payments', 'Policies', 'Review'] as $i => $t)<div class="ws {{ $i === 0 ? 'on' : '' }}" data-ws="{{ $i }}"><span>Step {{ $i + 1 }}</span>{{ $t }}</div>@endforeach</div>
-<form class="card" id="wf" method="POST" action="{{ route('start-selling.submit') }}" style="max-width:760px" novalidate data-confirm-title="Submit rental partner application?" data-confirm="Your rental partner profile will be linked to this account ({{ auth()->user()->email }}). You can keep renting as a customer." data-confirm-ok="Submit">
+<div class="wizard-steps" id="wsteps">@foreach(['Account & shop', 'Contact', 'Fulfillment', 'Payments', 'Policies', 'Review'] as $i => $t)<div class="ws {{ $i === 0 ? 'on' : '' }}" data-ws="{{ $i }}"><span>Step {{ $i + 1 }}</span>{{ $t }}</div>@endforeach</div>
+<form class="card" id="wf" method="POST" action="{{ route('start-selling.submit') }}" enctype="multipart/form-data" style="max-width:760px" novalidate data-confirm-title="Submit rental partner application?" data-confirm="Your rental partner profile will be linked to this account ({{ auth()->user()->email }}). You can keep renting as a customer." data-confirm-ok="Submit">
   @csrf
-  @include('partials.shop-fields')
+  @include('partials.shop-fields', ['accountStep' => true])
   <section data-step="5">
     <h2>Review</h2>
     <div class="review-sum" id="reviewSum"></div>
@@ -52,6 +52,8 @@
     var on = function (a) { return !!f.querySelector('[data-arr="' + a + '"]:checked'); }, rows = [];
     var city = optText('shop_addr[cityCode]'), ful = radioLabel('fulfillment');
     var addr = [val('shop_addr[street]'), val('shop_addr[barangay]'), city].filter(Boolean).join(', ');
+    var biz = checked('account_type') === 'business';
+    rows.push(['Account type', biz ? 'Business · ' + (optText('biz_reg_type') || '') + ' ' + val('biz_reg_no') + (val('biz_tin') ? ' · TIN ' + val('biz_tin') : '') : 'Personal (one-to-one)']);
     rows.push(['Contact', [val('contact_person'), val('phone'), val('email')].filter(Boolean).join(' · ')]);
     if (addr) rows.push(['Address', addr]);
     rows.push(['Hours', val('hours')]);

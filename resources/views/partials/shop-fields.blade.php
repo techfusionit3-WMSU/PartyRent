@@ -7,10 +7,11 @@
     $err = fn ($k) => $errors->has($k) ? '<div class="error-text" style="display:block">'.e($errors->first($k)).'</div>' : '';
 @endphp
 <section data-step="0">
-  <h2>Business info</h2>
-  <div class="field"><label>Business name</label><input class="input" name="name" required minlength="3" value="{{ $o('name') }}" placeholder="e.g. Santos Party Rentals">{!! $err('name') !!}</div>
-  <div class="field"><label>Business description</label><textarea class="input" name="description" required minlength="20" placeholder="What do you rent out, and for which events?">{{ $o('description') }}</textarea>{!! $err('description') !!}</div>
-  <div class="field"><label>Business logo</label><div class="row wrap gap-sm">@foreach($logos as $l)<label class="chip {{ $o('logo', '🎈') === $l ? 'active' : '' }}" style="font-size:1.3rem"><input type="radio" name="logo" value="{{ $l }}" @checked($o('logo', '🎈') === $l) hidden>{{ $l }}</label>@endforeach</div></div>
+  <h2>Account & shop</h2>
+  @if(! empty($accountStep))@include('partials.business-fields', ['choose' => true])@endif
+  <div class="field"><label>Shop name</label><input class="input" name="name" required minlength="3" value="{{ $o('name') }}" placeholder="e.g. Santos Party Rentals">{!! $err('name') !!}</div>
+  <div class="field"><label>Shop description</label><textarea class="input" name="description" required minlength="20" placeholder="What do you rent out, and for which events?">{{ $o('description') }}</textarea>{!! $err('description') !!}</div>
+  <div class="field"><label>Shop logo</label><div class="row wrap gap-sm">@foreach($logos as $l)<label class="chip {{ $o('logo', '🎈') === $l ? 'active' : '' }}" style="font-size:1.3rem"><input type="radio" name="logo" value="{{ $l }}" @checked($o('logo', '🎈') === $l) hidden>{{ $l }}</label>@endforeach</div></div>
 </section>
 <section data-step="1">
   <h2>Contact</h2>

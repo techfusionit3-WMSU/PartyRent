@@ -6,7 +6,7 @@
 <div class="card" style="background:linear-gradient(135deg,{{ $s->color }}14,#fff)">
   <div class="row wrap top">
     <div class="logo-tile" style="width:84px;height:84px;font-size:2.6rem;background:#fff;box-shadow:var(--shadow)">@if($s->logo_path)<img src="{{ asset('storage/'.$s->logo_path) }}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:14px">@else{{ $s->logo }}@endif</div>
-    <div class="grow"><h1 class="mb-0">{{ $s->name }}</h1><div class="muted">{{ $s->city }} · <span class="stars">{{ stars($s->rating) }}</span> <a href="{{ route('suppliers.show', [$s, 'tab' => 'reviews']) }}#reviews">{{ rating_text($s) }}</a></div><p class="mt-1 mb-1">{{ $s->description }}</p>
+    <div class="grow"><h1 class="mb-0">{{ $s->name }}@if($s->isVerifiedBusiness()) <span class="badge b-green" style="vertical-align:middle">{{ icon('check') }}Verified Business</span>@endif</h1><div class="muted">{{ $s->city }} · <span class="stars">{{ stars($s->rating) }}</span> <a href="{{ route('suppliers.show', [$s, 'tab' => 'reviews']) }}#reviews">{{ rating_text($s) }}</a></div><p class="mt-1 mb-1">{{ $s->description }}</p>
       @php($myCity = customer_city())
       <div class="row wrap gap-sm"><span class="badge b-teal">{{ icon('truck', 'width:12px') }} {{ $s->fulfillmentLabel() }}{{ $s->offersDelivery() ? ' · '.$s->deliverySummary() : '' }}</span>
         @if($myCity && $s->offersDelivery())

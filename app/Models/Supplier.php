@@ -25,10 +25,18 @@ class Supplier extends Model
             'applied_at' => 'datetime',
             'approved_at' => 'datetime',
             'reviewed_at' => 'datetime',
+            'biz_verified_at' => 'datetime',
         ];
     }
 
     public function owner(): BelongsTo { return $this->belongsTo(User::class, 'owner_id'); }
+    public function staff(): HasMany { return $this->hasMany(ShopStaff::class); }
+
+    public const REG_TYPES = ['dti' => 'DTI (sole proprietor)', 'sec' => 'SEC (corporation / partnership)', 'cda' => 'CDA (cooperative)'];
+
+    public function isBusiness(): bool { return $this->account_type === 'business'; }
+    public function isVerifiedBusiness(): bool { return $this->isBusiness() && $this->biz_status === 'verified'; }
+    public function accountLabel(): string { return $this->isBusiness() ? 'Business' : 'Personal'; }
     public function products(): HasMany { return $this->hasMany(Product::class); }
     public function payouts(): HasMany { return $this->hasMany(Payout::class); }
 

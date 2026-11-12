@@ -20,7 +20,7 @@ class SupplierController extends Controller
      */
     public function dashboard(Request $request)
     {
-        $sup = $request->user()->supplier;
+        $sup = $request->user()->shop();
         $T = today_iso();
         $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
         $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->get();
@@ -66,7 +66,7 @@ class SupplierController extends Controller
 
     public function schedule(Request $request)
     {
-        $sup = $request->user()->supplier;
+        $sup = $request->user()->shop();
         $T = today_iso();
         $reqs = RentalRequest::where('supplier_id', $sup->id)->whereIn('status', Finance::ACTIVE)->with(['customer', 'payments'])->get();
         $events = [];
@@ -91,7 +91,7 @@ class SupplierController extends Controller
 
     public function payments(Request $request)
     {
-        $sup = $request->user()->supplier;
+        $sup = $request->user()->shop();
         $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
         $pays = Payment::whereIn('rental_request_id', $reqs->pluck('id'))->with('rentalRequest.customer')->orderByDesc('submitted_at')->get();
         $tab = in_array($request->query('tab'), ['pending', 'verified', 'rejected', 'overdue'], true) ? $request->query('tab') : 'all';
@@ -107,14 +107,14 @@ class SupplierController extends Controller
 
     public function shop(Request $request)
     {
-        $s = $request->user()->supplier;
+        $s = $request->user()->shop();
 
         return view('supplier.shop', ['s' => $s, 'd' => $s->toArray(), 'p' => $s->policy ?? [], 'logos' => StartSellingController::LOGOS, 'previewCity' => $s->city_code]);
     }
 
     public function updateShop(Request $request)
     {
-        $s = $request->user()->supplier;
+        $s = $request->user()->shop();
         $v = $request->validate(StartSellingController::rules(), StartSellingController::messages());
         $s->update(StartSellingController::toAttributes($v));
         Notifier::audit('Updated shop profile', $s->name);

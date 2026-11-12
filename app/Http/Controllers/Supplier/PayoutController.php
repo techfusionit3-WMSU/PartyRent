@@ -15,7 +15,7 @@ class PayoutController extends Controller
 {
     public function index(Request $request)
     {
-        $s = $request->user()->supplier;
+        $s = $request->user()->shop();
 
         return view('supplier.payouts', [
             's' => $s,
@@ -30,7 +30,7 @@ class PayoutController extends Controller
 
     public function updateAccount(Request $request)
     {
-        $s = $request->user()->supplier;
+        $s = $request->user()->shop();
         $data = $request->validate([
             'payout_method' => 'required|in:gcash,bank',
             'payout_bank' => 'required_if:payout_method,bank|nullable|string|max:60',

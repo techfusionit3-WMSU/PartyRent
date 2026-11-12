@@ -16,7 +16,7 @@ class ReportController extends Controller
     /** Day / week / month inventory calendar for one item. */
     public function calendar(Request $request)
     {
-        $sup = $request->user()->supplier;
+        $sup = $request->user()->shop();
         $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->orderBy('name')->get();
         if ($prods->isEmpty()) {
             return view('supplier.calendar', ['prods' => $prods]);
@@ -69,7 +69,7 @@ class ReportController extends Controller
 
     public function damages(Request $request)
     {
-        $list = RentalRequest::where('supplier_id', $request->user()->supplier->id)->whereNotNull('inspection')->with(['customer', 'payments'])->get()
+        $list = RentalRequest::where('supplier_id', $request->user()->shop()->id)->whereNotNull('inspection')->with(['customer', 'payments'])->get()
             ->sortByDesc(fn ($r) => $r->inspection['at'] ?? '')->values();
 
         return view('supplier.damages', ['list' => $list]);
@@ -77,7 +77,7 @@ class ReportController extends Controller
 
     private function data(Request $request): array
     {
-        $sup = $request->user()->supplier;
+        $sup = $request->user()->shop();
         $rg = Report::range($request);
         $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['customer', 'payments'])->get();
         $ids = $reqs->pluck('id');

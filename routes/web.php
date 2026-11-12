@@ -112,6 +112,11 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])->name('reviews.reply');
     Route::get('/shop', [SupplierController::class, 'shop'])->name('shop');
     Route::put('/shop', [SupplierController::class, 'updateShop'])->name('shop.update');
+    Route::post('/shop/business', [\App\Http\Controllers\Supplier\StaffController::class, 'business'])->name('business');
+    Route::get('/staff', [\App\Http\Controllers\Supplier\StaffController::class, 'index'])->name('staff');
+    Route::post('/staff', [\App\Http\Controllers\Supplier\StaffController::class, 'store'])->name('staff.store');
+    Route::put('/staff/{member}', [\App\Http\Controllers\Supplier\StaffController::class, 'update'])->name('staff.update');
+    Route::delete('/staff/{member}', [\App\Http\Controllers\Supplier\StaffController::class, 'destroy'])->name('staff.remove');
 
     Route::get('/requests', [SupplierRequestController::class, 'index'])->name('requests');
     Route::get('/requests/{rentalRequest}', [SupplierRequestController::class, 'show'])->name('requests.show');
@@ -172,6 +177,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
     Route::get('/applications', [AdminController::class, 'applications'])->name('applications');
     Route::post('/applications/{supplier}', [AdminController::class, 'reviewApplication'])->name('applications.review');
+    Route::post('/applications/{supplier}/business', [AdminController::class, 'reviewBusiness'])->name('business.review');
+    Route::get('/applications/{supplier}/business-doc', [AdminController::class, 'businessDoc'])->name('business.doc');
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');

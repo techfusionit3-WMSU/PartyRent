@@ -60,9 +60,44 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         ];
     }
 
+    /** The rental partner shop this user OWNS (any status). Use shop() for the shop they work in. */
     public function supplier(): HasOne
     {
         return $this->hasOne(Supplier::class, 'owner_id');
+    }
+
+    public function staffOf(): HasOne
+    {
+        return $this->hasOne(ShopStaff::class);
+    }
+
+    /** The approved shop this user runs in Rental Partner mode: their own, or the verified business they work for. */
+    public function shop(): ?Supplier
+    {
+        if ($this->supplier?->status === 'approved') {
+            return $this->supplier;
+        }
+        $s = $this->staffOf?->supplier;
+
+        return $s && $s->status === 'approved' && $s->isVerifiedBusiness() ? $s : null;
+    }
+
+    /** owner | manager | coordinator | warehouse | cashier | null */
+    public function shopRole(): ?string
+    {
+        if ($this->supplier?->status === 'approved') {
+            return 'owner';
+        }
+
+        return $this->shop() ? $this->staffOf->role : null;
+    }
+
+    /** May this user open the given supplier route? Owners can open everything. */
+    public function canShop(string $routeName): bool
+    {
+        $role = $this->shopRole();
+
+        return $role === 'owner' || ($role !== null && ShopStaff::allows($role, $routeName));
     }
 
     public function rentalRequests(): HasMany
@@ -96,9 +131,10 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return 'customer';
     }
 
+    /** Can use Rental Partner mode (owner of an approved shop, or staff of a verified business). */
     public function isApprovedSupplier(): bool
     {
-        return $this->supplier?->status === 'approved';
+        return $this->shop() !== null;
     }
 
     /** Role the interface is acting as, given the session's chosen mode. */

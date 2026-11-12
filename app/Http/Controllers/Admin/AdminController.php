@@ -46,9 +46,29 @@ class AdminController extends Controller
     public function applications(Request $request)
     {
         $this->need($request, 'applications.review');
-        $tab = in_array($request->query('tab'), ['pending', 'approved', 'rejected'], true) ? $request->query('tab') : 'pending';
+        $tab = in_array($request->query('tab'), ['pending', 'approved', 'rejected', 'business'], true) ? $request->query('tab') : 'pending';
+        // "business" = approved shops that upgraded to Business and wait for a document check.
+        $upgrades = Supplier::where('status', 'approved')->where('account_type', 'business')->where('biz_status', 'pending');
+        $list = $tab === 'business' ? (clone $upgrades)->with('owner')->latest('updated_at')->get() : Supplier::where('status', $tab)->with('owner')->latest('applied_at')->get();
+        $counts = Supplier::selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status')->put('business', (clone $upgrades)->count());
 
-        return view('admin.applications', ['list' => Supplier::where('status', $tab)->with('owner')->latest('applied_at')->get(), 'tab' => $tab, 'counts' => Supplier::selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status')]);
+        return view('admin.applications', ['list' => $list, 'tab' => $tab, 'counts' => $counts]);
+    }
+
+    public function reviewBusiness(Request $request, Supplier $supplier)
+    {
+        $data = $request->validate(['decision' => 'required|in:approve,reject', 'reason' => 'nullable|string|max:500']);
+        $res = Rentals::reviewBusiness($supplier, $data['decision'] === 'approve', $data['reason'] ?? null, $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $supplier->name.($data['decision'] === 'approve' ? ' is now a Verified Business.' : ' was told what to fix.') : $res['error']);
+    }
+
+    public function businessDoc(Request $request, Supplier $supplier)
+    {
+        $this->need($request, 'applications.review');
+        abort_unless($supplier->biz_doc_path && \Illuminate\Support\Facades\Storage::disk('local')->exists($supplier->biz_doc_path), 404);
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->response($supplier->biz_doc_path);
     }
 
     public function reviewApplication(Request $request, Supplier $supplier)

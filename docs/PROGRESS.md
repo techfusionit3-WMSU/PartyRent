@@ -16,7 +16,12 @@ Build order:
 - [x] A. Status wording (Booked) + minimal supplier dashboard
 - [x] B. Replacement value per product → inspection pre-fills charges (missing/total 100%, major 50%), cap; shown to customers (migration `2026_11_12_000100`, setting `majorDamagePct`, `ReplacementValueTest`; deposit suggestion + typical-value guess NOT done)
 - [x] C. Rename Supplier → Rental Partner in UI text (script: only string literals in app/, text in blade; routes/URLs/DB/code keep `supplier`. Demo seed data + DB-stored old notifications unchanged)
-- [ ] D. Account type Personal/Business on apply (+ business docs), shop staff (manager/cashier/warehouse/coordinator)
+- [x] D. Account type Personal/Business on apply (+ business docs), shop staff (manager/cashier/warehouse/coordinator)
+  Migration `2026_11_12_000200`; `ShopStaff::ROLES` (route-name patterns) + `OWNER_ONLY`; `User::shop()/shopRole()/canShop()`
+  (supplier controllers use `shop()`, `supplier` = owned shop). Guard in `EnsureRole::shopPage`. Business docs on private disk;
+  admin "Business checks" tab for Personal→Business upgrades; approving a business application verifies it. Staff see the owner's
+  supplier notifications. `ShopStaffs::add` creates an account + emails a set-password link. `BusinessAccountsTest` (5); 98 green.
+  NOTE: the rename script once turned `'supplier.'` into `'rental partner.'` in new code — fixed; committed code audited clean.
 - [ ] E. Rent by time (rental_mode day|hour, min hours, buffer, hourly rate; overlap check)
 - [ ] F. Business event packages: stages, services (teams/day), tiers, add-ons, milestones
 

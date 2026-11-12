@@ -922,6 +922,10 @@ class Rentals
             return self::fail('You already have a rental partner profile ('.$existing->status.').');
         }
         $needsReview = (bool) Settings::get('requireSupplierApproval', true);
+        if (! $needsReview && ($data['account_type'] ?? null) === 'business') {
+            $data['biz_status'] = 'verified';
+            $data['biz_verified_at'] = now();
+        }
         $attrs = array_merge($data, [
             'owner_id' => $u->id, 'status' => $needsReview ? 'pending' : 'approved', 'applied_at' => now(),
             'approved_at' => $needsReview ? null : now(), 'reject_reason' => null, 'reviewed_at' => null, 'reviewed_by' => null,
@@ -938,6 +942,25 @@ class Rentals
         return self::ok(['supplier' => $s]);
     }
 
+    /** Admin checks the documents of a shop that upgraded from Personal to Business. */
+    public static function reviewBusiness(Supplier $s, bool $approve, ?string $reason, User $by): array
+    {
+        if (! $by->hasPerm('applications.review')) {
+            return self::fail('You do not have permission to review applications.');
+        }
+        if (! $s->isBusiness() || $s->biz_status !== 'pending') {
+            return self::fail('There is nothing to check for this shop.');
+        }
+        if (! $approve && ! trim((string) $reason)) {
+            return self::fail('Please state the reason for rejection.');
+        }
+        $s->update($approve ? ['biz_status' => 'verified', 'biz_verified_at' => now(), 'biz_reject_reason' => null] : ['biz_status' => 'rejected', 'biz_reject_reason' => $reason]);
+        Notifier::notify($s->owner_id, 'supplier', $approve ? 'Business account verified' : 'Business documents not accepted', $approve ? $s->name.' is now a Verified Business. You can add staff under Staff & Roles.' : 'We could not verify the business documents for '.$s->name.': '.$reason.'. Update them on your Shop Profile page.', self::link($approve ? 'supplier.staff' : 'supplier.shop'));
+        Notifier::audit($approve ? 'Verified business' : 'Rejected business documents', $s->name.($reason ? ' — '.$reason : ''), $by);
+
+        return self::ok();
+    }
+
     public static function reviewApplication(Supplier $s, bool $approve, ?string $reason, User $by): array
     {
         if (! $by->hasPerm('applications.review')) {
@@ -949,7 +972,9 @@ class Rentals
         if (! $approve && ! trim((string) $reason)) {
             return self::fail('Please state the reason for rejection.');
         }
-        $s->update(['status' => $approve ? 'approved' : 'rejected', 'reviewed_at' => now(), 'reviewed_by' => $by->id, 'reject_reason' => $approve ? null : $reason, 'approved_at' => $approve ? now() : null]);
+        $s->update(['status' => $approve ? 'approved' : 'rejected', 'reviewed_at' => now(), 'reviewed_by' => $by->id, 'reject_reason' => $approve ? null : $reason, 'approved_at' => $approve ? now() : null]
+            // Approving a business application also accepts its documents.
+            + ($approve && $s->isBusiness() ? ['biz_status' => 'verified', 'biz_verified_at' => now()] : []));
         Notifier::notify($s->owner_id, 'customer', $approve ? 'Rental Partner application approved 🎉' : 'Rental Partner application rejected', $approve ? $s->name.' is approved! Use "Switch to Rental Partner Mode" in your profile menu to start listing items.' : 'Your application for '.$s->name.' was not approved: '.$reason.'. You may update and resubmit.', self::link('start-selling'));
         Notifier::audit($approve ? 'Approved rental partner application' : 'Rejected rental partner application', $s->name.($reason ? ' — '.$reason : ''), $by);
 

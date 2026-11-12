@@ -184,7 +184,7 @@ class Reviews
     /** The shop replies once, publicly. */
     public static function reply(Review $rv, User $by, string $text): array
     {
-        if (! $by->supplier || $by->supplier->id !== $rv->supplier_id) {
+        if ($by->shop()?->id !== $rv->supplier_id) {
             return ['ok' => false, 'error' => 'Only the shop that was reviewed can reply.'];
         }
         if ($rv->reply) {

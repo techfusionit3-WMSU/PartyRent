@@ -17,8 +17,8 @@
 <div class="grid grid-2">
   <div class="card"><h3>Rental trends</h3>@include('partials.columns', ['rows' => $trend, 'color' => '#7C3AED', 'label' => 'Requests per month'])</div>
   <div class="card"><h3>Collections per month</h3>@include('partials.columns', ['rows' => $collections, 'money' => true, 'color' => '#0D9488', 'label' => 'Collections per month'])</div>
-  <div class="card pad-0"><div style="padding:18px 20px 0"><h3>Supplier performance</h3></div>
-    <div class="table-wrap"><table class="table"><thead><tr><th>Supplier</th><th class="num">Rentals</th><th class="num">Value</th><th class="num">Rating</th></tr></thead><tbody>
+  <div class="card pad-0"><div style="padding:18px 20px 0"><h3>Rental Partner performance</h3></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Rental Partner</th><th class="num">Rentals</th><th class="num">Value</th><th class="num">Rating</th></tr></thead><tbody>
       @forelse($perf as $s)<tr><td><a href="{{ route('suppliers.show', $s['model']) }}">{{ $s['model']->name }}</a></td><td class="num">{{ $s['rentals'] }}</td><td class="num">{{ money_short($s['value']) }}</td><td class="num">{{ $s['model']->rating > 0 ? number_format($s['model']->rating, 1) : '—' }}</td></tr>@empty<tr><td colspan="4" class="muted">No approved rental partners yet.</td></tr>@endforelse
     </tbody></table></div>
   </div>

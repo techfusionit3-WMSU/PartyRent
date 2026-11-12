@@ -1,7 +1,7 @@
 @extends('layouts.dash', ['title' => 'Rental Partner Applications', 'nav' => 'applications'])
 
 @section('content')
-<div class="page-head"><div><h1>Supplier applications</h1><p>Approve shops before they can list items. Applicants keep their customer account either way.</p></div></div>
+<div class="page-head"><div><h1>Rental Partner applications</h1><p>Approve shops before they can list items. Applicants keep their customer account either way.</p></div></div>
 <div class="tabs">@foreach(['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected'] as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('admin.applications', ['tab' => $k]) }}">{{ $l }}<span class="count">{{ $counts[$k] ?? 0 }}</span></a>@endforeach</div>
 @if($list->isEmpty())
   <div class="card">@include('partials.empty', ['emoji' => '📄', 'title' => 'No applications here'])</div>

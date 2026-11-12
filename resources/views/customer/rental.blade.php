@@ -25,7 +25,7 @@
     @if($r->fulfillment === 'pickup')<div class="card"><h3>{{ icon('map', 'width:18px;vertical-align:-3px') }} Pickup location</h3>@include('partials.supplier-location', ['s' => $sup, 'reveal' => $r->revealsPickupLocation()])</div>@endif
     <div class="card"><h3>{{ $r->fulfillment === 'delivery' ? 'Delivery' : 'Pickup' }} details</h3>
       <dl class="kv">
-        <dt>Supplier</dt><dd><a href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->phone }}</div></dd>
+        <dt>Rental Partner</dt><dd><a href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->phone }}</div></dd>
         @if($r->fulfillment === 'delivery')<dt>Deliver to</dt><dd>{{ $r->address }}</dd>@else<dt>Pickup at</dt><dd>{{ $r->revealsPickupLocation() ? $sup->address : $sup->publicAddress() }}<div class="small muted">{{ $sup->hours }}</div></dd>@endif
         <dt>Contact</dt><dd>{{ $r->contact_name }} · {{ $r->contact_phone }}</dd>
         <dt>Payment</dt><dd>{{ \App\Models\Payment::ARR_LABEL[$r->arrangement] }} · {{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}</dd>
@@ -34,7 +34,7 @@
         <dt>Return status</dt><dd>{{ $r->status === 'completed' ? 'Returned & closed' : ($r->inspection ? 'Inspected' : ($r->status === 'return_pending' ? 'Awaiting return' : ($r->status === 'ongoing' ? 'Due '.fmt_date(add_days($r->end_date, 1)) : '—'))) }}</dd>
       </dl>
       @if($r->instructions)<p class="small mt-1 mb-0"><b>Your instructions:</b> {{ $r->instructions }}</p>@endif
-      @if($r->supplier_notes)<div class="alert alert-info mt-1">{{ icon('message') }}<div class="small"><b>Supplier notes:</b> {{ $r->supplier_notes }}</div></div>@endif
+      @if($r->supplier_notes)<div class="alert alert-info mt-1">{{ icon('message') }}<div class="small"><b>Rental Partner notes:</b> {{ $r->supplier_notes }}</div></div>@endif
     </div>
     @if($policy['allowed'] && ! in_array($r->status, ['declined', 'cancelled', 'completed'], true))
       <form class="card" method="POST" action="{{ route('rentals.cancel', $r) }}" data-confirm="Cancel {{ $r->code }}? {{ $policy['note'] }}" data-confirm-title="Cancel request?" data-confirm-ok="Cancel request" data-danger>

@@ -11,7 +11,7 @@
 
 @if($compare && count($groups) > 1)
   <div class="card mb-2"><div class="card-head"><h3>Compare rental partners in your list</h3><a class="btn btn-xs btn-ghost" href="{{ route('cart') }}">Close</a></div>
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Supplier</th><th class="num">Items</th><th>Delivery</th><th>Payment options</th><th class="num">Deposit</th><th>Availability</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Rental Partner</th><th class="num">Items</th><th>Delivery</th><th>Payment options</th><th class="num">Deposit</th><th>Availability</th></tr></thead><tbody>
       @foreach($groups as $g)
         <tr><td data-label="Rental Partner"><b>{{ $g['supplier']->name }}</b><div class="small muted">{{ $g['supplier']->city }} · ★ {{ rating_text($g['supplier']) }}</div></td><td data-label="Items" class="num">{{ money($g['quote']['itemsSubtotal']) }}</td><td data-label="Delivery">{{ $g['supplier']->fulfillmentLabel() }}@if($g['delivery'])<div class="small muted">{{ $g['delivery']['ok'] ? 'Est. '.money($g['delivery']['fee']) : ($g['delivery']['code'] === 'no_city' ? $g['supplier']->deliverySummary() : 'Pickup only in your area') }}</div>@endif</td><td data-label="Payment">{!! collect($g['supplier']->arrangements)->map(fn ($a) => e(\App\Models\Payment::ARR_LABEL[$a]))->implode('<br>') !!}</td><td data-label="Deposit" class="num">{{ money($g['compareQuote']['deposit']) }}</td><td data-label="Availability">@if($g['check']['ok'])<span class="badge b-green">All dates OK</span>@else<span class="badge b-red">Conflicts</span>@endif</td></tr>
       @endforeach

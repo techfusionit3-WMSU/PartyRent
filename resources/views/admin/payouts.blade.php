@@ -1,7 +1,7 @@
 @extends('layouts.dash', ['title' => 'Rental Partner Payouts', 'nav' => 'payouts'])
 
 @section('content')
-<div class="page-head"><div><h1>Supplier payouts</h1><p>Customers pay PartyRent. The money is held until the rental is completed, then released to the rental partner. Like Shopee, the {{ rtrim(rtrim(number_format($pct, 2), '0'), '.') }}% platform commission is taken from items only (plus the Free Shipping program extra for rental partners who joined). Delivery fees, Free Shipping vouchers (paid by PartyRent) and damage compensation are passed through without a fee; security deposits are never paid out.</p></div></div>
+<div class="page-head"><div><h1>Rental Partner payouts</h1><p>Customers pay PartyRent. The money is held until the rental is completed, then released to the rental partner. Like Shopee, the {{ rtrim(rtrim(number_format($pct, 2), '0'), '.') }}% platform commission is taken from items only (plus the Free Shipping program extra for rental partners who joined). Delivery fees, Free Shipping vouchers (paid by PartyRent) and damage compensation are passed through without a fee; security deposits are never paid out.</p></div></div>
 <div class="stats mb-3">
   @include('partials.stat', ['label' => 'Held for active rentals', 'value' => money_short($totals['escrow']), 'sub' => 'in escrow', 'icon' => 'shield', 'color' => 'teal'])
   @include('partials.stat', ['label' => 'To send', 'value' => money_short($totals['pending']), 'sub' => $pending->count().' released payout'.($pending->count() === 1 ? '' : 's'), 'icon' => 'cash', 'color' => 'gold', 'href' => route('admin.payouts', ['tab' => 'pending'])])
@@ -12,7 +12,7 @@
 <div class="card pad-0">
   @if($tab === 'pending')
     @if($pending->isEmpty())@include('partials.empty', ['emoji' => '✅', 'title' => 'Nothing to send', 'text' => 'Released payouts show here until you record the transfer.'])@else
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Payout</th><th>Supplier · account</th><th class="num">Items</th><th class="num">Commission</th><th class="num">Delivery · damages</th><th class="num">Send</th><th>Record transfer</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Payout</th><th>Rental Partner · account</th><th class="num">Items</th><th class="num">Commission</th><th class="num">Delivery · damages</th><th class="num">Send</th><th>Record transfer</th></tr></thead><tbody>
       @foreach($pending as $p)<tr>
         <td data-label="Payout"><b>{{ $p->code }}</b><div class="small muted">{{ $p->rentalRequest->code }} · released {{ fmt_date($p->created_at->toDateString()) }}</div></td>
         <td data-label="Rental Partner"><b>{{ $p->supplier->name }}</b><div class="small {{ $p->supplier->hasPayoutAccount() ? 'muted' : '' }}" @unless($p->supplier->hasPayoutAccount()) style="color:var(--red)" @endunless>{{ $p->supplier->hasPayoutAccount() ? $p->supplier->payoutAccountLabel() : 'No payout account yet' }}</div></td>
@@ -40,7 +40,7 @@
   @elseif($tab === 'release')
     @if($awaiting->isEmpty())@include('partials.empty', ['emoji' => '✅', 'title' => 'Nothing waiting', 'text' => 'Completed rentals are released automatically. Cancelled requests where money was kept, or completed ones that still had a pending payment, show here.'])@else
     <div class="alert alert-info" style="margin:12px 16px">{{ icon('info') }}<div class="small">Release once refunds are settled: check that the cashier has recorded any refund the customer is owed.</div></div>
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Request</th><th>Supplier</th><th>Status</th><th class="num">Held</th><th class="num">Payout</th><th></th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Request</th><th>Rental Partner</th><th>Status</th><th class="num">Held</th><th class="num">Payout</th><th></th></tr></thead><tbody>
       @foreach($awaiting as $r)@php($b = \App\Domain\Payouts::breakdown($r))<tr>
         <td data-label="Request"><b>{{ $r->code }}</b><div class="small muted">{{ $r->event_name }} · {{ $r->customer->name }}</div></td>
         <td data-label="Rental Partner">{{ $r->supplier->name }}</td>
@@ -52,12 +52,12 @@
     </tbody></table></div>@endif
   @elseif($tab === 'paid')
     @if($paid->isEmpty())@include('partials.empty', ['text' => 'No payouts sent yet.'])@else
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Paid</th><th>Payout</th><th>Supplier</th><th>Method · reference</th><th class="num">Commission</th><th class="num">Net sent</th><th>By</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Paid</th><th>Payout</th><th>Rental Partner</th><th>Method · reference</th><th class="num">Commission</th><th class="num">Net sent</th><th>By</th></tr></thead><tbody>
       @foreach($paid as $p)<tr><td data-label="Paid">{{ fmt_date($p->paid_at->toDateString()) }}</td><td data-label="Payout"><b>{{ $p->code }}</b><div class="small muted">{{ $p->rentalRequest->code }}</div></td><td data-label="Rental Partner">{{ $p->supplier->name }}</td><td data-label="Reference">{{ $p->methodLabel() }}{{ $p->gateway === 'xendit' ? ' via Xendit' : '' }} · {{ $p->reference }}</td><td data-label="Commission" class="num">{{ money($p->commission) }}</td><td data-label="Net" class="num"><b>{{ money($p->net) }}</b></td><td data-label="By">{{ $p->payer->name ?? ($p->gateway === 'xendit' ? 'Automatic' : '—') }}</td></tr>@endforeach
     </tbody></table></div>@endif
   @else
     @if($suppliers->isEmpty())@include('partials.empty', ['text' => 'No rental partner money on the platform yet.'])@else
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Supplier</th><th>Payout account</th><th class="num">In escrow</th><th class="num">Awaiting release</th><th class="num">To send</th><th class="num">Paid out</th><th class="num">Commission</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Rental Partner</th><th>Payout account</th><th class="num">In escrow</th><th class="num">Awaiting release</th><th class="num">To send</th><th class="num">Paid out</th><th class="num">Commission</th></tr></thead><tbody>
       @foreach($suppliers as $s)@php($x = $sum[$s->id])<tr><td data-label="Rental Partner"><b>{{ $s->name }}</b></td><td data-label="Account" class="small">{{ $s->payoutAccountLabel() }}</td><td data-label="In escrow" class="num">{{ money($x['escrow']) }}</td><td data-label="Awaiting" class="num">{{ money($x['awaiting']) }}</td><td data-label="To send" class="num">{{ money($x['pending']) }}</td><td data-label="Paid out" class="num">{{ money($x['paid']) }}</td><td data-label="Commission" class="num">{{ money($x['commission']) }}</td></tr>@endforeach
     </tbody></table></div>@endif
   @endif

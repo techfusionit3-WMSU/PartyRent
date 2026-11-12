@@ -69,7 +69,7 @@
       @if($r->instructions)<div class="alert alert-info mt-1">{{ icon('message') }}<div class="small"><b>Instructions:</b> {{ $r->instructions }}</div></div>@endif
     </div>
     <div class="card">@include('partials.payment-summary')</div>
-    <form class="card" method="POST" action="{{ route('supplier.requests.notes', $r) }}">@csrf<h3>Supplier notes</h3><div class="field"><textarea class="input" name="notes" rows="3" placeholder="Notes are visible to the customer.">{{ $r->supplier_notes }}</textarea></div><button class="btn btn-sm">{{ icon('edit') }}Save notes</button></form>
+    <form class="card" method="POST" action="{{ route('supplier.requests.notes', $r) }}">@csrf<h3>Rental Partner notes</h3><div class="field"><textarea class="input" name="notes" rows="3" placeholder="Notes are visible to the customer.">{{ $r->supplier_notes }}</textarea></div><button class="btn btn-sm">{{ icon('edit') }}Save notes</button></form>
     @if(! empty($r->fulfillment_log['releaseDate']))
       <div class="card"><h3>Release & return log</h3><dl class="kv"><dt>Released</dt><dd>{{ fmt_date($r->fulfillment_log['releaseDate']) }}</dd><dt>Quantity</dt><dd>{{ $r->fulfillment_log['releaseQty'] ?? '' }}</dd><dt>Received by</dt><dd>{{ $r->fulfillment_log['receivedBy'] ?? '' }}</dd>@if(! empty($r->fulfillment_log['returnDate']))<dt>Returned</dt><dd>{{ fmt_date($r->fulfillment_log['returnDate']) }}</dd><dt>Returned qty</dt><dd>{{ $r->fulfillment_log['returnedQty'] ?? '' }}</dd>@endif</dl></div>
     @endif

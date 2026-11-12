@@ -37,7 +37,7 @@
     @if($compare->isNotEmpty())
       <div class="card mb-2"><div class="card-head"><h3>Compare items</h3><a class="btn btn-xs btn-ghost" href="{{ $qs([]) }}">Close</a></div>
         <div class="table-wrap"><table class="table"><thead><tr><th></th>@foreach($compare as $p)<th style="text-transform:none;font-size:.86rem;color:var(--ink)">{{ $p->name }}</th>@endforeach</tr></thead><tbody>
-          <tr><td class="muted strong">Supplier</td>@foreach($compare as $p)<td>{{ $p->supplier->name }}</td>@endforeach</tr>
+          <tr><td class="muted strong">Rental Partner</td>@foreach($compare as $p)<td>{{ $p->supplier->name }}</td>@endforeach</tr>
           <tr><td class="muted strong">Location</td>@foreach($compare as $p)<td>{{ $p->supplier->city }}</td>@endforeach</tr>
           <tr><td class="muted strong">Daily price</td>@foreach($compare as $p)<td>{{ money($p->basePrice()) }}@if(count($p->tiers) > 1)<div class="small muted">from {{ money($p->lowestPrice()) }} in bulk</div>@endif</td>@endforeach</tr>
           <tr><td class="muted strong">Available {{ $dates ? fmt_range($dates[0], end($dates)) : 'today' }}</td>@foreach($compare as $p)<td><b>{{ inv()->minAvailable($p->id, $dates) }}</b> of {{ $p->total_stock }}</td>@endforeach</tr>

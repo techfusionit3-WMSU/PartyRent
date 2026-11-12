@@ -19,7 +19,7 @@
 <h2 class="mt-3 mb-2">Growth & administration</h2>
 <div class="grid grid-2">
   <div class="card"><h3>User growth</h3><p class="small muted">Total accounts at the end of each month</p>@include('partials.columns', ['rows' => $userGrowth, 'color' => '#E11D74', 'label' => 'Total users by month'])</div>
-  <div class="card"><h3>Supplier growth</h3><p class="small muted">Approved rental partners at the end of each month</p>@include('partials.columns', ['rows' => $supplierGrowth, 'color' => '#0D9488', 'label' => 'Approved rental partners by month'])</div>
+  <div class="card"><h3>Rental Partner growth</h3><p class="small muted">Approved rental partners at the end of each month</p>@include('partials.columns', ['rows' => $supplierGrowth, 'color' => '#0D9488', 'label' => 'Approved rental partners by month'])</div>
   <div class="card"><h3>Administrative activity</h3><p class="small muted">Logged actions per staff member (all time)</p>@include('partials.bars', ['rows' => $staffActivity, 'color' => '#7C3AED'])</div>
 </div>
 @endsection

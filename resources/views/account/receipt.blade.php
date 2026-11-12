@@ -8,7 +8,7 @@
       <dt>Transaction ID</dt><dd>{{ $p->code }}</dd>
       <dt>Rental request</dt><dd>{{ $r->code }} · {{ $r->event_name }}</dd>
       <dt>Customer</dt><dd>{{ $r->customer->name }}</dd>
-      <dt>Supplier</dt><dd>{{ $r->supplier->name }}</dd>
+      <dt>Rental Partner</dt><dd>{{ $r->supplier->name }}</dd>
       <dt>Payment type</dt><dd>{{ $p->typeLabel() }}</dd>
       <dt>Method</dt><dd>{{ $p->methodLabel() }}</dd>
       <dt>Reference no.</dt><dd>{{ $p->reference ?: '—' }}</dd>

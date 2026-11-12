@@ -1,7 +1,7 @@
 @extends('layouts.market', ['title' => $s->name, 'nav' => 'suppliers'])
 
 @section('content')
-<div class="crumbs"><a href="{{ route('suppliers.index') }}">Suppliers</a> / {{ $s->name }}</div>
+<div class="crumbs"><a href="{{ route('suppliers.index') }}">Rental Partners</a> / {{ $s->name }}</div>
 @if($s->status !== 'approved')<div class="alert alert-warn mb-2">{{ icon('clock') }}<div>Preview only — your shop is <b>{{ $s->status }}</b> and is not visible to customers yet.</div></div>@endif
 <div class="card" style="background:linear-gradient(135deg,{{ $s->color }}14,#fff)">
   <div class="row wrap top">

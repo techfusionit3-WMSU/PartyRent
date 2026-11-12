@@ -8,7 +8,7 @@
 @section('content')
 <div class="card center" style="max-width:640px;margin:20px auto;padding:34px 24px">
   <div style="font-size:3.2rem">{{ $em }}</div>
-  <h1>Supplier application</h1>
+  <h1>Rental Partner application</h1>
   <div class="row" style="justify-content:center;gap:10px"><span class="logo-tile" style="width:44px;height:44px;font-size:1.4rem;background:var(--brand-50)">{{ $sp->logo }}</span><b>{{ $sp->name }}</b><span class="badge {{ $cls }}">{{ $lbl }}</span></div>
   <p class="mt-2">{{ $txt }}</p>
   <p class="small muted">Submitted {{ fmt_datetime($sp->applied_at) }}{{ $sp->reviewed_at ? ' · Reviewed '.fmt_datetime($sp->reviewed_at) : '' }}</p>

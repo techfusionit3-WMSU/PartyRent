@@ -332,6 +332,10 @@ class Packages
         $rows = self::resolve($def, $sel);
         $fmt = fn ($r) => $r['qty'].'× '.$r['name'];
         $out = [];
+        // Rows placed in a stage are listed under that stage instead (below).
+        $staged = fn ($r) => isset($r['index']) && ($def['components'][$r['index']]['stage'] ?? null) !== null && ! empty($def['stages']);
+        $all = $rows;
+        $rows = array_filter($rows, fn ($r) => ! $staged($r));
         $inc = array_filter($rows, fn ($r) => $r['group'] === 'included');
         if ($inc) {
             $out[] = 'Included: '.implode(', ', array_map($fmt, $inc));
@@ -348,7 +352,7 @@ class Packages
         }
         foreach ($def['stages'] ?? [] as $i => $st) {
             $info = array_filter([($t = $sel['stages'][$i]['time'] ?? '') !== '' ? Hours::fmt(Hours::toMin($t)) : '', $sel['stages'][$i]['venue'] ?? '']);
-            $what = array_map($fmt, array_filter($rows, fn ($r) => isset($r['index']) && ($def['components'][$r['index']]['stage'] ?? null) === $i));
+            $what = array_map($fmt, array_filter($all, fn ($r) => isset($r['index']) && ($def['components'][$r['index']]['stage'] ?? null) === $i));
             $out[] = $st['name'].($info ? ' ('.implode(', ', $info).')' : '').($what ? ': '.implode(', ', $what) : '');
         }
 

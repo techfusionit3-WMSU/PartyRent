@@ -34,7 +34,11 @@ Build order:
   `Packages::describe`). `Inventory::serviceDemand/serviceCap` + check() rows {service, name} (all bad rows now carry
   `name`). Tier switch on package page (same supplier + tier_group). Add-ons/choices/guests already existed;
   milestones = existing Installment arrangement. `EventPackagesTest` (4); 108 green.
-- [ ] Browser check of A–F (none of it has been clicked through yet).
+- [x] Browser check of A–F (headless Edge, playwright-core 1.65 in session scratchpad `drv/walk.js`, throwaway SQLite
+  `check.sqlite`, port 8033, MAIL_MAILER=log). Fixed: hourly product page still ran the per-day RentBox JS (null error);
+  hourly cart line had no line total; staged package items were listed twice. No console/500 errors after fixes.
+- [ ] NEXT (user 2026-11-12): "don't stop until ready for real-life e-commerce; expand beyond weddings; look at teams /
+  businesses around Zamboanga who could be clients". Research → new categories/features → production hardening.
 
 ### Previous: Supplier payouts through Xendit
 (user request 2026-11-11: "is it not automated?").

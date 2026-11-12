@@ -9,7 +9,7 @@
     <div class="card mt-2"><h3>Availability calendar</h3><div data-calendar data-kind="item" data-id="{{ $p->id }}" data-month="{{ substr($start, 0, 7) }}" data-need="{{ $qty }}"></div></div>
   </div>
 
-  <div data-rentbox data-type="item" data-max-days="{{ setting('maxRentalDays', 30) }}">
+  <div @unless($p->isHourly()) data-rentbox @endunless data-type="item" data-max-days="{{ setting('maxRentalDays', 30) }}">
     <span class="badge b-purple plain">{{ $cat->name }}</span> <span class="badge b-gray plain">Condition: {{ $p->condition }}</span>
     <h1 class="mt-1">{{ $p->name }}</h1>
     <div class="row wrap small muted">@if($reviews->count())<span class="stars">{{ stars($p->rating) }}</span><a href="#reviews">{{ number_format($p->rating, 1) }} · {{ $reviews->count() }} {{ $reviews->count() === 1 ? 'review' : 'reviews' }}</a>@else<span>No reviews yet</span>@endif<span>· {{ $p->rent_count }} rentals</span></div>

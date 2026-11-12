@@ -14,7 +14,7 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
   "Booked" + "Partially Paid", not "Accepted"/"Reserved".
 Build order:
 - [x] A. Status wording (Booked) + minimal supplier dashboard
-- [ ] B. Replacement value per product → inspection pre-fills charges (missing/total 100%, major 50%), cap; shown to customers
+- [x] B. Replacement value per product → inspection pre-fills charges (missing/total 100%, major 50%), cap; shown to customers (migration `2026_11_12_000100`, setting `majorDamagePct`, `ReplacementValueTest`; deposit suggestion + typical-value guess NOT done)
 - [ ] C. Rename Supplier → Rental Partner in UI text
 - [ ] D. Account type Personal/Business on apply (+ business docs), shop staff (manager/cashier/warehouse/coordinator)
 - [ ] E. Rent by time (rental_mode day|hour, min hours, buffer, hourly rate; overlap check)

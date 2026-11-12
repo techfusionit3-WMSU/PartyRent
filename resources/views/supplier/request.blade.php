@@ -115,8 +115,10 @@
       <div class="card card-flat mb-1 soft" style="padding:10px 14px"><div class="row between"><b>{{ inv()->product($spid)?->name }}</b><span class="small">{{ $sq }} sold · <span class="badge b-gold plain">Consumed — not returned</span></span></div></div>
     @endforeach
     @foreach($peak as $pid => $q)
-      <div class="card card-flat mb-1" style="padding:14px"><div class="row between mb-1"><b>{{ inv()->product($pid)->name }}</b><span class="small muted">Released (peak day): {{ $q }}</span></div>
+      @php($rv = (float) (inv()->product($pid)->replacement_value ?? 0))
+      <div class="card card-flat mb-1" style="padding:14px" data-insp data-value="{{ $rv }}" data-major-pct="{{ setting('majorDamagePct', 50) }}"><div class="row between mb-1"><b>{{ inv()->product($pid)->name }}</b><span class="small muted">Released (peak day): {{ $q }}@if($rv) · Replacement value {{ money($rv) }} each @endif</span></div>
         <div class="form-grid" style="grid-template-columns:repeat(6,minmax(0,1fr))">@foreach([['returned', 'Returned', $q], ['good', 'Good', $q], ['minor', 'Minor damage', 0], ['major', 'Major damage', 0], ['total', 'Completely damaged', 0], ['missing', 'Missing', 0]] as [$k, $l, $v])<div class="field"><label class="small">{{ $l }}</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][{{ $k }}]" value="{{ $v }}"></div>@endforeach</div>
+        @if($rv)<p class="small muted mb-1" data-insp-hint>Charges fill in automatically: completely damaged or missing = {{ money($rv) }} each, major damage = {{ setting('majorDamagePct', 50) }}%. Add a repair fee for minor damage. You can change the amounts, up to {{ money($rv) }} per damaged or missing piece.</p>@else<p class="small muted mb-1">Tip: set a replacement value on this item so charges fill in automatically next time.</p>@endif
         <div class="form-grid"><div class="field"><label class="small">Repair fees (₱)</label><input class="input input-sm" type="number" min="0" step="0.01" name="items[{{ $pid }}][repairFee]" value="0"></div><div class="field"><label class="small">Replacement fees (₱)</label><input class="input input-sm" type="number" min="0" step="0.01" name="items[{{ $pid }}][replaceFee]" value="0"></div></div>
       </div>
     @endforeach
@@ -163,6 +165,20 @@
 @endif
 @push('scripts')
 <script>
+// Pre-fill charges from the replacement value until the supplier types their own amount.
+(function () {
+  document.querySelectorAll('[data-insp]').forEach(function (box) {
+    var v = +box.dataset.value || 0; if (!v) return;
+    var pct = (+box.dataset.majorPct || 0) / 100;
+    var get = function (k) { var i = box.querySelector('[name$="[' + k + ']"]'); return i ? (+i.value || 0) : 0; };
+    var repl = box.querySelector('[name$="[replaceFee]"]');
+    repl.addEventListener('input', function () { repl.dataset.touched = '1'; });
+    box.addEventListener('input', function (e) {
+      if (e.target === repl || repl.dataset.touched) return;
+      repl.value = Math.round((get('total') + get('missing') + get('major') * pct) * v * 100) / 100;
+    });
+  });
+})();
 // Like the prototype: warn when units are damaged or missing but no fee was entered.
 (function () {
   var f = document.getElementById('inspForm'); if (!f) return;

@@ -556,6 +556,11 @@ class Rentals
             if ($row['returned'] + $row['missing'] !== $released) {
                 return self::fail($name.': returned + missing must equal released quantity ('.$released.').');
             }
+            $value = (float) (inv()->product($pid)?->replacement_value ?? 0);
+            $affected = $row['minor'] + $row['major'] + $row['total'] + $row['missing'];
+            if ($value > 0 && $row['repairFee'] + $row['replaceFee'] > $value * $affected + 0.001) {
+                return self::fail($name.': charges can be at most the replacement value ('.money($value).' × '.$affected.' damaged or missing = '.money($value * $affected).').');
+            }
             $items[] = $row;
         }
         $comp = 0.0;

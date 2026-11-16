@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\RentalRequest;
 use App\Models\Review;
 use App\Models\Supplier;
+use App\Support\RentalPeriod;
 use Illuminate\Http\Request;
 
 class MarketController extends Controller
@@ -50,11 +51,18 @@ class MarketController extends Controller
         if ($st['start'] && (! $st['end'] || $st['end'] < $st['start'])) {
             $st['end'] = $st['start'];
         }
-        // "Deliver to" city: picking one in the filters remembers it for this session (badges, cart estimates).
-        if ($request->has('to')) {
-            Locations::isCity($request->query('to')) ? session(['deliver_to' => $request->query('to')]) : session()->forget('deliver_to');
+        // "Landing" = nothing searched or filtered yet (dates don't count): the home sections show above the results.
+        $landing = ! array_filter(array_diff_key($st, ['sort' => 1, 'view' => 1, 'start' => 1, 'end' => 1]), fn ($v) => $v !== '') && $st['sort'] === 'recommended' && $st['view'] === 'items' && ! $request->query('compare');
+        // Rental dates: from the link (remembered as the rental period), otherwise the customer's selected period.
+        if ($request->boolean('clear')) {
+            RentalPeriod::clear();
+            $st['start'] = $st['end'] = '';
+        } elseif ($st['start'] && ! RentalPeriod::validate($st['start'], $st['end'])) {
+            RentalPeriod::set($st['start'], $st['end']);
+        } elseif ($rp = RentalPeriod::get()) {
+            [$st['start'], $st['end']] = [$rp['start'], $rp['end']];
         }
-        $to = customer_city();
+        $to = null;
         $dates = $st['start'] ? array_slice(date_range($st['start'], $st['end']), 0, (int) setting('maxRentalDays', 30)) : [];
         $need = max(1, (int) $st['qty']);
         $ai = $st['q'] ? Ai::interpret($st['q']) : null;
@@ -121,14 +129,25 @@ class MarketController extends Controller
             $compare = $prods->whereIn('id', array_map('intval', $ids))->values();
         }
         $cat = $st['category'] ? Category::find($st['category']) : null;
-        // "Landing" = nothing searched or filtered yet: show the welcome bits above the results.
-        $landing = ! array_filter(array_diff_key($st, ['sort' => 1, 'view' => 1]), fn ($v) => $v !== '') && $st['sort'] === 'recommended' && ! $compare->count();
+        // Home sections (reference C.home), only on the landing view.
+        $home = [];
+        if ($landing) {
+            $evs = $u ? RentalRequest::where('customer_id', $u->id)->pluck('event_type')->unique()->all() : [];
+            $rec = $evs ? $prods->filter(fn ($p) => array_intersect($p->events ?? [], $evs))->sortByDesc('rent_count')->take(4) : collect();
+            $home = [
+                'featured' => $prods->sortBy([['rating', 'desc'], ['rent_count', 'desc']])->take(8),
+                'recommended' => $rec->count() ? $rec : $prods->sortByDesc('rent_count')->take(4),
+                'offers' => $prods->filter(fn ($p) => count($p->tiers ?? []) > 1)->sortByDesc(fn ($p) => 1 - \App\Domain\Pricing::lowestPrice($p) / max(0.01, $p->basePrice()))->take(4),
+                'recent' => $prods->sortByDesc('created_at')->take(4),
+                'topSuppliers' => $sups->sortByDesc('rating')->take(3),
+            ];
+        }
         $pkgs = $landing ? Package::live()->with('supplier')->get() : collect();
         $active = $u && $landing ? RentalRequest::where('customer_id', $u->id)->whereIn('status', array_merge(Finance::ACTIVE, ['pending']))->with(['payments', 'supplier'])->orderBy('start_date')->take(3)->get() : collect();
         $notifs = $u && $landing ? Notifier::for($u, session('mode'))->filter(fn ($n) => ! $n->isReadBy($u->id))->take(3) : collect();
 
         return view('market.browse', [
-            'landing' => $landing, 'pkgs' => $pkgs, 'active' => $active, 'notifs' => $notifs, 'themes' => self::EVENT_THEMES,
+            'landing' => $landing, 'home' => $home, 'pkgs' => $pkgs, 'pkgCount' => Package::live()->count(), 'active' => $active, 'notifs' => $notifs, 'themes' => self::EVENT_THEMES,
             'prodCount' => $prods->count(), 'supCount' => $sups->count(),
             'st' => $st, 'list' => $list->values(), 'dates' => $dates, 'ai' => $ai, 'compare' => $compare,
             'cats' => Category::where('active', true)->orderBy('sort')->get(), 'sups' => $sups,

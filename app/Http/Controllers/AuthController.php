@@ -37,6 +37,11 @@ class AuthController extends Controller
         }
         $request->session()->regenerate();
         session(['mode' => $u->defaultMode()]);
+        // Reference post-login prompt: customers choose rental dates or just browse (once per login).
+        \App\Support\RentalPeriod::clear();
+        if (! $u->isStaff()) {
+            session()->flash(\App\Support\RentalPeriod::ASK, true);
+        }
         $u->forceFill(['last_login_at' => now()])->save();
         if ($u->isStaff()) {
             Notifier::audit('Signed in', $u->email, $u);

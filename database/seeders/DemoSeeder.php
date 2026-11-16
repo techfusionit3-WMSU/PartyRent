@@ -549,7 +549,7 @@ class DemoSeeder extends Seeder
             $rv->created_at = $this->ts($d);
             $rv->save();
         }
-        \App\Domain\Reviews::recalcAll();
+        // Ratings stay as seeded (reference seed.js); real reviews recalculate them from then on.
         $complaints = [
             ['CMP-001', 'u7', 'Payment rejected but money was deducted', 's4', 'PR-0008', 'My bank transfer for the wedding installment was rejected but the amount left my account. Please help check.', 'open', 'high', -5, []],
             ['CMP-002', 'u9', 'Listing photos look different', 's3', null, 'The tent listing photo shows side walls but the tent we got had none.', 'in_review', 'normal', -9, [['at' => $this->ts(-8)->toIso8601String(), 'by' => $this->U['u11'], 'note' => 'Contacted supplier for clarification.']]],

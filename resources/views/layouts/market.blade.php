@@ -29,7 +29,6 @@
   </div>
   @if(in_array($nav, ['home', 'browse'], true))
     <div class="cat-strip"><div class="container scroll-x">
-      <a href="{{ route('home', array_filter(request()->only(['start', 'end', 'qty']))) }}" class="{{ ! request('category') ? 'active' : '' }}">All</a>
       @foreach($cats as $c)<a href="{{ route('home', array_filter(['category' => $c->id] + request()->only(['start', 'end', 'qty', 'view']))) }}" class="{{ request('category') === $c->id ? 'active' : '' }}">{{ $c->name }}</a>@endforeach
     </div></div>
   @endif
@@ -38,6 +37,7 @@
 
 <div class="mk-main"><div class="container">
   @yield('content')
+  @if(session(\App\Support\RentalPeriod::ASK))@include('partials.date-prompt')@endif
 </div></div>
 
 <footer class="mk-footer"><div class="container">

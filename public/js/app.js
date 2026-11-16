@@ -488,6 +488,25 @@
     $$('[data-review-form]').forEach(MediaInputs);
   });
 
+  /* ---------- side drawer (reference UI.drawer): <button data-drawer="id">, [data-drawer-close="id"] ---------- */
+  document.addEventListener('click', e => {
+    const op = e.target.closest('[data-drawer]');
+    if (op) { const d = document.getElementById(op.dataset.drawer); if (d) { d.classList.remove('hidden'); const bd = document.querySelector('.drawer-backdrop[data-drawer-close="' + op.dataset.drawer + '"]'); if (bd) bd.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } }
+    const cl = e.target.closest('[data-drawer-close]');
+    if (cl) { const id = cl.dataset.drawerClose; const d = document.getElementById(id); if (d) d.classList.add('hidden'); const bd = document.querySelector('.drawer-backdrop[data-drawer-close="' + id + '"]'); if (bd) bd.classList.add('hidden'); document.body.style.overflow = ''; }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.drawer:not(.hidden)').forEach(d => { d.classList.add('hidden'); $$('.drawer-backdrop').forEach(b => b.classList.add('hidden')); document.body.style.overflow = ''; }); });
+
+  /* ---------- browse: compare up to 3 items (floating bar) ---------- */
+  const cmpBar = document.getElementById('compareBar');
+  if (cmpBar) {
+    const boxes = () => $$('input[name="compare[]"]');
+    const sync = () => { const n = boxes().filter(b => b.checked).length; cmpBar.classList.toggle('hidden', !n); document.getElementById('compareN').textContent = n + ' selected'; };
+    document.addEventListener('change', e => { if (e.target.name === 'compare[]') { if (boxes().filter(b => b.checked).length > 3) { e.target.checked = false; toast('You can compare up to 3 items.', 'warn'); } sync(); } });
+    document.getElementById('compareClear').onclick = () => { boxes().forEach(b => { b.checked = false; }); sync(); };
+    sync();
+  }
+
   /* ---------- Rental List checkboxes (per item / per shop / Select all) ---------- */
   $$('[data-indet]').forEach(x => { x.indeterminate = true; });
   document.addEventListener('change', async e => {

@@ -46,6 +46,7 @@ return new class extends Migration
 
         Schema::table('products', function (Blueprint $table) {
             $table->unsignedInteger('written_off')->default(0);
+            $table->unsignedSmallInteger('max_rental_days')->nullable(); // optional per-product limit (Services.durationIssues)
             $table->decimal('max_hours', 4, 1)->nullable();
             $table->string('time_from', 5)->nullable();
             $table->string('time_to', 5)->nullable();
@@ -173,7 +174,7 @@ return new class extends Migration
         });
         Schema::table('products', function (Blueprint $t) {
             $t->dropConstrainedForeignId('hidden_by');
-            $t->dropColumn(['written_off', 'max_hours', 'time_from', 'time_to', 'allow_overnight', 'hidden_reason', 'hidden_at']);
+            $t->dropColumn(['written_off', 'max_rental_days', 'max_hours', 'time_from', 'time_to', 'allow_overnight', 'hidden_reason', 'hidden_at']);
         });
         Schema::table('suppliers', fn (Blueprint $t) => $t->dropColumn(['type', 'company', 'application', 'revision_note', 'payment_plans', 'time_settings', 'delivery_zones', 'services', 'damage_policy']));
     }

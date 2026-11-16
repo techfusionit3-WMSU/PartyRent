@@ -32,6 +32,23 @@ class Notifier
         ]);
     }
 
+    /**
+     * Money alerts for one shop (Services.notifyFinance): its cashiers (cashier workspace); a shop without a
+     * cashier gets them in the supplier workspace of the owner, who verifies payments themselves.
+     */
+    public static function finance(\App\Models\Supplier $s, string $title, string $body, string $link = ''): void
+    {
+        $cashiers = \App\Models\ShopStaff::where('supplier_id', $s->id)->where('role', 'cashier')->pluck('user_id');
+        if ($cashiers->isEmpty()) {
+            self::notify($s->owner_id, 'supplier', $title, $body, $link);
+
+            return;
+        }
+        foreach ($cashiers as $uid) {
+            self::notify($uid, 'cashier', $title, $body, $link);
+        }
+    }
+
     /** Notifications visible to a user in their current mode (superadmin also sees admin alerts). */
     public static function for(User $u, ?string $mode): Collection
     {

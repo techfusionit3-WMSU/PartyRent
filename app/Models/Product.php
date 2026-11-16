@@ -23,7 +23,7 @@ class Product extends Model
             'delivery' => 'boolean',
             'pickup' => 'boolean',
             'handling_fee' => 'float',
-            'allow_overnight' => 'boolean', 'hidden_at' => 'datetime', 'written_off' => 'integer', 'max_hours' => 'float',
+            'allow_overnight' => 'boolean', 'hidden_at' => 'datetime', 'written_off' => 'integer', 'max_hours' => 'float', 'max_rental_days' => 'integer',
             'replacement_value' => 'float',
             'min_hours' => 'float', 'buffer_min' => 'integer',
             'weight_kg' => 'float', 'length_cm' => 'float', 'width_cm' => 'float', 'height_cm' => 'float',

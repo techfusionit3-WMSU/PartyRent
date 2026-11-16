@@ -90,7 +90,7 @@ class RentalLifecycleTest extends TestCase
         $this->actingAs($juan)->withSession(['mode' => 'supplier']);
 
         // stock can no longer be reduced below what's reserved
-        $this->put("/supplier/products/{$table->id}", ['name' => $table->name, 'category_id' => $table->category_id, 'description' => $table->description, 'total_stock' => 3, 'unit' => $table->unit, 'condition' => 'Good', 'status' => 'active', 'tiers' => $table->tiers])
+        $this->put("/supplier/products/{$table->id}", ['name' => $table->name, 'category_id' => $table->category_id, 'description' => $table->description, 'total_stock' => 3, 'unit' => $table->unit, 'condition' => 'good_as_new', 'status' => 'active', 'base_price' => $table->tiers[0]['price']])
             ->assertSessionHas('error');
 
         // deposit via cashier, recorded offline

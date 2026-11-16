@@ -51,84 +51,114 @@ class CatalogController extends Controller
         return view('supplier.product-form', ['p' => $this->ownProduct($request, $product), 'cats' => Category::where('active', true)->orderBy('sort')->get(), 'events' => array_keys(Ai::EVENTS)]);
     }
 
+    public const COLORS = ['White', 'Pink', 'Gold', 'Champagne', 'Blue', 'Red', 'Black', 'Clear', 'Multicolor', 'Warm White', 'Silver'];
+
+    public const THEMES = ['Classic', 'Elegant', 'Modern', 'Minimalist', 'Pastel', 'Princess', 'Kids', 'Glam', 'Garden', 'Outdoor', 'Romantic', 'Carnival', 'Rustic', 'Fun', 'Disco'];
+
+    /**
+     * Reference product form + change list C7: base price and an optional bulk discount become quantity tiers;
+     * colors/themes from fixed chips plus "Others" text; optional maximum rental days, hour limits, a specific
+     * time frame inside the shop's rental hours, overnight rentals and an item rental policy.
+     */
     private function productData(Request $request): array
     {
+        $time = ['nullable', 'regex:/^([01]\d|2[0-4]):[0-5]\d$/'];
         $v = $request->validate([
             'name' => 'required|string|min:3|max:120',
             'category_id' => 'required|exists:categories,id',
             'description' => 'required|string|min:10|max:2000',
             'listing_type' => 'nullable|in:rent,sale',
-            'total_stock' => 'required|integer|min:0|max:100000',
+            'total_stock' => 'nullable|integer|min:0|max:100000',
+            'qty' => 'nullable|array', 'qty.*' => 'nullable|integer|min:0|max:100000',
             'unit' => 'required|string|max:40',
-            'perishable' => 'nullable|boolean',
-            'lead_days' => 'nullable|integer|min:0|max:60',
-            'shelf_life_days' => 'nullable|integer|min:1|max:3650',
-            'low_stock_at' => 'nullable|integer|min:0|max:100000',
-            'condition' => 'required|string|max:40',
+            'condition' => 'nullable|in:'.implode(',', array_keys(\App\Domain\Damage::CONDITIONS)),
             'status' => 'required|in:active,inactive',
-            'tiers' => 'required|array|min:1|max:8',
-            'tiers.*.min' => 'nullable|integer|min:1',
-            'tiers.*.max' => 'nullable|integer|min:1',
-            'tiers.*.price' => 'nullable|numeric|min:0',
-            'colors' => 'nullable|string|max:255',
-            'themes' => 'nullable|string|max:255',
+            'base_price' => 'required|numeric|min:0.01|max:10000000',
+            'bulk' => 'nullable|array|max:7', 'bulk.*.min' => 'nullable|integer|min:2', 'bulk.*.price' => 'nullable|numeric|min:0.01',
+            'colors' => 'nullable|array', 'colors.*' => 'string|max:40', 'colors_other' => 'nullable|string|max:120',
+            'themes' => 'nullable|array', 'themes.*' => 'string|max:40', 'themes_other' => 'nullable|string|max:120',
             'events' => 'nullable|array', 'events.*' => 'string|max:40',
             'delivery' => 'nullable|boolean',
-            'handling_fee' => 'nullable|numeric|min:0|max:1000000',
-            'handling_per' => 'nullable|in:line,unit',
             'replacement_value' => 'nullable|numeric|min:0|max:100000000',
             'rental_mode' => 'nullable|in:day,hour',
-            'min_hours' => 'nullable|numeric|min:0.5|max:24',
-            'buffer_min' => 'nullable|integer|min:0|max:480',
-            'weight_kg' => 'nullable|numeric|min:0|max:10000',
-            'length_cm' => 'nullable|numeric|min:0|max:10000',
-            'width_cm' => 'nullable|numeric|min:0|max:10000',
-            'height_cm' => 'nullable|numeric|min:0|max:10000',
+            'max_rental_days' => 'nullable|integer|min:1|max:365',
+            'min_hours' => 'nullable|numeric|min:0.5|max:720', 'max_hours' => 'nullable|numeric|min:0.5|max:720',
+            'time_frame' => 'nullable|boolean', 'time_from' => $time, 'time_to' => $time, 'allow_overnight' => 'nullable|boolean',
+            'rental_policy' => 'nullable|string|max:1000',
             'images' => 'nullable|array|max:5', 'images.*' => 'image|max:8192',
-            'listing_type' => 'nullable|in:rent,sale',
             'perishable' => 'nullable|boolean',
             'lead_days' => 'nullable|integer|min:0|max:60',
             'shelf_life_days' => 'nullable|integer|min:1|max:3650',
             'low_stock_at' => 'nullable|integer|min:0|max:100000',
-        ]);
+        ], ['base_price.required' => 'Enter the base price.', 'bulk.*.min.min' => 'A bulk discount starts at 2 or more pieces.']);
         $sale = ($v['listing_type'] ?? 'rent') === 'sale';
-        if ($sale && ! in_array($v['unit'], Product::SALE_UNITS, true)) {
-            $v['unit'] = 'pc';
-        }
-        if (! $sale && ! str_contains($v['unit'], '/')) {
-            $v['unit'] = 'piece / day';
-        }
-        $split = fn ($s) => array_values(array_filter(array_map(fn ($x) => ucwords(trim($x)), explode(',', (string) $s))));
-        $sale = ($v['listing_type'] ?? 'rent') === 'sale';
+        $hourly = ! $sale && ($v['rental_mode'] ?? 'day') === 'hour';
         $unit = $sale
             ? (in_array($v['unit'], Product::SALE_UNITS, true) ? $v['unit'] : 'pc')
-            : (str_contains($v['unit'], '/') ? $v['unit'] : 'piece / day');
-        if (! $sale) { // "piece / day" or "piece / hour", following how the item is rented
-            $unit = trim(explode('/', $unit)[0]).' / '.(($v['rental_mode'] ?? 'day') === 'hour' ? 'hour' : 'day');
+            : trim(explode('/', $v['unit'])[0]).' / '.($hourly ? 'hour' : 'day');
+
+        // base price + bulk discount (optional) → continuous tiers 1…, last open-ended
+        $bulk = collect($v['bulk'] ?? [])->filter(fn ($b) => ($b['min'] ?? '') !== '' && ($b['price'] ?? '') !== '')->map(fn ($b) => ['min' => (int) $b['min'], 'price' => (float) $b['price']])->sortBy('min')->values();
+        if ($bulk->pluck('min')->duplicates()->isNotEmpty()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['bulk' => 'Each bulk discount needs a different starting quantity.']);
         }
+        $steps = collect([['min' => 1, 'price' => (float) $v['base_price']]])->concat($bulk)->values();
+        $tiers = $steps->map(fn ($t, $i) => ['min' => $t['min'], 'max' => isset($steps[$i + 1]) ? $steps[$i + 1]['min'] - 1 : null, 'price' => $t['price']])->all();
+
+        $tags = function (string $k) use ($v) {
+            $other = array_map(fn ($x) => ucwords(trim($x)), explode(',', (string) ($v[$k.'_other'] ?? '')));
+
+            return array_values(array_unique(array_filter(array_merge(array_map('trim', $v[$k] ?? []), $other))));
+        };
+        $frame = ! $sale && $request->boolean('time_frame') && ($v['time_from'] ?? null) && ($v['time_to'] ?? null);
+        if ($frame && \App\Domain\Slots::toMin($v['time_to']) <= \App\Domain\Slots::toMin($v['time_from']) && ! $request->boolean('allow_overnight')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['time_to' => 'The time frame must end later than it starts (or allow overnight rental).']);
+        }
+        if (($v['min_hours'] ?? null) && ($v['max_hours'] ?? null) && $v['max_hours'] < $v['min_hours']) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['max_hours' => 'Maximum hours cannot be less than the minimum.']);
+        }
+        $qty = array_map('intval', array_filter((array) ($v['qty'] ?? []), fn ($q) => $q !== null && $q !== ''));
+        $total = ! $sale && $qty ? array_sum($qty) : (int) ($v['total_stock'] ?? 0);
 
         return [
             'listing_type' => $sale ? 'sale' : 'rent',
-            'perishable' => $sale && $request->boolean('perishable'),
-            'lead_days' => $sale ? (int) ($v['lead_days'] ?? 0) : 0,
-            'shelf_life_days' => $sale && $request->boolean('perishable') ? ($v['shelf_life_days'] ?? null) : null,
-            'low_stock_at' => $sale ? ($v['low_stock_at'] ?? null) : null,
             'name' => trim($v['name']), 'category_id' => $v['category_id'], 'description' => trim($v['description']),
-            'total_stock' => (int) $v['total_stock'], 'unit' => $unit, 'condition' => $v['condition'], 'status' => $v['status'],
-            'tiers' => $v['tiers'], 'colors' => $split($v['colors'] ?? ''), 'themes' => $split($v['themes'] ?? ''), 'events' => $v['events'] ?? [],
+            'total_stock' => $total, 'unit' => $unit, 'condition' => $sale ? 'brand_new' : ($v['condition'] ?? 'used'), 'status' => $v['status'],
+            'tiers' => $tiers, 'colors' => $tags('colors'), 'themes' => $tags('themes'), 'events' => $v['events'] ?? [],
             'delivery' => $request->boolean('delivery'), 'pickup' => true,
-            'handling_fee' => r2($v['handling_fee'] ?? 0), 'handling_per' => $v['handling_per'] ?? 'line',
             'replacement_value' => $sale ? null : (($v['replacement_value'] ?? null) ? r2($v['replacement_value']) : null),
-            'rental_mode' => ! $sale && ($v['rental_mode'] ?? 'day') === 'hour' ? 'hour' : 'day',
-            'min_hours' => (float) ($v['min_hours'] ?? 1) ?: 1, 'buffer_min' => (int) ($v['buffer_min'] ?? 60),
-            'weight_kg' => ($v['weight_kg'] ?? null) ?: null, 'length_cm' => ($v['length_cm'] ?? null) ?: null,
-            'width_cm' => ($v['width_cm'] ?? null) ?: null, 'height_cm' => ($v['height_cm'] ?? null) ?: null,
-            'listing_type' => $sale ? 'sale' : 'rent',
+            'rental_mode' => $hourly ? 'hour' : 'day',
+            'min_hours' => ! $sale && ($v['min_hours'] ?? null) ? (float) $v['min_hours'] : ($hourly ? 1.0 : 0.0), // 0 = no minimum
+            'max_hours' => $sale || empty($v['max_hours']) ? null : (float) $v['max_hours'],
+            'max_rental_days' => $sale || ! $request->boolean('has_max_days') ? null : ($v['max_rental_days'] ?? null),
+            'time_from' => $frame ? $v['time_from'] : null, 'time_to' => $frame ? $v['time_to'] : null,
+            'allow_overnight' => ! $sale && $request->boolean('allow_overnight'),
+            'rental_policy' => trim((string) ($v['rental_policy'] ?? '')) ?: null,
             'perishable' => $sale && $request->boolean('perishable'),
             'lead_days' => $sale ? (int) ($v['lead_days'] ?? 0) : 0,
             'shelf_life_days' => $sale && $request->boolean('perishable') ? ($v['shelf_life_days'] ?? null) : null,
             'low_stock_at' => $sale ? ($v['low_stock_at'] ?? null) : null,
+            '_qty' => $sale ? [] : $qty,
         ];
+    }
+
+    /** Stock per inventory location (reference stockByLocation). A new item's stock goes to the first location. */
+    private function saveLocationQty(Product $p, array $qty): void
+    {
+        $locs = $p->supplier->locations()->pluck('id')->all();
+        if (! $locs || $p->isSale()) {
+            return;
+        }
+        if (! $qty) {
+            if (\App\Models\LocationStock::where('product_id', $p->id)->exists()) {
+                return;
+            }
+            $qty = [$locs[0] => (int) $p->total_stock];
+        }
+        foreach ($locs as $id) {
+            \App\Models\LocationStock::updateOrCreate(['product_id' => $p->id, 'inventory_location_id' => $id], ['qty' => (int) ($qty[$id] ?? 0)]);
+        }
+        inv()->flush();
     }
 
     private function storeImages(Request $request, ?Product $p): array
@@ -147,11 +177,14 @@ class CatalogController extends Controller
     public function storeProduct(Request $request)
     {
         $data = $this->productData($request);
+        $qty = $data['_qty'];
+        unset($data['_qty']);
         $data['images'] = $this->storeImages($request, null);
         $res = Rentals::saveProduct($this->sup($request), $data);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }
+        $this->saveLocationQty($res['product'], $qty);
 
         return redirect()->route('supplier.products')->with('success', $res['product']->name.' saved.');
     }
@@ -160,6 +193,15 @@ class CatalogController extends Controller
     {
         $p = $this->ownProduct($request, $product);
         $data = $this->productData($request);
+        $qty = $data['_qty'];
+        unset($data['_qty']);
+        if ($qty) { // per-location quantities: each location keeps its booked allocation
+            $chk = Rentals::setLocationStock($p, $qty);
+            if (! $chk['ok']) {
+                return back()->withInput()->with('error', $chk['error']);
+            }
+            $p->refresh();
+        }
         $data['images'] = $this->storeImages($request, $p);
         $res = Rentals::saveProduct($this->sup($request), $data, $p);
         if (! $res['ok']) {

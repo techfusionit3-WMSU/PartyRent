@@ -48,7 +48,20 @@ NEXT, in order:
    Supplier pages DONE (2026-11-17): dashboard (charts via public/js/charts.js + partials/chart), requests, schedule,
    products (status archived), packages list, Inventory Management (Rentals::setLocationStock), Payment Monitoring
    (shop verifies: supplier.payments.verify/reject), calendar, reports, damages, Shop settings (7 tabs), Inventory
-   Locations (App\Domain\StockLocations), team. Supplier LEFT: product-form (C7), package form (C8), mode switch. Then cashier (scope per shop!),
+   Locations (App\Domain\StockLocations), team, product form (C7 form side; migration products.rental_policy).
+   ▶ NEXT (2026-11-17, after this commit), in order:
+     a. C7 follow-up: enforce product time_from/time_to (+ allow_overnight) in Slots::validateLine and show
+        rental_policy + time frame on the customer product page. CatalogController::updateProduct calls
+        Rentals::setLocationStock BEFORE saveProduct — move after (or into one transaction).
+     b. Package form (C8): reference SP.packages form modal fields (name, emoji, description, items, fixed price,
+        events, conditions, min/max hours, photo) + C8 (Rental event tags type-or-pick, square crop on upload,
+        inventory section after items). App editor = supplier/package-form.blade.php (components/options kept).
+     c. Mode switch customer ⇄ supplier check; C3 product page TikTok-style; C9–C13 change list.
+     d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
+        un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
+        private disk + 'revision' decision), then superadmin.
+   Rig: app server on :8033 may be an OLD session's `php artisan serve` (its DB was another scratchpad's
+   check.sqlite) — if pages 500 on new columns, kill it and start a fresh one with this session's env.sh. Then cashier (scope per shop!),
    admin (applications docs + revision), superadmin. Left after that: supplier,
    cashier, admin, superadmin pages. Rig now: scratchpad `drv/shot.js <name> <refPath> <appPath> [email] [--full]
    [--mode=supplier]` (run with MSYS_NO_PATHCONV=1), `static.js` serves reference on :8080, `env.sh` = SQLite env.

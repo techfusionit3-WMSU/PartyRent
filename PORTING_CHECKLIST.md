@@ -58,7 +58,7 @@ from the first row that is not `verified`.
 | request (availability date+time, allocation, schedule approve/reject, accept, release, inspect, settle) | E | in progress | 390+1440 match for pending view; v4 inspection (damage policy) done |
 | schedule (next 14 days) | E | done | 1440 identical |
 | products | E | done | search + status tabs, stock today, rentals, Activate/Deactivate/Archive/Restore (status archived); ProductStatusTest |
-| product-form | E | todo | |
+| product-form | E | done | reference layout + C7 (tags in specs w/ Others, base price + Bulk discount, Add maximum, time frame + overnight, item policy, stock per location) |
 | packages (+ package modal) | E (separate page) | done | list per reference (items separately, min next 30 days, limited by); app editor page kept |
 | inventory (stock, holds, damaged/missing) | E | done | Inventory Management per reference: 8 stats, written off, Update stock per location (Rentals::setLocationStock), hold + condition modals, hold schedule; InventoryPageTest |
 | locations (stock by location, transfers, movement log) | M | done | App\Domain\StockLocations, LocationController, migration stock_movements.to_location_id; InventoryLocationsTest |
@@ -142,7 +142,7 @@ from the first row that is not `verified`.
 | C4 Service-fee rule (consecutive same place = 1; place change +1; each separate block +1) | verified | Pricing::serviceVisits + test |
 | C5 Rent request: delivery zone, location UI, Delivery→Pickup grouping bug | done | public/js/checkout.js |
 | C6 Checkout: charges collapsible in Order Summary; RF / DP / total outside | done | customer/_checkout-summary |
-| C7 Product form order, Others tags, Quantity, base price, Bulk discount, Add maximum, time frame + overnight | todo | |
+| C7 Product form order, Others tags, Quantity, base price, Bulk discount, Add maximum, time frame + overnight | done (form) | time_from/time_to + allow_overnight + rental_policy saved; NOT yet enforced in Slots::validateLine / shown on product page |
 | C8 Package form: Rental event tags, square crop, inventory section position | todo | |
 | C9 Inventory: total stock + "All N units" in maintenance/set-aside | todo | |
 | C10 Inventory calendar mobile | todo | |

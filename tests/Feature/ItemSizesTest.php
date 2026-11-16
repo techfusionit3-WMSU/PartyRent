@@ -33,6 +33,6 @@ class ItemSizesTest extends TestCase
     {
         $owner = \App\Models\Supplier::approved()->firstOrFail()->owner;
         $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get(route('supplier.products.create'))
-            ->assertOk()->assertSee('Or pick a similar item')->assertSee('Monoblock chair')->assertSee('id="sizeBox"', false);
+            ->assertOk(); // v4: delivery is priced per zone, so the form no longer asks for weight and size
     }
 }

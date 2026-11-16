@@ -117,6 +117,6 @@ class HourlyRentalTest extends TestCase
         $this->actingAs($this->customer())->get(route('products.show', $this->p))->assertOk()
             ->assertSee('Start time')->assertSee('id="hourForm"', false)->assertSee('/ unit / hour');
         $this->actingAs($this->p->supplier->owner)->withSession(['mode' => 'supplier'])->get(route('supplier.products.edit', $this->p))->assertOk()
-            ->assertSee('By the hour')->assertSee('Gap between bookings');
+            ->assertSee('By the hour'); // v4: gaps come from the shop's preparation / recovery hours
     }
 }

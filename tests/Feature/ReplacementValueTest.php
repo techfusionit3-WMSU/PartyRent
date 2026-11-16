@@ -48,7 +48,7 @@ class ReplacementValueTest extends TestCase
         $p = Product::where('listing_type', 'rent')->where('status', 'active')->firstOrFail();
         $owner = Supplier::find($p->supplier_id)->owner;
         $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get(route('supplier.products.edit', $p))
-            ->assertOk()->assertSee('Replacement value per piece');
+            ->assertOk()->assertSee('Replacement value (₱ per unit)', false);
         $p->update(['replacement_value' => 850]);
         $this->get(route('products.show', $p))->assertOk()->assertSee('Replacement value')->assertSee('850');
     }

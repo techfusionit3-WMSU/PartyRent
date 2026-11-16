@@ -4,6 +4,12 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
+**v4 port of the reference prototype** (user 2026-11-16; prompt = `PartyRent_port_prompt.md` + "replicate /reference
+exactly"). Reference unzipped (read-only) in `reference/partyrent/`. Step 1 audit done: `docs/PORT_AUDIT.md`,
+`PORTING_CHECKLIST.md`. WAITING for user approval + answers (naming, money flow, org roles, booking_days, home merge,
+package-form inventory). The UI/UX batch below = the port's change list (section 6); it is applied AFTER the port.
+
+### Paused: UI/UX + logic batch
 **UI/UX + logic batch** (user spec 2026-11-16, pasted; follow its stated assumptions 1–5). Build order:
 - [ ] 1.1 Merge home + browse into one page; sticky date picker/filters; "Switch to supplier" → shop name
 - [ ] 1.2 Product page TikTok-Shop style (separate web/mobile layouts); one-line bulk discount text; service-fee rule

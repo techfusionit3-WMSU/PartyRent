@@ -38,6 +38,7 @@
       @foreach($l['once'] ?? [] as $o)
         <div class="sum-line small"><span>{{ $o['label'] }} <span class="muted">· charged once</span></span><span>{{ $o['qty'] }} × {{ money($o['unit']) }}{{ $kind === 'sale' ? ' / '.($l['unitWord'] ?? 'unit') : '' }} = <b>{{ money($o['subtotal']) }}</b></span></div>
       @endforeach
+      @if(! empty($l['discount']))<div class="sum-line small" style="color:var(--green)"><span>Shop discount – {{ $l['discount']['name'] }} <span class="muted">· {{ $l['discount']['label'] }}</span></span><span>−{{ money($l['discount']['amount']) }}</span></div>@endif
     </div>
   @endforeach
   @if($g['d'])</div>@endif

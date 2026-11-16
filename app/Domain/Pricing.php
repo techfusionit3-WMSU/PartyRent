@@ -60,6 +60,25 @@ class Pricing
         return count($parts) > 1 ? $line.' · up to '.$amt($last[0]).' off at '.$last[1].'+' : $line;
     }
 
+    /**
+     * Base price + bulk discount steps ([['min' => n, 'price' => x], …]) → continuous tiers starting at 1, the last
+     * one open-ended. Returns an error message for duplicate starting quantities or a step below 2 pieces.
+     */
+    public static function tiersFrom(float $base, array $bulk): array|string
+    {
+        $steps = collect($bulk)->filter(fn ($b) => ($b['min'] ?? '') !== '' && ($b['price'] ?? '') !== '' && $b['min'] !== null && $b['price'] !== null)
+            ->map(fn ($b) => ['min' => (int) $b['min'], 'price' => (float) $b['price']])->sortBy('min')->values();
+        if ($steps->pluck('min')->duplicates()->isNotEmpty()) {
+            return 'Each bulk discount needs a different starting quantity.';
+        }
+        if ($steps->contains(fn ($b) => $b['min'] < 2)) {
+            return 'A bulk discount starts at 2 or more pieces.';
+        }
+        $all = collect([['min' => 1, 'price' => $base]])->concat($steps)->values();
+
+        return $all->map(fn ($t, $i) => ['min' => $t['min'], 'max' => isset($all[$i + 1]) ? $all[$i + 1]['min'] - 1 : null, 'price' => $t['price']])->all();
+    }
+
     public static function tierFor(Product $p, int $qty): array
     {
         $tiers = self::sortedTiers($p);
@@ -116,7 +135,7 @@ class Pricing
      *   package      by its pricing mode: rental part per date × packages that day,
      *                sale items + services once × the peak number of packages
      */
-    public static function quoteLine(array $line, ?array $combined = null): array
+    public static function quoteLine(array $line, ?array $combined = null, ?string $at = null): array
     {
         $days = array_filter(array_map('intval', $line['days'] ?? []));
         ksort($days);
@@ -155,12 +174,14 @@ class Pricing
         if ($p && $p->isSale()) {
             $qty = array_sum($days);
             $unit = $qty ? self::unitPrice($p, $qty) : 0.0;
-            $total = r2($unit * $qty);
+            $gross = r2($unit * $qty);
+            $disc = $qty ? Discounts::best($p, [['qty' => $qty, 'unit' => $unit]], $at) : null; // shop discount (C11)
+            $total = r2($gross - ($disc['amount'] ?? 0));
 
             return array_merge($base, [
                 'kind' => 'sale', 'name' => $p->name, 'unitWord' => $p->unitWord(), 'dates' => array_keys($days),
-                'once' => $qty ? [['label' => $p->name, 'qty' => $qty, 'unit' => $unit, 'subtotal' => $total]] : [],
-                'sale' => $total, 'total' => $total,
+                'once' => $qty ? [['label' => $p->name, 'qty' => $qty, 'unit' => $unit, 'subtotal' => $gross]] : [],
+                'gross' => $gross, 'discount' => $disc, 'sale' => $total, 'total' => $total,
             ]);
         }
         // Hourly items: the tier price is per hour, so one unit costs price × hours of the booking.
@@ -174,10 +195,12 @@ class Pricing
             }
             $base['days'][] = $row + ['subtotal' => r2($row['unit'] * $qty)];
         }
-        $rent = r2(array_sum(array_column($base['days'], 'subtotal')));
+        $gross = r2(array_sum(array_column($base['days'], 'subtotal')));
+        $disc = $p && $base['days'] ? Discounts::best($p, $base['days'], $at) : null; // shop discount (C11)
+        $rent = r2($gross - ($disc['amount'] ?? 0));
         $name = ($p?->name ?? 'Item').($hours ? ' · '.Hours::label($line['time']) : '');
 
-        return array_merge($base, ['kind' => 'rent', 'name' => $name, 'rent' => $rent, 'total' => $rent] + ($hours ? ['hours' => $hours] : []));
+        return array_merge($base, ['kind' => 'rent', 'name' => $name, 'gross' => $gross, 'discount' => $disc, 'rent' => $rent, 'total' => $rent] + ($hours ? ['hours' => $hours] : []));
     }
 
     /* ---------- delivery ---------- */
@@ -295,7 +318,10 @@ class Pricing
         $s = $o['supplier'] ?? null;
         $lines = array_values($o['lines'] ?? []);
         $combined = self::combinedQty($lines);
-        $lq = array_map(fn ($l) => self::quoteLine($l, $combined), $lines);
+        $at = $o['at'] ?? null; // day the request is placed: decides which shop discounts apply
+        $lq = array_map(fn ($l) => self::quoteLine($l, $combined, $at), $lines);
+        $discounts = array_values(array_filter(array_map(fn ($l) => ! empty($l['discount']) ? $l['discount'] + ['item' => $l['name']] : null, $lq)));
+        $discount = r2(array_sum(array_column($discounts, 'amount')));
         $rentalSubtotal = r2(array_sum(array_column($lq, 'rent')));
         $salesSubtotal = r2(array_sum(array_column($lq, 'sale')));
         $packageServices = r2(array_sum(array_column($lq, 'service')));
@@ -326,7 +352,7 @@ class Pricing
             : (float) ($pol['depositValue'] ?? 0));
 
         return [
-            'lines' => $lq, 'rentalFee' => $rentalFee, 'itemsSubtotal' => $rentalFee,
+            'lines' => $lq, 'rentalFee' => $rentalFee, 'itemsSubtotal' => $rentalFee, 'discount' => $discount, 'discounts' => $discounts,
             'rentalSubtotal' => $rentalSubtotal, 'salesSubtotal' => $salesSubtotal, 'servicesSubtotal' => $packageServices,
             'delivery' => $delivery, 'deliveryFee' => $deliveryFee, 'services' => $services, 'serviceFee' => $serviceFee, 'serviceVisits' => $visits,
             'total' => $total, 'payable' => $total, 'plan' => $plan, 'terms' => $terms,
@@ -348,6 +374,7 @@ class Pricing
         return self::quoteOrder([
             'supplier' => $r->supplier, 'lines' => $r->lines, 'fulfillment' => $r->fulfillment,
             'destinations' => $r->destinations ?? [], 'plan' => $r->plan ?? 'full', 'services' => $r->services ?? [],
+            'at' => $r->created_at?->format('Y-m-d'),
         ]);
     }
 

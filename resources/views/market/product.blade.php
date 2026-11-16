@@ -27,6 +27,7 @@
     <div class="pdx-price">
       <div><span class="pdx-amt">{{ money($p->basePrice()) }}</span> <span class="pdx-unit">/ {{ $p->unit }}</span></div>
       @if($bulk)<div class="pdx-bulk">{{ icon('tag', 'width:14px;height:14px;vertical-align:-2px') }} {{ $bulk }}</div>@endif
+      @foreach(\App\Domain\Discounts::running($p->supplier_id, today_iso())->filter(fn ($d) => $d->covers($p)) as $promo)<div class="pdx-bulk">{{ icon('sparkle', 'width:14px;height:14px;vertical-align:-2px') }} {{ $promo->name }}: {{ $promo->label() }}{{ $promo->min_qty ? ' for '.$promo->min_qty.'+ pieces' : '' }}{{ $promo->ends_on ? ' · until '.fmt_date($promo->ends_on->format('Y-m-d')) : '' }}</div>@endforeach
     </div>
     <h1 class="pdx-title">{{ $p->name }}</h1>
     <div class="pdx-meta">@if($reviews->count())<span class="stars">{{ stars($p->rating) }}</span> <a href="#reviews">{{ number_format($p->rating, 1) }} ({{ $reviews->count() }})</a>@else<span>No reviews yet</span>@endif<span class="dotsep">{{ $p->rent_count }} rented</span></div>

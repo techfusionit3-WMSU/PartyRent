@@ -98,12 +98,10 @@ class CatalogController extends Controller
             : trim(explode('/', $v['unit'])[0]).' / '.($hourly ? 'hour' : 'day');
 
         // base price + bulk discount (optional) → continuous tiers 1…, last open-ended
-        $bulk = collect($v['bulk'] ?? [])->filter(fn ($b) => ($b['min'] ?? '') !== '' && ($b['price'] ?? '') !== '')->map(fn ($b) => ['min' => (int) $b['min'], 'price' => (float) $b['price']])->sortBy('min')->values();
-        if ($bulk->pluck('min')->duplicates()->isNotEmpty()) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['bulk' => 'Each bulk discount needs a different starting quantity.']);
+        $tiers = \App\Domain\Pricing::tiersFrom((float) $v['base_price'], $v['bulk'] ?? []);
+        if (is_string($tiers)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['bulk' => $tiers]);
         }
-        $steps = collect([['min' => 1, 'price' => (float) $v['base_price']]])->concat($bulk)->values();
-        $tiers = $steps->map(fn ($t, $i) => ['min' => $t['min'], 'max' => isset($steps[$i + 1]) ? $steps[$i + 1]['min'] - 1 : null, 'price' => $t['price']])->all();
 
         $tags = function (string $k) use ($v) {
             $other = array_map(fn ($x) => ucwords(trim($x)), explode(',', (string) ($v[$k.'_other'] ?? '')));

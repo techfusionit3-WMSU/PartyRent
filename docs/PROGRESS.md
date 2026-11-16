@@ -70,7 +70,14 @@ NEXT, in order:
         C9 DONE: inventory hold modal shows total stock + "All N units" checkbox (fills + locks qty).
         C10 DONE: inventory calendar on phones = compact month (count pills, coloured dots for reserved/pending/
         maint./returns, today outlined) and week as a vertical agenda; tapping a day jumps to #dayInfo.
-        NEXT: C11 Discounts page, C12 shortfall/dispute cases, C13 Xendit checks.
+        C11 DONE: Catalog → Discounts (DiscountController, supplier/discounts.blade.php, nav item). Shop discounts
+        (`discounts` table, App\Domain\Discounts): percent / ₱ per piece, all or selected items, min pieces, period
+        (= day the request is placed; quoteRequest uses created_at), on/off. Pricing::quoteLine applies the ONE best
+        discount per product line (packages excluded); line 'gross'/'discount', order 'discount'/'discounts';
+        rentalFee is net (supplier funds it → commission/payout on net). Shown in rental-charges, lines-table and
+        product page banner. Bulk discount editor per item (Pricing::tiersFrom shared with the product form).
+        DiscountsTest (3) incl. checkout stores the discounted total.
+        NEXT: C12 shortfall/dispute cases, then C13 Xendit checks (refund permission!), then cashier/admin/super.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
         private disk + 'revision' decision), then superadmin.

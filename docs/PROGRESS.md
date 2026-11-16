@@ -6,8 +6,19 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 ## Current task
 **v4 port of the reference prototype** (user 2026-11-16; prompt = `PartyRent_port_prompt.md` + "replicate /reference
 exactly"). Reference unzipped (read-only) in `reference/partyrent/`. Step 1 audit done: `docs/PORT_AUDIT.md`,
-`PORTING_CHECKLIST.md`. WAITING for user approval + answers (naming, money flow, org roles, booking_days, home merge,
-package-form inventory). The UI/UX batch below = the port's change list (section 6); it is applied AFTER the port.
+`PORTING_CHECKLIST.md`. APPROVED 2026-11-16. User: "always follow the zip UI/UX and do all the prompts".
+Decisions:
+1. UI says **Supplier** again (zip wording; supersedes the 11-12 "Rental Partner" rename).
+2. Every customer payment goes through **Xendit first**; each shop (individual or organization) has its own
+   cashier who sees only that shop's payments / receipts / balances / overdue; platform payouts via Xendit stay.
+3. Zip org model: Individual / Organization; roles org_admin, cashier, inventory, staff
+   (map manager→org_admin, warehouse→inventory, coordinator→staff, cashier→cashier).
+4. Add `booking_days` table for locked availability (keep `lines` JSON for display).
+5. Home + browse merged (change list); home sections sit above the browse grid.
+6. Package form: inventory section moved right after the items.
+7. App-only pages keep working but use the zip UI/UX; menus follow the zip.
+8. `reference/` folder: decide later (untracked for now).
+The UI/UX batch below = the port's change list (section 6); it is applied AFTER the port.
 
 ### Paused: UI/UX + logic batch
 **UI/UX + logic batch** (user spec 2026-11-16, pasted; follow its stated assumptions 1–5). Build order:

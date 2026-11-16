@@ -9,7 +9,7 @@ from the first row that is not `verified`.
 | # | Step | Status | Note |
 |---|---|---|---|
 | S1 | Audit, checklist, schema plan, route map (`docs/PORT_AUDIT.md`) | done | waiting for approval + answers to open questions |
-| S2 | Design system: base.css / layout.css v4 diff, Blade components, `eyeOff` icon | todo | |
+| S2 | Design system: base.css / layout.css v4 diff, Blade components, `eyeOff` icon | done | 3-way merge (phase-1 copy, app edits, v4); app keeps 2 modal-scroll fixes; eyeOff added; screenshot rig works |
 | S3 | Schema + models + seeders (10 demo accounts, seed.js data) | todo | |
 | S4 | Core logic services + unit tests | todo | |
 | S5 | Pages per role | todo | |

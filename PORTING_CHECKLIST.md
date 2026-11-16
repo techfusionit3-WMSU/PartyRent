@@ -62,10 +62,10 @@ from the first row that is not `verified`.
 | packages (+ package modal) | E (separate page) | done | list per reference (items separately, min next 30 days, limited by); app editor page kept |
 | inventory (stock, holds, damaged/missing) | E | done | Inventory Management per reference: 8 stats, written off, Update stock per location (Rentals::setLocationStock), hold + condition modals, hold schedule; InventoryPageTest |
 | locations (stock by location, transfers, movement log) | M | todo | |
-| calendar | E | todo | |
+| calendar | E | done | 1440 matched (default item by id, legend, out-of-month days, holds line) |
 | payments | E | done | Payment Monitoring per reference: verification queue (review modal, verify/reject via supplier.payments.verify/reject), balances by order, overdue, records; SupplierPaymentsTest |
 | damages (+ damage policy) | E | in progress | page per SP.damages done; Damage policy tab in shop settings pending |
-| reports (8 reports, CSV) | E | todo | |
+| reports (8 reports, CSV) | E | done | reference charts (bars, line, hbars incl. pct), tables; app CSV download kept |
 | shop (zones, services, damage policy, payment plans, rental hours) | P | todo | |
 | team (Org Admin, Cashier, Inventory Staff, Staff) | P (`staff`) | done | TeamRolesTest 6 green; screenshot pending |
 | Org permissions (`Auth.orgCan`) on nav + actions | P (`canShop`) | done | ShopStaff::ORG_PERMS + ROUTE_PERMS, nav filtered |

@@ -77,7 +77,10 @@
 
   function hbars(el, data, o) {
     const max = Math.max.apply(null, data.map(d => d.value).concat([1]));
-    el.innerHTML = data.length ? data.map(d => '<div class="hbar" title="' + esc(d.label) + ': ' + fmt(d.value, o.money) + '"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(d.label) + '</span><div class="tr"><span style="width:' + (d.value / max * 100) + '%;background:' + (o.color || '#E11D74') + '"></span></div><b class="right">' + fmt(d.value, o.money) + '</b></div>').join('') : '<div class="muted small">No data yet</div>';
+    // o.pct: values are percentages (bar = share of 100, label "4.8%") — reference utilization report
+    const w = d => o.pct ? Math.min(100, d.value) : d.value / max * 100;
+    const lab = d => o.pct ? d.value.toFixed(1) + '%' : fmt(d.value, o.money);
+    el.innerHTML = data.length ? data.map(d => '<div class="hbar" title="' + esc(d.label) + ': ' + lab(d) + '"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(d.label) + '</span><div class="tr"><span style="width:' + w(d) + '%;background:' + (o.color || '#E11D74') + '"></span></div><b class="right">' + lab(d) + '</b></div>').join('') : '<div class="muted small">No data yet</div>';
   }
 
   const KINDS = { bars, line, donut, hbars };

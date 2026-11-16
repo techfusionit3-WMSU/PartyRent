@@ -17,7 +17,7 @@ class ReportController extends Controller
     public function calendar(Request $request)
     {
         $sup = $request->user()->shop();
-        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'deleted')->orderBy('name')->get();
+        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'deleted')->orderBy('id')->get();
         if ($prods->isEmpty()) {
             return view('supplier.calendar', ['prods' => $prods]);
         }

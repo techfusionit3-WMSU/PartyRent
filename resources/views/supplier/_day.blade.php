@@ -18,5 +18,5 @@
 @endforelse
 @if($b['holds'])
   <div class="label mt-2 mb-1">Holds</div>
-  @foreach($b['holds'] as $h)<div class="small">{{ $h->type === 'setaside' ? 'Set aside' : 'Maintenance' }}: {{ $h->qty }} · {{ $h->note }}</div>@endforeach
+  @foreach($b['holds'] as $h)<div class="small">• {{ $h->qty }} {{ $h->type === 'setaside' ? 'set aside' : 'in maintenance' }}{{ $h->note ? ' — '.$h->note : '' }}</div>@endforeach
 @endif

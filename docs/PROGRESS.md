@@ -44,7 +44,13 @@ NEXT, in order:
 3. IN PROGRESS (2026-11-16 late): customer pages compared at 1440 with the rig (see below). Done: rentals, payments,
    profile, suppliers, packages, package, ai, start-selling (v4 wizard); product partly (C3 pending). Admin port must add:
    view/download application docs (private disk `applications/{uid}/…`, paths in suppliers.application.docs) and the
-   'revision' decision (status revision + revision_note). Left: supplier,
+   'revision' decision (status revision + revision_note).
+   Supplier pages DONE (2026-11-17): dashboard (charts via public/js/charts.js + partials/chart), requests, schedule,
+   products (status archived), packages list, Inventory Management (Rentals::setLocationStock), Payment Monitoring
+   (shop verifies: supplier.payments.verify/reject). Supplier LEFT: calendar, reports (charts), damages policy tab +
+   shop settings (zones, services, damage policy, payment plans, rental hours), Inventory Locations page (missing;
+   sidebar item), product-form (C7), package form (C8), team screenshot, mode switch. Then cashier (scope per shop!),
+   admin (applications docs + revision), superadmin. Left after that: supplier,
    cashier, admin, superadmin pages. Rig now: scratchpad `drv/shot.js <name> <refPath> <appPath> [email] [--full]
    [--mode=supplier]` (run with MSYS_NO_PATHCONV=1), `static.js` serves reference on :8080, `env.sh` = SQLite env.
    Was: Remaining customer pages: product (C3 TikTok-style later), packages, package, suppliers, ai, rentals, payments,

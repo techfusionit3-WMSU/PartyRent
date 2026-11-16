@@ -70,7 +70,8 @@ class SupplierLocationTest extends TestCase
 
     public function test_home_based_location_stays_private_until_pickup_is_accepted(): void
     {
-        $happy = Supplier::where('name', 'like', 'Happy Moments%')->firstOrFail(); // home-based, pinned
+        $happy = Supplier::where('name', 'like', 'Happy Moments%')->firstOrFail();
+        $happy->update(['location_type' => 'home', 'lat' => 14.6401, 'lng' => 121.0772]); // the v4 seed has only public, unpinned shops
         $this->get("/suppliers/{$happy->id}")->assertOk()
             ->assertSee('Home-based in Quezon City')
             ->assertDontSee('88 Katipunan')
@@ -78,7 +79,9 @@ class SupplierLocationTest extends TestCase
 
         // a public shop shows its address, pin and directions
         $dream = Supplier::where('name', 'like', 'Dream Events%')->firstOrFail();
-        $this->get("/suppliers/{$dream->id}")->assertOk()->assertSee('401 Chino Roces')->assertSee('data-lat="'.$dream->lat.'"', false)->assertSee('Get directions');
+        $dream->update(['lat' => 14.5547, 'lng' => 121.0144]); // pinned public shop
+        $this->get("/suppliers/{$dream->id}")->assertOk()->assertSee('401 Chino Roces');
+        $this->get("/suppliers/{$dream->id}?tab=policies")->assertOk()->assertSee('data-lat="'.$dream->lat.'"', false)->assertSee('Get directions');
 
         // PR-0002 is an accepted pickup from Happy Moments: the customer now gets the exact spot
         $kristine = $this->user('kristine@demo.ph');
@@ -91,22 +94,22 @@ class SupplierLocationTest extends TestCase
         $d = add_days(today_iso(), 26);
         CartLine::where('user_id', $maria->id)->delete();
         $this->actingAs($maria)->withSession(['mode' => 'customer'])->post('/cart', ['type' => 'item', 'ref_id' => $table->id, 'days' => json_encode([$d => 1])]);
-        $this->get("/checkout/{$happy->id}?fulfillment=pickup")->assertOk()->assertSee('shared once')->assertDontSee('88 Katipunan');
-        $this->post("/checkout/{$happy->id}", ['eventName' => 'Quiet Pickup', 'eventType' => 'Birthday', 'eventDate' => $d, 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'bank', 'agree' => '1'])->assertRedirect();
+        $this->get('/checkout')->assertOk()->assertDontSee('88 Katipunan');
+        $this->checkout($happy->id, ['eventName' => 'Quiet Pickup', 'eventType' => 'Birthday', 'eventDate' => $d, 'fulfillment' => 'pickup',
+            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'bank'])->assertOk()->assertJsonPath('ok', true);
         $code = RentalRequest::where('event_name', 'Quiet Pickup')->value('code');
         $this->get("/rentals/{$code}")->assertOk()->assertDontSee('88 Katipunan');
     }
 
     public function test_no_pickup_from_seller_without_a_pickup_location(): void
     {
-        $hub = Supplier::where('name', 'like', 'Celebration Hub%')->firstOrFail(); // online seller
+        $hub = Supplier::where('name', 'like', 'Celebration Hub%')->firstOrFail();
+        $hub->update(['location_type' => 'none', 'fulfillment' => 'delivery']); // online seller (not in the v4 seed)
         $maria = $this->user('maria@demo.ph');
         $this->actingAs($maria)->withSession(['mode' => 'customer']);
         // her seeded cart has Celebration Hub chairs; asking for pickup falls back to delivery
-        $this->get("/checkout/{$hub->id}?fulfillment=pickup")->assertOk()->assertSee('name="fulfillment" value="delivery"', false);
-        $this->post("/checkout/{$hub->id}", ['eventName' => 'No Pickup', 'eventType' => 'Birthday', 'eventDate' => add_days(today_iso(), 12), 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'bank', 'agree' => '1'])->assertSessionHas('error');
+        $this->checkout($hub->id, ['eventName' => 'No Pickup', 'eventType' => 'Birthday', 'eventDate' => add_days(today_iso(), 12), 'fulfillment' => 'pickup',
+            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'bank'])->assertStatus(422);
         $this->get("/suppliers/{$hub->id}")->assertOk()->assertSee('Online seller');
     }
 

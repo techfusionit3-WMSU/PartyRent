@@ -29,6 +29,23 @@ abstract class TestCase extends BaseTestCase
         return $r->fresh();
     }
 
+    /**
+     * v4 single checkout (POST /checkout JSON) for the signed-in customer's rental-list lines of one shop.
+     * $form uses the old field names: eventName, eventType, eventDate, fulfillment, contactName, contactPhone,
+     * arrangement (→ plan), method, destinations.
+     */
+    protected function checkout(int $supplierId, array $form): \Illuminate\Testing\TestResponse
+    {
+        $ids = \App\Models\CartLine::where('user_id', auth()->id())->where('supplier_id', $supplierId)->pluck('id')->all();
+
+        return $this->postJson('/checkout', [
+            'shared' => array_intersect_key($form, array_flip(['eventName', 'eventType', 'contactName', 'contactPhone', 'instructions'])),
+            'orders' => [['supplier_id' => $supplierId, 'cart_line_ids' => $ids, 'eventDate' => $form['eventDate'] ?? null, 'fulfillment' => $form['fulfillment'] ?? 'pickup',
+                'plan' => $form['plan'] ?? $form['arrangement'] ?? 'full', 'method' => $form['method'] ?? 'bank', 'destinations' => $form['destinations'] ?? []]],
+            'agree' => $form['agree'] ?? '1',
+        ]);
+    }
+
     /** v4: each shop has its own cashier. Give the request's shop one (the seed only has Grace at Elegant Occasion). */
     protected function shopCashier(string $code): User
     {

@@ -146,10 +146,10 @@ class PackagesTest extends TestCase
         $this->assertSame([3 => 1], array_map('intval', $line->sel['choices']));
         $this->assertSame([4], $line->sel['addons']);
 
-        $this->post('/checkout/'.$k->supplier_id, [
+        $this->checkout($k->supplier_id, [
             'eventName' => 'Fiesta', 'eventType' => 'Birthday', 'eventDate' => $d1, 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod', 'agree' => '1',
-        ])->assertRedirect();
+            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod',
+        ])->assertOk()->assertJsonPath('ok', true);
         $r = RentalRequest::where('event_name', 'Fiesta')->firstOrFail();
         $total = $r->pricing['total'];
         $this->assertEquals(4900.0, $total);

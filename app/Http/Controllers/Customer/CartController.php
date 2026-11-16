@@ -152,7 +152,7 @@ class CartController extends Controller
                 'inst' => ['n' => min(3, (int) $cfg['installment']['maxInstallments']), 'items' => [], 'auto' => true],
                 // static shop info for the page
                 'shop' => [
-                    'name' => $s->name, 'logo' => $s->logo, 'color' => $s->color, 'address' => $s->address, 'hours' => $s->hours, 'fulfillment' => $s->fulfillment,
+                    'name' => $s->name, 'logo' => $s->logo, 'color' => $s->color, 'address' => $s->publicAddress(), 'hours' => $s->hours, 'fulfillment' => $s->fulfillment,
                     'zones' => $s->delivery_zones ?? [], 'deliveryFee' => (float) $s->delivery_fee, 'services' => $s->services ?? [], 'times' => Slots::options($s),
                     'plans' => array_map(fn ($k) => ['key' => $k, 'label' => Finance::PLAN_LABEL[$k], 'summary' => Finance::planSummary($s, $k)], Finance::plansOf($s)),
                     'maxInstallments' => (int) $cfg['installment']['maxInstallments'],

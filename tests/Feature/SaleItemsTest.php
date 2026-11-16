@@ -99,18 +99,14 @@ class SaleItemsTest extends TestCase
         $this->post('/cart', ['type' => 'item', 'ref_id' => $p->id, 'days' => json_encode([$d => 11])])->assertSessionHas('error');
 
         $this->post('/cart', ['type' => 'item', 'ref_id' => $p->id, 'days' => json_encode([$d => 7])])->assertSessionHas('success');
-        $this->post('/checkout/'.$shop->id, [
+        $this->checkout($shop->id, [
             'eventName' => 'Cupcake Party', 'eventType' => 'Birthday', 'eventDate' => $d, 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod', 'agree' => '1',
-        ])->assertRedirect();
+            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod',
+        ])->assertOk()->assertJsonPath('ok', true);
         $r = RentalRequest::where('event_name', 'Cupcake Party')->firstOrFail();
-        $this->assertEquals(6300.0, $r->pricing['total']); // 7 × 900, sold once (not per day)
+        $this->assertEquals(6300.0, $r->pricing['salesSubtotal']); // 7 × 900, sold once (not per day)
 
-        // Cash on Delivery, full payment: the supplier's 30% down payment is paid upfront, the rest on delivery
-        $up = $r->fin()['upfront'];
-        $this->assertEquals(['amount' => 1890.0, 'type' => 'down', 'label' => 'Down payment (rest on delivery)'], $up);
-        $this->as('juan@demo.ph', 'supplier')->post("/supplier/requests/{$r->code}/accept")->assertSessionHas('error');
-        $this->as('cashier@partyrent.ph', 'cashier')->post('/cashier/record', ['request' => $r->code, 'type' => 'down', 'method' => 'cash', 'amount' => $up['amount'], 'date' => today_iso(), 'reference' => 'OR-DP1'])->assertSessionHas('success');
+        // v4: the supplier accepts first; payments follow
         $this->as('juan@demo.ph', 'supplier')->post("/supplier/requests/{$r->code}/accept")->assertSessionHas('success');
         inv()->flush();
         $this->assertSame(7, inv()->committedSale($p->id));

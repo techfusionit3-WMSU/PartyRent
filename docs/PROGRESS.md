@@ -34,8 +34,13 @@ NEXT, in order:
    `window.PR.toast` exposed), damages page per SP.damages. `ReplacementValueTest` rewritten (policy tests).
    NOT yet: shop "Damage policy" tab (supplier/shop?tab=damage), product form condition select still old
    Excellent/Good list (→ brand_new|good_as_new|used), "mark repaired" action on inventory.
-2. PagesTest GREEN (d9fa96b+1). Full suite 33 red / 64 green. Next: rewrite the other red feature tests for the v4 flows
-   (one checkout POST /checkout JSON, payments only after accept, shop cashier cashier@elegantoccasion.ph).
+2. DONE: full suite GREEN (96 passed, 1 skipped). Tests now use v4 flows via TestCase helpers `accepted($code)`,
+   `shopCashier($code)`, `checkout($supplierId, $form)` (POST /checkout JSON). Demo PayAccounts back in DemoSeeder.
+   Fixes found on the way: `Hours::window` read only {from,to} (v4 lines are {start,end}) → hourly items were
+   priced as 1 h; public shop page + checkout showed a home-based seller's exact address (now `publicAddress()`;
+   map + directions moved to the Policies tab "Location" card).
+   Open follow-ups: skipped `PayoutsTest::test_shop_cashier_sees_only_their_shop` (scope cashier pages per shop in
+   step 3); hourly item over several dates still priced per-day with the one-day window; `Hours::error` unused.
 3. Remaining customer pages: product (C3 TikTok-style later), packages, package, suppliers, ai, rentals, payments,
    profile, start-selling (Individual/Organization wizard). Then supplier, cashier, admin, superadmin pages.
 4. Change list still open: C1 done, C3, C7–C13.

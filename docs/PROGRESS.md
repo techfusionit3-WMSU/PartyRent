@@ -67,8 +67,10 @@ NEXT, in order:
         web = thumb rail + photo | price banner + title + rent box, shop card, Description / Calendar / Delivery &
         policies cards; mobile = swipe gallery 1/N, full-width price banner, sticky CTA bar (Shop · Add · Request),
         bottom nav hidden. `Pricing::bulkLine` replaces the tier table. Browser-checked (drv/pdx.js).
-        NEXT: C9–C13 change list (C9 inventory "All N units", C10 calendar mobile, C11 Discounts page,
-        C12 shortfall/dispute cases, C13 Xendit checks).
+        C9 DONE: inventory hold modal shows total stock + "All N units" checkbox (fills + locks qty).
+        C10 DONE: inventory calendar on phones = compact month (count pills, coloured dots for reserved/pending/
+        maint./returns, today outlined) and week as a vertical agenda; tapping a day jumps to #dayInfo.
+        NEXT: C11 Discounts page, C12 shortfall/dispute cases, C13 Xendit checks.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
         private disk + 'revision' decision), then superadmin.

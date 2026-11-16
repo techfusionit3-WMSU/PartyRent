@@ -25,6 +25,8 @@ class InventoryPageTest extends TestCase
         $this->get(route('supplier.inventory'))->assertOk()->assertSee('Inventory Management')->assertSee('Update stock')->assertSee('Maintenance & set-aside schedule', false);
 
         $chair = Product::where('supplier_id', $sup->id)->where('name', 'White Monoblock Chair')->firstOrFail();
+        // C9: the maintenance / set-aside form shows the total stock and an "All N units" option
+        $this->get(route('supplier.inventory'))->assertSee('All '.$chair->total_stock.' units')->assertSee('total stock '.$chair->total_stock);
         $locs = $sup->locations()->get();
         $this->assertGreaterThanOrEqual(1, $locs->count());
         $qty = $locs->mapWithKeys(fn ($l) => [$l->id => inv()->stockAt($chair->id, $l->id)])->all();

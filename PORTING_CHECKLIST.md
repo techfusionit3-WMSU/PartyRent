@@ -144,8 +144,8 @@ from the first row that is not `verified`.
 | C6 Checkout: charges collapsible in Order Summary; RF / DP / total outside | done | customer/_checkout-summary |
 | C7 Product form order, Others tags, Quantity, base price, Bulk discount, Add maximum, time frame + overnight | done | form + Slots::validateLine frame/overnight rule + product page time frame & item rental policy |
 | C8 Package form: Rental event tags, square crop, inventory section position | done | + reference min/max rental hours, photo; browser-checked |
-| C9 Inventory: total stock + "All N units" in maintenance/set-aside | todo | |
-| C10 Inventory calendar mobile | todo | |
+| C9 Inventory: total stock + "All N units" in maintenance/set-aside | done | |
+| C10 Inventory calendar mobile | done | compact month + week agenda; browser-checked |
 | C11 Discounts page | todo | |
 | C12 Shortfall/dispute cases (report → flag → notify → case page → proposals → deadline/escalate → apply → audit) | todo | |
 | C13 Xendit: totals match charge; service fees to platform; refunds + payout reduction; practice mode; payout tests | todo | |

@@ -97,7 +97,9 @@
   <div class="modal-backdrop hidden" id="hold{{ $p->id }}"><div class="modal sm" role="dialog" aria-modal="true"><div class="modal-head"><h3>Maintenance / set aside · {{ $p->name }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
     <form method="POST" action="{{ route('supplier.inventory.hold', $p) }}">@csrf<div class="modal-body">
       <div class="field"><label>Type</label><select class="input" name="type"><option value="maintenance">Maintenance / repair</option><option value="setaside">Set aside (display, personal use)</option></select></div>
-      <div class="field"><label>Quantity</label><input class="input" type="number" min="1" max="{{ $p->total_stock }}" name="qty" required value="1"><div class="hint">Total stock: {{ $p->total_stock }} · available on {{ fmt_date($date) }}: {{ $b['available'] }}</div></div>
+      <div class="field"><label for="hq{{ $p->id }}">Quantity <span class="muted">· total stock {{ $p->total_stock }}</span></label><input class="input" type="number" id="hq{{ $p->id }}" min="1" max="{{ $p->total_stock }}" name="qty" required value="1">
+        <label class="check small mt-1"><input type="checkbox" data-all-units="hq{{ $p->id }}" value="{{ $p->total_stock }}"> All {{ $p->total_stock }} units</label>
+        <div class="hint">Available on {{ fmt_date($date) }}: {{ $b['available'] }} of {{ $p->total_stock }}</div></div>
       <div class="form-grid"><div class="field"><label>From</label><input class="input" type="date" name="start_date" required value="{{ today_iso() }}"></div><div class="field"><label>Until (optional)</label><input class="input" type="date" name="end_date"></div></div>
       <div class="field"><label>Note</label><input class="input" name="note" required maxlength="255" placeholder="e.g. Repainting"></div>
     </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Set aside units</button></div></form>
@@ -115,6 +117,16 @@
 document.querySelectorAll('[data-stock-form]').forEach(function (f) {
   var sum = function () { var t = 0; f.querySelectorAll('[data-loc]').forEach(function (i) { t += Math.max(0, Math.floor(+i.value || 0)); }); f.querySelector('[data-tot]').textContent = t; };
   f.addEventListener('input', sum);
+});
+</script>
+@endpush
+@push('scripts')
+<script>
+// "All N units" (change list C9): fills the quantity with the total stock and locks it while ticked.
+document.querySelectorAll('[data-all-units]').forEach(function (cb) {
+  var q = document.getElementById(cb.getAttribute('data-all-units')), prev = q.value;
+  cb.addEventListener('change', function () { if (cb.checked) { prev = q.value; q.value = cb.value; q.readOnly = true; } else { q.value = prev; q.readOnly = false; } });
+  q.addEventListener('input', function () { if (+q.value !== +cb.value) cb.checked = false; });
 });
 </script>
 @endpush

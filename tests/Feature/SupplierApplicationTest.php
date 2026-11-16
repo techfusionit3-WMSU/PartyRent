@@ -73,7 +73,15 @@ class SupplierApplicationTest extends TestCase
         $this->assertEquals(400, $s->delivery_fee);
 
         // asked to revise → the applicant can edit and resubmit; documents already sent are kept
-        $s->update(['status' => 'revision', 'revision_note' => 'Upload a clearer permit.']);
+        $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();
+        $this->actingAs($admin)->withSession(['mode' => 'admin'])->get('/admin/applications')->assertOk()->assertSee('permit.pdf')->assertSee('Request revision');
+        $this->get(route('admin.applications.doc', [$s, 'mayors_permit']))->assertOk();
+        $this->get(route('admin.applications.doc', [$s, 'nope']))->assertNotFound();
+        $this->post(route('admin.applications.review', $s), ['decision' => 'revision', 'reason' => ''])->assertSessionHas('error');
+        $this->post(route('admin.applications.review', $s), ['decision' => 'revision', 'reason' => 'Upload a clearer permit.'])->assertSessionHas('success');
+        $this->assertSame('revision', $s->fresh()->status);
+        $this->get('/admin/applications?tab=revision')->assertOk()->assertSee('Upload a clearer permit.');
+        $this->actingAs($jose)->withSession(['mode' => 'customer'])->get(route('admin.applications.doc', [$s, 'mayors_permit']))->assertRedirect(); // not a reviewer
         $this->actingAs($jose->fresh())->withSession(['mode' => 'customer']); // reload the cached supplier relation
         $this->get('/start-selling')->assertSee('Requires Revision')->assertSee('Upload a clearer permit.');
         $this->get('/start-selling?edit=1')->assertOk()->assertSee('cda.pdf');

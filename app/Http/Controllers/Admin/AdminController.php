@@ -46,7 +46,7 @@ class AdminController extends Controller
     public function applications(Request $request)
     {
         $this->need($request, 'applications.review');
-        $tab = in_array($request->query('tab'), ['pending', 'approved', 'rejected', 'business'], true) ? $request->query('tab') : 'pending';
+        $tab = in_array($request->query('tab'), ['pending', 'revision', 'approved', 'rejected', 'business'], true) ? $request->query('tab') : 'pending';
         // "business" = approved shops that upgraded to Business and wait for a document check.
         $upgrades = Supplier::where('status', 'approved')->where('account_type', 'business')->where('biz_status', 'pending');
         $list = $tab === 'business' ? (clone $upgrades)->with('owner')->latest('updated_at')->get() : Supplier::where('status', $tab)->with('owner')->latest('applied_at')->get();
@@ -73,10 +73,22 @@ class AdminController extends Controller
 
     public function reviewApplication(Request $request, Supplier $supplier)
     {
-        $data = $request->validate(['decision' => 'required|in:approve,reject', 'reason' => 'nullable|string|max:500']);
-        $res = Rentals::reviewApplication($supplier, $data['decision'] === 'approve', $data['reason'] ?? null, $request->user());
+        $data = $request->validate(['decision' => 'required|in:approve,reject,revision', 'reason' => 'nullable|string|max:500']);
+        $res = Rentals::reviewApplication($supplier, $data['decision'] === 'revision' ? 'revision' : $data['decision'] === 'approve', $data['reason'] ?? null, $request->user());
+        $done = ['approve' => 'approved', 'reject' => 'rejected', 'revision' => 'sent back for revision'][$data['decision']];
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $supplier->name.' '.($data['decision'] === 'approve' ? 'approved' : 'rejected').'. The applicant was notified.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $supplier->name.' '.$done.'. The applicant was notified.' : $res['error']);
+    }
+
+    /** An application document (private disk applications/{uid}/…), for reviewers only. */
+    public function applicationDoc(Request $request, Supplier $supplier, string $key)
+    {
+        $this->need($request, 'applications.review');
+        $doc = ($supplier->application['docs'] ?? [])[$key] ?? null;
+        abort_unless($doc && ! empty($doc['path']) && \Illuminate\Support\Facades\Storage::disk('local')->exists($doc['path']), 404);
+        abort_unless(str_starts_with($doc['path'], 'applications/'), 404);
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->response($doc['path'], $doc['name'] ?? basename($doc['path']));
     }
 
     public function users(Request $request)

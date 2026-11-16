@@ -213,6 +213,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::post('/applications/{supplier}', [AdminController::class, 'reviewApplication'])->name('applications.review');
     Route::post('/applications/{supplier}/business', [AdminController::class, 'reviewBusiness'])->name('business.review');
     Route::get('/applications/{supplier}/business-doc', [AdminController::class, 'businessDoc'])->name('business.doc');
+    Route::get('/applications/{supplier}/doc/{key}', [AdminController::class, 'applicationDoc'])->name('applications.doc');
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');

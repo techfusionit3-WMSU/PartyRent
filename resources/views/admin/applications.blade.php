@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="page-head"><div><h1>Supplier applications</h1><p>Approve shops before they can list items. Applicants keep their customer account either way.</p></div></div>
-<div class="tabs">@foreach(['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'business' => 'Business checks'] as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('admin.applications', ['tab' => $k]) }}">{{ $l }}<span class="count">{{ $counts[$k] ?? 0 }}</span></a>@endforeach</div>
+<div class="tabs">@foreach(['pending' => 'Pending', 'revision' => 'Needs revision', 'approved' => 'Approved', 'rejected' => 'Rejected', 'business' => 'Business checks'] as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('admin.applications', ['tab' => $k]) }}">{{ $l }}<span class="count">{{ $counts[$k] ?? 0 }}</span></a>@endforeach</div>
 @if($list->isEmpty())
   <div class="card">@include('partials.empty', ['emoji' => '📄', 'title' => 'No applications here'])</div>
 @else
@@ -15,10 +15,16 @@
         </div>
         <dl class="kv mt-2"><dt>Account</dt><dd>@if($s->isBusiness())<b>Business</b> · {{ \App\Models\Supplier::REG_TYPES[$s->biz_reg_type] ?? $s->biz_reg_type }} {{ $s->biz_reg_no }} · TIN {{ $s->biz_tin }}@if($s->biz_doc_path) · <a href="{{ route('admin.business.doc', $s) }}" target="_blank" rel="noopener">View permit</a>@endif <span class="badge {{ $s->biz_status === 'verified' ? 'b-green' : ($s->biz_status === 'rejected' ? 'b-red' : 'b-gold') }}">{{ ['verified' => 'Verified', 'rejected' => 'Not accepted', 'pending' => 'To check'][$s->biz_status] ?? 'To check' }}</span>@else Personal (one-to-one) @endif</dd><dt>Location</dt><dd>{{ $s->address }}<div class="small muted">{{ \App\Models\Supplier::LOCATION_TYPES[$s->location_type][0] ?? $s->location_type }}@if($s->hasPin()) · <a href="https://www.openstreetmap.org/?mlat={{ $s->lat }}&mlon={{ $s->lng }}#map=17/{{ $s->lat }}/{{ $s->lng }}" target="_blank" rel="noopener">View pin on map</a>@else · no pin @endif</div></dd><dt>Contact</dt><dd>{{ $s->contact_person }} · {{ $s->phone }} · {{ $s->email }}</dd><dt>Fulfillment</dt><dd>{{ $s->fulfillmentLabel() }}{{ $s->offersDelivery() ? ' · '.$s->deliverySummary() : '' }}</dd>
           <dt>Payments</dt><dd>{{ collect($s->methods)->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }} · {{ collect(\App\Domain\Finance::plansOf($s))->map(fn ($a) => \App\Domain\Finance::PLAN_LABEL[$a])->implode(', ') }}</dd>
-          <dt>Deposit</dt><dd>{{ $s->depositLabel() }}</dd>@if($s->reject_reason)<dt>Rejection reason</dt><dd style="color:var(--red)">{{ $s->reject_reason }}</dd>@endif</dl>
+          <dt>Deposit</dt><dd>{{ $s->depositLabel() }}</dd>@if($s->reject_reason)<dt>Rejection reason</dt><dd style="color:var(--red)">{{ $s->reject_reason }}</dd>@endif
+          @if($s->status === 'revision' && $s->revision_note)<dt>Revision asked</dt><dd style="color:var(--purple)">{{ $s->revision_note }}</dd>@endif
+          @php($docs = $s->application['docs'] ?? [])
+          @php($reqs = collect(\App\Domain\Applications::requirements($s->application['type'] ?? null, $s->application['company']['companyType'] ?? null))->keyBy('key'))
+          <dt>Documents</dt><dd>@forelse($docs as $k => $d)<div>{{ icon('file', 'width:14px;vertical-align:-2px') }} {{ $reqs[$k]['label'] ?? $k }}: <a href="{{ route('admin.applications.doc', [$s, $k]) }}" target="_blank" rel="noopener">{{ $d['name'] ?? 'View' }}</a> <span class="small muted">{{ isset($d['size']) ? round($d['size'] / 1024).' KB' : '' }}</span></div>@empty<span class="muted">No documents uploaded</span>@endforelse
+            @if($missing = \App\Domain\Applications::missingDocs($s->application ?? []))<div class="small" style="color:var(--red)">Missing: {{ collect($missing)->pluck('label')->implode(', ') }}</div>@endif</dd></dl>
         @if($s->status === 'pending')
           <div class="row wrap mt-2" style="justify-content:flex-end;gap:8px">
-            <form method="POST" action="{{ route('admin.applications.review', $s) }}" class="row" style="gap:6px">@csrf<input type="hidden" name="decision" value="reject"><input class="input input-sm" name="reason" required placeholder="Reason for rejection" style="width:260px"><button class="btn btn-danger btn-sm">Reject</button></form>
+            <form method="POST" action="{{ route('admin.applications.review', $s) }}" class="row" style="gap:6px">@csrf<input type="hidden" name="decision" value="revision"><input class="input input-sm" name="reason" required placeholder="What should they fix?" style="width:240px"><button class="btn btn-sm">Request revision</button></form>
+            <form method="POST" action="{{ route('admin.applications.review', $s) }}" class="row" style="gap:6px">@csrf<input type="hidden" name="decision" value="reject"><input class="input input-sm" name="reason" required placeholder="Reason for rejection" style="width:240px"><button class="btn btn-danger btn-sm">Reject</button></form>
             <form method="POST" action="{{ route('admin.applications.review', $s) }}" data-confirm="Approve {{ $s->name }}? The shop and its listings become visible to customers." data-confirm-title="Approve supplier?" data-confirm-ok="Approve">@csrf<input type="hidden" name="decision" value="approve"><button class="btn btn-success btn-sm">{{ icon('check') }}Approve</button></form>
           </div>
         @endif

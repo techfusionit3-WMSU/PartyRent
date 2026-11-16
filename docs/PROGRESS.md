@@ -101,8 +101,12 @@ NEXT, in order:
         Cashier scoping DONE: CashierController shopId() = user()->shop()?->id; every list/report/CSV/record/verify/
         reject is limited to that shop (404 on another shop's payment); a cashier without a shop (superadmin) sees all.
         PayoutsTest::test_shop_cashier_sees_only_their_shop un-skipped (120 green, 0 skipped).
-        NEXT: cashier pages vs reference at 1440/390 (UI), then admin (applications: view docs from private disk +
-        'revision' decision), then superadmin.
+        Admin applications DONE: documents listed per requirement (+ missing ones) and streamed by
+        admin.applications.doc (private disk, applications.review perm); "Request revision" decision (status
+        revision + revision_note, applicant notified) + "Needs revision" tab. SupplierApplicationTest covers it.
+        NEXT: UI comparison vs reference at 1440/390 for cashier, admin and superadmin pages (rig: scratchpad
+        drv/sup.js-style scripts, app :8034 with env.sh SQLite; reference :8080 static server not started this
+        session), then the remaining PORTING_CHECKLIST rows.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
         private disk + 'revision' decision), then superadmin.

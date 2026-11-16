@@ -1408,13 +1408,27 @@ class Rentals
         return self::ok();
     }
 
-    public static function reviewApplication(Supplier $s, bool $approve, ?string $reason, User $by): array
+    /**
+     * Reference reviewApplication: approve, reject (reason) or ask for a revision (what to fix). A revision sends
+     * the application back to the applicant, who edits and resubmits it (StartSellingController ?edit=1).
+     */
+    public static function reviewApplication(Supplier $s, bool|string $approve, ?string $reason, User $by): array
     {
         if (! $by->hasPerm('applications.review')) {
             return self::fail('You do not have permission to review applications.');
         }
         if ($s->status !== 'pending') {
             return self::fail('This application is not pending.');
+        }
+        if ($approve === 'revision') {
+            if (! trim((string) $reason)) {
+                return self::fail('Say what the applicant needs to fix.');
+            }
+            $s->update(['status' => 'revision', 'revision_note' => trim($reason), 'reviewed_at' => now(), 'reviewed_by' => $by->id]);
+            Notifier::notify($s->owner_id, 'customer', 'Supplier application needs changes', 'Please update your application for '.$s->name.': '.trim($reason), self::link('start-selling'));
+            Notifier::audit('Requested application revision', $s->name.' — '.trim($reason), $by);
+
+            return self::ok();
         }
         if (! $approve && ! trim((string) $reason)) {
             return self::fail('Please state the reason for rejection.');

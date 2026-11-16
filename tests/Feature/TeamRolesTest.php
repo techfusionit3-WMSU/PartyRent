@@ -37,6 +37,27 @@ class TeamRolesTest extends TestCase
             ->assertOk()->assertSee('Team & Roles')->assertSee('What each role can do')->assertSee('Account owner');
     }
 
+    /** Customer ⇄ Supplier mode (reference Auth.setMode / guard): menu shows the shop name, pages follow the mode. */
+    public function test_mode_switch_both_ways(): void
+    {
+        $juan = $this->owner();
+        $this->actingAs($juan)->withSession(['mode' => 'customer'])->get('/')->assertOk()->assertSee($juan->supplier->name);
+        $this->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('supplier.dashboard'));
+        $this->assertSame('supplier', session('mode'));
+        $this->get(route('supplier.dashboard'))->assertOk()->assertSee('Switch to Customer Mode');
+        $this->post('/mode', ['mode' => 'customer'])->assertRedirect(route('home'));
+        $this->assertSame('customer', session('mode'));
+        // opening a supplier page switches back automatically
+        $this->get('/supplier/products')->assertOk();
+        $this->assertSame('supplier', session('mode'));
+
+        // a customer without an approved shop cannot switch
+        $maria = User::where('email', 'maria@demo.ph')->firstOrFail();
+        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post('/mode', ['mode' => 'supplier'])->assertSessionHas('error');
+        $this->assertSame('customer', session('mode'));
+        $this->get(route('supplier.dashboard'))->assertRedirect(route('start-selling'));
+    }
+
     public function test_employee_rules(): void
     {
         $this->actingAs($this->owner())->withSession(['mode' => 'supplier']);

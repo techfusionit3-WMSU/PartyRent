@@ -5,13 +5,13 @@
 --}}
 @php($st = \App\Domain\Slots::settings($sup))
 @if(($part ?? 'selects') === 'selects')
-  @php($dt = \App\Domain\Slots::defaultTime($sup))
+  @php($dt = \App\Domain\Slots::defaultTime($sup, $item ?? null))
   @foreach([['pst', 'start', 'Start time', $dt['start']], ['pet', 'end', 'End time', $dt['end']]] as [$tid, $tname, $tlabel, $tval])
     <div class="field"><label for="{{ $tid }}">{{ $tlabel }}</label><select class="input" id="{{ $tid }}" name="{{ $tname }}">@foreach(\App\Domain\Slots::options($sup) as $o)<option value="{{ $o }}" @selected($o === $tval)>{{ \App\Domain\Slots::fmt12($o) }}</option>@endforeach</select></div>
   @endforeach
 @else
   @php($lim = \App\Domain\Slots::hourLimitLabel($item))
-  <div class="row wrap between mb-2" style="gap:6px"><span class="small">{{ icon('clock', 'width:14px;vertical-align:-2px') }} Total rental duration: <b id="durTxt">Select dates</b></span><span class="small muted">Rental hours {{ \App\Domain\Slots::fmt12($st['open']) }} – {{ \App\Domain\Slots::fmt12($st['close']) }}{{ $lim ? ' · '.$lim : '' }}</span></div>
+  <div class="row wrap between mb-2" style="gap:6px"><span class="small">{{ icon('clock', 'width:14px;vertical-align:-2px') }} Total rental duration: <b id="durTxt">Select dates</b></span>@php($frame = \App\Domain\Slots::frameLabel($item))<span class="small muted">{{ $frame ? 'Item time frame '.$frame : 'Rental hours '.\App\Domain\Slots::fmt12($st['open']).' – '.\App\Domain\Slots::fmt12($st['close']) }}{{ $lim ? ' · '.$lim : '' }}</span></div>
   @push('scripts')
   <script>
   // Total rental duration (reference Slots.duration): start time on the first date → end time on the last.

@@ -142,7 +142,7 @@ from the first row that is not `verified`.
 | C4 Service-fee rule (consecutive same place = 1; place change +1; each separate block +1) | verified | Pricing::serviceVisits + test |
 | C5 Rent request: delivery zone, location UI, Delivery→Pickup grouping bug | done | public/js/checkout.js |
 | C6 Checkout: charges collapsible in Order Summary; RF / DP / total outside | done | customer/_checkout-summary |
-| C7 Product form order, Others tags, Quantity, base price, Bulk discount, Add maximum, time frame + overnight | done (form) | time_from/time_to + allow_overnight + rental_policy saved; NOT yet enforced in Slots::validateLine / shown on product page |
+| C7 Product form order, Others tags, Quantity, base price, Bulk discount, Add maximum, time frame + overnight | done | form + Slots::validateLine frame/overnight rule + product page time frame & item rental policy |
 | C8 Package form: Rental event tags, square crop, inventory section position | todo | |
 | C9 Inventory: total stock + "All N units" in maintenance/set-aside | todo | |
 | C10 Inventory calendar mobile | todo | |

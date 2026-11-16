@@ -50,9 +50,10 @@ NEXT, in order:
    (shop verifies: supplier.payments.verify/reject), calendar, reports, damages, Shop settings (7 tabs), Inventory
    Locations (App\Domain\StockLocations), team, product form (C7 form side; migration products.rental_policy).
    ▶ NEXT (2026-11-17, after this commit), in order:
-     a. C7 follow-up: enforce product time_from/time_to (+ allow_overnight) in Slots::validateLine and show
-        rental_policy + time frame on the customer product page. CatalogController::updateProduct calls
-        Rentals::setLocationStock BEFORE saveProduct — move after (or into one transaction).
+     a. DONE (2026-11-17): C7 follow-up. `Slots::frame/frameLabel`, `defaultTime($s, $item)`; validateLine
+        refuses times outside the item frame (frame may wrap past midnight) and back-to-back dates when overnight
+        is off (only for items WITH a frame). Product page: "Item time frame" + "Item rental policy" rows; rent-times
+        line shows the frame. updateProduct saves location stock + product in one DB transaction (DomainException).
      b. Package form (C8): reference SP.packages form modal fields (name, emoji, description, items, fixed price,
         events, conditions, min/max hours, photo) + C8 (Rental event tags type-or-pick, square crop on upload,
         inventory section after items). App editor = supplier/package-form.blade.php (components/options kept).

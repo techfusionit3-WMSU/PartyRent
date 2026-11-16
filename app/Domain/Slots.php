@@ -72,12 +72,46 @@ class Slots
         return $out;
     }
 
-    /** Default time for a new booking: the supplier's full rental hours. */
-    public static function defaultTime(?Supplier $s): array
+    /**
+     * Default time for a new booking: the item's own time frame when it has one (change list C7), else the
+     * supplier's full rental hours.
+     */
+    public static function defaultTime(?Supplier $s, Product|Package|null $item = null): array
     {
+        if ($f = self::frame($item)) {
+            return ['start' => $f['start'], 'end' => $f['end']];
+        }
         $st = self::settings($s);
 
         return ['start' => $st['open'], 'end' => $st['close']];
+    }
+
+    /**
+     * An item's own rental time frame (change list C7): ['start', 'end', 'overnight'] or null when the item
+     * follows the shop's rental hours. A frame whose end is not after its start runs past midnight
+     * (only allowed with overnight rental).
+     */
+    public static function frame(Product|Package|null $item): ?array
+    {
+        if (! $item instanceof Product || ! $item->time_from || ! $item->time_to) {
+            return null;
+        }
+
+        return ['start' => $item->time_from, 'end' => $item->time_to, 'overnight' => (bool) $item->allow_overnight];
+    }
+
+    /** "8:00 AM – 5:00 PM", "+ overnight" when the item may be kept past midnight. */
+    public static function frameLabel(Product|Package|null $item): string
+    {
+        $f = self::frame($item);
+
+        return $f ? self::fmt12($f['start']).' – '.self::fmt12($f['end']).($f['overnight'] ? ' · overnight rental allowed' : ' · same day only') : '';
+    }
+
+    /** Is minute-of-day $n inside the frame? A frame ending at or before its start wraps past midnight. */
+    private static function inFrame(int $n, int $from, int $to): bool
+    {
+        return $to > $from ? $n >= $from && $n <= $to : $n >= $from || $n <= $to;
     }
 
     /** A line's time as ['start' => 'HH:MM', 'end' => 'HH:MM'] or null (all day). Accepts the older {from, to} shape. */
@@ -215,6 +249,17 @@ class Slots
             return $out;
         }
         $set = array_flip($dates);
+        if ($f = self::frame($item)) { // the item's own time frame (C7)
+            $ff = self::toMin($f['start']);
+            $ft = self::toMin($f['end']);
+            if (! self::inFrame($a, $ff, $ft) || ! self::inFrame($b, $ff, $ft)) {
+                $out[] = $name.' can only be rented between '.self::fmt12($f['start']).' and '.self::fmt12($f['end']).'.';
+            }
+            $multi = array_filter($dates, fn ($d) => isset($set[add_days($d, 1)]));
+            if (! $f['overnight'] && $multi) {
+                $out[] = $name.' cannot be kept overnight. Book it for one date at a time.';
+            }
+        }
         $single = array_filter($dates, fn ($d) => ! isset($set[add_days($d, -1)]) && ! isset($set[add_days($d, 1)]));
         if ($single && $b <= $a) {
             $out[] = $name.': the end time must be later than the start time. For an overnight rental, set the end date to the next day.';

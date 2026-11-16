@@ -195,17 +195,26 @@ class CatalogController extends Controller
         $data = $this->productData($request);
         $qty = $data['_qty'];
         unset($data['_qty']);
-        if ($qty) { // per-location quantities: each location keeps its booked allocation
-            $chk = Rentals::setLocationStock($p, $qty);
-            if (! $chk['ok']) {
-                return back()->withInput()->with('error', $chk['error']);
-            }
-            $p->refresh();
-        }
-        $data['images'] = $this->storeImages($request, $p);
-        $res = Rentals::saveProduct($this->sup($request), $data, $p);
-        if (! $res['ok']) {
-            return back()->withInput()->with('error', $res['error']);
+        // Location stock and product fields are saved together: if either is refused, neither is kept.
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($request, $p, $data, $qty) {
+                if ($qty) { // per-location quantities: each location keeps its booked allocation
+                    $chk = Rentals::setLocationStock($p, $qty);
+                    if (! $chk['ok']) {
+                        throw new \DomainException($chk['error']);
+                    }
+                    $p->refresh();
+                }
+                $data['images'] = $this->storeImages($request, $p);
+                $res = Rentals::saveProduct($this->sup($request), $data, $p);
+                if (! $res['ok']) {
+                    throw new \DomainException($res['error']);
+                }
+            });
+        } catch (\DomainException $e) {
+            inv()->flush();
+
+            return back()->withInput()->with('error', $e->getMessage());
         }
 
         return redirect()->route('supplier.products')->with('success', $p->name.' updated.');

@@ -148,7 +148,7 @@ class CartController extends Controller
                 'fulfillment' => $s->fulfillment === 'pickup' ? 'pickup' : 'delivery', 'plan' => self::firstPlan($s), 'method' => 'online', 'services' => [],
                 'destinations' => [['id' => 'd1', 'label' => 'Event venue', 'address' => $u->address ?: '', 'zoneId' => '', 'deliveryTime' => $st['open'], 'contactName' => '', 'contactPhone' => '']],
                 'lines' => array_map(fn ($l) => ['cart_id' => $l['id'], 'name' => inv()->itemName($l), 'type' => $l['type'], 'days' => Rentals::cleanDays($l['days']),
-                    'time' => Slots::time($l) ?? Slots::defaultTime($s), 'destId' => 'd1', 'group' => $l['id']], $chosen),
+                    'time' => Slots::time($l) ?? Slots::defaultTime($s, $l['type'] === 'package' ? null : inv()->product($l['ref_id'])), 'destId' => 'd1', 'group' => $l['id']], $chosen),
                 'inst' => ['n' => min(3, (int) $cfg['installment']['maxInstallments']), 'items' => [], 'auto' => true],
                 // static shop info for the page
                 'shop' => [

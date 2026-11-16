@@ -36,7 +36,7 @@
           @php($item = $l['type'] === 'package' ? inv()->package($l['ref_id']) : inv()->product($l['ref_id']))
           @continue(! $item)
           @php($ds = array_keys($l['days']))
-          @php($t = \App\Domain\Slots::time($l) ?? \App\Domain\Slots::defaultTime($s))
+          @php($t = \App\Domain\Slots::time($l) ?? \App\Domain\Slots::defaultTime($s, $item))
           @php($siblings = collect($g['lines'])->reject(fn ($x) => $x['id'] === $l['id'])->values()->all())
           <div class="cart-line" data-line="{{ $l['id'] }}">
             <div class="cl-top"><input type="checkbox" class="sel-box" data-select='@json([$l['id']])' @checked($l['selected']) aria-label="Select {{ $item->name }}">@include('partials.thumb', ['item' => $item])<div class="grow" style="min-width:0"><div class="row between top"><div style="min-width:0">

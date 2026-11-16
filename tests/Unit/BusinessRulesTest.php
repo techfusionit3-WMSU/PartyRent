@@ -167,6 +167,31 @@ class BusinessRulesTest extends TestCase
         $this->assertSame('2 Days (all day)', Slots::duration(['days' => [$d => 1, add_days($d, 1) => 1]])['label']);
     }
 
+    public function test_item_time_frame_and_overnight_rule(): void
+    {
+        $d = add_days(today_iso(), 4);
+        $next = add_days($d, 1);
+        $p = $this->product(10);
+        $line = fn (array $days, string $a, string $b) => ['type' => 'item', 'ref_id' => $p->id, 'days' => $days, 'time' => ['start' => $a, 'end' => $b]];
+
+        // no frame: only the shop's rental hours apply, back-to-back dates are fine
+        $this->assertSame([], Slots::validateLine($line([$d => 1, $next => 1], '08:00', '17:00')));
+
+        $p->update(['time_from' => '08:00', 'time_to' => '17:00', 'allow_overnight' => false]);
+        $this->assertSame(['start' => '08:00', 'end' => '17:00'], Slots::defaultTime($this->s, $p));
+        $this->assertSame([], Slots::validateLine($line([$d => 1], '09:00', '16:00')));
+        $this->assertStringContainsString('only be rented between 8:00 AM and 5:00 PM', implode(' ', Slots::validateLine($line([$d => 1], '07:00', '16:00'))));
+        $this->assertStringContainsString('cannot be kept overnight', implode(' ', Slots::validateLine($line([$d => 1, $next => 1], '09:00', '16:00'))));
+
+        $p->update(['allow_overnight' => true]);
+        $this->assertSame([], Slots::validateLine($line([$d => 1, $next => 1], '09:00', '16:00')));
+
+        // a frame past midnight (with overnight): 6 PM – 8 AM
+        $p->update(['time_from' => '18:00', 'time_to' => '08:00']);
+        $this->assertSame([], Slots::validateLine($line([$d => 1, $next => 1], '19:00', '07:00')));
+        $this->assertNotSame([], Slots::validateLine($line([$d => 1, $next => 1], '12:00', '07:00')));
+    }
+
     /* ---------- pricing.js ---------- */
 
     public function test_tier_per_date_uses_combined_quantity_and_charges(): void

@@ -59,7 +59,8 @@ NEXT, in order:
         rental hours (migration 2026_11_17_000300 packages.max_hours), photo with in-browser square crop
         (canvas → 800px JPEG data URL `photo`, server checks with getimagesizefromstring, stores packages/*.jpg;
         `clear_photo` removes). Inventory card right after "What's inside" (packagePrice JSON `stock`: today,
-        min30, limiting item). Order: Details, What's inside, Inventory, Stages, Tier, Guests. NOT browser-checked yet.
+        min30, limiting item). Order: Details, What's inside, Inventory, Stages, Tier, Guests. Browser-checked
+        at 1440 + 390 (scratchpad drv/pkgform.js, app :8034): tags, crop → 800×800, inventory card, publish; no errors.
      c. Mode switch customer ⇄ supplier check; C3 product page TikTok-style; C9–C13 change list.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from

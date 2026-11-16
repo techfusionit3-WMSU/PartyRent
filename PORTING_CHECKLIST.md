@@ -143,7 +143,7 @@ from the first row that is not `verified`.
 | C5 Rent request: delivery zone, location UI, Delivery→Pickup grouping bug | done | public/js/checkout.js |
 | C6 Checkout: charges collapsible in Order Summary; RF / DP / total outside | done | customer/_checkout-summary |
 | C7 Product form order, Others tags, Quantity, base price, Bulk discount, Add maximum, time frame + overnight | done | form + Slots::validateLine frame/overnight rule + product page time frame & item rental policy |
-| C8 Package form: Rental event tags, square crop, inventory section position | done | + reference min/max rental hours, photo; browser check pending |
+| C8 Package form: Rental event tags, square crop, inventory section position | done | + reference min/max rental hours, photo; browser-checked |
 | C9 Inventory: total stock + "All N units" in maintenance/set-aside | todo | |
 | C10 Inventory calendar mobile | todo | |
 | C11 Discounts page | todo | |

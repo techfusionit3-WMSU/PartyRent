@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Domain\Applications;
+use App\Domain\Finance;
 use App\Domain\Locations;
 use App\Domain\Rentals;
 use App\Http\Controllers\Controller;
@@ -13,6 +15,8 @@ class StartSellingController extends Controller
 {
     public const LOGOS = ['🎈', '🎉', '✨', '🎪', '💍', '🥳', '🎀', '🎂', '👑', '🌸', '🪩', '🎵'];
 
+    public const STEPS = ['Supplier type', 'Applicant', 'Documents', 'Shop details', 'Delivery & payments', 'Payout', 'Policies', 'Review'];
+
     public function show(Request $request)
     {
         $u = $request->user();
@@ -20,33 +24,163 @@ class StartSellingController extends Controller
         if (! $existing && $u->staffOf) {
             return redirect()->route('profile')->with('error', 'You work for '.$u->staffOf->supplier->name.'. Ask them to remove you before opening your own shop.');
         }
-        if ($existing && $existing->status !== 'rejected' && ! $request->boolean('edit')) {
+        // Reference: an existing profile shows its status; rejected / revision ones can be edited (?edit=1) and resubmitted.
+        if ($existing && (! in_array($existing->status, ['rejected', 'revision'], true) || ! $request->boolean('edit'))) {
             return view('customer.application-status', ['sp' => $existing]);
         }
-        $d = $existing?->toArray() ?? [];
+        $app = array_replace_recursive([
+            'type' => $existing?->type ?? '',
+            'personal' => ['fullName' => $u->name, 'birthDate' => '', 'address' => $u->address, 'phone' => $u->phone, 'email' => $u->email],
+            'identity' => ['idType' => Applications::ID_TYPES[0], 'idNumber' => ''],
+            'business' => ['shopName' => '', 'address' => $u->address, 'productTypes' => '', 'phone' => $u->phone],
+            'company' => ['legalName' => '', 'companyType' => 'corporation', 'address' => '', 'email' => '', 'phone' => '', 'natureOfBusiness' => 'Party and event equipment rental', 'description' => '', 'branches' => 1, 'website' => ''],
+            'representative' => ['name' => $u->name, 'position' => '', 'idType' => Applications::ID_TYPES[0], 'email' => $u->email, 'phone' => $u->phone],
+            'docs' => [], 'applicable' => [],
+            'payout' => ['method' => 'bank', 'provider' => '', 'accountName' => '', 'accountNumber' => '', 'financeContact' => ''],
+        ], (array) ($existing?->application ?? []));
 
         return view('customer.start-selling', [
-            'existing' => $existing, 'logos' => self::LOGOS, 'previewCity' => $u->city_code,
+            'existing' => $existing, 'logos' => self::LOGOS, 'steps' => self::STEPS, 'app' => $app,
+            'offerPlans' => $existing ? Finance::plansOf($existing) : ['standard', 'full'],
+            'errorStep' => self::errorStep(array_keys(session('errors')?->getMessages() ?? [])),
             'd' => array_merge([
-                'name' => '', 'description' => '', 'logo' => '🎈', 'contact_person' => $u->name, 'phone' => $u->phone, 'email' => $u->email,
-                'address_parts' => $u->address_parts, 'location_type' => 'shop', 'lat' => null, 'lng' => null, 'fulfillment' => 'both', 'methods' => ['cod', 'bank'], 'arrangements' => ['down', 'full'],
-                'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM',
-                // A sensible first zone: the applicant's own city.
-                'delivery' => array_merge(\App\Models\Supplier::DELIVERY_DEFAULTS, ['zones' => $u->city_code ? [['level' => 'city', 'code' => $u->city_code, 'fee' => 300]] : []]),
-            ], $d),
-            'p' => array_merge(['reservationFee' => 0, 'reservationCredited' => true, 'downType' => 'percent', 'downValue' => 30, 'depositType' => 'fixed', 'depositValue' => 500, 'installments' => 2, 'cancelDays' => 3, 'cancellation' => 'Free cancellation up to 3 days before the rental start date.', 'returns' => 'Items must be returned clean and complete on the agreed date.', 'conditions' => 'Renter is responsible for damaged or missing items.'], $existing->policy ?? []),
+                'name' => '', 'description' => '', 'logo' => '🎈', 'phone' => $u->phone, 'email' => $u->email,
+                'address_parts' => $u->address_parts, 'location_type' => 'shop', 'lat' => null, 'lng' => null, 'fulfillment' => 'both', 'methods' => ['cod', 'bank'],
+                'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM', 'delivery_fee' => 300,
+                'policy' => ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3, 'cancellation' => 'Free cancellation up to 3 days before the rental start date. The reservation fee is non-refundable.', 'returns' => 'Items must be returned clean and complete on the agreed date.', 'conditions' => 'Renter is responsible for damaged or missing items, charged according to our damage policy.'],
+            ], $existing?->toArray() ?? []),
         ]);
+    }
+
+    /** Wizard step that holds the first field with an error. */
+    private static function errorStep(array $keys): int
+    {
+        $step = 7;
+        foreach ($keys as $k) {
+            $step = min($step, match (true) {
+                $k === 'app.type' => 0,
+                str_starts_with($k, 'app.personal'), str_starts_with($k, 'app.identity'), str_starts_with($k, 'app.company'), str_starts_with($k, 'app.representative') => 1,
+                str_starts_with($k, 'docs') => 2,
+                str_starts_with($k, 'app.payout') => 5,
+                in_array($k, ['fulfillment', 'delivery_fee', 'methods', 'offerPlans', 'depositType', 'depositValue'], true) => 4,
+                in_array($k, ['cancelDays', 'cancellation', 'returns', 'conditions'], true) => 6,
+                default => 3,
+            });
+        }
+
+        return $step;
     }
 
     public function submit(Request $request)
     {
-        if ($request->user()->staffOf) {
+        $u = $request->user();
+        if ($u->staffOf) {
             return back()->with('error', 'Staff of another shop cannot open their own shop.');
         }
-        $v = $request->validate(self::rules(), self::messages());
-        $attrs = self::toAttributes($v);
-        $biz = self::business($request, $request->user()->supplier);
-        $res = Rentals::submitApplication($request->user(), $attrs + $biz);
+        $existing = $u->supplier;
+        $phone = ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'];
+        $type = $request->input('app.type');
+        $v = $request->validate([
+            'app.type' => 'required|in:individual,organization',
+            'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
+            'phone' => $phone, 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',
+            'location_type' => 'required|in:shop,home,none',
+            ...AddressInput::rules('shop_addr', $request->input('location_type', 'shop') !== 'none'),
+            'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
+            'fulfillment' => 'required|in:delivery,pickup,both', 'delivery_fee' => 'nullable|numeric|min:0',
+            'methods' => 'required|array|min:1', 'methods.*' => 'in:cod,bank,debit',
+            'offerPlans' => 'required|array|min:1', 'offerPlans.*' => 'in:'.implode(',', Finance::PLANS),
+            'depositType' => 'required|in:percent,fixed', 'depositValue' => 'nullable|numeric|min:0',
+            'cancelDays' => 'nullable|integer|min:0|max:30', 'cancellation' => 'required|string|max:1000', 'returns' => 'required|string|max:1000', 'conditions' => 'required|string|max:1000',
+            'app.applicable' => 'nullable|array', 'app.applicable.*' => 'in:'.implode(',', Applications::allDocKeys()),
+            'docs' => 'nullable|array', 'docs.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
+            ...($type === 'organization' ? [
+                'app.company.legalName' => 'required|string|min:3|max:180', 'app.company.companyType' => 'required|in:'.implode(',', array_keys(Applications::COMPANY_TYPES)),
+                'app.company.branches' => 'required|integer|min:1|max:500', 'app.company.address' => 'required|string|min:8|max:300', 'app.company.email' => 'required|email|max:180',
+                'app.company.phone' => $phone, 'app.company.natureOfBusiness' => 'required|string|max:180', 'app.company.description' => 'required|string|min:20|max:2000', 'app.company.website' => 'nullable|string|max:255',
+                'app.representative.name' => 'required|string|max:120', 'app.representative.position' => 'required|string|max:120', 'app.representative.idType' => 'required|in:'.implode(',', Applications::ID_TYPES),
+                'app.representative.email' => 'required|email|max:180', 'app.representative.phone' => $phone, 'app.payout.financeContact' => 'required|string|max:120',
+            ] : [
+                'app.personal.fullName' => 'required|string|min:3|max:120', 'app.personal.birthDate' => 'required|date|before_or_equal:'.add_days(today_iso(), -365 * 18),
+                'app.personal.address' => 'required|string|min:8|max:300', 'app.personal.phone' => $phone, 'app.personal.email' => 'required|email|max:180',
+                'app.identity.idType' => 'required|in:'.implode(',', Applications::ID_TYPES), 'app.identity.idNumber' => 'required|string|max:60',
+                'app.business.productTypes' => 'required|string|max:300',
+            ]),
+            'app.payout.method' => 'required|in:bank,ewallet', 'app.payout.provider' => 'required|string|max:80', 'app.payout.accountName' => 'required|string|max:120', 'app.payout.accountNumber' => 'required|string|max:40',
+        ], [
+            'app.type.required' => 'Choose Individual Supplier or Organization / Company Supplier.', 'methods.required' => 'Select at least one payment method.', 'offerPlans.required' => 'Offer at least one payment plan.',
+            'app.personal.birthDate.before_or_equal' => 'You must be at least 18 years old.', 'phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).',
+            ...AddressInput::messages('shop_addr'),
+        ]);
+
+        $in = (array) $request->input('app', []);
+        $old = (array) ($existing?->application ?? []);
+        $org = $type === 'organization';
+        $app = ['type' => $type, 'applicable' => array_values((array) ($in['applicable'] ?? [])), 'payout' => $in['payout']];
+        if ($org) {
+            $app += ['company' => $in['company'], 'representative' => $in['representative']];
+            $app['company']['branches'] = (int) $app['company']['branches'];
+        } else {
+            $addr0 = AddressInput::attributes($v['shop_addr'] ?? []);
+            $app += ['personal' => $in['personal'], 'identity' => $in['identity'],
+                'business' => ['shopName' => trim($v['name']), 'address' => $addr0['address'] ?: $in['personal']['address'], 'productTypes' => trim($in['business']['productTypes']), 'phone' => $v['phone']]];
+        }
+        // Documents: keep earlier uploads of the same supplier type, add new ones (private disk).
+        $docs = ($old['type'] ?? null) === $type ? (array) ($old['docs'] ?? []) : [];
+        $allowed = array_column(Applications::requirements($type, $app['company']['companyType'] ?? null), 'key');
+        foreach ((array) $request->file('docs', []) as $key => $file) {
+            if (in_array($key, $allowed, true)) {
+                $docs[$key] = ['name' => mb_substr($file->getClientOriginalName(), 0, 120), 'path' => $file->store('applications/'.$u->id, 'local'), 'size' => $file->getSize(), 'uploadedAt' => now()->toIso8601String()];
+            }
+        }
+        $app['docs'] = array_intersect_key($docs, array_flip($allowed));
+        if ($e = Applications::validate($app)) {
+            return back()->withInput()->withErrors([str_contains($e, 'document') ? 'docs' : 'app.type' => $e]);
+        }
+        $app['submittedAt'] = now()->toIso8601String();
+        $app['history'] = array_merge((array) ($old['history'] ?? []), $existing ? [['status' => $existing->status, 'reason' => $existing->reject_reason ?: $existing->revision_note, 'at' => $existing->reviewed_at?->toIso8601String()]] : []);
+
+        $addr = AddressInput::attributes($v['shop_addr'] ?? []);
+        if ($loc = self::locationErrors($v, $addr['city_code'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages($loc);
+        }
+        if ($v['depositType'] === 'percent' && (float) ($v['depositValue'] ?? 0) > 100) {
+            return back()->withInput()->withErrors(['depositValue' => 'Deposit percentage cannot exceed 100%.']);
+        }
+        $pin = isset($v['lat'], $v['lng']) && $v['lat'] !== null ? [round((float) $v['lat'], 7), round((float) $v['lng'], 7)] : [null, null];
+        $plans = [];
+        foreach (Finance::PLANS as $k) {
+            $plans[$k] = array_merge(Finance::DEFAULT_PLANS[$k], (array) ($existing?->payment_plans[$k] ?? []), ['enabled' => in_array($k, $v['offerPlans'], true)]);
+        }
+        $provider = strtolower(trim((string) $app['payout']['provider']));
+        $bank = collect(array_keys(\App\Domain\XenditPayouts::BANKS))->first(fn ($b) => strtolower($b) === $provider);
+        $payout = [];
+        if ($app['payout']['method'] === 'ewallet' && str_contains($provider, 'gcash')) {
+            $payout = ['payout_method' => 'gcash', 'payout_bank' => null];
+        } elseif ($app['payout']['method'] === 'bank' && $bank) {
+            $payout = ['payout_method' => 'bank', 'payout_bank' => $bank];
+        }
+        if ($payout) {
+            $payout += ['payout_account_name' => $app['payout']['accountName'], 'payout_account_no' => $app['payout']['accountNumber']];
+        }
+        $attrs = [
+            'name' => trim($v['name']), 'description' => trim($v['description']), 'logo' => $v['logo'],
+            'contact_person' => $org ? $app['representative']['name'] : $app['personal']['fullName'],
+            'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'],
+            'city' => Locations::name($addr['city_code']), ...$addr,
+            'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1],
+            'fulfillment' => $v['fulfillment'], 'delivery_fee' => $v['fulfillment'] === 'pickup' ? 0 : (float) ($v['delivery_fee'] ?? 0),
+            'delivery' => $existing?->delivery ?? \App\Models\Supplier::DELIVERY_DEFAULTS,
+            'methods' => array_values(array_unique($v['methods'])), 'payment_plans' => $plans, 'arrangements' => [], // legacy column (v4 uses payment_plans)
+            'policy' => array_merge((array) ($existing?->policy ?? []), ['depositType' => $v['depositType'], 'depositValue' => (float) ($v['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions']]),
+            'time_settings' => $existing?->time_settings ?: \App\Domain\Slots::DEFAULT,
+            'damage_policy' => $existing?->damage_policy ?: \App\Domain\Damage::DEFAULT,
+            'type' => $type, 'company' => $org ? ['legalName' => $app['company']['legalName'], 'companyType' => $app['company']['companyType']] : null,
+            'application' => $app, 'revision_note' => null,
+            // app-only flags kept in step with the supplier type
+            'account_type' => $org ? 'business' : 'personal', 'biz_status' => $org ? 'pending' : null,
+        ] + $payout;
+        $res = Rentals::submitApplication($u, $attrs);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }

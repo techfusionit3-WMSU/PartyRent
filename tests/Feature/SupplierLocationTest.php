@@ -29,7 +29,14 @@ class SupplierLocationTest extends TestCase
     private function application(array $over): array
     {
         return array_merge([
-            'name' => 'Jose Sounds', 'description' => 'Sound systems and lights for parties in Marikina.', 'logo' => '🎵', 'contact_person' => 'Jose Garcia',
+            // v4 wizard: an Individual Supplier with the required government ID
+            'app' => ['type' => 'individual',
+                'personal' => ['fullName' => 'Jose Garcia', 'birthDate' => '1990-04-02', 'address' => '7 Sampaguita St., Marikina Heights, Marikina', 'phone' => '0923 555 0707', 'email' => 'jose@demo.ph'],
+                'identity' => ['idType' => 'Philippine National ID', 'idNumber' => '1234-5678-9012'], 'business' => ['productTypes' => 'speakers, lights'],
+                'payout' => ['method' => 'bank', 'provider' => 'BDO', 'accountName' => 'Jose Garcia', 'accountNumber' => '001234567890']],
+            'docs' => ['gov_id' => \Illuminate\Http\UploadedFile::fake()->create('id.pdf', 50, 'application/pdf')],
+            'offerPlans' => ['full'], 'delivery_fee' => 300,
+            'name' => 'Jose Sounds', 'description' => 'Sound systems and lights for parties in Marikina.', 'logo' => '🎵',
             'phone' => '0923 555 0707', 'email' => 'jose@demo.ph', 'hours' => 'Daily 8–6',
             'location_type' => 'shop', 'shop_addr' => self::MARIKINA + ['barangay' => 'Marikina Heights', 'street' => '7 Sampaguita St.'],
             'lat' => 14.6520, 'lng' => 121.1100, 'fulfillment' => 'both',

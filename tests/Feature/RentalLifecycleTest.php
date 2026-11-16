@@ -166,23 +166,41 @@ class RentalLifecycleTest extends TestCase
 
     public function test_supplier_onboarding_and_admin_approval(): void
     {
+        \Illuminate\Support\Facades\Storage::fake('local');
         $jose = $this->user('jose@demo.ph');
-        $this->actingAs($jose)->withSession(['mode' => 'customer'])->post('/start-selling', [
-            'name' => 'Jose Sounds', 'description' => 'Sound systems and lights for parties in Marikina.', 'logo' => '🎵', 'contact_person' => 'Jose Garcia',
+        $form = [
+            'app' => [
+                'type' => 'individual',
+                'personal' => ['fullName' => 'Jose Garcia', 'birthDate' => '1990-04-02', 'address' => '7 Sampaguita St., Marikina Heights, Marikina', 'phone' => '0923 555 0707', 'email' => 'jose@demo.ph'],
+                'identity' => ['idType' => 'Philippine National ID', 'idNumber' => '1234-5678-9012'],
+                'business' => ['productTypes' => 'speakers, lights'],
+                'payout' => ['method' => 'ewallet', 'provider' => 'GCash', 'accountName' => 'Jose Garcia', 'accountNumber' => '0923 555 0707'],
+            ],
+            'name' => 'Jose Sounds', 'description' => 'Sound systems and lights for parties in Marikina.', 'logo' => '🎵',
             'phone' => '0923 555 0707', 'email' => 'jose@demo.ph', 'hours' => 'Daily 8–6',
             'shop_addr' => ['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '137402000', 'barangay' => 'Marikina Heights', 'street' => '7 Sampaguita St.'],
             'location_type' => 'home', 'lat' => 14.6520, 'lng' => 121.1100,
-            'fulfillment' => 'both', 'delivery' => ['mode' => 'zones', 'zones' => [['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '137402000', 'fee' => 300], ['regionCode' => '040000000', 'provinceCode' => '045800000', 'cityCode' => '', 'fee' => 650]]],
-            'methods' => ['cod'], 'arrangements' => ['full'], 'reservationFee' => 0, 'reservationCredited' => '1',
-            'downType' => 'percent', 'downValue' => 0, 'installments' => 2, 'depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 2,
+            'fulfillment' => 'both', 'delivery_fee' => 300, 'methods' => ['cod'], 'offerPlans' => ['full'],
+            'depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 2,
             'cancellation' => 'Free up to 2 days before.', 'returns' => 'Return clean.', 'conditions' => 'Renter pays for damage.',
-        ])->assertSessionHas('success');
+        ];
+        $this->actingAs($jose)->withSession(['mode' => 'customer']);
+        // the government ID is required for an Individual Supplier
+        $this->post('/start-selling', $form)->assertSessionHasErrors('docs');
+        $this->assertNull(Supplier::where('name', 'Jose Sounds')->first());
+
+        $id = \Illuminate\Http\UploadedFile::fake()->create('national-id.pdf', 120, 'application/pdf');
+        $this->post('/start-selling', $form + ['docs' => ['gov_id' => $id]])->assertSessionHas('success');
         $s = Supplier::where('name', 'Jose Sounds')->firstOrFail();
         $this->assertSame('pending', $s->status);
+        $this->assertSame('individual', $s->type);
         $this->assertSame('Marikina City', $s->city);
         $this->assertSame('137402000', $s->city_code);
-        // zone rows: deepest place picked decides the level
-        $this->assertEquals([['level' => 'city', 'code' => '137402000', 'fee' => 300], ['level' => 'province', 'code' => '045800000', 'fee' => 650]], $s->delivery['zones']);
+        $this->assertSame(['full'], \App\Domain\Finance::plansOf($s));
+        $this->assertSame('national-id.pdf', $s->application['docs']['gov_id']['name']);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($s->application['docs']['gov_id']['path']);
+        $this->assertSame('gcash', $s->payout_method); // payout account taken from the application
+        $this->get('/start-selling')->assertOk()->assertSee('Pending Review')->assertSee('Individual Supplier');
 
         $admin = $this->user('admin@partyrent.ph');
         $this->actingAs($admin)->withSession(['mode' => 'admin'])->post("/admin/applications/{$s->id}", ['decision' => 'approve'])->assertSessionHas('success');

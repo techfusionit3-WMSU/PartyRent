@@ -45,7 +45,7 @@ from the first row that is not `verified`.
 | rental (daily qty, payments, installment schedule, propose schedule, cancel, review) | E | in progress | plan/locations/installments ported; screenshot pending |
 | payments | E | done | 1440 compared: reference type/method labels, Details button, My Rentals nav |
 | profile | E | done | 1440 compared; app PH address picker kept |
-| start-selling (Individual / Organization wizard, documents, revision) | P (Personal/Business) | todo | |
+| start-selling (Individual / Organization wizard, documents, revision) | P (Personal/Business) | done | 8-step wizard (App\Domain\Applications), private doc uploads, revision resubmit, status page; e2e walked; SupplierApplicationTest. Admin review of docs + 'revision' decision → admin port |
 | Post-login "Select Rental Dates / I'm Just Browsing" prompt | M | todo | |
 | Persistent rental period bar `12/12/2026 - 12/15/2026 \| 4 Days` | P | todo | |
 | Filters side panel (drawer + count + Show results) | M | todo | |

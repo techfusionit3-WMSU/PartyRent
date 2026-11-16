@@ -117,7 +117,7 @@ class ReviewsTest extends TestCase
 
     public function test_supplier_replies_once_and_others_cannot(): void
     {
-        $rv = Review::whereNotNull('rental_request_id')->whereNull('reply')->firstOrFail();
+        $rv = $this->rentalReview();
         $owner = $rv->supplier->owner;
         $this->as($owner, 'supplier')->get('/supplier/reviews')->assertOk()->assertSee($rv->comment);
         $this->as($owner, 'supplier')->post("/supplier/reviews/{$rv->id}/reply", ['reply' => 'Thank you so much for renting with us!'])->assertSessionHas('success');
@@ -171,9 +171,18 @@ class ReviewsTest extends TestCase
         $this->as($sup->owner, 'supplier')->get('/supplier/reviews?tab=hidden')->assertOk();
         $super = User::whereJsonContains('roles', 'superadmin')->first();
         $this->as($super)->get('/admin/reviews?tab=all')->assertOk();
-        $cashier = User::where('email', 'cashier@partyrent.ph')->first();
+        $cashier = User::where('email', 'cashier@elegantoccasion.ph')->first();
         $this->assertNotSame(200, $this->as($cashier)->get('/admin/reviews')->status());
-        $k = \App\Models\Package::whereHas('reviews')->first();
+        $k = $this->rentalReview(package: true)->package;
         $this->get("/packages/{$k->id}")->assertOk()->assertSee('Customer reviews')->assertSee('Verified rental');
+    }
+
+    /** A verified review from a completed rental (the v4 seed's reviews are not tied to rentals). */
+    private function rentalReview(bool $package = false): Review
+    {
+        $r = \App\Models\RentalRequest::where('status', 'completed')->firstOrFail();
+        $item = $package ? ['package_id' => \App\Models\Package::where('supplier_id', $r->supplier_id)->value('id')] : ['product_id' => array_key_first(\App\Domain\Rentals::peakUnits($r))];
+
+        return Review::create(['supplier_id' => $r->supplier_id, 'rental_request_id' => $r->id, 'customer_id' => $r->customer_id, 'rating' => 5, 'comment' => 'Everything arrived on time and clean.'] + $item);
     }
 }

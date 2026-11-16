@@ -54,10 +54,10 @@ from the first row that is not `verified`.
 | Page / flow | Laravel today | Status | Note |
 |---|---|---|---|
 | dashboard (charts, upcoming schedule) | E (simplified 11-12) | done | reference stats + 5 charts (public/js/charts.js port, partials/chart) + upcoming; 1440 identical |
-| requests (6 tabs) | E | todo | |
+| requests (6 tabs) | E | done | 1440 identical (Accepted / Upcoming) |
 | request (availability date+time, allocation, schedule approve/reject, accept, release, inspect, settle) | E | in progress | 390+1440 match for pending view; v4 inspection (damage policy) done |
-| schedule (next 14 days) | E | todo | |
-| products | E | todo | |
+| schedule (next 14 days) | E | done | 1440 identical |
+| products | E | done | search + status tabs, stock today, rentals, Activate/Deactivate/Archive/Restore (status archived); ProductStatusTest |
 | product-form | E | todo | |
 | packages (+ package modal) | E (separate page) | todo | |
 | inventory (stock, holds, damaged/missing) | E | todo | |

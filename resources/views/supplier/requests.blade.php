@@ -4,7 +4,7 @@
 <div class="page-head"><div><h1>Rental Requests</h1><p>Review, accept or decline requests. Acceptance re-checks stock for every date.</p></div>
   <form method="GET"><input type="hidden" name="tab" value="{{ $tab }}"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search no., customer, event" style="width:240px" aria-label="Search"></form>
 </div>
-<div class="tabs">@foreach([['pending', 'Pending'], ['upcoming', 'Booked / Upcoming'], ['active', 'Ongoing & Returns'], ['completed', 'Completed'], ['closed', 'Declined / Cancelled'], ['all', 'All']] as [$k, $l])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.requests', array_filter(['tab' => $k, 'q' => $q])) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
+<div class="tabs">@foreach([['pending', 'Pending'], ['upcoming', 'Accepted / Upcoming'], ['active', 'Ongoing & Returns'], ['completed', 'Completed'], ['closed', 'Declined / Cancelled'], ['all', 'All']] as [$k, $l])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.requests', array_filter(['tab' => $k, 'q' => $q])) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
 <div class="card pad-0">
   @if($list->isEmpty())
     @include('partials.empty', ['text' => 'No requests in this tab.'])

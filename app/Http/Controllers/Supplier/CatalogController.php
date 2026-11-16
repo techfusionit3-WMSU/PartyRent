@@ -32,10 +32,13 @@ class CatalogController extends Controller
 
     public function products(Request $request)
     {
-        $list = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->with('category')->orderBy('name')->get();
+        $f = $request->query('f', 'all');
+        $q = trim((string) $request->query('q', ''));
+        $all = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->with('category')->orderBy('id')->get();
+        $list = $all->filter(fn ($p) => ($f === 'all' ? $p->status !== 'archived' : $p->status === $f) && ($q === '' || str_contains(mb_strtolower($p->name), mb_strtolower($q))))->values();
         inv()->primeProducts($list);
 
-        return view('supplier.products', ['list' => $list, 'today' => today_iso()]);
+        return view('supplier.products', ['list' => $list, 'today' => today_iso(), 'f' => $f, 'q' => $q]);
     }
 
     public function createProduct(Request $request)
@@ -166,17 +169,45 @@ class CatalogController extends Controller
         return redirect()->route('supplier.products')->with('success', $p->name.' updated.');
     }
 
+    /**
+     * Reference SP.products actions: Activate / Deactivate, Archive (refused while accepted reservations remain;
+     * packages that use the item are deactivated) and Restore (back to inactive). Hidden-by-admin listings are locked.
+     */
     public function productStatus(Request $request, Product $product)
     {
         $p = $this->ownProduct($request, $product);
-        $status = $request->validate(['status' => 'required|in:active,inactive'])['status'];
+        $to = $request->validate(['status' => 'required|in:active,inactive,archived,restore'])['status'];
         if ($p->status === 'hidden') {
             return back()->with('error', 'This listing was hidden by an administrator. You cannot republish it.');
         }
-        $p->update(['status' => $status]);
-        Notifier::audit('Changed listing status', $p->name.' → '.$status);
+        if ($to === 'restore') {
+            if ($p->status !== 'archived') {
+                return back();
+            }
+            $p->update(['status' => 'inactive']);
+            Notifier::audit('Restored product', $p->name);
 
-        return back()->with('success', $p->name.' is now '.$status.'.');
+            return back()->with('success', $p->name.' is restored as inactive. Activate it to show it in the marketplace again.');
+        }
+        if ($to === 'archived') {
+            $future = array_values(array_filter(inv()->reservedDates($p->id), fn ($d) => $d >= today_iso()));
+            if ($future) {
+                return back()->with('error', 'Cannot archive — '.$p->name.' has accepted reservations on '.implode(', ', array_map('fmt_date', array_slice($future, 0, 3))).(count($future) > 3 ? '…' : '').'.');
+            }
+            $inPkg = Package::where('supplier_id', $p->supplier_id)->where('active', true)->get()
+                ->filter(fn ($k) => collect(\App\Domain\Packages::def($k)['components'] ?? [])->contains(fn ($c) => (int) ($c['productId'] ?? 0) === $p->id))
+                ->merge(Package::where('supplier_id', $p->supplier_id)->where('active', true)->get()->filter(fn ($k) => collect($k->items ?? [])->contains(fn ($it) => (int) ($it['productId'] ?? $it['product_id'] ?? 0) === $p->id)))
+                ->unique('id');
+            $p->update(['status' => 'archived']);
+            $inPkg->each->update(['active' => false]);
+            Notifier::audit('Archived product', $p->name);
+
+            return back()->with('success', 'Archived.'.($inPkg->isNotEmpty() ? ' Deactivated packages: '.$inPkg->pluck('name')->implode(', ').'.' : ''));
+        }
+        $p->update(['status' => $to]);
+        Notifier::audit('Changed listing status', $p->name.' → '.$to);
+
+        return back()->with('success', $p->name.($to === 'active' ? ' is now active in the marketplace.' : ' is now inactive and hidden from customers.'));
     }
 
     /* ---------- packages ---------- */

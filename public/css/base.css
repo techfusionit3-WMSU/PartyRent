@@ -255,8 +255,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .tab .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: var(--surface-2); font-size: .72rem; }
 .tab.active .count { background: var(--brand-50); }
 .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; display: inline-flex; background: var(--surface-2); padding: 4px; border-radius: 999px; gap: 2px; }
-.seg button { flex: none; border: 0; background: transparent; padding: 7px 14px; border-radius: 999px; font: 600 .84rem var(--font); color: var(--ink-2); cursor: pointer; }
-.seg button.active { background: var(--surface); color: var(--brand); box-shadow: var(--shadow-sm); }
+.seg button, .seg a { flex: none; border: 0; background: transparent; padding: 7px 14px; border-radius: 999px; font: 600 .84rem var(--font); color: var(--ink-2); cursor: pointer; text-decoration: none; }
+.seg button.active, .seg a.active { background: var(--surface); color: var(--brand); box-shadow: var(--shadow-sm); }
 
 /* ---------- modal ---------- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(30, 20, 51, .45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fade .15s ease; }

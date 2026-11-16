@@ -10,7 +10,7 @@
         <td data-label="Activity"><span class="badge {{ in_array($e['kind'], ['Return', 'Inspect return'], true) ? 'b-gold' : 'b-teal' }}">{{ $e['kind'] }}</span></td>
         <td data-label="Request"><a href="{{ route('supplier.requests.show', $e['r']) }}">{{ $e['r']->code }}</a> · {{ $e['r']->event_name }}</td>
         <td data-label="Customer">{{ $e['r']->customer->name }}</td>
-        <td data-label="Items"><span class="small">{{ collect($e['r']->lines)->map(fn ($l) => inv()->itemName($l))->implode(', ') }}</span></td>
+        <td data-label="Items"><span class="small">{{ collect($e['r']->lines)->map(fn ($l) => (($l['type'] ?? 'item') === 'package' ? '📦 ' : '').inv()->itemName($l))->implode(', ') }}</span></td>
         <td data-label="Status">@include('partials.badges', ['status' => $e['r']->status])</td></tr>
     @endforeach
   </tbody></table></div>@endif

@@ -15,7 +15,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    public const STAFF_ROLES = ['admin', 'superadmin', 'cashier'];
+    public const STAFF_ROLES = ['admin', 'superadmin', 'cashier', 'employee'];
 
     public const ADMIN_PERMS = [
         'customers.view' => 'View customer accounts',
@@ -71,7 +71,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return $this->hasOne(ShopStaff::class);
     }
 
-    /** The approved shop this user runs in Rental Partner mode: their own, or the verified business they work for. */
+    /** The approved supplier this user works in: their own, or the one that employs them (Auth.supplierOf). */
     public function shop(): ?Supplier
     {
         if ($this->supplier?->status === 'approved') {
@@ -79,25 +79,43 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         }
         $s = $this->staffOf?->supplier;
 
-        return $s && $s->status === 'approved' && $s->isVerifiedBusiness() ? $s : null;
+        return $s && $s->status === 'approved' ? $s : null;
     }
 
-    /** owner | manager | coordinator | warehouse | cashier | null */
-    public function shopRole(): ?string
+    /** Organization role (Auth.orgRole): owner = org_admin; employees cashier | inventory | staff; else null. */
+    public function orgRole(): ?string
     {
         if ($this->supplier?->status === 'approved') {
-            return 'owner';
+            return 'org_admin';
         }
 
         return $this->shop() ? $this->staffOf->role : null;
     }
 
-    /** May this user open the given supplier route? Owners can open everything. */
+    /** Kept for older callers: 'owner' for the account owner, else the organization role. */
+    public function shopRole(): ?string
+    {
+        $r = $this->orgRole();
+
+        return $r === 'org_admin' && $this->supplier?->status === 'approved' ? 'owner' : $r;
+    }
+
+    /** Is this an employee account (cashier / inventory / staff) of a supplier? (Auth.isEmployee) */
+    public function isEmployee(): bool
+    {
+        return $this->staffOf !== null && ($this->hasRole('cashier') || $this->hasRole('employee'));
+    }
+
+    /** Organization permission check (Auth.orgCan). */
+    public function orgCan(string $perm): bool
+    {
+        return in_array($perm, ShopStaff::permsOf($this->orgRole()), true);
+    }
+
+    /** May this user open the given supplier route? */
     public function canShop(string $routeName): bool
     {
-        $role = $this->shopRole();
-
-        return $role === 'owner' || ($role !== null && ShopStaff::allows($role, $routeName));
+        return ShopStaff::allows($this->orgRole(), $routeName);
     }
 
     public function rentalRequests(): HasMany
@@ -126,6 +144,9 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
             if ($this->hasRole($r)) {
                 return $r;
             }
+        }
+        if ($this->hasRole('employee')) {
+            return 'supplier';
         }
 
         return 'customer';

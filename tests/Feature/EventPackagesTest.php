@@ -29,7 +29,7 @@ class EventPackagesTest extends TestCase
     {
         parent::setUp();
         $this->s = User::where('email', 'juan@demo.ph')->firstOrFail()->supplier;
-        $this->item = Product::where('supplier_id', $this->s->id)->where('listing_type', 'rent')->where('status', 'published')->firstOrFail();
+        $this->item = Product::where('supplier_id', $this->s->id)->where('listing_type', 'rent')->where('status', 'active')->firstOrFail();
         $this->item->update(['total_stock' => 500, 'damaged' => 0, 'missing' => 0]);
     }
 

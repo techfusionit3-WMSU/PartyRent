@@ -29,7 +29,7 @@ class SaleItemsTest extends TestCase
     {
         return array_merge([
             'listing_type' => 'sale', 'name' => 'Cupcake Tray (24 pcs)', 'category_id' => 'catering', 'description' => 'Two dozen vanilla cupcakes with pastel frosting.',
-            'total_stock' => 10, 'unit' => 'tray', 'condition' => 'Excellent', 'status' => 'published', 'tiers' => [['min' => 1, 'max' => null, 'price' => 900]],
+            'total_stock' => 10, 'unit' => 'tray', 'condition' => 'Excellent', 'status' => 'active', 'tiers' => [['min' => 1, 'max' => null, 'price' => 900]],
             'perishable' => '1', 'shelf_life_days' => 2, 'lead_days' => 3, 'low_stock_at' => 4, 'delivery' => '1',
         ], $over);
     }

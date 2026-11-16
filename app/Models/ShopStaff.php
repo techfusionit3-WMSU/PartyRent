@@ -5,47 +5,109 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** A user working for a Business rental partner, with one role that limits the pages they can open. */
+/**
+ * An employee account tied to one supplier (port of Auth.ORG_ROLES / ORG_PERMS in reference js/core/auth.js).
+ * The supplier's owner is always the Organization Admin; employees are Cashier, Inventory Staff or Staff and
+ * only ever see that supplier's data.
+ */
 class ShopStaff extends Model
 {
     protected $table = 'shop_staff';
 
     protected $guarded = ['id'];
 
-    /**
-     * role => [label, what they do, route-name patterns (after "supplier.") they may open].
-     * PartyRent collects every customer payment, so no staff role handles money.
-     */
-    public const ROLES = [
-        'manager' => ['Manager', 'Everything except staff, shop settings and the payout account.', ['*']],
-        'coordinator' => ['Coordinator', 'Accepts and declines requests, talks to customers, replies to reviews.', ['dashboard', 'schedule', 'requests', 'requests.show', 'requests.accept', 'requests.decline', 'requests.notes', 'requests.advance', 'calendar', 'products', 'packages', 'reviews', 'reviews.reply']],
-        'warehouse' => ['Warehouse', 'Prepares and releases items, receives returns, checks damage, manages stock.', ['dashboard', 'schedule', 'requests', 'requests.show', 'requests.advance', 'requests.inspection', 'requests.notes', 'products', 'inventory', 'inventory.*', 'calendar', 'damages']],
-        'cashier' => ['Cashier', 'Sees payments, balances, receipts, earnings and reports. Does not take money: PartyRent collects all payments.', ['dashboard', 'requests', 'requests.show', 'payments', 'payouts', 'reports', 'reports.csv']],
+    public const ORG_ROLES = ['org_admin' => 'Organization Admin', 'cashier' => 'Cashier', 'inventory' => 'Inventory Staff', 'staff' => 'Staff'];
+
+    /** Roles an owner can give an employee. */
+    public const EMPLOYEE_ROLES = ['cashier', 'inventory', 'staff'];
+
+    public const ROLE_BADGE = ['org_admin' => 'b-purple', 'cashier' => 'b-teal', 'inventory' => 'b-sky', 'staff' => 'b-gray'];
+
+    public const ORG_PERM_LIST = [
+        'orders.view' => 'View rental requests & schedules',
+        'orders.manage' => 'Accept / decline rental requests',
+        'fulfillment.update' => 'Update delivery, pickup & return status',
+        'products.manage' => 'Add & update products and packages',
+        'inventory.manage' => 'Manage stock, maintenance & damaged units',
+        'locations.manage' => 'Manage inventory locations & transfers',
+        'returns.inspect' => 'Record return inspections & damage',
+        'payments.view' => 'View payments & balances',
+        'payments.verify' => 'Verify / reject payments',
+        'payments.record' => 'Record payments & refunds',
+        'receipts.issue' => 'Issue receipts',
+        'reports.view' => 'View business & financial reports',
+        'shop.manage' => 'Edit shop profile, payment plans & policies',
+        'team.manage' => 'Manage employees & roles',
     ];
 
-    /** Pages only the owner can open. */
-    public const OWNER_ONLY = ['staff', 'staff.*', 'shop.update', 'business', 'payouts.account'];
+    public const ORG_PERMS = [
+        'cashier' => ['payments.view', 'payments.verify', 'payments.record', 'receipts.issue', 'reports.view'],
+        'inventory' => ['orders.view', 'products.manage', 'inventory.manage', 'locations.manage', 'returns.inspect'],
+        'staff' => ['orders.view', 'fulfillment.update', 'returns.inspect'],
+    ];
+
+    /**
+     * Supplier route name (after "supplier.") => permission it needs. First match wins; no match = any member.
+     * Mirrors the permission keys on the reference NAV items and Services checks.
+     */
+    public const ROUTE_PERMS = [
+        'dashboard' => null,
+        'requests.accept' => 'orders.manage', 'requests.decline' => 'orders.manage', 'requests.notes' => 'orders.manage',
+        'requests.schedule.*' => 'orders.manage',
+        'requests.advance' => 'fulfillment.update', 'requests.complete' => 'fulfillment.update',
+        'requests.inspection' => 'returns.inspect', 'requests.settle' => 'returns.inspect',
+        'requests.cash' => 'payments.record',
+        'requests' => 'orders.view', 'requests.*' => 'orders.view', 'schedule' => 'orders.view', 'calendar' => 'orders.view',
+        'reviews' => 'orders.view', 'reviews.*' => 'orders.manage',
+        'products' => 'products.manage', 'products.*' => 'products.manage',
+        'packages' => 'products.manage', 'packages.*' => 'products.manage',
+        'discounts' => 'products.manage', 'discounts.*' => 'products.manage',
+        'inventory' => 'inventory.manage', 'inventory.*' => 'inventory.manage',
+        'locations' => 'locations.manage', 'locations.*' => 'locations.manage',
+        'damages' => 'returns.inspect', 'damages.*' => 'returns.inspect',
+        'payments' => 'payments.view', 'payments.*' => 'payments.verify',
+        'payouts' => 'payments.view', 'payouts.account' => 'shop.manage',
+        'reports' => 'reports.view', 'reports.*' => 'reports.view',
+        'shop' => 'shop.manage', 'shop.*' => 'shop.manage', 'business' => 'shop.manage',
+        'team' => 'team.manage', 'team.*' => 'team.manage', 'staff' => 'team.manage', 'staff.*' => 'team.manage',
+    ];
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
 
-    public function label(): string { return self::ROLES[$this->role][0] ?? ucfirst($this->role); }
+    public function label(): string { return self::ORG_ROLES[$this->role] ?? ucfirst($this->role); }
 
-    /** Can this role open the supplier route with this name (e.g. "supplier.requests.show")? */
-    public static function allows(string $role, string $routeName): bool
+    /** Permissions of an organization role (org_admin = all). */
+    public static function permsOf(?string $role): array
+    {
+        if ($role === 'org_admin') {
+            return array_keys(self::ORG_PERM_LIST);
+        }
+
+        return self::ORG_PERMS[$role] ?? [];
+    }
+
+    /** Permission needed to open a supplier route (null = any member of the shop). */
+    public static function permFor(string $routeName): ?string
     {
         $name = str_starts_with($routeName, 'supplier.') ? substr($routeName, 9) : $routeName;
-        foreach (self::OWNER_ONLY as $p) {
-            if (fnmatch($p, $name)) {
-                return false;
-            }
-        }
-        foreach (self::ROLES[$role][2] ?? [] as $p) {
-            if (fnmatch($p, $name)) {
-                return true;
+        foreach (self::ROUTE_PERMS as $pattern => $perm) {
+            if (fnmatch($pattern, $name)) {
+                return $perm;
             }
         }
 
-        return false;
+        return null;
+    }
+
+    /** Can this organization role open the supplier route with this name? */
+    public static function allows(?string $role, string $routeName): bool
+    {
+        if ($role === null) {
+            return false;
+        }
+        $perm = self::permFor($routeName);
+
+        return $perm === null || in_array($perm, self::permsOf($role), true);
     }
 }

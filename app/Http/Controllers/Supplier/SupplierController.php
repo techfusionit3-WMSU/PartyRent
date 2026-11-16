@@ -23,7 +23,7 @@ class SupplierController extends Controller
         $sup = $request->user()->shop();
         $T = today_iso();
         $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
-        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->get();
+        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'deleted')->get();
         inv()->primeProducts($prods);
         $snap = $prods->reject->isSale()->map(fn ($p) => inv()->breakdown($p->id, $T));
         $ids = $reqs->pluck('id');
@@ -59,7 +59,7 @@ class SupplierController extends Controller
             'active' => $reqs->filter->isActive()->count(),
             'earned' => $split['rental'] + $split['sales'],
             'available' => $snap->sum('available'),
-            'items' => $prods->where('status', 'published')->count(),
+            'items' => $prods->where('status', 'active')->count(),
             'upcoming' => $reqs->filter(fn ($r) => in_array($r->status, $booked, true) && $r->start_date >= $T && $r->start_date <= add_days($T, 14))->sortBy('start_date')->take(6),
         ]);
     }

@@ -78,7 +78,7 @@ class Product extends Model
     /** Published listing from an approved supplier. */
     public function scopeLive($q)
     {
-        return $q->where('status', 'published')->whereHas('supplier', fn ($s) => $s->where('status', 'approved'));
+        return $q->where('status', 'active')->whereHas('supplier', fn ($s) => $s->where('status', 'approved'));
     }
 
     public function basePrice(): float { return Pricing::basePrice($this); }

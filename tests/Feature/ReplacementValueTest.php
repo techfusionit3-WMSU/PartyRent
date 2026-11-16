@@ -45,7 +45,7 @@ class ReplacementValueTest extends TestCase
 
     public function test_supplier_saves_value_and_customer_sees_it(): void
     {
-        $p = Product::where('listing_type', 'rent')->where('status', 'published')->firstOrFail();
+        $p = Product::where('listing_type', 'rent')->where('status', 'active')->firstOrFail();
         $owner = Supplier::find($p->supplier_id)->owner;
         $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get(route('supplier.products.edit', $p))
             ->assertOk()->assertSee('Replacement value per piece');

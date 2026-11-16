@@ -149,7 +149,7 @@ class ApiController extends Controller
     {
         $data = $request->validate(['id' => 'required|integer', 'date' => 'required|date_format:Y-m-d', 'from' => 'nullable|string|max:5', 'to' => 'nullable|string|max:5']);
         $p = inv()->product($data['id']);
-        abort_unless($p && $p->isHourly() && $p->status === 'published', 404);
+        abort_unless($p && $p->isHourly() && $p->status === 'active', 404);
         $w = \App\Domain\Hours::window(['from' => $data['from'] ?? null, 'to' => $data['to'] ?? null]);
         $busy = array_map(fn ($s) => $s + ['label' => \App\Domain\Hours::fmt($s['from']).' – '.\App\Domain\Hours::fmt($s['to'])], inv()->busySlots($p->id, $data['date']));
 

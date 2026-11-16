@@ -398,7 +398,7 @@ class Packages
                 return $fail('Stage '.($n + 1).' needs a name (e.g. Ceremony), or remove it.');
             }
         }
-        $own = Product::where('supplier_id', $s->id)->where('status', '!=', 'archived')->pluck('listing_type', 'id')->all();
+        $own = Product::where('supplier_id', $s->id)->where('status', '!=', 'deleted')->pluck('listing_type', 'id')->all();
         $hasStock = false;
         foreach ($def['components'] as $n => $c) {
             $label = 'Component '.($n + 1);

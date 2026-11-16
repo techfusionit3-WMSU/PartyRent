@@ -42,9 +42,10 @@ class AppServiceProvider extends ServiceProvider
             $badges = [];
             if ($role === 'supplier' && ($shop = $u->shop())) {
                 $badges['requests'] = RentalRequest::where('supplier_id', $shop->id)->where('status', 'pending')->count();
-                $badges['reviews'] = Review::visible()->where('supplier_id', $shop->id)->whereNull('reply')->count();
+                $badges['payments'] = Payment::where('status', 'pending')->whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $shop->id))->count();
             } elseif ($role === 'cashier') {
-                $badges['verification'] = Payment::where('status', 'pending')->count();
+                $shop = $u->shop();
+                $badges['verification'] = Payment::where('status', 'pending')->when($shop, fn ($q) => $q->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $shop->id)))->count();
             } elseif ($role === 'superadmin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();

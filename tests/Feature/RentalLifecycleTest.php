@@ -87,7 +87,7 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame(9, inv()->availableOn($table->id, $d2));
 
         // stock can no longer be reduced below what's reserved
-        $this->put("/supplier/products/{$table->id}", ['name' => $table->name, 'category_id' => $table->category_id, 'description' => $table->description, 'total_stock' => 3, 'unit' => $table->unit, 'condition' => 'Good', 'status' => 'published', 'tiers' => $table->tiers])
+        $this->put("/supplier/products/{$table->id}", ['name' => $table->name, 'category_id' => $table->category_id, 'description' => $table->description, 'total_stock' => 3, 'unit' => $table->unit, 'condition' => 'Good', 'status' => 'active', 'tiers' => $table->tiers])
             ->assertSessionHas('error');
 
         // deposit via cashier, recorded offline

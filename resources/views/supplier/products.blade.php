@@ -15,10 +15,10 @@
           <td data-label="Price" class="num">{{ money($p->basePrice()) }}<div class="small muted">{{ $p->priceUnitLabel() }}</div>@if(count($p->tiers) > 1)<div class="small muted">{{ count($p->tiers) }} tiers</div>@endif</td>
           <td data-label="Stock" class="num">{{ $p->total_stock }}</td>
           <td data-label="Available" class="num"><b>{{ $b['available'] }}</b>@if($b['reserved'])<div class="small muted">{{ $b['reserved'] }} reserved</div>@endif</td>
-          <td data-label="Status"><span class="badge {{ ['published' => 'b-green', 'draft' => 'b-gray', 'hidden' => 'b-gold'][$p->status] ?? 'b-gray' }}">{{ ucfirst($p->status) }}</span></td>
+          <td data-label="Status"><span class="badge {{ ['active' => 'b-green', 'inactive' => 'b-gray', 'hidden' => 'b-red'][$p->status] ?? 'b-gray' }}">{{ ucfirst($p->status) }}</span></td>
           <td><div class="btn-group">
             <a class="btn btn-xs" href="{{ route('supplier.products.edit', $p) }}">{{ icon('edit') }}Edit</a>
-            <form method="POST" action="{{ route('supplier.products.status', $p) }}">@csrf<input type="hidden" name="status" value="{{ $p->status === 'published' ? 'hidden' : 'published' }}"><button class="btn btn-xs btn-ghost">{{ $p->status === 'published' ? 'Hide' : 'Publish' }}</button></form>
+            <form method="POST" action="{{ route('supplier.products.status', $p) }}">@csrf<input type="hidden" name="status" value="{{ $p->status === 'active' ? 'hidden' : 'active' }}"><button class="btn btn-xs btn-ghost">{{ $p->status === 'active' ? 'Hide' : 'Publish' }}</button></form>
             <form method="POST" action="{{ route('supplier.products.status', $p) }}" data-confirm="Archive {{ $p->name }}? It will disappear from your shop. Past rentals keep their records." data-confirm-title="Archive listing?" data-confirm-ok="Archive" data-danger>@csrf<input type="hidden" name="status" value="archived"><button class="btn btn-xs btn-ghost">{{ icon('trash') }}</button></form>
           </div></td>
         </tr>

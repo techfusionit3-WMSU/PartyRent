@@ -239,7 +239,7 @@ class DemoSeeder extends Seeder
             'supplier_id' => $this->S[$sup], 'name' => $name, 'category_id' => $cat, 'total_stock' => $stock, 'damaged' => 0, 'missing' => 0,
             'tiers' => array_map(fn ($t) => ['min' => $t[0], 'max' => $t[1], 'price' => $t[2]], $tiers),
             'unit' => 'piece / day', 'condition' => 'Excellent', 'colors' => [], 'themes' => [], 'events' => [], 'images' => [],
-            'status' => 'published', 'rating' => 4.6, 'rent_count' => 0, 'delivery' => true, 'pickup' => true, 'description' => '',
+            'status' => 'active', 'rating' => 4.6, 'rent_count' => 0, 'delivery' => true, 'pickup' => true, 'description' => '',
         ], $x)];
         $list = [
             $P('p1', 's1', 'White Monoblock Chair', 'chairs', 100, [[1, 10, 15], [11, 30, 13], [31, 50, 11], [51, null, 10]], ['colors' => ['White'], 'themes' => ['Classic', 'Minimalist'], 'events' => ['Birthday', 'Christening', 'Reunion', 'Corporate'], 'rating' => 4.7, 'rent_count' => 412, 'description' => 'Sturdy, stackable white monoblock chairs. Cleaned and sanitized after every rental. Ideal for backyard parties, reunions and community events.', 'damaged' => 2]),

@@ -17,7 +17,7 @@ class ReportController extends Controller
     public function calendar(Request $request)
     {
         $sup = $request->user()->shop();
-        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->orderBy('name')->get();
+        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'deleted')->orderBy('name')->get();
         if ($prods->isEmpty()) {
             return view('supplier.calendar', ['prods' => $prods]);
         }
@@ -94,7 +94,7 @@ class ReportController extends Controller
         extract($this->data($request));
         $days = date_range(diff_days($rg['from'], $rg['to']) > 45 ? add_days($rg['to'], -29) : $rg['from'], $rg['to']);
         $months = Report::months(6);
-        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'archived')->get();
+        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'deleted')->get();
         inv()->primeProducts($prods);
         $next30 = date_range(today_iso(), add_days(today_iso(), 29));
         $util = $prods->reject->isSale()->map(function ($p) use ($next30) {

@@ -144,7 +144,7 @@ class MarketController extends Controller
     {
         $q = mb_strtolower((string) $request->query('q', ''));
         $f = (string) $request->query('f', '');
-        $list = Supplier::approved()->with(['products' => fn ($p) => $p->where('status', 'published')->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
+        $list = Supplier::approved()->with(['products' => fn ($p) => $p->where('status', 'active')->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
             ->filter(fn ($s) => (! $q || str_contains(mb_strtolower($s->name.' '.$s->city.' '.$s->description), $q)) && (! $f || $s->fulfillment === 'both' || $s->fulfillment === $f));
 
         return view('market.suppliers', ['list' => $list, 'q' => $request->query('q', ''), 'f' => $f]);
@@ -154,7 +154,7 @@ class MarketController extends Controller
     {
         $own = $request->user() && $supplier->owner_id === $request->user()->id;
         abort_unless($supplier->status === 'approved' || $own, 404);
-        $items = $supplier->products()->where('status', 'published')->with(['supplier', 'category'])->get();
+        $items = $supplier->products()->where('status', 'active')->with(['supplier', 'category'])->get();
         inv()->primeProducts($items);
 
         return view('market.supplier', [
@@ -167,7 +167,7 @@ class MarketController extends Controller
 
     public function product(Request $request, Product $product)
     {
-        abort_unless($product->status === 'published' && $product->supplier->status === 'approved', 404);
+        abort_unless($product->status === 'active' && $product->supplier->status === 'approved', 404);
         $today = today_iso();
         $earliest = add_days($today, $product->isSale() ? (int) $product->lead_days : 0);
         $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : max(add_days($today, 7), $earliest);

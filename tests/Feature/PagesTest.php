@@ -31,7 +31,7 @@ class PagesTest extends TestCase
         $p = \App\Models\Product::first();
         $k = \App\Models\Package::first();
         $s = Supplier::approved()->first();
-        foreach (['/', '/browse', '/browse?view=packages', '/browse?q=pink+chairs&start='.add_days(today_iso(), 3).'&avail=1', '/suppliers', "/suppliers/{$s->id}", "/suppliers/{$s->id}?tab=policies", "/suppliers/{$s->id}?tab=reviews",
+        foreach (['/', '/?view=packages', '/?q=pink+chairs&start='.add_days(today_iso(), 3).'&avail=1', '/suppliers', "/suppliers/{$s->id}", "/suppliers/{$s->id}?tab=policies", "/suppliers/{$s->id}?tab=reviews",
             "/products/{$p->id}", '/packages', "/packages/{$k->id}", '/ai', '/ai?q='.urlencode('outdoor birthday for 50 guests with tent and pink balloons'), '/login', '/register', '/forgot-password'] as $url) {
             $this->get($url)->assertOk();
         }
@@ -118,10 +118,10 @@ class PagesTest extends TestCase
         $this->assertCount(1, $c->fresh()->updates);
 
         // hide and restore a listing
-        $p = \App\Models\Product::where('status', 'published')->firstOrFail();
+        $p = \App\Models\Product::where('status', 'active')->firstOrFail();
         $this->post("/admin/listings/{$p->id}/status", ['status' => 'hidden', 'reason' => 'Blurry photos'])->assertSessionHas('success');
         $this->assertSame('hidden', $p->fresh()->status);
-        $this->post("/admin/listings/{$p->id}/status", ['status' => 'published'])->assertSessionHas('success');
+        $this->post("/admin/listings/{$p->id}/status", ['status' => 'active'])->assertSessionHas('success');
 
         // categories: create, reject duplicate, edit
         $cat = ['name' => 'Photo Booths', 'icon' => 'tent', 'grad_from' => '#7C3AED', 'grad_to' => '#E11D74', 'active' => 1];
@@ -132,7 +132,8 @@ class PagesTest extends TestCase
         $this->post('/admin/categories', ['grad_from' => 'red'] + $cat)->assertSessionHasErrors('grad_from');
 
         // sidebar hides pages the admin can't open
-        $this->as('paolo.admin@partyrent.ph')->get('/admin')->assertOk()->assertDontSee('Supplier Applications');
+        $this->as('paolo.admin@partyrent.ph')->get('/admin')->assertOk()->assertSee('Supplier Applications'); // reference shows the full admin menu
+        $this->as('paolo.admin@partyrent.ph')->get('/admin/applications')->assertStatus(403);
     }
 
     public function test_superadmin_actions(): void

@@ -4,7 +4,7 @@
 @section('content')
 <div class="page-head"><div><h1>Listings & packages</h1><p>Hide listings that break the rules — the rental partner is notified. Prices and stock stay under the rental partner's control.</p></div>
   <form method="GET" class="row wrap" style="gap:6px"><input type="hidden" name="view" value="{{ $view }}"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search item or rental partner" style="width:220px">
-    @if($view === 'items')<select class="input input-sm" name="status" style="width:auto" data-autosubmit><option value="">All statuses</option>@foreach(['published', 'hidden', 'draft'] as $s)<option value="{{ $s }}" @selected($status === $s)>{{ ucfirst($s) }}</option>@endforeach</select>@endif
+    @if($view === 'items')<select class="input input-sm" name="status" style="width:auto" data-autosubmit><option value="">All statuses</option>@foreach(['active', 'hidden', 'draft'] as $s)<option value="{{ $s }}" @selected($status === $s)>{{ ucfirst($s) }}</option>@endforeach</select>@endif
     <button class="btn btn-sm">Search</button></form>
 </div>
 <div class="tabs"><a class="tab {{ $view === 'items' ? 'active' : '' }}" href="{{ route('admin.listings') }}">Items</a><a class="tab {{ $view === 'packages' ? 'active' : '' }}" href="{{ route('admin.listings', ['view' => 'packages']) }}">Packages</a></div>
@@ -15,9 +15,9 @@
       <thead><tr><th>Item</th><th>Rental Partner</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $p)
         <tr><td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">★ {{ rating_text($p) }} · {{ $p->rent_count }} rentals</div></div></div></td><td data-label="Rental Partner">{{ $p->supplier->name }}<div class="small muted">{{ ucfirst($p->supplier->status) }}</div></td><td data-label="Category">{{ $p->category->name ?? '' }}</td><td data-label="Price" class="num">{{ money($p->basePrice()) }}</td><td data-label="Stock" class="num">{{ $p->total_stock }}</td>
-          <td data-label="Status"><span class="badge {{ ['published' => 'b-green', 'hidden' => 'b-red'][$p->status] ?? 'b-gray' }}">{{ ucfirst($p->status) }}</span></td>
-          <td>@if($canManage && $p->status !== 'draft')
-            @if($p->status === 'published')
+          <td data-label="Status"><span class="badge {{ ['active' => 'b-green', 'hidden' => 'b-red'][$p->status] ?? 'b-gray' }}">{{ ucfirst($p->status) }}</span></td>
+          <td>@if($canManage && $p->status !== 'inactive')
+            @if($p->status === 'active')
               <form method="POST" action="{{ route('admin.listings.status', $p) }}" class="row" style="gap:4px">@csrf<input type="hidden" name="status" value="hidden"><input class="input input-sm" name="reason" placeholder="Reason" style="width:140px" required><button class="btn btn-xs btn-danger">Hide</button></form>
             @else
               <form method="POST" action="{{ route('admin.listings.status', $p) }}">@csrf<input type="hidden" name="status" value="published"><button class="btn btn-xs">Restore</button></form>

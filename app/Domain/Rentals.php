@@ -128,7 +128,7 @@ class Rentals
     public static function addToCart(User $u, string $type, int $refId, array $days, ?array $sel = null, ?array $time = null): array
     {
         $item = $type === 'package' ? Package::find($refId) : Product::find($refId);
-        if (! $item || ($type === 'package' ? ! $item->active || $item->is_draft : $item->status !== 'published')) {
+        if (! $item || ($type === 'package' ? ! $item->active || $item->is_draft : $item->status !== 'active')) {
             return self::fail('This listing is not available.');
         }
         if ($item->supplier->owner_id === $u->id) {

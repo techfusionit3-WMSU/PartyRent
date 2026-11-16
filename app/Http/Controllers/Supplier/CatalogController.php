@@ -32,7 +32,7 @@ class CatalogController extends Controller
 
     public function products(Request $request)
     {
-        $list = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->with('category')->orderBy('name')->get();
+        $list = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->with('category')->orderBy('name')->get();
         inv()->primeProducts($list);
 
         return view('supplier.products', ['list' => $list, 'today' => today_iso()]);
@@ -40,7 +40,7 @@ class CatalogController extends Controller
 
     public function createProduct(Request $request)
     {
-        return view('supplier.product-form', ['p' => new Product(['listing_type' => $request->query('type') === 'sale' ? 'sale' : 'rent', 'tiers' => [['min' => 1, 'max' => null, 'price' => '']], 'unit' => $request->query('type') === 'sale' ? 'pc' : 'piece / day', 'condition' => 'Excellent', 'status' => 'published', 'delivery' => true, 'pickup' => true, 'colors' => [], 'themes' => [], 'events' => []]), 'cats' => Category::where('active', true)->orderBy('sort')->get(), 'events' => array_keys(Ai::EVENTS)]);
+        return view('supplier.product-form', ['p' => new Product(['listing_type' => $request->query('type') === 'sale' ? 'sale' : 'rent', 'tiers' => [['min' => 1, 'max' => null, 'price' => '']], 'unit' => $request->query('type') === 'sale' ? 'pc' : 'piece / day', 'condition' => 'Excellent', 'status' => 'active', 'delivery' => true, 'pickup' => true, 'colors' => [], 'themes' => [], 'events' => []]), 'cats' => Category::where('active', true)->orderBy('sort')->get(), 'events' => array_keys(Ai::EVENTS)]);
     }
 
     public function editProduct(Request $request, Product $product)
@@ -62,7 +62,7 @@ class CatalogController extends Controller
             'shelf_life_days' => 'nullable|integer|min:1|max:3650',
             'low_stock_at' => 'nullable|integer|min:0|max:100000',
             'condition' => 'required|string|max:40',
-            'status' => 'required|in:published,draft,hidden',
+            'status' => 'required|in:active,inactive',
             'tiers' => 'required|array|min:1|max:8',
             'tiers.*.min' => 'nullable|integer|min:1',
             'tiers.*.max' => 'nullable|integer|min:1',
@@ -169,9 +169,9 @@ class CatalogController extends Controller
     public function productStatus(Request $request, Product $product)
     {
         $p = $this->ownProduct($request, $product);
-        $status = $request->validate(['status' => 'required|in:published,draft,hidden,archived'])['status'];
-        if ($status === 'archived' && inv()->reservedDates($p->id)) {
-            return back()->with('error', 'This item has upcoming accepted reservations and cannot be archived yet.');
+        $status = $request->validate(['status' => 'required|in:active,inactive'])['status'];
+        if ($p->status === 'hidden') {
+            return back()->with('error', 'This listing was hidden by an administrator. You cannot republish it.');
         }
         $p->update(['status' => $status]);
         Notifier::audit('Changed listing status', $p->name.' → '.$status);
@@ -197,7 +197,7 @@ class CatalogController extends Controller
 
     private function packageForm(Request $request, Package $k)
     {
-        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->orderBy('name')->get();
+        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->orderBy('name')->get();
 
         return view('supplier.package-form', [
             'k' => $k, 'events' => array_keys(Ai::EVENTS), 'modes' => Packages::MODES,
@@ -334,7 +334,7 @@ class CatalogController extends Controller
     public function inventory(Request $request)
     {
         $date = $request->query('date') ?: today_iso();
-        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'archived')->with(['holds' => fn ($q) => $q->orderBy('start_date'), 'movements' => fn ($q) => $q->limit(200)])->orderBy('name')->get();
+        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->with(['holds' => fn ($q) => $q->orderBy('start_date'), 'movements' => fn ($q) => $q->limit(200)])->orderBy('name')->get();
         inv()->primeProducts($prods);
 
         return view('supplier.inventory', ['prods' => $prods, 'date' => $date]);

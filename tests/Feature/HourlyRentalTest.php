@@ -30,7 +30,7 @@ class HourlyRentalTest extends TestCase
     {
         parent::setUp();
         $this->date = add_days(today_iso(), 10);
-        $this->p = Product::where('listing_type', 'rent')->where('status', 'published')->firstOrFail();
+        $this->p = Product::where('listing_type', 'rent')->where('status', 'active')->firstOrFail();
         Hold::where('product_id', $this->p->id)->delete();
         $this->p->update(['rental_mode' => 'hour', 'unit' => 'unit / hour', 'total_stock' => 1, 'damaged' => 0, 'missing' => 0,
             'tiers' => [['min' => 1, 'max' => null, 'price' => 500]], 'min_hours' => 3, 'buffer_min' => 60]);

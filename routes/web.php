@@ -114,10 +114,10 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/shop', [SupplierController::class, 'shop'])->name('shop');
     Route::put('/shop', [SupplierController::class, 'updateShop'])->name('shop.update');
     Route::post('/shop/business', [\App\Http\Controllers\Supplier\StaffController::class, 'business'])->name('business');
-    Route::get('/staff', [\App\Http\Controllers\Supplier\StaffController::class, 'index'])->name('staff');
-    Route::post('/staff', [\App\Http\Controllers\Supplier\StaffController::class, 'store'])->name('staff.store');
-    Route::put('/staff/{member}', [\App\Http\Controllers\Supplier\StaffController::class, 'update'])->name('staff.update');
-    Route::delete('/staff/{member}', [\App\Http\Controllers\Supplier\StaffController::class, 'destroy'])->name('staff.remove');
+    Route::get('/team', [\App\Http\Controllers\Supplier\TeamController::class, 'index'])->name('team');
+    Route::post('/team', [\App\Http\Controllers\Supplier\TeamController::class, 'store'])->name('team.store');
+    Route::put('/team/{user}', [\App\Http\Controllers\Supplier\TeamController::class, 'update'])->name('team.update');
+    Route::redirect('/staff', '/supplier/team')->name('staff');
 
     Route::get('/requests', [SupplierRequestController::class, 'index'])->name('requests');
     Route::get('/requests/{rentalRequest}', [SupplierRequestController::class, 'show'])->name('requests.show');
@@ -189,6 +189,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::post('/payouts/{payout}/send', [\App\Http\Controllers\Admin\PayoutController::class, 'send'])->name('payouts.send');
     Route::post('/payouts/{payout}/check', [\App\Http\Controllers\Admin\PayoutController::class, 'check'])->name('payouts.check');
     Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
+    Route::get('/activity', [AdminController::class, 'audit'])->name('activity');
 
     Route::get('/listings', [AdminController::class, 'listings'])->name('listings');
     Route::post('/listings/{product}/status', [AdminController::class, 'listingStatus'])->name('listings.status');
@@ -215,6 +216,8 @@ Route::prefix('superadmin')->name('super.')->middleware(['auth', 'role:superadmi
     Route::get('/roles', [SuperController::class, 'roles'])->name('roles');
     Route::post('/roles', [SuperController::class, 'updateRoles'])->name('roles.update');
     Route::get('/settings', [SuperController::class, 'settings'])->name('settings');
+    Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+    Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
     Route::post('/settings', [SuperController::class, 'updateSettings'])->name('settings.update');
     Route::get('/pay-accounts', [\App\Http\Controllers\Admin\PayAccountController::class, 'index'])->name('pay-accounts');
     Route::post('/pay-accounts', [\App\Http\Controllers\Admin\PayAccountController::class, 'store'])->name('pay-accounts.store');

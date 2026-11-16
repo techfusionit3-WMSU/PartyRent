@@ -275,7 +275,7 @@ class DeliveryPricingTest extends TestCase
 
     public function test_browse_filters_by_deliver_to_city(): void
     {
-        $this->get('/browse?to='.self::CEBU_CITY.'&delivery=1')->assertOk()
+        $this->get('/?to='.self::CEBU_CITY.'&delivery=1')->assertOk()
             ->assertSee('Sinulog Fiesta Backdrop')           // Cebu supplier delivers in Cebu City
             ->assertDontSee('Pink Balloon Garland Set');     // Quezon City supplier doesn't
         $this->get('/suppliers/'.$this->supplier('Happy Moments')->id)->assertOk()->assertSee('Pickup only in your area');

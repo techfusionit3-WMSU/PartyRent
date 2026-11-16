@@ -1,58 +1,57 @@
 @extends('layouts.base')
 
 @php
+    // Port of NAV in reference js/ui/layout.js: [key, route, icon, label, count, org permission].
     $role = $shellRole;
     $b = $shellBadges ?? [];
     $NAV = [
-        'supplier' => ['tag' => 'Rental Partner', 'items' => [
-            ['Overview'], ['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['requests', 'supplier.requests', 'list', 'Rental Requests', $b['requests'] ?? 0], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns'],
-            ['Catalog'], ['products', 'supplier.products', 'box', 'Products'], ['packages', 'supplier.packages', 'package', 'Packages'], ['inventory', 'supplier.inventory', 'layers', 'Inventory'], ['calendar', 'supplier.calendar', 'calendar', 'Inventory Calendar'], ['damages', 'supplier.damages', 'tool', 'Damage & Compensation'],
-            ['Money'], ['payments', 'supplier.payments', 'card', 'Payments'], ['payouts', 'supplier.payouts', 'cash', 'Earnings & Payouts'], ['reports', 'supplier.reports', 'chart', 'Business Reports'],
-            ['Shop'], ['reviews', 'supplier.reviews', 'star', 'Customer Reviews', $b['reviews'] ?? 0], ['shop', 'supplier.shop', 'store', 'Shop Profile & Settings'], ['notifications', 'notifications', 'bell', 'Notifications'],
-        ], 'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products'], ['requests', 'supplier.requests', 'list', 'Requests'], ['shop', 'supplier.shop', 'store', 'Profile']]],
+        'supplier' => ['tag' => 'Supplier', 'items' => [
+            ['Overview'], ['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['requests', 'supplier.requests', 'list', 'Rental Requests', $b['requests'] ?? 0, 'orders.view'], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns', 0, 'orders.view'],
+            ['Catalog'], ['products', 'supplier.products', 'box', 'Products', 0, 'products.manage'], ['packages', 'supplier.packages', 'package', 'Packages', 0, 'products.manage'], ['inventory', 'supplier.inventory', 'layers', 'Inventory', 0, 'inventory.manage'], ['locations', 'supplier.locations', 'map', 'Inventory Locations', 0, 'locations.manage'], ['calendar', 'supplier.calendar', 'calendar', 'Inventory Calendar', 0, 'orders.view'],
+            ['Money & reports'], ['payments', 'supplier.payments', 'card', 'Payments', $b['payments'] ?? 0, 'payments.view'], ['damages', 'supplier.damages', 'tool', 'Damage & Compensation', 0, 'returns.inspect'], ['reports', 'supplier.reports', 'bars', 'Business Reports', 0, 'reports.view'],
+            ['Shop'], ['shop', 'supplier.shop', 'store', 'Shop Profile & Settings', 0, 'shop.manage'], ['team', 'supplier.team', 'users', 'Team & Roles', 0, 'team.manage'], ['notifications', 'notifications', 'bell', 'Notifications'],
+        ], 'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products', 'products.manage'], ['requests', 'supplier.requests', 'list', 'Requests', 'orders.view'], ['payments', 'supplier.payments', 'card', 'Payments', 'payments.view']]],
         'cashier' => ['tag' => 'Cashier', 'items' => [
             ['Payments'], ['dashboard', 'cashier.dashboard', 'grid', 'Dashboard'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0], ['record', 'cashier.record', 'cash', 'Record Payment'], ['balances', 'cashier.balances', 'clock', 'Installments & Overdue'],
-            ['Records'], ['history', 'cashier.history', 'list', 'Payment History & Receipts'], ['reports', 'cashier.reports', 'chart', 'Financial Reports', 0, 'reports.view'], ['notifications', 'notifications', 'bell', 'Notifications'],
+            ['Records'], ['history', 'cashier.history', 'list', 'Payment History'], ['receipts', 'cashier.receipts', 'receipt', 'Receipts'], ['reports', 'cashier.reports', 'bars', 'Financial Reports'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'cashier.dashboard', 'grid', 'Home'], ['verification', 'cashier.verification', 'check', 'Verify'], ['record', 'cashier.record', 'cash', 'Record'], ['history', 'cashier.history', 'list', 'History']]],
         'admin' => ['tag' => 'Admin', 'items' => [
-            ['Operations'], ['dashboard', 'admin.dashboard', 'grid', 'Dashboard'], ['users', 'admin.users', 'users', 'Customers & Rental Partners'], ['applications', 'admin.applications', 'file', 'Rental Partner Applications', $b['applications'] ?? 0, 'applications.review'],
-            ['Catalog'], ['listings', 'admin.listings', 'box', 'Listings', 0, 'listings.view'], ['categories', 'admin.categories', 'tag', 'Categories', 0, 'categories.manage'],
-            ['Monitoring'], ['transactions', 'admin.transactions', 'activity', 'Transactions & Reservations', 0, 'transactions.view'], ['payouts', 'admin.payouts', 'cash', 'Rental Partner Payouts', $b['payouts'] ?? 0, 'payouts.manage'], ['complaints', 'admin.complaints', 'flag', 'Complaints', $b['complaints'] ?? 0, 'complaints.manage'], ['reviews', 'admin.reviews', 'star', 'Review Moderation', $b['reviews'] ?? 0, 'complaints.manage'], ['reports', 'admin.reports', 'chart', 'Reports', 0, 'reports.view'], ['audit', 'admin.audit', 'clock', 'Activity Log'], ['notifications', 'notifications', 'bell', 'Notifications'],
+            ['Operations'], ['dashboard', 'admin.dashboard', 'grid', 'Dashboard'], ['users', 'admin.users', 'users', 'Customers & Suppliers'], ['applications', 'admin.applications', 'file', 'Supplier Applications', $b['applications'] ?? 0], ['listings', 'admin.listings', 'box', 'Listings & Packages'], ['categories', 'admin.categories', 'tag', 'Categories'],
+            ['Monitoring'], ['transactions', 'admin.transactions', 'activity', 'Transactions & Reservations'], ['complaints', 'admin.complaints', 'flag', 'Complaints & Issues', $b['complaints'] ?? 0], ['activity', 'admin.activity', 'clock', 'Activity Log'], ['reports', 'admin.reports', 'bars', 'Reports'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'admin.dashboard', 'grid', 'Home'], ['users', 'admin.users', 'users', 'Users'], ['applications', 'admin.applications', 'file', 'Apps'], ['transactions', 'admin.transactions', 'activity', 'Rentals']]],
+        'superadmin' => ['tag' => 'Superadmin', 'items' => [
+            ['Platform'], ['dashboard', 'super.dashboard', 'grid', 'Dashboard'], ['monitoring', 'super.monitoring', 'activity', 'Platform Monitoring'], ['users', 'super.users', 'users', 'Platform Users'], ['reports', 'super.reports', 'bars', 'Platform Reports'],
+            ['Access control'], ['admins', 'super.admins', 'shield', 'Administrators'], ['roles', 'super.roles', 'lock', 'Roles & Permissions'],
+            ['System'], ['audit', 'super.audit', 'file', 'Audit Logs'], ['settings', 'super.settings', 'settings', 'System Settings'], ['notifications', 'notifications', 'bell', 'Notifications'],
+        ], 'bottom' => [['dashboard', 'super.dashboard', 'grid', 'Home'], ['monitoring', 'super.monitoring', 'activity', 'Monitor'], ['admins', 'super.admins', 'shield', 'Admins'], ['audit', 'super.audit', 'file', 'Audit']]],
     ];
-    $NAV['superadmin'] = ['tag' => 'Superadmin', 'items' => [
-        ['Platform'], ['dashboard', 'super.dashboard', 'grid', 'Dashboard'], ['monitoring', 'super.monitoring', 'activity', 'Platform Monitoring'], ['platform-users', 'super.users', 'users', 'Platform Users'], ['reports', 'admin.reports', 'bars', 'Platform Reports'],
-        ['Operations'], ['applications', 'admin.applications', 'file', 'Rental Partner Applications', $b['applications'] ?? 0], ['listings', 'admin.listings', 'box', 'Listings'], ['categories', 'admin.categories', 'tag', 'Categories'], ['transactions', 'admin.transactions', 'list', 'Transactions & Reservations'], ['complaints', 'admin.complaints', 'flag', 'Complaints', $b['complaints'] ?? 0], ['reviews', 'admin.reviews', 'star', 'Review Moderation', $b['reviews'] ?? 0],
-        ['Payments'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0], ['cash-history', 'cashier.history', 'list', 'Payment History'], ['payouts', 'admin.payouts', 'cash', 'Rental Partner Payouts', $b['payouts'] ?? 0], ['pay-accounts', 'super.pay-accounts', 'card', 'Payment Accounts'],
-        ['Access control'], ['admins', 'super.admins', 'shield', 'Administrators'], ['roles', 'super.roles', 'lock', 'Roles & Permissions'],
-        ['System'], ['audit', 'admin.audit', 'file', 'Audit Logs'], ['settings', 'super.settings', 'settings', 'System Settings'], ['notifications', 'notifications', 'bell', 'Notifications'],
-    ], 'bottom' => [['dashboard', 'super.dashboard', 'grid', 'Home'], ['monitoring', 'super.monitoring', 'activity', 'Monitor'], ['admins', 'super.admins', 'shield', 'Admins'], ['audit', 'admin.audit', 'file', 'Audit']]];
     $cfg = $NAV[$role] ?? $NAV['admin'];
-    $sup = $role === 'supplier' ? $shellUser->shop() : null;
-    if ($sup) {
-        // Business owners get a Staff page; staff only see the pages their role can open.
-        if ($sup->isVerifiedBusiness()) {
-            $at = array_search(['Shop'], $cfg['items'], true);
-            array_splice($cfg['items'], $at + 1, 0, [['staff', 'supplier.staff', 'users', 'Staff & Roles']]);
-        }
-        $keep = fn ($it) => count($it) === 1 || $shellUser->canShop($it[1]);
-        $items = array_values(array_filter($cfg['items'], $keep));
-        $cfg['items'] = array_values(array_filter($items, fn ($it, $i) => count($it) > 1 || (isset($items[$i + 1]) && count($items[$i + 1]) > 1), ARRAY_FILTER_USE_BOTH));
-        $cfg['bottom'] = array_values(array_filter($cfg['bottom'], fn ($it) => $shellUser->canShop($it[1])));
+    $sup = in_array($role, ['supplier', 'cashier'], true) ? $shellUser->shop() : null;
+    $emp = $shellUser->isEmployee();
+    // Supplier employees only see the sections their organization role allows; a group label shows only before a visible item.
+    $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && ($role !== 'supplier' || empty($it[5]) || $shellUser->orgCan($it[5]));
+    $items = [];
+    $label = null;
+    foreach ($cfg['items'] as $it) {
+        if (count($it) === 1) { $label = $it; continue; }
+        if (! $allowed($it)) { continue; }
+        if ($label) { $items[] = $label; $label = null; }
+        $items[] = $it;
     }
+    $bottom = array_filter($cfg['bottom'], fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && ($role !== 'supplier' || empty($it[4]) || $shellUser->orgCan($it[4])));
+    $tag = $role === 'supplier' && $emp ? (\App\Models\ShopStaff::ORG_ROLES[$shellUser->orgRole()] ?? 'Staff') : ($role === 'supplier' && $sup && $sup->type === 'organization' ? 'Org Admin' : $cfg['tag']);
     $nav = $nav ?? '';
 @endphp
 
 @section('body')
 <div class="dash">
   <aside class="side" id="side">
-    @include('partials.brand', ['tag' => $cfg['tag']])
+    @include('partials.brand', ['tag' => $tag])
     @if($sup)
-      <div style="display:flex;gap:10px;align-items:center;padding:0 8px 12px"><div class="logo-tile" style="width:40px;height:40px;font-size:1.3rem;background:rgba(255,255,255,.1)">{{ $sup->logo }}</div><div class="small" style="color:#fff;font-weight:700;line-height:1.25">{{ $sup->name }}<div style="color:#8E83A8;font-weight:500">{{ $sup->city }}</div></div></div>
-      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="customer"><button class="mode-switch">{{ icon('swap') }}Switch to Customer Mode</button></form>
+      <div style="display:flex;gap:10px;align-items:center;padding:0 8px 12px"><div class="logo-tile" style="width:40px;height:40px;font-size:1.3rem;background:rgba(255,255,255,.1)">{{ $sup->logo }}</div><div class="small" style="color:#fff;font-weight:700;line-height:1.25">{{ $sup->name }}<div style="color:#8E83A8;font-weight:500">{{ $sup->city }}{{ $sup->type === 'organization' ? ' · Organization' : '' }}</div></div></div>
+      @unless($emp)<form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="customer"><button class="mode-switch">{{ icon('swap') }}Switch to Customer Mode</button></form>@endunless
     @endif
-    @foreach($cfg['items'] as $it)
-      @continue(! empty($it[5]) && ! $shellUser->hasPerm($it[5]))
+    @foreach($items as $it)
       @if(count($it) === 1)
         <div class="nav-label">{{ $it[0] }}</div>
       @else
@@ -70,7 +69,7 @@
   </div>
 </div>
 <nav class="bottom-nav">
-  @foreach($cfg['bottom'] as [$k, $r, $ic, $l])<a href="{{ route($r) }}" class="{{ $nav === $k ? 'active' : '' }}">{{ icon($ic) }}{{ $l }}</a>@endforeach
+  @foreach($bottom as $it)<a href="{{ route($it[1]) }}" class="{{ $nav === $it[0] ? 'active' : '' }}">{{ icon($it[2]) }}{{ $it[3] }}</a>@endforeach
   <button type="button" data-side-open>{{ icon('menu') }}More</button>
 </nav>
 @endsection

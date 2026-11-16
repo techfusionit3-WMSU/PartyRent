@@ -31,7 +31,7 @@ class AdminController extends Controller
         return view('admin.dashboard', [
             'users' => User::count(), 'customers' => User::whereJsonContains('roles', 'customer')->count(),
             'suppliers' => Supplier::approved()->count(), 'pendingApps' => Supplier::where('status', 'pending')->count(),
-            'listings' => Product::where('status', 'published')->count(),
+            'listings' => Product::where('status', 'active')->count(),
             'active' => $reqs->filter->isActive()->count(), 'pending' => $reqs->where('status', 'pending')->count(),
             'completed' => $reqs->where('status', 'completed')->count(),
             'overdue' => $reqs->filter(fn ($r) => $r->isActive() && $r->fin()['isOverdue'])->count(),
@@ -122,9 +122,9 @@ class AdminController extends Controller
         if ($view === 'packages') {
             $list = \App\Models\Package::with('supplier')->when($q, fn ($x) => $x->where('name', 'like', "%$q%"))->latest()->paginate(30)->withQueryString();
         } else {
-            $list = Product::with(['supplier', 'category'])->where('status', '!=', 'archived')
+            $list = Product::with(['supplier', 'category'])->where('status', '!=', 'deleted')
                 ->when($q, fn ($x) => $x->where(fn ($w) => $w->where('name', 'like', "%$q%")->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', "%$q%"))))
-                ->when(in_array($status, ['published', 'draft', 'hidden'], true), fn ($x) => $x->where('status', $status))
+                ->when(in_array($status, ['active', 'inactive', 'hidden'], true), fn ($x) => $x->where('status', $status))
                 ->orderBy('name')->paginate(30)->withQueryString();
         }
 
@@ -134,7 +134,7 @@ class AdminController extends Controller
     public function listingStatus(Request $request, Product $product)
     {
         $this->need($request, 'listings.manage');
-        $data = $request->validate(['status' => 'required|in:published,hidden', 'reason' => 'nullable|string|max:255']);
+        $data = $request->validate(['status' => 'required|in:active,hidden', 'reason' => 'nullable|string|max:255']);
         $product->update(['status' => $data['status']]);
         $hidden = $data['status'] === 'hidden';
         $data['reason'] ??= null;

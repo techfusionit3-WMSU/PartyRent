@@ -56,7 +56,7 @@ class EnsureRole
         if (! str_starts_with($name, 'supplier.') || $request->user()->canShop($name)) {
             return $next($request);
         }
-        $msg = 'Your role ('.\App\Models\ShopStaff::ROLES[$request->user()->shopRole()][0].') cannot open that page. Ask the shop owner.';
+        $msg = 'Your role ('.(\App\Models\ShopStaff::ORG_ROLES[$request->user()->orgRole()] ?? 'none').') cannot open that page. Ask your Organization Admin.';
         if ($request->expectsJson()) {
             abort(403, $msg);
         }

@@ -53,9 +53,9 @@ from the first row that is not `verified`.
 ## Supplier & organization staff
 | Page / flow | Laravel today | Status | Note |
 |---|---|---|---|
-| dashboard (charts, upcoming schedule) | E (simplified 11-12) | todo | |
+| dashboard (charts, upcoming schedule) | E (simplified 11-12) | done | reference stats + 5 charts (public/js/charts.js port, partials/chart) + upcoming; 1440 identical |
 | requests (6 tabs) | E | todo | |
-| request (availability date+time, allocation, schedule approve/reject, accept, release, inspect, settle) | E | in progress | 390+1440 match for pending view; inspection still old damage model |
+| request (availability date+time, allocation, schedule approve/reject, accept, release, inspect, settle) | E | in progress | 390+1440 match for pending view; v4 inspection (damage policy) done |
 | schedule (next 14 days) | E | todo | |
 | products | E | todo | |
 | product-form | E | todo | |
@@ -63,8 +63,8 @@ from the first row that is not `verified`.
 | inventory (stock, holds, damaged/missing) | E | todo | |
 | locations (stock by location, transfers, movement log) | M | todo | |
 | calendar | E | todo | |
-| payments | E | done | 1440 compared: reference type/method labels, Details button, My Rentals nav |
-| damages (+ damage policy) | E | todo | |
+| payments | E | todo | |
+| damages (+ damage policy) | E | in progress | page per SP.damages done; Damage policy tab in shop settings pending |
 | reports (8 reports, CSV) | E | todo | |
 | shop (zones, services, damage policy, payment plans, rental hours) | P | todo | |
 | team (Org Admin, Cashier, Inventory Staff, Staff) | P (`staff`) | done | TeamRolesTest 6 green; screenshot pending |
@@ -115,7 +115,7 @@ from the first row that is not `verified`.
 | Customer header, cat-strip, footer, floating bottom nav with AI fab | todo | |
 | Notifications, activity log, audit log | todo | |
 | AI module EN + Filipino, guardrails (no accept/cancel/reserve/price/verify; real listings only) | todo | |
-| Charts on every dashboard/report | todo | |
+| Charts on every dashboard/report | in progress | charts.js ported (bars/line/donut/hbars via partials.chart); supplier dashboard uses it |
 | 10 demo accounts seeded, password `demo123` | todo | |
 
 ## Business rules (unit tests)

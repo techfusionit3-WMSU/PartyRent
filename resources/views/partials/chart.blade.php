@@ -1,0 +1,2 @@
+{{-- Reference Charts placeholder, drawn by public/js/charts.js. $kind bars|line|donut|hbars, $rows [['label','value'(,'color')]], $opts {money, color, label, center} --}}
+<div data-chart="{{ $kind }}" data-rows="{{ json_encode(array_values(collect($rows)->map(fn ($r) => ['label' => (string) $r['label'], 'value' => (float) $r['value']] + (isset($r['color']) ? ['color' => $r['color']] : []))->all())) }}" data-opts="{{ json_encode((object) ($opts ?? [])) }}"></div>

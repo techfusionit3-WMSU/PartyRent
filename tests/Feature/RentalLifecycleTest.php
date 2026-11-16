@@ -29,62 +29,65 @@ class RentalLifecycleTest extends TestCase
     {
         $maria = $this->user('maria@demo.ph');
         $juan = $this->user('juan@demo.ph');
-        $cashier = $this->user('cashier@partyrent.ph');
         $shop = Supplier::where('owner_id', $juan->id)->first();
         $table = Product::where('supplier_id', $shop->id)->where('name', 'like', 'Rectangular%')->first(); // 15 in stock, ₱180/day
         $d1 = add_days(today_iso(), 20);
         $d2 = add_days(today_iso(), 21);
+        $free1 = inv()->availableOn($table->id, $d1);
+        $free2 = inv()->availableOn($table->id, $d2);
 
-        // 1. customer adds 4 tables on day 1 and 6 on day 2, then checks out (full payment, pickup)
+        // 1. customer adds 4 tables on day 1 and 6 on day 2, then checks out once (v4: POST /checkout JSON, full payment, pickup)
         CartLine::where('user_id', $maria->id)->delete();
         $this->actingAs($maria)->withSession(['mode' => 'customer'])
             ->post('/cart', ['type' => 'item', 'ref_id' => $table->id, 'days' => json_encode([$d1 => 4, $d2 => 6])])->assertSessionHas('success');
-        $this->post('/checkout/'.$shop->id, [
-            'eventName' => 'Test Party', 'eventType' => 'Birthday', 'eventDate' => $d1, 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'bank', 'agree' => '1',
-        ])->assertRedirect();
+        $ids = CartLine::where('user_id', $maria->id)->pluck('id')->all();
+        $this->postJson('/checkout', [
+            'shared' => ['eventName' => 'Test Party', 'eventType' => 'Birthday', 'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101'],
+            'orders' => [['supplier_id' => $shop->id, 'cart_line_ids' => $ids, 'eventDate' => $d1, 'fulfillment' => 'pickup', 'plan' => 'full', 'method' => 'bank']],
+            'agree' => '1',
+        ])->assertOk()->assertJsonPath('ok', true);
         $r = RentalRequest::where('event_name', 'Test Party')->firstOrFail();
         $this->assertSame('pending', $r->status);
-        $this->assertEquals(1800.0, $r->pricing['total']); // (4 + 6) × 180, no delivery fee
+        $this->assertEquals(1800.0, $r->pricing['rentalFee']); // (4 + 6) × 180
         $this->assertSame(0, CartLine::where('user_id', $maria->id)->count());
-        $this->assertSame(15, inv()->availableOn($table->id, $d2)); // pending requests never consume stock
+        $this->assertSame($free2, inv()->availableOn($table->id, $d2)); // pending requests never consume stock
 
-        // 2. the supplier cannot accept before the first payment (here: the full amount) is verified
-        $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept")->assertSessionHas('error', fn ($e) => str_contains($e, 'verified by the PartyRent cashier'));
-        $this->assertSame('pending', $r->fresh()->status);
-        $this->assertEquals(['amount' => 1800.0, 'type' => 'full', 'label' => 'Full payment'], $r->fresh()->fin()['upfront']);
+        // 2. v4: no payments before the supplier accepts
+        $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 100, 'method' => 'cod'])->assertSessionHas('error');
 
-        // 3. customer pays in full before acceptance by bank transfer (needs proof) → pending until verified
-        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 1800, 'method' => 'bank', 'pay_account' => \App\Models\PayAccount::where('label', 'BDO')->value('id'), 'reference' => 'BDO-1'])
+        // 3. the supplier accepts → stock is reserved per day
+        $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept", ['note' => 'See you!'])->assertSessionHas('success');
+        inv()->flush();
+        $r->refresh();
+        $this->assertSame('accepted', $r->status);
+        $this->assertSame($free1 - 4, inv()->availableOn($table->id, $d1));
+        $this->assertSame($free2 - 6, inv()->availableOn($table->id, $d2));
+        $total = (float) $r->fin()['total'];
+
+        // 4. customer pays in full by bank transfer (needs proof) → pending until the shop's cashier verifies
+        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => $total, 'method' => 'bank', 'pay_account' => \App\Models\PayAccount::where('label', 'BDO')->value('id'), 'reference' => 'BDO-1'])
             ->assertSessionHas('warn'); // proof missing
         // a real 1×1 PNG (the GD extension isn't required)
         $png = tempnam(sys_get_temp_dir(), 'pr').'.png';
         file_put_contents($png, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
         $proof = new \Illuminate\Http\UploadedFile($png, 'receipt.png', 'image/png', null, true);
-        $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 1800, 'method' => 'bank', 'pay_account' => \App\Models\PayAccount::where('label', 'BDO')->value('id'), 'reference' => 'BDO-1', 'proof' => $proof])
+        $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => $total, 'method' => 'bank', 'pay_account' => \App\Models\PayAccount::where('label', 'BDO')->value('id'), 'reference' => 'BDO-1', 'proof' => $proof])
             ->assertSessionHas('success');
         $pay = Payment::where('rental_request_id', $r->id)->where('type', 'full')->firstOrFail();
         $this->assertSame('pending', $pay->status);
-        $this->assertSame('Pending Verification', $r->fresh()->fin()['status']);
+        $this->assertSame('Pending', $r->fresh()->fin()['status']); // v4: unverified payments don't count yet
+        $this->assertEquals($total, $r->fresh()->fin()['pendingRental']);
         // overpaying is refused
         $this->post("/rentals/{$r->code}/payments", ['type' => 'balance', 'amount' => 50, 'method' => 'cod'])->assertSessionHas('error');
 
-        // 4. cashier verifies → receipt issued, fully paid
+        // 5. the shop's cashier verifies → receipt issued, fully paid
+        $cashier = $this->shopCashier($r->code);
         $this->actingAs($cashier)->withSession(['mode' => 'cashier'])->post("/cashier/payments/{$pay->code}/verify")->assertSessionHas('success');
         $pay->refresh();
         $this->assertSame('verified', $pay->status);
         $this->assertNotNull($pay->receipt_no);
         $this->assertSame('Fully Paid', $r->fresh()->fin()['status']);
-
-        $this->actingAs($cashier)->withSession(['mode' => 'cashier'])->post('/cashier/record', ['request' => $r->code, 'type' => 'deposit', 'method' => 'cash', 'amount' => 100, 'date' => today_iso(), 'reference' => 'OR-EARLY'])
-            ->assertSessionHas('error'); // the deposit comes after acceptance
-
-        // 5. now the supplier accepts → stock is reserved per day
-        $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept", ['note' => 'See you!'])->assertSessionHas('success');
-        inv()->flush();
-        $this->assertSame('accepted', $r->fresh()->status);
-        $this->assertSame(11, inv()->availableOn($table->id, $d1));
-        $this->assertSame(9, inv()->availableOn($table->id, $d2));
+        $this->actingAs($juan)->withSession(['mode' => 'supplier']);
 
         // stock can no longer be reduced below what's reserved
         $this->put("/supplier/products/{$table->id}", ['name' => $table->name, 'category_id' => $table->category_id, 'description' => $table->description, 'total_stock' => 3, 'unit' => $table->unit, 'condition' => 'Good', 'status' => 'active', 'tiers' => $table->tiers])
@@ -140,7 +143,14 @@ class RentalLifecycleTest extends TestCase
 
     public function test_accept_is_blocked_when_stock_is_short(): void
     {
-        // PR-0003 asks for 40 chairs on a day where only 13 are free (seed data).
+        // v4 availability is time-aware. Seeded PR-0003 (40 chairs, 13:00–18:00) fits after PR-0002's morning
+        // package (50 chairs, 06:00–11:00 + 1 h recovery), so accepting it would work…
+        $r = RentalRequest::where('code', 'PR-0003')->firstOrFail();
+        $this->assertTrue(inv()->check($r->lines, $r->id)['ok']);
+        // …but moved to 10:00–15:00 it overlaps the package and PR-0001: only 13 chairs are free then.
+        $r->update(['lines' => array_map(fn ($l) => array_merge($l, ['time' => ['start' => '10:00', 'end' => '15:00']]), $r->lines)]);
+        \App\Domain\BookingDays::sync($r->fresh());
+        inv()->flush();
         $juan = $this->user('juan@demo.ph');
         $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post('/supplier/requests/PR-0003/accept')->assertSessionHas('error');
         $this->assertSame('pending', RentalRequest::where('code', 'PR-0003')->value('status'));

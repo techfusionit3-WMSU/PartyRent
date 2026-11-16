@@ -23,7 +23,7 @@ class Finance
 
     public const TYPE_LABEL = [
         'reservation' => 'Reservation Fee', 'down' => 'Down Payment', 'installment' => 'Installment', 'balance' => 'Final Balance',
-        'full' => 'Full Payment', 'deposit' => 'Security Deposit', 'deposit_refund' => 'Deposit Refund', 'refund' => 'Refund',
+        'full' => 'Full Payment', 'deposit' => 'Security Deposit', 'deposit_refund' => 'Deposit Refund', 'refund' => 'Rental Refund',
         'compensation' => 'Damage Compensation',
     ];
 

@@ -1,13 +1,15 @@
 {{-- Package contents + customer choices. $def (Packages::def), $pp (Packages::price), $interactive (bool) --}}
 @php($sel = $pp['sel'])
+{{-- A plain package (only included items, no options or guests) uses the reference layout. --}}
+@php($simple = ! array_filter($pp['rows'], fn ($r) => $r['group'] !== 'included') && ! collect($def['components'])->contains(fn ($c) => in_array($c['kind'], ['choice', 'addon'], true)) && empty($def['minGuests']) && empty($def['maxGuests']))
 @php($kindBadge = ['sale' => '<span class="badge b-purple plain">Consumable</span>', 'service' => '<span class="badge b-gold plain">Service</span>', 'rent' => ''])
 <div class="pkg-contents" data-pkg-contents>
   <div class="pkg-sec">
-    <div class="strong">Included</div>
+    @unless($simple)<div class="strong">Included</div>@endunless
     @foreach(array_filter($pp['rows'], fn ($r) => $r['group'] === 'included') as $r)
       <div class="row pkg-row">
         @if(isset($r['productId']) && ($ip = inv()->product($r['productId'])))@include('partials.thumb', ['item' => $ip, 'cls' => 'sm'])@endif
-        <div class="grow">{{ $r['name'] }} {!! $kindBadge[$r['kind']] ?? '' !!}@if(! empty($r['perGuest']))<div class="small muted">{{ rtrim(rtrim(number_format($r['perGuest'], 2), '0'), '.') }} per guest</div>@endif</div>
+        <div class="grow">@if($simple && isset($r['productId']))<a href="{{ route('products.show', $r['productId']) }}">{{ $r['name'] }}</a>@else{{ $r['name'] }}@endif {!! $kindBadge[$r['kind']] ?? '' !!}@if(! empty($r['perGuest']))<div class="small muted">{{ rtrim(rtrim(number_format($r['perGuest'], 2), '0'), '.') }} per guest</div>@endif</div>
         <b>× {{ $r['qty'] }}</b>
       </div>
     @endforeach
@@ -56,7 +58,7 @@
     </div>
   @endif
 
-  <div class="pkg-sec pkg-total">
+  <div class="pkg-sec pkg-total" @if($simple) hidden @endif>
     <div class="row between"><span>Package price</span><b class="price" data-pkg-price>{{ money($pp['package']) }}</b></div>
     @if($pp['perDay'] > 0 && $pp['once'] > 0)<div class="small muted" data-pkg-split>{{ money($pp['perDay']) }} per day for rentals + {{ money($pp['once']) }} once for consumables & services</div>
     @elseif($pp['once'] > 0)<div class="small muted" data-pkg-split>Charged once (consumables & services)</div>

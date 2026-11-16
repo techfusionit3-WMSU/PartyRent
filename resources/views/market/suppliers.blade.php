@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="page-head"><div><h1>Party suppliers</h1><p>Verified local rental shops on PartyRent.</p></div>
-  <form class="row wrap" method="GET"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search suppliers or city" style="width:220px" aria-label="Search suppliers"><select class="input input-sm" name="f" style="width:auto" aria-label="Fulfillment" data-autosubmit><option value="">All fulfillment</option><option value="delivery" @selected($f === 'delivery')>Offers delivery</option><option value="pickup" @selected($f === 'pickup')>Offers pickup</option></select><button class="btn btn-sm">Search</button></form>
+  <form class="row wrap" method="GET"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search suppliers or city" style="width:220px" aria-label="Search suppliers"><select class="input input-sm" name="f" style="width:auto" aria-label="Fulfillment" data-autosubmit><option value="">All fulfillment</option><option value="delivery" @selected($f === 'delivery')>Offers delivery</option><option value="pickup" @selected($f === 'pickup')>Offers pickup</option></select></form>
 </div>
 <div class="grid grid-2">
   @forelse($list as $s)

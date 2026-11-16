@@ -9,12 +9,12 @@ class Payment extends Model
 {
     public const TYPE_LABEL = [
         'reservation' => 'Reservation Fee', 'down' => 'Down Payment', 'installment' => 'Installment',
-        'balance' => 'Remaining Balance', 'full' => 'Full Payment', 'deposit' => 'Security Deposit',
+        'balance' => 'Final Balance', 'full' => 'Full Payment', 'deposit' => 'Security Deposit',
         'deposit_refund' => 'Deposit Refund', 'compensation' => 'Damage Compensation', 'refund' => 'Rental Refund',
     ];
 
     public const METHOD_LABEL = [
-        'cod' => 'Cash on Delivery', 'cash' => 'Cash (Over the Counter)', 'bank' => 'Bank Transfer / GCash / Maya', 'debit' => 'Debit Card',
+        'cod' => 'Cash on Delivery', 'cash' => 'Cash (Over the Counter)', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit Card',
         'online' => 'Online (GCash, Maya, card)',
     ];
 

@@ -41,7 +41,11 @@ NEXT, in order:
    map + directions moved to the Policies tab "Location" card).
    Open follow-ups: skipped `PayoutsTest::test_shop_cashier_sees_only_their_shop` (scope cashier pages per shop in
    step 3); hourly item over several dates still priced per-day with the one-day window; `Hours::error` unused.
-3. Remaining customer pages: product (C3 TikTok-style later), packages, package, suppliers, ai, rentals, payments,
+3. IN PROGRESS (2026-11-16 late): customer pages compared at 1440 with the rig (see below). Done: rentals, payments,
+   profile, suppliers, packages, package; product partly (C3 pending). Left: ai, start-selling, then supplier,
+   cashier, admin, superadmin pages. Rig now: scratchpad `drv/shot.js <name> <refPath> <appPath> [email] [--full]
+   [--mode=supplier]` (run with MSYS_NO_PATHCONV=1), `static.js` serves reference on :8080, `env.sh` = SQLite env.
+   Was: Remaining customer pages: product (C3 TikTok-style later), packages, package, suppliers, ai, rentals, payments,
    profile, start-selling (Individual/Organization wizard). Then supplier, cashier, admin, superadmin pages.
 4. Change list still open: C1 done, C3, C7–C13.
 Screenshot rig: scratchpad (session-specific, may be gone) had `drv/shot.js` (playwright-core 1.48.2 + msedge;

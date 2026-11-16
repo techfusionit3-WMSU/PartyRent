@@ -33,18 +33,18 @@ from the first row that is not `verified`.
 |---|---|---|---|
 | browse (sort tabs, compare bar) | E | todo | |
 | ai (interpret → checklist → packages) | E | todo | |
-| suppliers | E | todo | |
+| suppliers | E | done | 1440 compared; seeded ratings shown; live search button removed |
 | supplier shop (payment plans, policies) | E | done | ported from C.supplier; screenshot pending |
-| product (availability calendar, rental charges estimate) | E | todo | |
-| packages | E | todo | |
-| package | E | todo | |
+| product (availability calendar, rental charges estimate) | E | in progress | 1440 compared: time selects + duration (partials/rent-times), duration badge, condition label, supplier rows; C3 redesign + Rental Charges block pending |
+| packages | E | done | 1440 identical |
+| package | E | done | 1440 compared: Included items (plain packages), time selects; app reviews kept |
 | cart / Rental List (grouped by shop, select-all/shop/item) | P | done | 1440 side-by-side matches (c143a1e); 390 to recheck |
 | checkout (one request per supplier, locations, split qty, services, plan, installments) | P (per supplier) | done | 1440 compared; e2e: 3 shops → PR-0014..16; C5/C6 applied |
 | confirmation (multi-request) | E | done | reached in e2e run |
-| rentals (tabs) | E | todo | |
+| rentals (tabs) | E | done | 390/1440 identical |
 | rental (daily qty, payments, installment schedule, propose schedule, cancel, review) | E | in progress | plan/locations/installments ported; screenshot pending |
-| payments | E | todo | |
-| profile | E | todo | |
+| payments | E | done | 1440 compared: reference type/method labels, Details button, My Rentals nav |
+| profile | E | done | 1440 compared; app PH address picker kept |
 | start-selling (Individual / Organization wizard, documents, revision) | P (Personal/Business) | todo | |
 | Post-login "Select Rental Dates / I'm Just Browsing" prompt | M | todo | |
 | Persistent rental period bar `12/12/2026 - 12/15/2026 \| 4 Days` | P | todo | |
@@ -63,7 +63,7 @@ from the first row that is not `verified`.
 | inventory (stock, holds, damaged/missing) | E | todo | |
 | locations (stock by location, transfers, movement log) | M | todo | |
 | calendar | E | todo | |
-| payments | E | todo | |
+| payments | E | done | 1440 compared: reference type/method labels, Details button, My Rentals nav |
 | damages (+ damage policy) | E | todo | |
 | reports (8 reports, CSV) | E | todo | |
 | shop (zones, services, damage policy, payment plans, rental hours) | P | todo | |

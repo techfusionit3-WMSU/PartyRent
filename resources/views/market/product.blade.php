@@ -10,11 +10,12 @@
   </div>
 
   <div @unless($p->isHourly()) data-rentbox @endunless data-type="item" data-max-days="{{ setting('maxRentalDays', 30) }}">
-    <span class="badge b-purple plain">{{ $cat->name }}</span> <span class="badge b-gray plain">Condition: {{ $p->condition }}</span>
+    <span class="badge b-purple plain">{{ $cat->name }}</span> <span class="badge b-gray plain">Condition: {{ \App\Domain\Damage::conditionLabel($p->condition) }}</span>
     <h1 class="mt-1">{{ $p->name }}</h1>
     <div class="row wrap small muted">@if($reviews->count())<span class="stars">{{ stars($p->rating) }}</span><a href="#reviews">{{ number_format($p->rating, 1) }} · {{ $reviews->count() }} {{ $reviews->count() === 1 ? 'review' : 'reviews' }}</a>@else<span>No reviews yet</span>@endif<span>· {{ $p->rent_count }} rentals</span></div>
     <div class="mt-2"><span class="price-lg">{{ money($p->basePrice()) }}</span> <span class="muted">/ {{ $p->unit }}</span></div>
-    @if(! $p->isSale() && $p->replacement_value)<div class="small muted mt-1">{{ icon('info') }} Replacement value: <b>{{ money($p->replacement_value) }}</b> per piece. This is the most you would pay if one is lost or destroyed.</div>@endif
+    @if(! $p->isSale())<div class="mt-1"><span class="badge {{ $p->max_rental_days ? 'b-purple' : 'b-gray' }} plain">{{ icon('clock', 'width:13px;height:13px') }} {{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '') : 'No Rental Duration Limit' }}</span></div>@endif
+    @if(! $p->isSale() && $p->replacement_value)<div class="small muted mt-1">{{ icon('info', 'width:14px;height:14px;vertical-align:-2px') }} Replacement value: <b>{{ money($p->replacement_value) }}</b> per piece. This is the most you would pay if one is lost or destroyed.</div>@endif
     @if(count($p->tiers) > 1)
       <div class="mt-1"><div class="small strong mb-1">Quantity-based pricing ({{ $p->isHourly() ? 'per hour' : 'per day' }})</div><div class="tiers">
         @foreach(\App\Domain\Pricing::sortedTiers($p) as $t)<div class="tier" data-tier data-min="{{ $t['min'] }}" data-max="{{ $t['max'] }}"><b>{{ money($t['price']) }}</b>{{ $t['min'] }}{{ $t['max'] ? '–'.$t['max'] : '+' }} pcs</div>@endforeach
@@ -86,7 +87,13 @@
     <form class="card soft" method="POST" action="{{ route('cart.add') }}">
       @csrf
       <input type="hidden" name="type" value="item"><input type="hidden" name="ref_id" value="{{ $p->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}">
-      <div class="form-grid"><div class="field"><label for="ps">Start date</label><input class="input" type="date" id="ps" min="{{ today_iso() }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input class="input" type="date" id="pe" min="{{ today_iso() }}" value="{{ $end }}"></div></div>
+      <div class="form-grid"><div class="field"><label for="ps">Start date</label><input class="input" type="date" id="ps" min="{{ today_iso() }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input class="input" type="date" id="pe" min="{{ today_iso() }}" value="{{ $end }}"></div>
+        @if(! $p->isSale())@include('partials.rent-times', ['sup' => $sup, 'item' => $p, 'part' => 'selects'])@endif
+      </div>
+      @if(! $p->isSale())
+        @include('partials.rent-times', ['sup' => $sup, 'item' => $p, 'part' => 'line'])
+        @if($p->max_rental_days)<div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">The supplier allows a maximum of <b>{{ $p->max_rental_days }} day{{ $p->max_rental_days > 1 ? 's' : '' }}</b> per booking for this item.</div></div>@endif
+      @endif
       <div class="row wrap between">
         <div><div class="label mb-1">Quantity per day</div><div class="qty" id="qbox"><button type="button" data-d aria-label="Decrease">−</button><input type="number" id="pq" min="1" value="{{ $qty }}" aria-label="Quantity"><button type="button" data-i aria-label="Increase">+</button></div></div>
         <div class="right"><div class="small muted">Stock: {{ $p->total_stock }} total</div><div id="availTxt"></div></div>
@@ -120,9 +127,12 @@
           @endif
         </dd>
         @if($p->handling_fee > 0)<dt>Handling</dt><dd>{{ money($p->handling_fee) }} {{ $p->handling_per === 'unit' ? 'per unit' : 'per order' }} when delivered</dd>@endif
-        <dt>Payment arrangements</dt><dd>{{ collect(\App\Domain\Finance::plansOf($sup))->map(fn ($a) => \App\Domain\Finance::PLAN_LABEL[$a])->implode(', ') }}</dd>
+        <dt>Payment plans</dt><dd>{{ collect(\App\Domain\Finance::plansOf($sup))->map(fn ($a) => \App\Domain\Finance::PLAN_LABEL[$a])->implode(', ') }}</dd>
+        @php($sst = \App\Domain\Slots::settings($sup))
+        <dt>Rental hours</dt><dd>{{ \App\Domain\Slots::fmt12($sst['open']) }} – {{ \App\Domain\Slots::fmt12($sst['close']) }} · {{ +$sst['prepHours'] }}h preparation / {{ +$sst['recoveryHours'] }}h recovery between bookings</dd>
         <dt>Payment methods</dt><dd>{{ collect($sup->methods)->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }}</dd>
         <dt>Security deposit</dt><dd>{{ $sup->depositLabel() }} (refundable)</dd>
+        @if(! $p->isSale())<dt>Rental duration</dt><dd>{{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '').' per booking' : 'No Rental Duration Limit' }}</dd>@endif
         <dt>Cancellation</dt><dd>{{ $sup->pol('cancellation') }}</dd>
         <dt>Returns</dt><dd>{{ $sup->pol('returns') }}</dd>
       </dl>

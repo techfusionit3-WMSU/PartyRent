@@ -18,14 +18,15 @@
     <div><span class="price-lg" data-pkg-headline>{{ money($pp['package']) }}</span> <span class="muted">/ package{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : ' / day' }}</span>@if($pp['savings'] > 0) <span class="badge b-gold">Save {{ money($pp['savings']) }} vs. getting it separately</span>@endif</div>
     @if($lead)<div class="alert alert-info mt-1">{{ icon('info') }}<div>Contains made-to-order items: book at least <b data-pkg-lead>{{ $lead }}</b> day(s) before your event.</div></div>@endif
     <div class="card mt-2 pad-0" data-pkg-config data-package="{{ $k->id }}" data-quote="{{ route('api.package-quote') }}">
-      <div style="padding:14px 16px;border-bottom:1px solid var(--line)" class="strong">What's in the package</div>
+      <div style="padding:14px 16px;border-bottom:1px solid var(--line)" class="strong">{{ ! array_filter($pp['rows'], fn ($r) => $r['group'] !== 'included') && ! collect($def['components'])->contains(fn ($c) => in_array($c['kind'], ['choice', 'addon'], true)) && empty($def['minGuests']) ? 'Included items' : "What's in the package" }}</div>
       @include('market._package-contents', ['def' => $def, 'pp' => $pp, 'interactive' => ! $own])
       @if($k->conditions)<div class="small muted" style="padding:10px 16px;border-top:1px solid var(--line)">{{ $k->conditions }}</div>@endif
     </div>
     <form class="card soft mt-2" method="POST" action="{{ route('cart.add') }}">
       @csrf
       <input type="hidden" name="type" value="package"><input type="hidden" name="ref_id" value="{{ $k->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}"><input type="hidden" name="sel" id="selInput" value="{{ json_encode($pp['sel']) }}">
-      <div class="form-grid"><div class="field"><label for="ps">Start date</label><input type="date" class="input" id="ps" min="{{ add_days(today_iso(), $lead) }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input type="date" class="input" id="pe" min="{{ add_days(today_iso(), $lead) }}" value="{{ $end }}"></div></div>
+      <div class="form-grid"><div class="field"><label for="ps">Start date</label><input type="date" class="input" id="ps" min="{{ add_days(today_iso(), $lead) }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input type="date" class="input" id="pe" min="{{ add_days(today_iso(), $lead) }}" value="{{ $end }}"></div>@include('partials.rent-times', ['sup' => $k->supplier, 'item' => $k, 'part' => 'selects'])</div>
+      @include('partials.rent-times', ['sup' => $k->supplier, 'item' => $k, 'part' => 'line'])
       @if($def['stages'])
         <div class="mb-2" id="stageBox"><div class="label mb-1">Your event schedule</div>
           @foreach($def['stages'] as $i => $st)

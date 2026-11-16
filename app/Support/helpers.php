@@ -182,7 +182,12 @@ if (! function_exists('rating_text')) {
     {
         $n = (int) ($m->review_count ?? 0);
 
-        return $n ? number_format((float) $m->rating, 1).' ('.$n.')' : 'No reviews yet';
+        if ($n) {
+            return number_format((float) $m->rating, 1).' ('.$n.')';
+        }
+
+        // seeded ratings (reference seed) have no review rows behind them yet
+        return (float) ($m->rating ?? 0) > 0 ? number_format((float) $m->rating, 1) : 'No reviews yet';
     }
 }
 

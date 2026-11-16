@@ -34,15 +34,15 @@ from the first row that is not `verified`.
 | browse (sort tabs, compare bar) | E | todo | |
 | ai (interpret → checklist → packages) | E | todo | |
 | suppliers | E | todo | |
-| supplier shop (payment plans, policies) | E | todo | |
+| supplier shop (payment plans, policies) | E | done | ported from C.supplier; screenshot pending |
 | product (availability calendar, rental charges estimate) | E | todo | |
 | packages | E | todo | |
 | package | E | todo | |
-| cart / Rental List (grouped by shop, select-all/shop/item) | P | todo | |
-| checkout (one request per supplier, locations, split qty, services, plan, installments) | P (per supplier) | todo | |
-| confirmation (multi-request) | E | todo | |
+| cart / Rental List (grouped by shop, select-all/shop/item) | P | done | 1440 side-by-side matches (c143a1e); 390 to recheck |
+| checkout (one request per supplier, locations, split qty, services, plan, installments) | P (per supplier) | done | 1440 compared; e2e: 3 shops → PR-0014..16; C5/C6 applied |
+| confirmation (multi-request) | E | done | reached in e2e run |
 | rentals (tabs) | E | todo | |
-| rental (daily qty, payments, installment schedule, propose schedule, cancel, review) | E | todo | |
+| rental (daily qty, payments, installment schedule, propose schedule, cancel, review) | E | in progress | plan/locations/installments ported; screenshot pending |
 | payments | E | todo | |
 | profile | E | todo | |
 | start-selling (Individual / Organization wizard, documents, revision) | P (Personal/Business) | todo | |
@@ -55,7 +55,7 @@ from the first row that is not `verified`.
 |---|---|---|---|
 | dashboard (charts, upcoming schedule) | E (simplified 11-12) | todo | |
 | requests (6 tabs) | E | todo | |
-| request (availability date+time, allocation, schedule approve/reject, accept, release, inspect, settle) | E | todo | |
+| request (availability date+time, allocation, schedule approve/reject, accept, release, inspect, settle) | E | in progress | 390+1440 match for pending view; inspection still old damage model |
 | schedule (next 14 days) | E | todo | |
 | products | E | todo | |
 | product-form | E | todo | |
@@ -67,8 +67,8 @@ from the first row that is not `verified`.
 | damages (+ damage policy) | E | todo | |
 | reports (8 reports, CSV) | E | todo | |
 | shop (zones, services, damage policy, payment plans, rental hours) | P | todo | |
-| team (Org Admin, Cashier, Inventory Staff, Staff) | P (`staff`) | todo | |
-| Org permissions (`Auth.orgCan`) on nav + actions | P (`canShop`) | todo | |
+| team (Org Admin, Cashier, Inventory Staff, Staff) | P (`staff`) | done | TeamRolesTest 6 green; screenshot pending |
+| Org permissions (`Auth.orgCan`) on nav + actions | P (`canShop`) | done | ShopStaff::ORG_PERMS + ROUTE_PERMS, nav filtered |
 | Mode switch customer ⇄ supplier | E | todo | |
 
 ## Cashier

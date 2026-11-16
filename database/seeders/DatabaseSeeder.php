@@ -3,18 +3,16 @@
 namespace Database\Seeders;
 
 /**
- * Clean start: settings, categories, PartyRent payment accounts and the staff accounts
- * (superadmin, admins, cashier). No customers, suppliers, listings or bookings.
- * The full demo data lives in DemoSeeder (used by the tests): php artisan db:seed --class=DemoSeeder
+ * `php artisan migrate:fresh --seed` loads the full demo data from the reference prototype (seed.js v4):
+ * the 10 demo accounts (password demo123), suppliers, listings, bookings and payments.
+ *
+ * For a clean start (settings, categories and the PartyRent admin accounts only) set SEED_DEMO=false.
  */
 class DatabaseSeeder extends DemoSeeder
 {
-    protected bool $staffOnly = true;
-
     public function run(): void
     {
-        $this->settings();
-        $this->categories();
-        $this->users();
+        $this->staffOnly = ! filter_var(env('SEED_DEMO', true), FILTER_VALIDATE_BOOL);
+        parent::run();
     }
 }

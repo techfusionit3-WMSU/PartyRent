@@ -39,6 +39,10 @@ return new class extends Migration
             $table->json('services')->nullable();
             $table->json('damage_policy')->nullable();
         });
+        if (! Schema::hasColumn('suppliers', 'delivery_fee')) {
+            // reference supplier.deliveryFee: the rate for addresses outside the named delivery zones
+            Schema::table('suppliers', fn (Blueprint $t) => $t->decimal('delivery_fee', 10, 2)->default(0));
+        }
 
         Schema::table('products', function (Blueprint $table) {
             $table->unsignedInteger('written_off')->default(0);
@@ -100,6 +104,11 @@ return new class extends Migration
             $table->json('installment_plan')->nullable();
             $table->json('destinations')->nullable();
             $table->json('services')->nullable();
+            $table->json('allocation')->nullable(); // {status: proposed|approved, at, by}
+        });
+
+        Schema::table('cart_lines', function (Blueprint $table) {
+            $table->boolean('selected')->default(true);
         });
 
         Schema::create('booking_days', function (Blueprint $table) {
@@ -150,7 +159,8 @@ return new class extends Migration
         Schema::table('audit_logs', fn (Blueprint $t) => $t->dropColumn('kind'));
         Schema::dropIfExists('booking_days');
         Schema::table('rental_requests', fn (Blueprint $t) => $t->dropIndex(['order_group']));
-        Schema::table('rental_requests', fn (Blueprint $t) => $t->dropColumn(['order_group', 'plan', 'installment_plan', 'destinations', 'services']));
+        Schema::table('rental_requests', fn (Blueprint $t) => $t->dropColumn(['order_group', 'plan', 'installment_plan', 'destinations', 'services', 'allocation']));
+        Schema::table('cart_lines', fn (Blueprint $t) => $t->dropColumn('selected'));
         Schema::table('stock_movements', function (Blueprint $t) {
             $t->dropConstrainedForeignId('inventory_location_id');
         });

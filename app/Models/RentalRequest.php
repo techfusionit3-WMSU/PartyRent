@@ -34,7 +34,7 @@ class RentalRequest extends Model
         return [
             'lines' => 'array',
             'pricing' => 'array',
-            'installment_plan' => 'array', 'destinations' => 'array', 'services' => 'array',
+            'installment_plan' => 'array', 'destinations' => 'array', 'services' => 'array', 'allocation' => 'array',
             'address_parts' => 'array',
             'fulfillment_log' => 'array',
             'inspection' => 'array',

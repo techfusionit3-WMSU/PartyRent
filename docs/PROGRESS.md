@@ -20,6 +20,27 @@ Decisions:
 8. `reference/` folder: decide later (untracked for now).
 The UI/UX batch below = the port's change list (section 6); it is applied AFTER the port.
 
+Port status (update every commit):
+- [x] S1 audit · [x] S2 CSS 3-way merge + eyeOff (58c1d35)
+- [~] S3 schema: migration `2026_11_16_000100_port_v4` done; org roles (`ShopStaff::ORG_PERMS`, `User::orgRole/orgCan/
+  isEmployee`), Team page, reference NAV, profile menu done (1e19ecb). Listing status now active|hidden|inactive|deleted.
+  TODO: DemoSeeder → seed.js v4 (drop s7–s10 Visayas/Mindanao demo shops, add Aquino Events Corp. pending org,
+  Grace=cashier@elegantoccasion.ph, Rico inventory, Joy staff, locations + stock split, plans/hours/zones/services,
+  wedding PR-0008 two venues, payments per seed.js). Needs S4 Pricing/Finance first (seeder snapshots pricing).
+- [x] S3 seed: DemoSeeder = seed.js v4 (7 suppliers, s4 org with Grace cashier / Rico inventory / Joy staff,
+  locations + stock split, PR-0008 two venues + approved installments, payments from schedule stages).
+  DatabaseSeeder now seeds the full demo (SEED_DEMO=false → staff only). `BookingDays::sync()` fills booking_days.
+- [~] S4 logic DONE: Slots, Inventory (time windows, locations, written_off), Pricing::quoteOrder (zones per
+  destination, services; change-list visit rule), Finance (3 plans), Payouts (service fee → platform).
+  `tests/Unit/BusinessRulesTest` 12 green. TODO still: listing moderation service, durationIssues, lockForUpdate
+  re-checks (add-to-cart / submit / accept) using booking_days.
+- [ ] S5 pages. Feature tests are RED (103) because controllers/views still use the old finance/pricing keys
+  (`upfront`, `arrangement`, `downRequired`, `delivery['ok']`, Shopee delivery). Fix page by page while porting;
+  delete tests for removed app-only behaviour (Shopee/weight delivery, upfront-before-accept) and write v4 ones.
+  Order: customer flow (browse/product/cart/checkout/rental/payments) → supplier → cashier → admin → super.
+- Screenshot rig: scratchpad `drv/shot.js <name> <refPath> <appPath> [email] [--full]` → `shots/<name>-390|1440.png`
+  (ref :8080 node static server in reference/partyrent; app :8033 with `. env.sh` = throwaway SQLite, no Xendit).
+
 ### Paused: UI/UX + logic batch
 **UI/UX + logic batch** (user spec 2026-11-16, pasted; follow its stated assumptions 1–5). Build order:
 - [ ] 1.1 Merge home + browse into one page; sticky date picker/filters; "Switch to supplier" → shop name

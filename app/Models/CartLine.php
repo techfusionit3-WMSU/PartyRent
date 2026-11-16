@@ -11,7 +11,7 @@ class CartLine extends Model
 
     protected function casts(): array
     {
-        return ['days' => 'array', 'sel' => 'array', 'time' => 'array'];
+        return ['days' => 'array', 'sel' => 'array', 'time' => 'array', 'selected' => 'boolean'];
     }
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }

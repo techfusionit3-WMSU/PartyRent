@@ -20,6 +20,29 @@ Decisions:
 8. `reference/` folder: decide later (untracked for now).
 The UI/UX batch below = the port's change list (section 6); it is applied AFTER the port.
 
+### ▶ RESUME HERE (checkpoint 2026-11-16, after 1f62c6d)
+Also DONE since the notes below: merged home+browse rebuilt from reference (hero + home sections on landing view,
+sticky `.browse-sticky` date bar + Items/Packages/Filters/Sort row, filters in side drawer `[data-drawer]`, compare ≤3
+floating bar + modal), post-login "Select Rental Dates / I'm Just Browsing" prompt (`partials/date-prompt`,
+AuthController flashes `RentalPeriod::ASK`), supplier card, seeded ratings kept (no Reviews::recalcAll in seeder),
+UI "Rental Partner" → "Supplier" everywhere, "Booked" → "Accepted", plan badge `@include('partials.badges', ['planBadge' => …])`.
+NEXT, in order:
+1. `partials/inspection-report.blade.php` → port reference `Shared.inspectionReport` (items have rented/returned/
+   repairable/nonRepairable/lost/condition/value/pcts/amounts/total; CONDITIONS brand_new|good_as_new|used). This is
+   the current PagesTest 500 ("Undefined array key good"). Then the v4 return inspection (damage policy %) in
+   Rentals::recordInspection + supplier request inspect modal + supplier damages page.
+2. Make `PagesTest` green (smoke test of all pages), then rewrite the other red feature tests for the v4 flows
+   (one checkout POST /checkout JSON, payments only after accept, shop cashier cashier@elegantoccasion.ph).
+3. Remaining customer pages: product (C3 TikTok-style later), packages, package, suppliers, ai, rentals, payments,
+   profile, start-selling (Individual/Organization wizard). Then supplier, cashier, admin, superadmin pages.
+4. Change list still open: C1 done, C3, C7–C13.
+Screenshot rig: scratchpad (session-specific, may be gone) had `drv/shot.js` (playwright-core 1.48.2 + msedge;
+args `<name> <refPath> <appPath> [email] [--full] [--supplier]`), reference served by a node static server on :8080
+from reference/partyrent, app `php artisan serve --port=8033` with env DB_CONNECTION=sqlite DB_DATABASE=<scratch>/check.sqlite
+XENDIT_SECRET_KEY= MAIL_MAILER=log SESSION_DRIVER=file. Recreate if missing. Gotcha: Blade directives glued to a word
+(`time@include`, `Filters@if`) don't compile — keep a space. Never write files via `php -r` + preg_replace without
+checking for a null result (it emptied a view once; restored from git).
+
 Port status (update every commit):
 - [x] S1 audit · [x] S2 CSS 3-way merge + eyeOff (58c1d35)
 - [~] S3 schema: migration `2026_11_16_000100_port_v4` done; org roles (`ShopStaff::ORG_PERMS`, `User::orgRole/orgCan/

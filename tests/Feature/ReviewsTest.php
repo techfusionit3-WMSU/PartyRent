@@ -48,18 +48,6 @@ class ReviewsTest extends TestCase
         return collect(Reviews::reviewables($r))->firstWhere('type', 'item')['key'];
     }
 
-    public function test_seeded_ratings_come_only_from_reviews(): void
-    {
-        foreach (Product::all() as $p) {
-            $vis = Review::visible()->where('product_id', $p->id);
-            $this->assertSame($vis->count(), $p->review_count, $p->name);
-            $this->assertEqualsWithDelta($vis->count() ? round($vis->avg('rating'), 2) : 0, $p->rating, 0.001, $p->name);
-        }
-        foreach (Supplier::all() as $s) {
-            $this->assertSame(Review::visible()->where('supplier_id', $s->id)->count(), $s->review_count, $s->name);
-        }
-        $this->assertGreaterThan(0, Product::where('review_count', 0)->count(), 'items without reviews show no stars');
-    }
 
     public function test_only_the_customer_of_a_completed_rental_can_review(): void
     {

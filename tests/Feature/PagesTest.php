@@ -44,7 +44,7 @@ class PagesTest extends TestCase
     {
         $r = RentalRequest::where('code', 'PR-0001')->first();
         $this->as('maria@demo.ph');
-        foreach (['/', '/cart', '/cart?compare=1', '/rentals', '/rentals?tab=active', '/rentals/PR-0001', '/rentals/PR-0006', '/my-payments', '/profile', '/start-selling', '/notifications', '/account', '/checkout/'.$r->supplier_id] as $url) {
+        foreach (['/', '/cart', '/cart?compare=1', '/rentals', '/rentals?tab=active', '/rentals/PR-0001', '/rentals/PR-0006', '/my-payments', '/profile', '/start-selling', '/notifications', '/account', '/checkout'] as $url) {
             $this->get($url)->assertOk();
         }
         // another customer's rental is not visible
@@ -77,7 +77,7 @@ class PagesTest extends TestCase
 
     public function test_cashier_and_admin_pages_render(): void
     {
-        $this->as('cashier@partyrent.ph');
+        $this->as('cashier@elegantoccasion.ph');
         foreach (['/cashier', '/cashier/verification', '/cashier/record', '/cashier/record?request=PR-0001', '/cashier/balances', '/cashier/balances?tab=overdue', '/cashier/history', '/cashier/history?q=PR-0001', '/payments/TXN-10001/receipt', '/cashier/reports', '/cashier/reports?range=3m', '/cashier/reports.csv'] as $url) {
             $this->get($url)->assertOk();
         }

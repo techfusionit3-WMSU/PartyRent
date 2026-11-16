@@ -34,7 +34,7 @@ NEXT, in order:
    `window.PR.toast` exposed), damages page per SP.damages. `ReplacementValueTest` rewritten (policy tests).
    NOT yet: shop "Damage policy" tab (supplier/shop?tab=damage), product form condition select still old
    Excellent/Good list (→ brand_new|good_as_new|used), "mark repaired" action on inventory.
-2. Make `PagesTest` green (smoke test of all pages), then rewrite the other red feature tests for the v4 flows
+2. PagesTest GREEN (d9fa96b+1). Full suite 33 red / 64 green. Next: rewrite the other red feature tests for the v4 flows
    (one checkout POST /checkout JSON, payments only after accept, shop cashier cashier@elegantoccasion.ph).
 3. Remaining customer pages: product (C3 TikTok-style later), packages, package, suppliers, ai, rentals, payments,
    profile, start-selling (Individual/Organization wizard). Then supplier, cashier, admin, superadmin pages.

@@ -98,9 +98,11 @@ NEXT, in order:
         refund (needs a paid test invoice). Checkout totals = pricing incl. bulk + shop discounts (DiscountsTest);
         service fees stay with the platform (Payouts::breakdown); payout formula test in BusinessRulesTest.
         RefundsTest (3).
-        NEXT: cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
-        un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
-        private disk + 'revision' decision), then superadmin.
+        Cashier scoping DONE: CashierController shopId() = user()->shop()?->id; every list/report/CSV/record/verify/
+        reject is limited to that shop (404 on another shop's payment); a cashier without a shop (superadmin) sees all.
+        PayoutsTest::test_shop_cashier_sees_only_their_shop un-skipped (120 green, 0 skipped).
+        NEXT: cashier pages vs reference at 1440/390 (UI), then admin (applications: view docs from private disk +
+        'revision' decision), then superadmin.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
         private disk + 'revision' decision), then superadmin.

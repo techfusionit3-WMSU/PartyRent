@@ -40,7 +40,31 @@ class PayoutsTest extends TestCase
 
     public function test_shop_cashier_sees_only_their_shop(): void
     {
-        $this->markTestSkipped('Cashier pages are scoped per shop in the cashier port (PROGRESS step 3).');
+        // v4 decision 2: Grace is Elegant Occasion's cashier — she sees and handles only that shop's money
+        $grace = User::where('email', 'cashier@elegantoccasion.ph')->firstOrFail();
+        $sid = $grace->shop()->id;
+        $mine = RentalRequest::where('supplier_id', $sid)->firstOrFail();
+        $other = RentalRequest::where('supplier_id', '!=', $sid)->whereIn('status', Finance::ACTIVE)->firstOrFail();
+        $theirs = \App\Models\Payment::create(['code' => 'PAY-OTHER1', 'rental_request_id' => $other->id, 'type' => 'balance', 'method' => 'bank', 'amount' => 10,
+            'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'OTHER-REF-1', 'status' => 'pending']);
+        $ours = \App\Models\Payment::create(['code' => 'PAY-MINE1', 'rental_request_id' => $mine->id, 'type' => 'deposit', 'method' => 'bank', 'amount' => 10,
+            'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'MINE-REF-1', 'status' => 'pending']);
+
+        $this->as('cashier@elegantoccasion.ph', 'cashier');
+        $this->get('/cashier/verification')->assertOk()->assertSee('PAY-MINE1')->assertDontSee('PAY-OTHER1');
+        $this->get('/cashier')->assertOk()->assertDontSee('PAY-OTHER1');
+        $this->get('/cashier/history?q=PAY-OTHER1')->assertOk()->assertDontSee('OTHER-REF-1'); // the query is echoed in the search box
+        $this->get('/cashier/balances')->assertOk()->assertDontSee($other->code);
+        $this->get('/cashier/record?request='.$other->code)->assertOk()->assertDontSee($other->customer->name);
+        $this->post("/cashier/payments/{$theirs->code}/verify")->assertNotFound();
+        $this->post("/cashier/payments/{$theirs->code}/reject", ['reason' => 'x'])->assertNotFound();
+        $this->post('/cashier/record', ['request' => $other->code, 'type' => 'balance', 'method' => 'cash', 'amount' => 5, 'date' => today_iso(), 'reference' => 'X'])->assertNotFound();
+        $this->assertSame('pending', $theirs->fresh()->status);
+        $csv = $this->get('/cashier/reports.csv?from='.add_days(today_iso(), -1).'&to='.today_iso())->streamedContent();
+        $this->assertStringNotContainsString('PAY-OTHER1', $csv);
+
+        // the superadmin works across every shop
+        $this->as('super@partyrent.ph', 'cashier')->get('/cashier/verification')->assertOk()->assertSee('PAY-OTHER1')->assertSee('PAY-MINE1');
     }
 
     public function test_seeded_payouts_and_owner_pays_a_supplier(): void

@@ -77,7 +77,7 @@ class HourlyRentalTest extends TestCase
 
         $this->assertTrue($this->add('14:00', '17:00')['ok']);
         $line = CartLine::where('ref_id', $this->p->id)->firstOrFail();
-        $this->assertSame(['from' => '14:00', 'to' => '17:00'], $line->time);
+        $this->assertSame(['start' => '14:00', 'end' => '17:00'], $line->time); // v4 time keys
         $q = Pricing::quoteLine($line->toLine());
         $this->assertSame(1500.0, $q['total']); // ₱500 × 3 h × 1
         $this->assertStringContainsString('2:00 PM – 5:00 PM', $q['name']);
@@ -86,14 +86,16 @@ class HourlyRentalTest extends TestCase
     public function test_overlap_and_buffer_are_refused(): void
     {
         $this->assertFalse($this->add('11:00', '14:00')['ok']);   // overlaps 9–12
-        $this->assertFalse($this->add('12:30', '15:30')['ok']);   // inside the 60-minute buffer
-        $this->assertTrue($this->add('13:00', '16:00')['ok']);    // exactly after the buffer
+        // v4: the shop's recovery (1 h after a return) + preparation (1 h before a release) keep units apart
+        $this->assertFalse($this->add('12:30', '15:30')['ok']);
+        $this->assertFalse($this->add('13:00', '16:00')['ok']);
+        $this->assertTrue($this->add('14:00', '17:00')['ok']);    // 12:00 + 1 h recovery + 1 h preparation
     }
 
-    public function test_minimum_hours_and_one_date(): void
+    public function test_minimum_hours_and_a_time_is_required(): void
     {
-        $this->assertStringContainsString('at least 3 hours', $this->add('14:00', '16:00')['error']);
-        $this->assertFalse(Rentals::addToCart($this->customer(), 'item', $this->p->id, [$this->date => 1, add_days($this->date, 1) => 1], null, ['from' => '14:00', 'to' => '18:00'])['ok']);
+        $this->assertStringContainsString('minimum rental duration of 3 hours', $this->add('14:00', '16:00')['error']);
+        // v4 (Slots): a timed booking may span several dates — start on the first, end on the last.
         $this->assertFalse(Rentals::addToCart($this->customer(), 'item', $this->p->id, [$this->date => 1])['ok']); // no time
     }
 

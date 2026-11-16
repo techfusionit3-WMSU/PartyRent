@@ -5,7 +5,8 @@ namespace App\Domain;
 use App\Models\Product;
 
 /**
- * Times for items rented by the hour. A line's `time` is {from: "HH:MM", to: "HH:MM"} on its one date;
+ * Times for items rented by the hour. A line's `time` is {start: "HH:MM", end: "HH:MM"} (v4; older lines
+ * used {from, to}) on its one date;
  * "24:00" means midnight at the end of that day. Minutes since midnight are used for overlap checks.
  */
 class Hours
@@ -31,8 +32,9 @@ class Hours
     /** [fromMin, toMin] of a valid time window, else null. */
     public static function window(?array $time): ?array
     {
-        $f = self::toMin($time['from'] ?? null);
-        $t = self::toMin($time['to'] ?? null);
+        // v4 lines store {start, end}; older app lines used {from, to}
+        $f = self::toMin($time['start'] ?? $time['from'] ?? null);
+        $t = self::toMin($time['end'] ?? $time['to'] ?? null);
 
         return $f !== null && $t !== null && $t > $f ? [$f, $t] : null;
     }

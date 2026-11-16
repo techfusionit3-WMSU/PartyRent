@@ -4,7 +4,26 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Business accounts, hourly rentals, item value, simpler dashboard** (user request 2026-11-12). Decisions:
+**UI/UX + logic batch** (user spec 2026-11-16, pasted; follow its stated assumptions 1–5). Build order:
+- [ ] 1.1 Merge home + browse into one page; sticky date picker/filters; "Switch to supplier" → shop name
+- [ ] 1.2 Product page TikTok-Shop style (separate web/mobile layouts); one-line bulk discount text; service-fee rule
+      (consecutive same place = 1 fee; place change = +1; each separate date block = +1)
+- [ ] 1.3 Rent request: delivery zone pick, nicer location UI, BUG: per-supplier grouping lost when Delivery → Pickup
+- [ ] 1.4 Checkout: rental charges collapsible in Order Summary (closed); reservation fee, down payment, total outside
+- [ ] 2.1 Product form: order Specs → Pricing → Inventory → Listing; Colors/Themes "Others" + text; "Quantity" label;
+      base price above bulk discount; "Tier pricing" → "Bulk discount" (optional); "Add maximum" button;
+      shop default time frame (shop settings) + per-product "Set specific time frame" + "Allow overnight rental"
+- [ ] 2.2 Package form: "Rental event" tags (type or pick); square crop on photo upload; move/re-lay Inventory section
+- [ ] 2.3 Inventory page: show total stock when marking maintenance/set aside; "All N units" select-all
+- [ ] 2.4 Inventory calendar mobile layout
+- [ ] 2.5 Discounts page (supplier catalog): manage every discount incl. bulk discounts
+- [ ] 3 Shortfall/dispute cases: report → flag bookings → notify → shared case page (timeline + thread) → proposals
+      (partial, substitute, delayed, refund, cancel) with deadline → accept/counter/decline → escalate to support →
+      apply (qty, inventory, calendar, payments) → audit log
+- [ ] Tests + browser check, then report assumptions back to the user
+
+### Previous: Business accounts, hourly rentals, item value, simpler dashboard
+(user request 2026-11-12). Decisions:
 - Business cashiers do NOT take cash: PartyRent collects every payment (Xendit / transfer).
 - Rent by time: customer picks ANY start/end time; DB must refuse overlapping bookings (+ supplier buffer).
 - Current supplier setup = **Personal** account; add a **Business** type (permits, shop staff incl. cashier,

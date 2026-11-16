@@ -89,8 +89,18 @@ NEXT, in order:
         case-alert partial on both booking pages. ShortfallCasesTest (5). Browser-checked (drv/cases.js): found + fixed
         apply() re-quoting the whole booking at today's rules (₱629 drift) — now the stored quote is honored: removed
         units come off at the booked unit rates, a substitute is added at its current price, then the credit.
-        NEXT: C13 Xendit (refund permission! pending shortfall refunds → Xendit refund,
-        payout reduction), then cashier/admin/super.
+        C13 DONE: App\Domain\Refunds (pending → awaiting → verified) + Xendit::refund / refundStatus / canRefund
+        (POST /refunds on the paid invoice, Idempotency-key; webhook "refund.*" → Refunds::handleCallback).
+        Shortfall refunds go back through the gateway: practice mode verifies instantly, Xendit SUCCEEDED/PENDING,
+        refused/FAILED or bank-paid → pending for the shop cashier with the reason. Payout follows (income =
+        paidRental − refunded). Superadmin settings shows Refunds Allowed/Not allowed (cached 10 min).
+        Real key check 2026-11-17: test key, GET /refunds = 200 → read OK; WRITE only provable by a real test-mode
+        refund (needs a paid test invoice). Checkout totals = pricing incl. bulk + shop discounts (DiscountsTest);
+        service fees stay with the platform (Payouts::breakdown); payout formula test in BusinessRulesTest.
+        RefundsTest (3).
+        NEXT: cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
+        un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
+        private disk + 'revision' decision), then superadmin.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
         private disk + 'revision' decision), then superadmin.

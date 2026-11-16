@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Xendit;
 use Illuminate\Http\Request;
 
-/** Receives Xendit callbacks: invoices ("Invoice paid") and payouts ("Payout"). Set both to https://<your-domain>/webhooks/xendit. */
+/** Receives Xendit callbacks: invoices ("Invoice paid"), payouts ("Payout") and refunds ("Refund"). Set all three to https://<your-domain>/webhooks/xendit. */
 class XenditWebhookController extends Controller
 {
     public function __invoke(Request $request)
@@ -15,9 +15,12 @@ class XenditWebhookController extends Controller
         }
 
         $body = (array) $request->json()->all();
-        $result = str_starts_with((string) ($body['event'] ?? ''), 'payout.')
-            ? \App\Domain\XenditPayouts::handleCallback($body)
-            : Xendit::handleCallback($body);
+        $event = (string) ($body['event'] ?? '');
+        $result = match (true) {
+            str_starts_with($event, 'payout.') => \App\Domain\XenditPayouts::handleCallback($body),
+            str_starts_with($event, 'refund.') => \App\Domain\Refunds::handleCallback($body),
+            default => Xendit::handleCallback($body),
+        };
 
         return response()->json(['result' => $result]);
     }

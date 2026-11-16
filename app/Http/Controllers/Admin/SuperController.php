@@ -189,7 +189,9 @@ class SuperController extends Controller
             's' => array_merge(Settings::DEFAULTS, array_intersect_key(Settings::all(), Settings::DEFAULTS)),
             'accountCount' => \App\Models\PayAccount::where('active', true)->count(),
             'gateway' => \App\Domain\OnlinePay::gateway(),
-            'xendit' => ['enabled' => \App\Domain\Xendit::enabled(), 'live' => \App\Domain\Xendit::liveMode(), 'webhook' => (string) config('services.xendit.callback_token') !== '', 'methods' => config('services.xendit.methods')],
+            'xendit' => ['enabled' => \App\Domain\Xendit::enabled(), 'live' => \App\Domain\Xendit::liveMode(), 'webhook' => (string) config('services.xendit.callback_token') !== '', 'methods' => config('services.xendit.methods'),
+                // C13: can the key refund? (cached 10 min — one read call to Xendit)
+                'refunds' => \App\Domain\Xendit::enabled() ? \Illuminate\Support\Facades\Cache::remember('xendit.canRefund', 600, fn () => \App\Domain\Xendit::canRefund() ?? 'unknown') : false],
             'paymongo' => ['enabled' => PayMongo::enabled(), 'live' => PayMongo::liveMode(), 'webhook' => (string) config('services.paymongo.webhook_secret') !== '', 'methods' => config('services.paymongo.methods')],
         ]);
     }

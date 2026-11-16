@@ -135,6 +135,67 @@ class Xendit
         $p->delete();
     }
 
+    /* ---------- refunds (change list C13) ---------- */
+
+    /**
+     * Refund part or all of a paid invoice: POST /refunds {invoice_id, reference_id, amount, reason}.
+     * Returns ['ok', 'id', 'status' => SUCCEEDED|PENDING|FAILED, 'error'].
+     */
+    public static function refund(Payment $source, Payment $refund, string $reason = 'OTHERS'): array
+    {
+        try {
+            $res = self::http()->withHeaders(['Idempotency-key' => 'refund-'.$refund->code])->post('/refunds', [
+                'invoice_id' => $source->gateway_ref, 'reference_id' => $refund->code, 'amount' => round((float) $refund->amount, 2), 'currency' => 'PHP',
+                'reason' => $reason, 'metadata' => ['payment' => $source->code, 'refund' => $refund->code],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Xendit refund failed: '.$e->getMessage());
+
+            return ['ok' => false, 'error' => 'Could not reach Xendit'];
+        }
+        if (! $res->successful()) {
+            Log::warning('Xendit refund refused: '.$res->body());
+
+            return ['ok' => false, 'error' => self::errorText($res), 'code' => $res->json('error_code'), 'http' => $res->status()];
+        }
+
+        return ['ok' => true, 'id' => (string) $res->json('id'), 'status' => strtoupper((string) $res->json('status'))];
+    }
+
+    /** Current status of a refund (SUCCEEDED | PENDING | FAILED) or null when Xendit cannot be asked. */
+    public static function refundStatus(string $id): ?string
+    {
+        try {
+            $res = self::http()->get('/refunds/'.$id);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $res->successful() ? strtoupper((string) $res->json('status')) : null;
+    }
+
+    /**
+     * Does the secret key have the Refunds permission? Lists refunds (read): a key without it gets 401/403.
+     * true | false, or null when Xendit could not be reached. Creating a refund also needs WRITE; a refused
+     * create leaves the refund for the cashier with Xendit's reason in the notes.
+     */
+    public static function canRefund(): ?bool
+    {
+        if (! self::enabled()) {
+            return false;
+        }
+        try {
+            $res = self::http()->get('/refunds', ['limit' => 1]);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (in_array($res->status(), [401, 403], true)) {
+            return false;
+        }
+
+        return $res->successful() ? true : null;
+    }
+
     /** Xendit sends the account's callback verification token in the x-callback-token header. */
     public static function validToken(string $given): bool
     {

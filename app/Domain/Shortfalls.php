@@ -429,13 +429,17 @@ class Shortfalls
             BookingDays::sync($r->fresh());
             inv()->flush();
             if ($refund > 0) {
-                Payment::create([
+                $refundPay = Payment::create([
                     'code' => Rentals::nextPaymentCode(), 'rental_request_id' => $r->id, 'type' => 'refund', 'method' => 'bank', 'amount' => $refund,
                     'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'SC-'.$c->id.'-'.substr((string) now()->getTimestampMs(), -5),
                     'status' => 'pending', 'notes' => 'Shortfall '.$c->code.' refund (agreed '.self::describe($d).')', 'recorded_by' => 'system',
                 ]);
-                Notifier::finance($c->supplier, 'Refund due: '.$r->code, money($refund).' goes back to '.$c->customer->name.' (shortfall '.$c->code.'). Send it and mark it verified.', route('supplier.requests.show', $r, false));
-                $changes[] = 'Refund due '.money($refund);
+                // C13: paid online -> back through the gateway (Xendit / practice); otherwise the shop's cashier sends it
+                $how = Refunds::issue($refundPay);
+                if ($how === 'manual') {
+                    Notifier::finance($c->supplier, 'Refund due: '.$r->code, money($refund).' goes back to '.$c->customer->name.' (shortfall '.$c->code.'). Send it and mark it verified.', route('supplier.requests.show', $r, false));
+                }
+                $changes[] = ($how === 'sent' ? 'Refunded ' : ($how === 'awaiting' ? 'Refund in progress ' : 'Refund due ')).money($refund);
             }
             $res = ['type' => $d['type'], 'credit' => (float) ($d['credit'] ?? 0), 'refund' => $refund, 'by' => $role, 'proposal' => $e->id, 'changes' => $changes,
                 'totalBefore' => $before['total'], 'totalAfter' => (float) ($r->fresh()->pricing['total'] ?? 0)];

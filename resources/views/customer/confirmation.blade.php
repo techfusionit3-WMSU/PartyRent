@@ -16,6 +16,6 @@
     <li>Pay using {{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}: payments go to PartyRent, count after cashier verification, and are released to the rental partner only after your rental is completed.</li>
     <li>Receive your items by {{ $r->fulfillment === 'delivery' ? 'delivery' : 'pickup' }} and return them after the event.</li>
   </ol></div>
-  <div class="row wrap mt-3" style="justify-content:center"><a class="btn btn-primary" href="{{ route('rentals.show', $r) }}">View request</a><a class="btn" href="{{ route('rentals.index') }}">My Rentals</a><a class="btn btn-ghost" href="{{ route('browse') }}">Keep browsing</a></div>
+  <div class="row wrap mt-3" style="justify-content:center"><a class="btn btn-primary" href="{{ route('rentals.show', $r) }}">View request</a><a class="btn" href="{{ route('rentals.index') }}">My Rentals</a><a class="btn btn-ghost" href="{{ route('home') }}">Keep browsing</a></div>
 </div>
 @endsection

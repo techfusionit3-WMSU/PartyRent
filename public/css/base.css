@@ -442,3 +442,4 @@ label.pkg-row { cursor: pointer; }
 .todo-ico.t-teal { background: var(--teal-50); color: var(--teal); }
 .todo-ico.t-purple { background: var(--purple-50); color: var(--purple); }
 @media (max-width: 520px) { .todo-row { flex-wrap: wrap; } .todo-row .btn { margin-left: 48px; } }
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

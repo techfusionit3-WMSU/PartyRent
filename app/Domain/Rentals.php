@@ -944,7 +944,7 @@ class Rentals
             Notifier::notify('admin', 'admin', 'New rental partner application', $u->name.' applied to open '.$s->name.'.', '');
             Notifier::notify($u, 'customer', 'Application submitted', 'Your rental partner application for '.$s->name.' is pending review. We will notify you once it is approved.', self::link('start-selling'));
         } else {
-            Notifier::notify($u, 'customer', 'Your shop is live!', $s->name.' is approved. Switch to Rental Partner Mode to add your first product.', self::link('supplier.dashboard'));
+            Notifier::notify($u, 'customer', 'Your shop is live!', $s->name.' is approved. Tap your shop name in the profile menu to add your first product.', self::link('supplier.dashboard'));
         }
         Notifier::audit('Submitted rental partner application', $s->name, $u);
 
@@ -984,7 +984,7 @@ class Rentals
         $s->update(['status' => $approve ? 'approved' : 'rejected', 'reviewed_at' => now(), 'reviewed_by' => $by->id, 'reject_reason' => $approve ? null : $reason, 'approved_at' => $approve ? now() : null]
             // Approving a business application also accepts its documents.
             + ($approve && $s->isBusiness() ? ['biz_status' => 'verified', 'biz_verified_at' => now()] : []));
-        Notifier::notify($s->owner_id, 'customer', $approve ? 'Rental Partner application approved 🎉' : 'Rental Partner application rejected', $approve ? $s->name.' is approved! Use "Switch to Rental Partner Mode" in your profile menu to start listing items.' : 'Your application for '.$s->name.' was not approved: '.$reason.'. You may update and resubmit.', self::link('start-selling'));
+        Notifier::notify($s->owner_id, 'customer', $approve ? 'Rental Partner application approved 🎉' : 'Rental Partner application rejected', $approve ? $s->name.' is approved! Tap '.$s->name.' in your profile menu to start listing items.' : 'Your application for '.$s->name.' was not approved: '.$reason.'. You may update and resubmit.', self::link('start-selling'));
         Notifier::audit($approve ? 'Approved rental partner application' : 'Rejected rental partner application', $s->name.($reason ? ' — '.$reason : ''), $by);
 
         return self::ok();

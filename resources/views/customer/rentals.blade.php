@@ -10,7 +10,7 @@
   @endforeach
 </div>
 @if($list->isEmpty())
-  <div class="card">@include('partials.empty', ['emoji' => '📋', 'title' => 'No rentals here', 'text' => $tab === 'all' ? 'When you submit a rental request it will appear here.' : 'Nothing in this tab yet.', 'action' => '<a class="btn btn-primary" href="'.route('browse').'">Find party supplies</a>'])</div>
+  <div class="card">@include('partials.empty', ['emoji' => '📋', 'title' => 'No rentals here', 'text' => $tab === 'all' ? 'When you submit a rental request it will appear here.' : 'Nothing in this tab yet.', 'action' => '<a class="btn btn-primary" href="'.route('home').'">Find party supplies</a>'])</div>
 @else
   <div class="stack">
     @foreach($list as $r)

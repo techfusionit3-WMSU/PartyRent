@@ -23,7 +23,7 @@ class AiController extends Controller
         if ($request->query('search')) {
             $f = $this->filtersFrom($request);
 
-            return redirect()->route('browse', array_filter([
+            return redirect()->route('home', array_filter([
                 'category' => count($f['items']) === 1 ? $f['items'][0] : null, 'event' => $f['eventType'], 'color' => $f['colors'][0] ?? null,
                 // The event city becomes the "deliver to" city, so results show who can deliver there.
                 'theme' => $f['themes'][0] ?? null, 'start' => $f['start'], 'end' => $f['end'], 'to' => Locations::findCityByName($f['city'])['code'] ?? null,

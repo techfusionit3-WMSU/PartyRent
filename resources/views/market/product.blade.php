@@ -1,7 +1,7 @@
 @extends('layouts.market', ['title' => $p->name, 'nav' => 'browse', 'alternativesUrl' => route('products.alternatives', $p)])
 
 @section('content')
-<div class="crumbs"><a href="{{ route('browse') }}">Browse</a> / <a href="{{ route('browse', ['category' => $cat->id]) }}">{{ $cat->name }}</a> / {{ $p->name }}</div>
+<div class="crumbs"><a href="{{ route('home') }}">Browse</a> / <a href="{{ route('home', ['category' => $cat->id]) }}">{{ $cat->name }}</a> / {{ $p->name }}</div>
 <div class="pd">
   <div class="pd-gallery">
     <div class="main">@include('partials.img', ['item' => $p])</div>

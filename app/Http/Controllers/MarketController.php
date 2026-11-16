@@ -30,41 +30,19 @@ class MarketController extends Controller
         return $list;
     }
 
-    public function home(Request $request)
+    /** Old /browse links: same page now lives at "/". */
+    public function browseRedirect(Request $request)
+    {
+        return redirect()->to(route('home', $request->query()), 301);
+    }
+
+    /** Home and browse are one page: welcome bits on top, then sticky dates/filters and the results. */
+    public function browse(Request $request)
     {
         $u = $request->user();
         if ($u && $u->isStaff()) {
             return redirect()->route($u->homeRoute());
         }
-        $prods = $this->live();
-        $pkgs = Package::live()->with('supplier')->get();
-        $sups = Supplier::approved()->withCount(['products' => fn ($q) => $q->where('status', 'published')])->get();
-
-        $recommended = collect();
-        if ($u) {
-            $evs = RentalRequest::where('customer_id', $u->id)->pluck('event_type')->unique()->all();
-            $recommended = $prods->filter(fn ($p) => array_intersect($p->events ?? [], $evs))->sortByDesc('rent_count')->take(4);
-        }
-        if ($recommended->isEmpty()) {
-            $recommended = $prods->sortByDesc('rent_count')->take(4);
-        }
-        $active = $u ? RentalRequest::where('customer_id', $u->id)->whereIn('status', array_merge(Finance::ACTIVE, ['pending']))->with(['payments', 'supplier'])->orderBy('start_date')->take(3)->get() : collect();
-        $notifs = $u ? Notifier::for($u, session('mode'))->filter(fn ($n) => ! $n->isReadBy($u->id))->take(3) : collect();
-
-        return view('market.home', [
-            'prods' => $prods, 'pkgs' => $pkgs, 'sups' => $sups,
-            'featured' => $prods->sortBy([['rating', 'desc'], ['rent_count', 'desc']])->take(8),
-            'recommended' => $recommended,
-            'recent' => $prods->sortByDesc('created_at')->take(4),
-            'offers' => $prods->filter(fn ($p) => count($p->tiers) > 1)->sortByDesc(fn ($p) => 1 - $p->lowestPrice() / max(1, $p->basePrice()))->take(4),
-            'cats' => Category::where('active', true)->orderBy('sort')->get(),
-            'active' => $active, 'notifs' => $notifs,
-            'themes' => self::EVENT_THEMES,
-        ]);
-    }
-
-    public function browse(Request $request)
-    {
         $st = array_merge(['q' => '', 'category' => '', 'supplier' => '', 'city' => '', 'event' => '', 'color' => '', 'theme' => '', 'min' => '', 'max' => '', 'start' => '', 'end' => '', 'qty' => '', 'avail' => '', 'delivery' => '', 'pickup' => '', 'rating' => '', 'sort' => 'recommended', 'view' => 'items'], array_filter($request->only(['q', 'category', 'supplier', 'city', 'event', 'color', 'theme', 'min', 'max', 'start', 'end', 'qty', 'avail', 'delivery', 'pickup', 'rating', 'sort', 'view']), fn ($v) => $v !== null));
         if ($st['start'] && $st['start'] < today_iso()) {
             $st['start'] = today_iso();
@@ -143,14 +121,21 @@ class MarketController extends Controller
             $compare = $prods->whereIn('id', array_map('intval', $ids))->values();
         }
         $cat = $st['category'] ? Category::find($st['category']) : null;
+        // "Landing" = nothing searched or filtered yet: show the welcome bits above the results.
+        $landing = ! array_filter(array_diff_key($st, ['sort' => 1, 'view' => 1]), fn ($v) => $v !== '') && $st['sort'] === 'recommended' && ! $compare->count();
+        $pkgs = $landing ? Package::live()->with('supplier')->get() : collect();
+        $active = $u && $landing ? RentalRequest::where('customer_id', $u->id)->whereIn('status', array_merge(Finance::ACTIVE, ['pending']))->with(['payments', 'supplier'])->orderBy('start_date')->take(3)->get() : collect();
+        $notifs = $u && $landing ? Notifier::for($u, session('mode'))->filter(fn ($n) => ! $n->isReadBy($u->id))->take(3) : collect();
 
         return view('market.browse', [
+            'landing' => $landing, 'pkgs' => $pkgs, 'active' => $active, 'notifs' => $notifs, 'themes' => self::EVENT_THEMES,
+            'prodCount' => $prods->count(), 'supCount' => $sups->count(),
             'st' => $st, 'list' => $list->values(), 'dates' => $dates, 'ai' => $ai, 'compare' => $compare,
             'cats' => Category::where('active', true)->orderBy('sort')->get(), 'sups' => $sups,
             'colors' => $prods->flatMap(fn ($x) => $x->colors ?? [])->unique()->sort()->values(),
             'themesList' => $prods->flatMap(fn ($x) => $x->themes ?? [])->unique()->sort()->values(),
             'events' => array_keys(Ai::EVENTS), 'cities' => $sups->pluck('city')->unique()->values(),
-            'heading' => $st['q'] ? 'Results for “'.$st['q'].'”' : ($cat ? $cat->name : ($st['event'] ? $st['event'].' supplies' : ($st['view'] === 'packages' ? 'Rental packages' : 'Browse party supplies'))),
+            'heading' => $st['q'] ? 'Results for “'.$st['q'].'”' : ($cat ? $cat->name : ($st['event'] ? $st['event'].' supplies' : ($st['view'] === 'packages' ? 'Rental packages' : ($landing ? 'All party rentals' : 'Browse party supplies')))),
             'cat' => $cat, 'to' => $to,
         ]);
     }

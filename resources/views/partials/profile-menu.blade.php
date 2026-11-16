@@ -16,7 +16,7 @@
       <a href="{{ route('profile') }}">{{ icon('user') }}Profile & Settings</a>
       <div class="sep"></div>
       @if($shop)
-        <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="menu-item menu-switch">{{ icon('swap') }}{{ $u->shopRole() === 'owner' ? 'Switch to Rental Partner Mode' : 'Work at '.$shop->name }}</button></form>
+        <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="menu-item menu-switch" title="Open your shop">{{ icon('store') }}<span class="ellipsis">{{ $shop->name }}</span></button></form>
       @elseif($sup && $sup->status === 'pending')
         <a href="{{ route('start-selling') }}">{{ icon('clock') }}Rental Partner application: <span class="badge b-gold">Pending Review</span></a>
       @else

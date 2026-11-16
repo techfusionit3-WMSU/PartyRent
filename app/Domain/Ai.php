@@ -435,7 +435,7 @@ class Ai
             }
             $mine = RentalRequest::where('customer_id', $user->id)->whereNotIn('status', ['completed', 'declined', 'cancelled'])->with('payments')->orderBy('start_date')->get();
             if ($mine->isEmpty()) {
-                return $reply('You have no active rental requests right now. '.self::a(route('browse'), 'Browse supplies →'));
+                return $reply('You have no active rental requests right now. '.self::a(route('home'), 'Browse supplies →'));
             }
 
             return $reply('Your active requests:<br>'.$mine->map(fn ($r) => '• '.self::a(route('rentals.show', $r), $r->code).' '.e($r->event_name).' — <b>'.e(RentalRequest::statusLabel($r->status)).'</b>, '.e($r->fin()['status']))->implode('<br>'));
@@ -504,7 +504,7 @@ class Ai
             })->implode('<br>').($f['start'] ? '' : '<br><span class="muted">Tip: add a date, e.g. "chairs available on Nov 20".</span>'));
         }
         if ($list->isNotEmpty()) {
-            return $reply('Here is what I found on PartyRent:<br>'.$list->take(5)->map(fn ($p) => '• '.self::a(route('products.show', $p), $p->name).' — '.e($p->supplier->name).': <b>'.money($p->basePrice()).'</b>/'.e($p->unitWord()).(count($p->tiers) > 1 ? ' (as low as '.money($p->lowestPrice()).' in bulk)' : ''))->implode('<br>').($list->count() > 5 ? '<br>'.self::a(route('browse', ['category' => $list->first()->category_id]), 'See all '.$list->count().' →') : ''));
+            return $reply('Here is what I found on PartyRent:<br>'.$list->take(5)->map(fn ($p) => '• '.self::a(route('products.show', $p), $p->name).' — '.e($p->supplier->name).': <b>'.money($p->basePrice()).'</b>/'.e($p->unitWord()).(count($p->tiers) > 1 ? ' (as low as '.money($p->lowestPrice()).' in bulk)' : ''))->implode('<br>').($list->count() > 5 ? '<br>'.self::a(route('home', ['category' => $list->first()->category_id]), 'See all '.$list->count().' →') : ''));
         }
         if ($sup) {
             return $reply('<b>'.e($sup->name).'</b> — '.e($sup->city).', rated '.$sup->rating.'★. '.e($sup->description).'<br>'.self::a(route('suppliers.show', $sup), 'Visit shop →'));

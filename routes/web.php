@@ -20,8 +20,8 @@ use App\Http\Controllers\Supplier\SupplierController;
 use Illuminate\Support\Facades\Route;
 
 /* ---------- public marketplace ---------- */
-Route::get('/', [MarketController::class, 'home'])->name('home');
-Route::get('/browse', [MarketController::class, 'browse'])->name('browse');
+Route::get('/', [MarketController::class, 'browse'])->name('home');
+Route::get('/browse', [MarketController::class, 'browseRedirect'])->name('browse');
 Route::get('/suppliers', [MarketController::class, 'suppliers'])->name('suppliers.index');
 Route::get('/suppliers/{supplier}', [MarketController::class, 'supplier'])->name('suppliers.show');
 Route::get('/products/{product}', [MarketController::class, 'product'])->name('products.show');

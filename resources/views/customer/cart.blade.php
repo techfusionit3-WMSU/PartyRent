@@ -3,10 +3,10 @@
 @section('content')
 @if(! $groups)
   <div class="page-head"><div><h1>Rental List</h1></div></div>
-  <div class="card">@include('partials.empty', ['emoji' => '🛒', 'title' => 'Your rental list is empty', 'text' => 'Add items or packages, then set the dates and quantities for each day.', 'action' => '<div class="row wrap" style="justify-content:center"><a class="btn btn-primary" href="'.route('browse').'">Browse supplies</a><a class="btn" href="'.route('ai').'">'.icon('sparkle').'Plan with AI</a></div>'])</div>
+  <div class="card">@include('partials.empty', ['emoji' => '🛒', 'title' => 'Your rental list is empty', 'text' => 'Add items or packages, then set the dates and quantities for each day.', 'action' => '<div class="row wrap" style="justify-content:center"><a class="btn btn-primary" href="'.route('home').'">Browse supplies</a><a class="btn" href="'.route('ai').'">'.icon('sparkle').'Plan with AI</a></div>'])</div>
 @else
 <div class="page-head"><div><h1>Rental List</h1><p>Set a different quantity for each date if you need to. Availability is checked day by day and changes save automatically.</p></div>
-  <div class="row">@if(count($groups) > 1)<a class="btn btn-sm" href="{{ route('cart', ['compare' => 1]) }}">{{ icon('layers') }}Compare rental partners</a>@endif<a class="btn btn-sm btn-ghost" href="{{ route('browse') }}">{{ icon('plus') }}Add more items</a></div>
+  <div class="row">@if(count($groups) > 1)<a class="btn btn-sm" href="{{ route('cart', ['compare' => 1]) }}">{{ icon('layers') }}Compare rental partners</a>@endif<a class="btn btn-sm btn-ghost" href="{{ route('home') }}">{{ icon('plus') }}Add more items</a></div>
 </div>
 
 @if($compare && count($groups) > 1)

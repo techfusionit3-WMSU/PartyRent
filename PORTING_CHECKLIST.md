@@ -147,5 +147,5 @@ from the first row that is not `verified`.
 | C9 Inventory: total stock + "All N units" in maintenance/set-aside | done | |
 | C10 Inventory calendar mobile | done | compact month + week agenda; browser-checked |
 | C11 Discounts page | done | shop discounts in pricing + bulk discount editor; DiscountsTest |
-| C12 Shortfall/dispute cases (report → flag → notify → case page → proposals → deadline/escalate → apply → audit) | todo | |
+| C12 Shortfall/dispute cases (report → flag → notify → case page → proposals → deadline/escalate → apply → audit) | done | Shortfalls domain, /cases page, ShortfallCasesTest |
 | C13 Xendit: totals match charge; service fees to platform; refunds + payout reduction; practice mode; payout tests | todo | |

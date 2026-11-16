@@ -40,7 +40,10 @@ class AppServiceProvider extends ServiceProvider
             $role = $u->activeRole(session('mode'));
             $notifs = Notifier::for($u, session('mode'));
             $badges = [];
+            \App\Domain\Shortfalls::escalateDue(); // proposal deadlines (also run by the scheduler)
+            $openCases = fn () => \App\Models\ShortfallCase::where('status', '!=', 'resolved');
             if ($role === 'supplier' && ($shop = $u->shop())) {
+                $badges['cases'] = $openCases()->where('supplier_id', $shop->id)->count();
                 $badges['requests'] = RentalRequest::where('supplier_id', $shop->id)->where('status', 'pending')->count();
                 $badges['payments'] = Payment::where('status', 'pending')->whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $shop->id))->count();
             } elseif ($role === 'cashier') {
@@ -49,12 +52,14 @@ class AppServiceProvider extends ServiceProvider
             } elseif ($role === 'superadmin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
+                $badges['cases'] = \App\Models\ShortfallCase::where('status', 'escalated')->count();
                 $badges['verification'] = Payment::where('status', 'pending')->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
                 $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();
             } elseif ($role === 'admin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
+                $badges['cases'] = \App\Models\ShortfallCase::where('status', 'escalated')->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
                 $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();
             }

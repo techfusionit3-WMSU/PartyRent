@@ -13,6 +13,13 @@ Artisan::command('partyrent:scan-overdue', function () {
 
 Schedule::command('partyrent:scan-overdue')->hourly();
 
+/* Shortfall cases (change list C12): proposals past their deadline go to PartyRent support. Also runs on page loads. */
+Artisan::command('partyrent:escalate-cases', function () {
+    $this->info(\App\Domain\Shortfalls::escalateDue().' case(s) escalated to support.');
+})->purpose('Escalate shortfall cases whose proposal deadline passed');
+
+Schedule::command('partyrent:escalate-cases')->everyFifteenMinutes();
+
 /* Check the mail setup: php artisan partyrent:mail-test you@gmail.com */
 Artisan::command('partyrent:mail-test {to?}', function (?string $to = null) {
     $to = $to ?: config('mail.from.address');

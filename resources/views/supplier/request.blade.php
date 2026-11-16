@@ -9,6 +9,7 @@
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.requests') }}">Rental Requests</a> / {{ $r->code }}</div>
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@if($r->status !== 'pending')@include('partials.badges', ['pay' => $f['status']])@endif@include('partials.badges', ['planBadge' => $r->plan])</div></div>
+@include('partials.case-alert', ['r' => $r])
 <div class="card mb-2">@include('partials.progress')</div>
 
 {{-- next step --}}

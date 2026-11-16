@@ -77,7 +77,18 @@ NEXT, in order:
         rentalFee is net (supplier funds it → commission/payout on net). Shown in rental-charges, lines-table and
         product page banner. Bulk discount editor per item (Pricing::tiersFrom shared with the product form).
         DiscountsTest (3) incl. checkout stores the discounted total.
-        NEXT: C12 shortfall/dispute cases, then C13 Xendit checks (refund permission!), then cashier/admin/super.
+        C12 DONE (2026-11-17): App\Domain\Shortfalls + CaseController. Supplier "Problems & Cases"
+        (supplier/shortfalls) reports item/qty/dates/reason/photo (private disk cases/) → maintenance hold (bypasses
+        holdConflicts) → affected(): per date overbooked = reserved − usable, given to the most recently accepted
+        bookings first → one ShortfallCase per booking, customer notified. Shared page /cases/{case}
+        (customer | shop | support) = steps reported→proposed→countered→agreed→resolved, open proposal + deadline,
+        accept / decline / counter (customer), thread; case_events = timeline + thread + audit. Types partial |
+        substitute | delay | refund | cancel (+ credit). apply(): lines, BookingDays::sync, pricing re-snapshot
+        with pricing['credits'], pending 'refund' Payment (recorded_by system) when paid > new total, notify shop
+        finance. escalateDue() (page loads + `partyrent:escalate-cases` every 15 min) → admin.cases → settle.
+        case-alert partial on both booking pages. ShortfallCasesTest (5). Browser check pending.
+        NEXT: browser check of C12, then C13 Xendit (refund permission! pending shortfall refunds → Xendit refund,
+        payout reduction), then cashier/admin/super.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
         private disk + 'revision' decision), then superadmin.

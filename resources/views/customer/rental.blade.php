@@ -3,6 +3,7 @@
 @section('content')
 <div class="crumbs"><a href="{{ route('rentals.index') }}">My Rentals</a> / {{ $r->code }}</div>
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@include('partials.badges', ['pay' => $f['status']])</div></div>
+@include('partials.case-alert', ['r' => $r])
 <div class="card mb-2">@include('partials.progress')</div>
 @if($f['isOverdue'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div><b>Payment overdue.</b> Outstanding: {{ money($f['overdueAmount']) }}. Please settle as soon as possible to keep your reservation. The supplier will review overdue accounts according to their policy.</div></div>@endif
 @if($r->status === 'pending')<div class="alert alert-info mb-2">{{ icon('clock') }}<div>Waiting for <b>{{ $sup->name }}</b> to review your request. Items are not reserved until it is accepted.</div></div>@endif

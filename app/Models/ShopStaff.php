@@ -62,6 +62,7 @@ class ShopStaff extends Model
         'products' => 'products.manage', 'products.*' => 'products.manage',
         'packages' => 'products.manage', 'packages.*' => 'products.manage',
         'discounts' => 'products.manage', 'discounts.*' => 'products.manage',
+        'shortfalls' => 'orders.view', 'shortfalls.*' => 'orders.manage',
         'inventory' => 'inventory.manage', 'inventory.*' => 'inventory.manage',
         'locations' => 'locations.manage', 'locations.*' => 'locations.manage',
         'damages' => 'returns.inspect', 'damages.*' => 'returns.inspect',

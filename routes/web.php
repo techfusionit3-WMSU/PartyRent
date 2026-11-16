@@ -7,6 +7,7 @@ use App\Http\Controllers\AiController;
 use App\Http\Controllers\ApiController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Cashier\CashierController;
+use App\Http\Controllers\CaseController;
 use App\Http\Controllers\Customer\CartController;
 use App\Http\Controllers\Customer\RentalController;
 use App\Http\Controllers\Customer\StartSellingController;
@@ -76,6 +77,16 @@ Route::middleware('auth')->group(function () {
 });
 
 /* ---------- customer mode ---------- */
+// Shortfall / dispute cases (change list C12): one page for the customer, the shop and PartyRent support.
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/cases/{case}', [CaseController::class, 'show'])->name('cases.show');
+    Route::post('/cases/{case}/propose', [CaseController::class, 'propose'])->name('cases.propose');
+    Route::post('/cases/{case}/respond', [CaseController::class, 'respond'])->name('cases.respond');
+    Route::post('/cases/{case}/message', [CaseController::class, 'message'])->name('cases.message');
+    Route::post('/cases/{case}/settle', [CaseController::class, 'settle'])->name('cases.settle');
+    Route::get('/cases-photo/{case}', [CaseController::class, 'photo'])->name('cases.photo');
+});
+
 Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/cart', [CartController::class, 'index'])->name('cart');
     Route::post('/cart', [CartController::class, 'add'])->name('cart.add');
@@ -155,6 +166,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/packages/{package}/move', [CatalogController::class, 'movePackage'])->name('packages.move');
     Route::post('/packages/{package}/active', [CatalogController::class, 'packageActive'])->name('packages.active');
     Route::delete('/packages/{package}', [CatalogController::class, 'deletePackage'])->name('packages.delete');
+    Route::get('/shortfalls', [CaseController::class, 'supplierIndex'])->name('shortfalls');
+    Route::post('/shortfalls', [CaseController::class, 'report'])->name('shortfalls.store');
     Route::get('/discounts', [DiscountController::class, 'index'])->name('discounts');
     Route::post('/discounts', [DiscountController::class, 'store'])->name('discounts.store');
     Route::put('/discounts/{discount}', [DiscountController::class, 'update'])->name('discounts.update');
@@ -218,6 +231,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::post('/categories', [AdminController::class, 'storeCategory'])->name('categories.store');
     Route::post('/categories/{category}', [AdminController::class, 'updateCategory'])->name('categories.update');
     Route::get('/complaints', [AdminController::class, 'complaints'])->name('complaints');
+    Route::get('/cases', [CaseController::class, 'adminIndex'])->name('cases');
     Route::post('/complaints', [AdminController::class, 'storeComplaint'])->name('complaints.store');
     Route::post('/complaints/{complaint}', [AdminController::class, 'updateComplaint'])->name('complaints.update');
     Route::get('/reviews', [ReviewController::class, 'adminIndex'])->name('reviews');

@@ -1,33 +1,42 @@
-@extends('layouts.dash', ['title' => 'Packages', 'nav' => 'packages'])
+@extends('layouts.dash', ['title' => 'Rental Packages', 'nav' => 'packages'])
 
+{{-- Reference SP.packages (+ app: order, duplicate, delete, drafts, options) --}}
+@php($today = today_iso())
+@php($next30 = array_map(fn ($i) => add_days($today, $i), range(0, 29)))
 @section('content')
-<div class="page-head"><div><h1>Packages</h1><p>Bundles of your rental items, consumables and services. Availability always comes from the stock of what's inside. Customers see them in this order.</p></div><a class="btn btn-primary" href="{{ route('supplier.packages.create') }}">{{ icon('plus') }}New package</a></div>
+<div class="page-head"><div><h1>Rental Packages</h1><p>Bundles of your items at a fixed price. Reserving a package deducts each included item from inventory.</p></div><a class="btn btn-primary" href="{{ route('supplier.packages.create') }}">{{ icon('plus') }}Create package</a></div>
 @if($list->isEmpty())
-  <div class="card">@include('partials.empty', ['emoji' => '📦', 'title' => 'No packages yet', 'text' => 'Bundle items that customers often rent together, add services and let them pick options.'])</div>
+  <div class="card">@include('partials.empty', ['emoji' => '📦', 'title' => 'No packages yet', 'text' => 'Bundle items that customers often rent together.'])</div>
 @else
   <div class="grid grid-2">
     @foreach($list as $n => $k)
       @php($def = \App\Domain\Packages::def($k))
       @php($pp = \App\Domain\Packages::price($def))
+      @php($inc = array_values(array_filter($pp['rows'], fn ($r) => $r['group'] === 'included')))
+      @php($hidden = $k->status === 'hidden')
+      @php($limiting = collect($inc)->filter(fn ($r) => isset($r['productId']) && $r['qty'] > 0)->map(fn ($r) => ['name' => $r['name'], 'a' => intdiv(inv()->availableOn($r['productId'], $today), (int) max(1, $r['qty']))])->sortBy('a')->first())
       <div class="card">
-        <div class="row between top">
-          <div><div style="font-size:1.8rem">{{ $k->emoji }}</div><b>{{ $k->name }}</b>
-            <span class="badge {{ $k->is_draft ? 'b-gray' : ($k->active ? 'b-green' : 'b-gold') }}">{{ $k->statusLabel() }}</span>
-            <div class="small muted">{{ count($def['components']) }} components · {{ money($pp['package']) }}{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : '/day' }}{{ $pp['savings'] > 0 ? ' · saves customers '.money($pp['savings']) : '' }} · {{ \App\Domain\Packages::MODES[$def['pricing']['mode']] }}</div>
-          </div>
-          <div class="btn-group">
-            <form method="POST" action="{{ route('supplier.packages.move', $k) }}">@csrf<input type="hidden" name="dir" value="up"><button class="btn btn-xs btn-ghost" aria-label="Move up" @disabled($n === 0)>↑</button></form>
-            <form method="POST" action="{{ route('supplier.packages.move', $k) }}">@csrf<input type="hidden" name="dir" value="down"><button class="btn btn-xs btn-ghost" aria-label="Move down" @disabled($n === $list->count() - 1)>↓</button></form>
+        <div class="row top">
+          @include('partials.thumb', ['item' => $k])
+          <div class="grow">
+            <div class="row between"><b>{{ $k->emoji }} {{ $k->name }}</b><span class="badge {{ $hidden ? 'b-red' : ($k->is_draft ? 'b-gray' : ($k->active ? 'b-green' : 'b-gray')) }}">{{ $hidden ? 'Hidden by admin' : ($k->is_draft ? 'Draft' : ($k->active ? 'Active' : 'Inactive')) }}</span></div>
+            <div class="small muted">{{ $k->description }}</div>
+            @if($hidden)<div class="small" style="color:var(--red)">Hidden by a PartyRent admin: {{ $k->hidden_reason }}. It cannot be republished.</div>@endif
+            <div class="mt-1"><span class="price">{{ money($pp['package']) }}</span> <span class="small muted">{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : '/ day · ' }}items separately {{ money($pp['separate']) }}</span></div>
           </div>
         </div>
-        <p class="small mt-1 mb-1">{{ $k->description }}</p>
-        <div class="small muted">@foreach(\App\Domain\Packages::describe($def) as $line)<div>{{ $line }}</div>@endforeach</div>
-        @unless($k->is_draft)<div class="small mt-1">Available today: <b>{{ inv()->packageAvailableOn($k->id, today_iso()) }}</b></div>@endunless
-        <div class="btn-group mt-2">
-          <a class="btn btn-sm" href="{{ route('supplier.packages.edit', $k) }}">{{ icon('edit') }}Edit</a>
-          @unless($k->is_draft)<form method="POST" action="{{ route('supplier.packages.active', $k) }}">@csrf<button class="btn btn-sm btn-ghost">{{ $k->active ? 'Hide' : 'Show' }}</button></form>@endunless
-          <form method="POST" action="{{ route('supplier.packages.duplicate', $k) }}">@csrf<button class="btn btn-sm btn-ghost">Duplicate</button></form>
-          <form method="POST" action="{{ route('supplier.packages.delete', $k) }}" data-confirm="Delete {{ $k->name }}? It disappears from customers' Rental Lists. Requests already booked keep their copy." data-confirm-title="Delete package?" data-confirm-ok="Delete" data-danger>@csrf @method('DELETE')<button class="btn btn-sm btn-ghost" aria-label="Delete package">{{ icon('trash') }}</button></form>
+        <div class="mt-1 small">@foreach($inc as $r)<span class="tag">{{ $r['qty'] }}× {{ $r['name'] }}</span> @endforeach</div>
+        @if(count($def['components']) > count($inc))<div class="small muted mt-1">@foreach(array_slice(\App\Domain\Packages::describe($def), 1) as $line)<div>{{ $line }}</div>@endforeach</div>@endif
+        <div class="row between mt-2 wrap">
+          <div class="small">@unless($k->is_draft)<b>{{ inv()->packageAvailableOn($k->id, $today) }}</b> available today · min <b>{{ min(array_map(fn ($d) => inv()->packageAvailableOn($k->id, $d), $next30)) }}</b> next 30 days @if($limiting)<div class="muted">Limited by {{ $limiting['name'] }}</div>@endif @endunless</div>
+          <div class="btn-group">
+            <a class="btn btn-xs" href="{{ route('supplier.packages.edit', $k) }}">{{ icon('edit') }}Edit</a>
+            @unless($k->is_draft || $hidden)<form method="POST" action="{{ route('supplier.packages.active', $k) }}">@csrf<button class="btn btn-xs">{{ $k->active ? 'Deactivate' : 'Activate' }}</button></form>@endunless
+            <form method="POST" action="{{ route('supplier.packages.duplicate', $k) }}">@csrf<button class="btn btn-xs btn-ghost">Duplicate</button></form>
+            <form method="POST" action="{{ route('supplier.packages.move', $k) }}">@csrf<input type="hidden" name="dir" value="up"><button class="btn btn-xs btn-ghost" aria-label="Move up" title="Show earlier to customers" @disabled($n === 0)>↑</button></form>
+            <form method="POST" action="{{ route('supplier.packages.move', $k) }}">@csrf<input type="hidden" name="dir" value="down"><button class="btn btn-xs btn-ghost" aria-label="Move down" title="Show later to customers" @disabled($n === $list->count() - 1)>↓</button></form>
+            <form method="POST" action="{{ route('supplier.packages.delete', $k) }}" data-confirm="Delete {{ $k->name }}? It disappears from customers' Rental Lists. Requests already booked keep their copy." data-confirm-title="Delete package?" data-confirm-ok="Delete" data-danger>@csrf @method('DELETE')<button class="btn btn-xs btn-ghost" aria-label="Delete package">{{ icon('trash') }}</button></form>
+          </div>
         </div>
       </div>
     @endforeach

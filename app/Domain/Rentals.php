@@ -1518,6 +1518,51 @@ class Rentals
     }
 
     /** Adjust damaged / missing counters (repaired or found units go back to available). */
+    /**
+     * Reference "Update stock" (stockByLocation): each inventory location keeps its own quantity and the
+     * product total is their sum. Refused when a location would hold fewer units than the peak booking
+     * already allocated to it, or the new total would break accepted reservations.
+     * $qty: [inventory_location_id => units]
+     */
+    public static function setLocationStock(Product $p, array $qty): array
+    {
+        $locs = $p->supplier->locations()->get();
+        if ($locs->isEmpty()) {
+            return self::fail('Add an inventory location first.');
+        }
+        $new = [];
+        foreach ($locs as $l) {
+            $new[$l->id] = max(0, (int) ($qty[$l->id] ?? inv()->stockAt($p->id, $l->id)));
+        }
+        foreach ($locs as $l) {
+            $peak = 0;
+            foreach (inv()->reservedDates($p->id, $l->id) as $d) {
+                $peak = max($peak, (int) inv()->demandOn($p->id, $d, Inventory::RESERVING, null, null, $l->id)['total']);
+            }
+            if ($new[$l->id] < $peak) {
+                return self::fail($l->name.' has '.$peak.' unit(s) allocated to accepted bookings — it cannot go below that.');
+            }
+        }
+        $total = array_sum($new);
+        if ($c = inv()->stockChangeConflicts($p->id, $total)) {
+            return self::fail('This would leave too few units for accepted reservations on '.implode(', ', array_map(fn ($x) => fmt_date($x['date']), $c)).'.');
+        }
+        DB::transaction(function () use ($p, $new, $total) {
+            foreach ($new as $locId => $q) {
+                \App\Models\LocationStock::updateOrCreate(['product_id' => $p->id, 'inventory_location_id' => $locId], ['qty' => $q]);
+            }
+            $delta = $total - (int) $p->total_stock;
+            $p->update(['total_stock' => $total]);
+            if ($delta) {
+                StockMovement::create(['product_id' => $p->id, 'qty' => $delta, 'type' => 'adjust', 'user_id' => auth()->id(), 'balance' => $total, 'note' => 'Updated stock per location', 'created_at' => now()]);
+            }
+        });
+        inv()->flush();
+        Notifier::audit('Updated stock per location', $p->name.': '.$p->supplier->locations()->get()->map(fn ($l) => $l->name.' '.$new[$l->id])->implode(', '));
+
+        return self::ok(['total' => $total]);
+    }
+
     public static function adjustCondition(Product $p, string $field, int $newValue): array
     {
         if (! in_array($field, ['damaged', 'missing'], true)) {

@@ -157,6 +157,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/inventory/{product}/holds', [CatalogController::class, 'addHold'])->name('inventory.hold');
     Route::delete('/inventory/holds/{hold}', [CatalogController::class, 'releaseHold'])->name('inventory.release');
     Route::post('/inventory/{product}/condition', [CatalogController::class, 'adjustCondition'])->name('inventory.condition');
+    Route::post('/inventory/{product}/stock', [CatalogController::class, 'locationStock'])->name('inventory.stock');
 
     Route::get('/calendar', [SupplierReportController::class, 'calendar'])->name('calendar');
     Route::get('/damages', [SupplierReportController::class, 'damages'])->name('damages');

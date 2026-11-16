@@ -365,10 +365,19 @@ class CatalogController extends Controller
     public function inventory(Request $request)
     {
         $date = $request->query('date') ?: today_iso();
-        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->with(['holds' => fn ($q) => $q->orderBy('start_date'), 'movements' => fn ($q) => $q->limit(200)])->orderBy('name')->get();
+        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->with(['holds' => fn ($q) => $q->orderBy('start_date'), 'movements' => fn ($q) => $q->limit(200)])->orderBy('id')->get();
         inv()->primeProducts($prods);
 
-        return view('supplier.inventory', ['prods' => $prods, 'date' => $date]);
+        $sup = $this->sup($request);
+        $conflicts = [];
+        foreach (\App\Models\RentalRequest::where('supplier_id', $sup->id)->where('status', 'pending')->get() as $r) {
+            foreach (inv()->check($r->lines, $r->id)['bad'] as $bad) {
+                $conflicts[] = ['r' => $r, 'b' => $bad];
+            }
+        }
+        $holds = Hold::whereIn('product_id', $prods->pluck('id'))->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', today_iso()))->with('product')->orderBy('start_date')->get();
+
+        return view('supplier.inventory', ['prods' => $prods, 'date' => $date, 'locs' => $sup->locations()->get(), 'conflicts' => $conflicts, 'holds' => $holds]);
     }
 
     public function restock(Request $request, Product $product)
@@ -398,12 +407,34 @@ class CatalogController extends Controller
         return back()->with('success', 'Hold released — units are available again.');
     }
 
+    /** Damaged & missing counts together (reference condModal); the old single field/value form still works. */
     public function adjustCondition(Request $request, Product $product)
     {
         $p = $this->ownProduct($request, $product);
-        $data = $request->validate(['field' => 'required|in:damaged,missing', 'value' => 'required|integer|min:0']);
-        $res = Rentals::adjustCondition($p, $data['field'], (int) $data['value']);
+        if ($request->has('field')) {
+            $data = $request->validate(['field' => 'required|in:damaged,missing', 'value' => 'required|integer|min:0']);
+            $res = Rentals::adjustCondition($p, $data['field'], (int) $data['value']);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? ucfirst($data['field']).' count updated.' : $res['error']);
+            return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? ucfirst($data['field']).' count updated.' : $res['error']);
+        }
+        $data = $request->validate(['damaged' => 'required|integer|min:0', 'missing' => 'required|integer|min:0']);
+        if ($c = inv()->stockChangeConflicts($p->id, $p->total_stock, (int) $data['damaged'], (int) $data['missing'])) {
+            return back()->with('error', 'This would leave too few units for accepted reservations on '.implode(', ', array_map(fn ($x) => fmt_date($x['date']), $c)).'.');
+        }
+        $res = Rentals::adjustCondition($p, 'damaged', (int) $data['damaged']);
+        if ($res['ok']) {
+            $res = Rentals::adjustCondition($p->fresh(), 'missing', (int) $data['missing']);
+        }
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Inventory condition updated.' : $res['error']);
+    }
+
+    public function locationStock(Request $request, Product $product)
+    {
+        $p = $this->ownProduct($request, $product);
+        $data = $request->validate(['qty' => 'required|array', 'qty.*' => 'integer|min:0|max:100000']);
+        $res = Rentals::setLocationStock($p, $data['qty']);
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Stock updated (total '.$res['total'].').' : $res['error']);
     }
 }

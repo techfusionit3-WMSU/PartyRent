@@ -59,8 +59,8 @@ from the first row that is not `verified`.
 | schedule (next 14 days) | E | done | 1440 identical |
 | products | E | done | search + status tabs, stock today, rentals, Activate/Deactivate/Archive/Restore (status archived); ProductStatusTest |
 | product-form | E | todo | |
-| packages (+ package modal) | E (separate page) | todo | |
-| inventory (stock, holds, damaged/missing) | E | todo | |
+| packages (+ package modal) | E (separate page) | done | list per reference (items separately, min next 30 days, limited by); app editor page kept |
+| inventory (stock, holds, damaged/missing) | E | done | Inventory Management per reference: 8 stats, written off, Update stock per location (Rentals::setLocationStock), hold + condition modals, hold schedule; InventoryPageTest |
 | locations (stock by location, transfers, movement log) | M | todo | |
 | calendar | E | todo | |
 | payments | E | todo | |

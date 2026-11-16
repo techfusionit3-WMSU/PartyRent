@@ -5,17 +5,13 @@
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@include('partials.badges', ['pay' => $f['status']])</div></div>
 <div class="card mb-2">@include('partials.progress')</div>
 @if($f['isOverdue'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div><b>Payment overdue.</b> Outstanding: {{ money($f['overdueAmount']) }}. Please settle as soon as possible to keep your reservation. The rental partner will review overdue accounts according to their policy.</div></div>@endif
-@if($r->status === 'pending')
-  @if(! $f['upfrontPaid'])
-    <div class="alert alert-warn mb-2">{{ icon('card') }}<div><b>Pay the {{ strtolower($f['upfront']['label']) }} of {{ money($f['upfront']['amount']) }} to confirm your request.</b> {{ $sup->name }} can only accept once PartyRent's cashier has verified it.@if($f['pendingRental'] > 0) Your {{ money($f['pendingRental']) }} payment is waiting for verification.@endif If the rental partner declines, PartyRent refunds you in full. Items are not reserved until the request is accepted.@if($payTypes) <button class="btn btn-sm btn-primary mt-1" data-modal="payModal">Pay now</button>@endif</div></div>
-  @else
-    <div class="alert alert-info mb-2">{{ icon('clock') }}<div>Your {{ strtolower($f['upfront']['label']) }} is verified. Waiting for <b>{{ $sup->name }}</b> to accept. Items are not reserved until it is accepted; if they decline, PartyRent refunds you in full.</div></div>
-  @endif
-@endif
+@if($r->status === 'pending')<div class="alert alert-info mb-2">{{ icon('clock') }}<div>Waiting for <b>{{ $sup->name }}</b> to review your request. Items are not reserved until it is accepted.</div></div>@endif
 
 <div class="grid grid-side">
   <div class="stack">
     <div class="card"><div class="card-head"><h3>Items & daily quantities</h3><span class="small muted">{{ fmt_range($r->start_date, $r->end_date) }}</span></div>@include('partials.lines-table', ['pricing' => $r->pricing])</div>
+    @if($r->fulfillment === 'delivery' && $r->destinations)<div class="card"><h3>{{ count($r->destinations) > 1 ? 'Delivery & event locations' : 'Delivery location' }}</h3>@include('partials.destinations')</div>@endif
+    @if($r->plan === 'installment')@include('partials.installment-card')@endif
     <div class="card"><div class="card-head"><h3>Payment history</h3>@if($payTypes)<button class="btn btn-primary btn-sm" data-modal="payModal">{{ icon('card') }}Make a payment</button>@endif</div>@include('partials.payment-history')</div>
     @include('partials.inspection-report')
     <div class="card"><h3>Activity</h3>@include('partials.timeline')</div>
@@ -26,9 +22,9 @@
     <div class="card"><h3>{{ $r->fulfillment === 'delivery' ? 'Delivery' : 'Pickup' }} details</h3>
       <dl class="kv">
         <dt>Rental Partner</dt><dd><a href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->phone }}</div></dd>
-        @if($r->fulfillment === 'delivery')<dt>Deliver to</dt><dd>{{ $r->address }}</dd>@else<dt>Pickup at</dt><dd>{{ $r->revealsPickupLocation() ? $sup->address : $sup->publicAddress() }}<div class="small muted">{{ $sup->hours }}</div></dd>@endif
+        @if($r->fulfillment === 'delivery')<dt>Deliver to</dt><dd>{{ count($r->destinations ?? []) > 1 ? count($r->destinations).' locations (see left)' : $r->address }}</dd>@else<dt>Pickup at</dt><dd>{{ $r->revealsPickupLocation() ? $sup->address : $sup->publicAddress() }}<div class="small muted">{{ $sup->hours }}</div></dd>@endif
         <dt>Contact</dt><dd>{{ $r->contact_name }} · {{ $r->contact_phone }}</dd>
-        <dt>Payment</dt><dd>{{ \App\Models\Payment::ARR_LABEL[$r->arrangement] }} · {{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}</dd>
+        <dt>Payment</dt><dd>{{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }} · {{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</dd>
         @if(! empty($r->fulfillment_log['releaseDate']))<dt>Released</dt><dd>{{ fmt_date($r->fulfillment_log['releaseDate']) }} to {{ $r->fulfillment_log['receivedBy'] ?? '' }}</dd>@endif
         @if(! empty($r->fulfillment_log['returnDate']))<dt>Returned</dt><dd>{{ fmt_date($r->fulfillment_log['returnDate']) }}</dd>@endif
         <dt>Return status</dt><dd>{{ $r->status === 'completed' ? 'Returned & closed' : ($r->inspection ? 'Inspected' : ($r->status === 'return_pending' ? 'Awaiting return' : ($r->status === 'ongoing' ? 'Due '.fmt_date(add_days($r->end_date, 1)) : '—'))) }}</dd>

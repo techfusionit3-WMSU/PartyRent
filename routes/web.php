@@ -67,7 +67,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/reviews/{review}/report', [ReviewController::class, 'report'])->middleware('throttle:10,1')->name('reviews.report');
     Route::get('/payments/{payment}/proof', [PaymentFileController::class, 'proof'])->name('payments.proof');
     Route::get('/pay-accounts/{payAccount}/qr', [PaymentFileController::class, 'qr'])->name('payments.qr');
-    Route::post('/api/delivery-preview', [ApiController::class, 'deliveryPreview'])->name('api.delivery-preview');
 
     // Email verification: unverified customers can browse, but renting/selling needs a verified email.
     Route::get('/email/verify', [AuthController::class, 'verifyNotice'])->name('verification.notice');
@@ -79,16 +78,20 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/cart', [CartController::class, 'index'])->name('cart');
     Route::post('/cart', [CartController::class, 'add'])->name('cart.add');
+    Route::post('/cart/select', [CartController::class, 'select'])->name('cart.select');
     Route::patch('/cart/{line}', [CartController::class, 'update'])->name('cart.update');
+    Route::post('/cart/{line}/time', [CartController::class, 'time'])->name('cart.time');
     Route::delete('/cart/{line}', [CartController::class, 'remove'])->name('cart.remove');
-    Route::get('/checkout/{supplier}', [CartController::class, 'checkout'])->name('checkout');
-    Route::post('/checkout/{supplier}', [CartController::class, 'submit'])->name('checkout.submit');
-    Route::get('/checkout/{supplier}/quote', [CartController::class, 'quote'])->name('checkout.quote');
+    Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout');
+    Route::post('/checkout', [CartController::class, 'submit'])->name('checkout.submit');
+    Route::post('/checkout/quote', [CartController::class, 'quote'])->name('checkout.quote');
+    Route::get('/rentals/submitted', [CartController::class, 'submitted'])->name('rentals.submitted');
 
     Route::get('/rentals', [RentalController::class, 'index'])->name('rentals.index');
     Route::get('/rentals/{rentalRequest}', [RentalController::class, 'show'])->name('rentals.show');
     Route::get('/rentals/{rentalRequest}/submitted', [RentalController::class, 'confirmation'])->name('rentals.confirmation');
     Route::post('/rentals/{rentalRequest}/cancel', [RentalController::class, 'cancel'])->name('rentals.cancel');
+    Route::post('/rentals/{rentalRequest}/installments', [RentalController::class, 'proposeInstallments'])->name('rentals.installments');
     Route::post('/rentals/{rentalRequest}/payments', [RentalController::class, 'pay'])->name('rentals.pay');
     Route::get('/rentals/{rentalRequest}/payments/{payment}/online', [RentalController::class, 'onlineReturn'])->name('rentals.online.return');
     // practice checkout (PAYMONGO_FAKE=true, never in production)
@@ -129,6 +132,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/requests/{rentalRequest}/complete', [SupplierRequestController::class, 'complete'])->name('requests.complete');
     Route::post('/requests/{rentalRequest}/notes', [SupplierRequestController::class, 'notes'])->name('requests.notes');
     Route::post('/requests/{rentalRequest}/cash', [SupplierRequestController::class, 'recordCash'])->name('requests.cash');
+    Route::post('/requests/{rentalRequest}/source', [SupplierRequestController::class, 'source'])->name('requests.source');
+    Route::post('/requests/{rentalRequest}/schedule/{decision}', [SupplierRequestController::class, 'schedule'])->whereIn('decision', ['approve', 'reject'])->name('requests.schedule');
 
     Route::get('/products', [CatalogController::class, 'products'])->name('products');
     Route::get('/products/new', [CatalogController::class, 'createProduct'])->name('products.create');

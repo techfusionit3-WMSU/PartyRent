@@ -43,25 +43,42 @@ class RequestController extends Controller
     public function show(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);
-        $availRows = [];
-        foreach (inv()->demandMap($r->lines) as $d => $pids) {
-            foreach ($pids as $pid => $qn) {
-                $availRows[] = ['d' => $d, 'pid' => $pid, 'qn' => $qn, 'b' => inv()->breakdown($pid, $d, $r->id)];
-            }
-        }
-        $conflicts = $r->status === 'pending' ? inv()->check($r->lines, $r->id)['bad'] : [];
+        $u = $request->user();
+        $chk = inv()->check($r->lines, $r->id);
         $f = $r->fin();
-        $sug = Finance::suggestedNext($r);
+        $locs = $r->supplier->locations;
 
         return view('supplier.request', [
-            'r' => $r, 'c' => $r->customer, 'f' => $f, 'availRows' => $availRows, 'conflicts' => $conflicts,
+            'r' => $r, 'c' => $r->customer, 'f' => $f, 'chk' => $chk, 'conflicts' => $r->status === 'pending' ? $chk['bad'] : [],
+            'showAvail' => in_array($r->status, ['pending', 'accepted', 'in_progress'], true), 'locs' => $locs,
+            'canAlloc' => in_array($r->status, ['pending', 'accepted', 'in_progress'], true) && ($u->orgCan('orders.manage') || $u->orgCan('inventory.manage')) && $locs->count() > 1,
+            'finOK' => Rentals::canFinance($r->supplier_id, 'payments.verify', $u), 'canRecord' => in_array($r->status, Finance::ACTIVE, true) && Rentals::canFinance($r->supplier_id, 'payments.record', $u),
             'next' => Rentals::nextSteps($r), 'review' => $r->status === 'pending' ? Rentals::acceptReview($r) : null,
             'checklist' => $r->status === 'inspection' ? Rentals::completionChecklist($r) : [],
             'custHist' => RentalRequest::where('customer_id', $r->customer_id)->get(['status']),
-            'peak' => $r->status === 'return_pending' ? Rentals::peakUnits($r) : [], 'sug' => $sug,
+            'peak' => $r->status === 'return_pending' ? Rentals::peakUnits($r) : [], 'sug' => Finance::suggestedNext($r),
         ]);
     }
 
+    /** Change the inventory source of one line. */
+    public function source(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $data = $request->validate(['line' => 'required|string|max:20', 'location' => 'required|integer']);
+        $res = Rentals::setLineSource($r, $data['line'], (int) $data['location']);
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Inventory source updated.' : $res['error']);
+    }
+
+    /** Approve or reject the customer's installment schedule. */
+    public function schedule(Request $request, RentalRequest $rentalRequest, string $decision)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $approve = $decision === 'approve';
+        $res = Rentals::reviewInstallmentPlan($r, $approve, $request->input('reason'), $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? ($approve ? 'Installment schedule approved.' : 'Schedule rejected. Customer notified.') : $res['error']);
+    }
     public function accept(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);
@@ -125,13 +142,13 @@ class RequestController extends Controller
         return back()->with('success', 'Notes saved.');
     }
 
-    /** Cash received by the supplier (e.g. COD) — sent to the cashier for verification. */
+    /** Record a payment received by the shop (reference recordCash): verified at once, receipt issued. */
     public function recordCash(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);
         $data = $request->validate(['type' => 'required|string', 'amount' => 'required|numeric|min:1', 'date' => 'required|date|before_or_equal:today', 'reference' => 'required|string|max:80', 'notes' => 'nullable|string|max:255']);
-        $res = Rentals::submitPayment($r, array_merge($data, ['method' => 'cash']), 'supplier');
+        $res = Rentals::cashierRecord($r, array_merge($data, ['method' => $request->input('method', 'cash')]), $request->user());
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payment recorded and sent for cashier verification.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payment recorded and verified. Receipt '.$res['payment']->receipt_no.' issued.' : $res['error']);
     }
 }

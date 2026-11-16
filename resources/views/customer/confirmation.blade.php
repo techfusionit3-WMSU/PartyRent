@@ -1,21 +1,23 @@
-@extends('layouts.market', ['title' => 'Request submitted', 'nav' => 'rentals'])
+@extends('layouts.market', ['title' => 'Request Submitted', 'nav' => 'rentals'])
 
+{{-- Port of C.confirmation (reference js/pages/customer-rent.js) --}}
 @section('content')
-<div class="card center" style="max-width:640px;margin:20px auto;padding:36px 24px">
+<div class="card center" style="max-width:680px;margin:20px auto;padding:36px 24px">
   <div style="font-size:3.4rem">🎉</div>
-  <h1>Request submitted!</h1>
-  <p class="muted">Your rental request number is</p>
-  <div class="price-lg" style="font-size:2rem">{{ $r->code }}</div>
-  <div class="mt-1">@include('partials.badges', ['status' => 'pending'])</div>
-  @php($up = $r->fin()['upfront'])
-  <p class="mt-2">We sent it to <b>{{ $r->supplier->name }}</b>. To confirm it, pay the <b>{{ strtolower($up['label']) }} of {{ money($up['amount']) }}</b>. {{ $r->supplier->name }} can accept once PartyRent's cashier has verified it.</p>
-  <div class="card card-flat soft" style="text-align:left"><b>What happens next</b><ol class="small mb-0" style="padding-left:18px">
-    <li>Pay the {{ strtolower($up['label']) }} ({{ money($up['amount']) }}) from your request page. Our cashier verifies it.</li>
-    <li>The rental partner then accepts or declines (status stays <b>Pending</b> until then). If they decline, PartyRent refunds you in full.</li>
-    <li>Once accepted, the rest of your payment schedule appears in <b>My Rentals</b>.</li>
-    <li>Pay using {{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}: payments go to PartyRent, count after cashier verification, and are released to the rental partner only after your rental is completed.</li>
-    <li>Receive your items by {{ $r->fulfillment === 'delivery' ? 'delivery' : 'pickup' }} and return them after the event.</li>
+  <h1>{{ $list->count() > 1 ? $list->count().' requests submitted!' : 'Request submitted!' }}</h1>
+  <p class="muted">Each shop received its own rental request.</p>
+  <div class="stack-sm" style="text-align:left">
+    @foreach($list as $r)
+      <div class="card card-flat row between wrap" style="padding:12px 14px"><div><b class="price">{{ $r->code }}</b> · {{ $r->supplier->name }}<div class="small muted">{{ fmt_range($r->start_date, $r->end_date) }} · {{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }}{{ count($r->destinations ?? []) > 1 ? ' · '.count($r->destinations).' locations' : '' }}</div></div>
+        <div class="row">@include('partials.badges', ['status' => 'pending'])<b>{{ money($r->pricing['total']) }}</b><a class="btn btn-xs" href="{{ route('rentals.show', $r) }}">View</a></div></div>
+    @endforeach
+  </div>
+  <div class="card card-flat soft mt-2" style="text-align:left"><b>What happens next</b><ol class="small mb-0" style="padding-left:18px">
+    <li>Each supplier reviews availability and its inventory allocation (status stays <b>Pending</b>).</li>
+    <li>Once accepted, that order's payment schedule appears in <b>My Rentals</b> — reservation fee first (or the full payment).</li>
+    @if($list->contains(fn ($r) => $r->plan === 'installment'))<li>Installment schedules are approved by the supplier before they take effect.</li>@endif
+    <li>You pay online through PartyRent; each payment is confirmed automatically. Everything is due on or before the event date.</li>
   </ol></div>
-  <div class="row wrap mt-3" style="justify-content:center"><a class="btn btn-primary" href="{{ route('rentals.show', $r) }}">View request</a><a class="btn" href="{{ route('rentals.index') }}">My Rentals</a><a class="btn btn-ghost" href="{{ route('home') }}">Keep browsing</a></div>
+  <div class="row wrap mt-3" style="justify-content:center"><a class="btn btn-primary" href="{{ route('rentals.index') }}">My Rentals</a>@if($left)<a class="btn" href="{{ route('cart') }}">Back to Rental List ({{ $left }} left)</a>@endif<a class="btn btn-ghost" href="{{ route('home') }}">Keep browsing</a></div>
 </div>
 @endsection

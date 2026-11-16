@@ -488,5 +488,14 @@
     $$('[data-review-form]').forEach(MediaInputs);
   });
 
-  window.PRUI = { toast, confirmDialog, openModal, closeModal, Scheduler, Calendar, AddressPicker, api, esc };
+  /* ---------- Rental List checkboxes (per item / per shop / Select all) ---------- */
+  $$('[data-indet]').forEach(x => { x.indeterminate = true; });
+  document.addEventListener('change', async e => {
+    const box = e.target.closest && e.target.closest('input[data-select]'); if (!box) return;
+    box.disabled = true;
+    try { await api('/cart/select', { method: 'POST', body: JSON.stringify({ ids: JSON.parse(box.dataset.select), on: box.checked }) }); location.reload(); }
+    catch (err) { box.disabled = false; toast(err.message, 'error'); }
+  });
+
+  window.PRUI = { toast, confirmDialog, openModal, closeModal, Scheduler, Calendar, AddressPicker, api, esc, icon: (n, st) => svg(n, st || 'width:16px;height:16px;vertical-align:-3px') };
 })();

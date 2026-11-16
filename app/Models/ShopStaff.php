@@ -53,7 +53,7 @@ class ShopStaff extends Model
     public const ROUTE_PERMS = [
         'dashboard' => null,
         'requests.accept' => 'orders.manage', 'requests.decline' => 'orders.manage', 'requests.notes' => 'orders.manage',
-        'requests.schedule.*' => 'orders.manage',
+        'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage',
         'requests.advance' => 'fulfillment.update', 'requests.complete' => 'fulfillment.update',
         'requests.inspection' => 'returns.inspect', 'requests.settle' => 'returns.inspect',
         'requests.cash' => 'payments.record',

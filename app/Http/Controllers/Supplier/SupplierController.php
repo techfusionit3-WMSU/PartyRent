@@ -30,7 +30,7 @@ class SupplierController extends Controller
         $ver = Payment::whereIn('rental_request_id', $ids)->where('status', 'verified')->get();
 
         $pend = $reqs->where('status', 'pending');
-        $toReview = $pend->filter(fn ($r) => $r->fin()['upfrontPaid'] !== false); // null = nothing to pay upfront
+        $toReview = $pend;
         $booked = ['accepted', 'in_progress', 'ready_pickup', 'out_delivery'];
         $out = $reqs->filter(fn ($r) => in_array($r->status, $booked, true) && $r->start_date <= $T);
         $returns = $reqs->filter(fn ($r) => ($r->status === 'ongoing' && $r->end_date < $T) || $r->status === 'return_pending');

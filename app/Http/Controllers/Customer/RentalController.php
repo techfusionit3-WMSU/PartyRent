@@ -42,14 +42,6 @@ class RentalController extends Controller
         $r = $this->own($request, $rentalRequest);
         $f = $r->fin();
         $types = [];
-        if ($r->status === 'pending' && $f['upfrontLeft'] > 0.009) {
-            $up = $f['upfront'];
-            $types[] = [$up['type'], $up['label'].' (to confirm)', $f['upfrontLeft']];
-            $left = r2($f['balance'] - $f['pendingRental']);
-            if ($left > $f['upfrontLeft'] + 0.009) {
-                $types[] = ['full', 'Pay the full amount now', $left];
-            }
-        }
         if ($r->isActive()) {
             $sug = Finance::suggestedNext($r);
             $left = r2($f['balance'] - $f['pendingRental']);
@@ -76,7 +68,17 @@ class RentalController extends Controller
 
     public function confirmation(Request $request, RentalRequest $rentalRequest)
     {
-        return view('customer.confirmation', ['r' => $this->own($request, $rentalRequest)]);
+        return redirect()->route('rentals.submitted', ['ids' => $this->own($request, $rentalRequest)->code]);
+    }
+
+    /** Customer proposes (or re-proposes) an installment schedule. */
+    public function proposeInstallments(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $items = array_values(array_filter((array) $request->input('items', []), fn ($x) => ! empty($x['due']) && (float) ($x['amount'] ?? 0) > 0));
+        $res = Rentals::proposeInstallmentPlan($r, $request->user(), $items);
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Schedule sent to '.$r->supplier->name.' for approval.' : $res['error']);
     }
 
     public function cancel(Request $request, RentalRequest $rentalRequest)

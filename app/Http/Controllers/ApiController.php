@@ -111,37 +111,6 @@ class ApiController extends Controller
         return response()->json(Locations::forClient())->setPublic()->setMaxAge(86400);
     }
 
-    /** Live preview while a supplier edits delivery settings: what would a customer in `city` pay (no items, one trip)? */
-    public function deliveryPreview(Request $request): JsonResponse
-    {
-        $v = $request->validate(array_merge(DeliveryInput::rules(), [
-            'city' => 'required|string|max:12', 'fulfillment' => 'nullable|in:delivery,pickup,both', 'shop_addr' => 'nullable|array', 'shop_addr.cityCode' => 'nullable|string|max:12',
-        ]));
-        $shopCity = $v['shop_addr']['cityCode'] ?? null;
-        $sup = new Supplier([
-            'name' => 'This shop', 'fulfillment' => $v['fulfillment'] ?? 'both',
-            'city_code' => Locations::isCity($shopCity) ? $shopCity : null, 'city' => Locations::name($shopCity) ?: 'your shop city',
-        ]);
-        $q = Pricing::deliveryQuote($sup, [], 0, $v['city'], DeliveryInput::toSettings($v['delivery'] ?? [], $sup->fulfillment, false));
-        if (! $q['ok']) {
-            return response()->json(['ok' => false, 'error' => $q['error']]);
-        }
-        $detail = collect($q['breakdown'])->map(fn ($b) => $b['label'].': '.money($b['amount']))->implode(' · ');
-        if ($q['mode'] === 'weight') {
-            $per = (float) (\App\Domain\Settings::get('shipPerKg')[$q['route']] ?? 0);
-
-            return response()->json([
-                'ok' => true, 'fee' => $q['fee'],
-                'text' => 'Delivery to '.$q['cityLabel'].': '.money($q['fee']).' for the first kg',
-                'detail' => 'Route: '.Pricing::TIER_LABEL[$q['route']].' · + '.money($per).' per extra kg'.($q['legs'] === 2 ? ' · charged each way' : ''),
-            ]);
-        }
-
-        return response()->json([
-            'ok' => true, 'fee' => $q['fee'], 'text' => 'Delivery to '.$q['cityLabel'].': '.money($q['fee']).($q['distanceKm'] !== null ? ' (~'.$q['distanceKm'].' km)' : ''),
-            'detail' => count($q['breakdown']) > 1 ? $detail : '',
-        ]);
-    }
 
     /** Month availability for a product or package. */
     /** Hourly item: booked times on a date, and how many units are free for a chosen window. */

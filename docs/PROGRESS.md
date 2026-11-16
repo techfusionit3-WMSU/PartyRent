@@ -34,7 +34,13 @@ Port status (update every commit):
   destination, services; change-list visit rule), Finance (3 plans), Payouts (service fee → platform).
   `tests/Unit/BusinessRulesTest` 12 green. TODO still: listing moderation service, durationIssues, lockForUpdate
   re-checks (add-to-cart / submit / accept) using booking_days.
-- [ ] S5 pages. Feature tests are RED (103) because controllers/views still use the old finance/pricing keys
+- [~] S5 pages. DONE so far: Rental List (cart.blade.php: select-all/shop/item, times, scheduler, Rental Charges estimate,
+  compare modal), single checkout (customer/checkout.blade.php + public/js/checkout.js + POST checkout.quote JSON;
+  change list C5/C6 applied: zone per location, Delivery↔Pickup keeps split lines, charges collapsed in Order Summary),
+  confirmation (multi-request), rental details (plan, locations, installment card + proposal), payment summary,
+  supplier request (time-aware availability, allocation, installment approve/reject, record payment), public shop page,
+  product/package cards, RentalPeriod (session) + period banner. Feature tests now 35 red (flow tests for old checkout
+  URL / platform cashier / pay-before-accept): rewrite per area. Old note: Feature tests were RED (103) because controllers/views still use the old finance/pricing keys
   (`upfront`, `arrangement`, `downRequired`, `delivery['ok']`, Shopee delivery). Fix page by page while porting;
   delete tests for removed app-only behaviour (Shopee/weight delivery, upfront-before-accept) and write v4 ones.
   Order: customer flow (browse/product/cart/checkout/rental/payments) → supplier → cashier → admin → super.

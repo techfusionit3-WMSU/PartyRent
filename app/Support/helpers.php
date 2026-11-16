@@ -275,3 +275,18 @@ if (! function_exists('active_role')) {
         return $u ? $u->activeRole(session('mode')) : null;
     }
 }
+
+if (! function_exists('rental_period')) {
+    /** The customer's selected rental period ['start', 'end'] or null (App\Support\RentalPeriod). */
+    function rental_period(): ?array
+    {
+        return \App\Support\RentalPeriod::get();
+    }
+}
+
+if (! function_exists('rental_period_outside')) {
+    function rental_period_outside(array $days): bool
+    {
+        return \App\Support\RentalPeriod::outside($days);
+    }
+}

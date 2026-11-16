@@ -1,26 +1,20 @@
-{{-- Payment summary card: customer, rental partner, cashier and admin all see the same numbers. --}}
+{{-- Payment summary card (reference Shared.paymentSummary): customer, supplier, cashier and admin all see the same numbers. --}}
 @php($f = $r->fin())
 @php($p = $f['pricing'])
+@php($ip = $r->installment_plan)
+@php($plan = $p['plan'] ?? 'full')
 <div class="row between mb-1"><h3 class="mb-0">Payment summary</h3>@include('partials.badges', ['pay' => $f['status']])</div>
-@include('partials.subtotals', ['p' => $p])
-{{-- Delivery comes from the snapshot frozen at submission, never from the rental partner's current rates. --}}
-@php($dl = $p['delivery'] ?? null)
-@if($p['deliveryFee'] || ($dl['ok'] ?? false))
-  <div class="sum-line"><span class="muted">Delivery{{ ! empty($dl['cityLabel']) ? ' to '.$dl['cityLabel'] : '' }}{{ ! empty($dl['waived']) ? ' (free)' : '' }}</span><span>{{ money($p['deliveryFee']) }}</span></div>
-  @if(count($dl['breakdown'] ?? []) > 1)
-    @foreach($dl['breakdown'] as $b)<div class="sum-line small" style="padding-left:12px"><span class="muted">{{ $b['label'] }}</span><span class="muted">{{ $b['amount'] < 0 ? '− '.money(-$b['amount']) : money($b['amount']) }}</span></div>@endforeach
-  @endif
+<div class="row wrap gap-sm mb-1"><span class="badge b-purple plain">{{ \App\Domain\Finance::PLAN_LABEL[$plan] }}</span>@if($f['reservationConfirmed'])<span class="badge b-green plain">{{ $plan === 'full' ? 'Order confirmed' : 'Reservation confirmed' }}</span>@endif @if($f['pendingRental'])<span class="badge b-gold plain">Awaiting verification: {{ money($f['pendingRental']) }}</span>@endif</div>
+@include('partials.rental-charges', ['q' => $p])
+@if($plan === 'full')
+  <div class="sum-line"><span class="muted">Full Payment (100%)</span><span>{{ money($p['total']) }}</span></div>
+@else
+  @if($p['reservationFee'])<div class="sum-line"><span class="muted">Reservation Fee ({{ $p['terms']['resPct'] }}%) <span class="badge b-teal plain">non-refundable · credited</span></span><span>{{ money($p['reservationFee']) }}</span></div>@endif
+  @if($p['downPayment'])<div class="sum-line"><span class="muted">Down Payment ({{ $p['terms']['downPct'] }}%) <span class="badge b-teal plain">credited</span></span><span>{{ money($p['downPayment']) }}</span></div>@endif
+  <div class="sum-line"><span class="muted">{{ $plan === 'installment' ? 'Installment balance' : 'Final Balance' }} ({{ 100 - ($p['terms']['resPct'] ?? 0) - ($p['terms']['downPct'] ?? 0) }}%)</span><span>{{ money($p['finalBalance']) }}</span></div>
 @endif
-<div class="sum-line strong"><span>Total rental amount</span><span>{{ money($p['total']) }}</span></div>
-@if($p['reservationFee'])
-  <div class="sum-line"><span class="muted">Reservation fee @if($p['reservationCredited'])<span class="badge b-teal plain">credited to down payment</span>@else<span class="badge b-gold plain">additional charge</span>@endif</span><span>{{ money($p['reservationFee']) }}</span></div>
-@endif
-@if($p['arrangement'] === 'down')
-  <div class="sum-line"><span class="muted">Required down payment{{ $p['downPct'] ? ' ('.$p['downPct'].'%)' : '' }}</span><span>{{ money($p['downRequired']) }}</span></div>
-  @if($p['reservationFee'] && $p['reservationCredited'])<div class="sum-line"><span class="muted">Remaining down payment after reservation fee</span><span>{{ money(max(0, $p['downRequired'] - $p['reservationFee'])) }}</span></div>@endif
-  <div class="sum-line"><span class="muted">Balance after down payment</span><span>{{ money($p['payable'] - $p['downRequired'] - ($p['reservationCredited'] ? 0 : $p['reservationFee'])) }}</span></div>
-@endif
-@if(! $p['reservationCredited'] && $p['reservationFee'])<div class="sum-line strong"><span>Total payable</span><span>{{ money($p['payable']) }}</span></div>@endif
+@if($ip)<div class="small mt-1">Installment schedule: <span class="badge {{ ['approved' => 'b-green', 'proposed' => 'b-gold', 'rejected' => 'b-red'][$ip['status']] ?? 'b-gray' }}">{{ ucfirst($ip['status'] === 'proposed' ? 'awaiting supplier approval' : $ip['status']) }}</span>@if($ip['status'] === 'rejected' && ! empty($ip['reason']))<div class="muted">{{ $ip['reason'] }}</div>@endif</div>@endif
+<div class="sum-line strong mt-1"><span>Total rental amount</span><span>{{ money($f['payable']) }}</span></div>
 <div class="sum-line"><span class="muted">Verified payments</span><span style="color:var(--green)">− {{ money($f['paidRental']) }}</span></div>
 @if($f['pendingRental'])<div class="sum-line"><span class="muted">Pending verification</span><span style="color:#B45309">{{ money($f['pendingRental']) }}</span></div>@endif
 @if($f['refunded'])<div class="sum-line"><span class="muted">Refunded</span><span>{{ money($f['refunded']) }}</span></div>@endif
@@ -31,9 +25,10 @@
     @foreach($f['schedule'] as $sc)
       <div class="sum-line"><span>{{ ['paid' => '✅', 'overdue' => '⚠️', 'upcoming' => '🕒'][$sc['state']] }} {{ $sc['label'] }}<div class="small muted">Due {{ fmt_date($sc['due']) }}</div></span><span class="right"><b>{{ money($sc['amount']) }}</b><div class="small" style="color:{{ $sc['state'] === 'overdue' ? 'var(--red)' : ($sc['state'] === 'paid' ? 'var(--green)' : 'var(--muted)') }}">{{ ucfirst($sc['state']) }}</div></span></div>
     @endforeach
+    <p class="small muted mb-0">All payments are due on or before the event date ({{ fmt_date($r->event_date) }}).</p>
   </div>
 @elseif($r->status === 'pending')
-  <div class="alert alert-info mt-2">{{ icon('info') }}<div>Payment requirements will be generated once the rental partner accepts this request.</div></div>
+  <div class="alert alert-info mt-2">{{ icon('info') }}<div>Payment deadlines start once the supplier accepts this request.</div></div>
 @endif
 
 <div class="card card-flat soft mt-2" style="padding:14px">

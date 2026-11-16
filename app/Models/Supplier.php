@@ -111,34 +111,19 @@ class Supplier extends Model
         return $this->hasPin() ? 'https://www.google.com/maps/dir/?api=1&destination='.$this->lat.','.$this->lng : null;
     }
 
-    /** Delivery settings with every key present (see Pricing::deliveryQuote for how they apply). */
-    public const DELIVERY_DEFAULTS = [
-        'mode' => 'weight',         // weight (PartyRent standard rates, like Shopee) | zones | distance
-        'reach' => 'island',        // weight mode: how far you deliver — local (same province) | island (same island group) | inter (nationwide)
-        'zones' => [],              // [{level: city|province|region, code, fee}] — most specific match wins
-        'baseFee' => 0, 'perKm' => 0, 'freeKm' => 0, 'maxKm' => 0, // distance mode; maxKm 0 = no limit
-        'freeOver' => 0,            // items subtotal at which the trip fee is waived; 0 = off
-        'roundTrip' => true,        // true: one fee covers drop-off + retrieval; false: each leg is charged
-        'chargePerTrip' => false,   // true: each block of consecutive rental dates is its own trip
-    ];
+    /** Legacy delivery editor defaults (old Shop settings form; replaced by the v4 zone editor). */
+    public const DELIVERY_DEFAULTS = ['mode' => 'zones', 'reach' => 'island', 'zones' => [], 'baseFee' => 0, 'perKm' => 0, 'freeKm' => 0, 'maxKm' => 0, 'freeOver' => 0, 'roundTrip' => true, 'chargePerTrip' => false];
 
+    /** Legacy delivery settings (kept only so old data still reads). v4 uses delivery_zones + delivery_fee. */
     public function deliverySettings(): array
     {
-        return array_merge(self::DELIVERY_DEFAULTS, $this->delivery ?? []);
+        return $this->delivery ?? [];
     }
 
-    /** Memoised delivery quote with no items, used for "delivers to your city" badges. */
-    private array $reach = [];
-
-    public function deliveryTo(?string $cityCode): array
-    {
-        return $this->reach[$cityCode ?? ''] ??= \App\Domain\Pricing::deliveryQuote($this, [], 0, $cityCode);
-    }
-
-    /** null when no city is known. */
+    /** v4: every address can be delivered to — named zones have their own fee, other areas use delivery_fee. */
     public function deliversTo(?string $cityCode): ?bool
     {
-        return $cityCode ? $this->deliveryTo($cityCode)['ok'] : null;
+        return $this->offersDelivery();
     }
 
     public function offersDelivery(): bool
@@ -146,39 +131,22 @@ class Supplier extends Model
         return $this->fulfillment !== 'pickup';
     }
 
-    /** Short public description of delivery rates, e.g. "Delivers to 3 areas · from ₱500" or "₱300 + ₱25/km, up to 60 km". */
+    /** Short public description of delivery rates (zones + the standard rate). */
     public function deliverySummary(): string
     {
         if (! $this->offersDelivery()) {
             return 'Pickup only';
         }
-        $d = $this->deliverySettings();
-        if ($d['mode'] === 'distance') {
-            $s = money_short($d['baseFee']).($d['perKm'] > 0 ? ' + '.money_short($d['perKm']).'/km' : '');
-            if ($d['freeKm'] > 0 && $d['perKm'] > 0) {
-                $s .= ' after '.(float) $d['freeKm'].' km';
-            }
-            $s .= $d['maxKm'] > 0 ? ', up to '.(float) $d['maxKm'].' km' : '';
-        } else {
-            $fees = array_column($d['zones'], 'fee');
-            if (! $fees) {
-                return 'No delivery areas set';
-            }
-            $s = count($fees).' delivery area'.(count($fees) > 1 ? 's' : '').' · '.(min($fees) == max($fees) ? money_short(min($fees)) : 'from '.money_short(min($fees)));
-        }
+        $fees = array_merge(array_map('floatval', array_column($this->delivery_zones ?? [], 'fee')), [(float) $this->delivery_fee]);
+        $n = count($this->delivery_zones ?? []);
 
-        return $s.($d['freeOver'] > 0 ? ' · free over '.money_short($d['freeOver']) : '');
+        return ($n ? $n.' delivery zone'.($n > 1 ? 's' : '').' · ' : '').(min($fees) == max($fees) ? money_short(min($fees)) : 'from '.money_short(min($fees)));
     }
 
-    /** Human list of the areas a zones-mode supplier covers. */
+    /** Named delivery zones with their fees, plus the standard rate. */
     public function deliveryAreas(): array
     {
-        $d = $this->deliverySettings();
-        if ($d['mode'] === 'distance') {
-            return [$d['maxKm'] > 0 ? 'Within '.(float) $d['maxKm'].' km of '.$this->city : 'Anywhere reachable from '.$this->city];
-        }
-
-        return array_map(fn ($z) => \App\Domain\Locations::name($z['code']).' — '.money($z['fee']), $d['zones']);
+        return array_merge(array_map(fn ($z) => $z['name'].' — '.money($z['fee']), $this->delivery_zones ?? []), ['Other areas (standard rate) — '.money($this->delivery_fee)]);
     }
 
     public function fulfillmentLabel(): string

@@ -26,6 +26,11 @@ class BusinessRulesTest extends TestCase
 {
     use RefreshDatabase;
 
+    // Seed like the feature tests: RefreshDatabase only seeds on the first migration of a run.
+    protected bool $seed = true;
+
+    protected string $seeder = \Database\Seeders\DemoSeeder::class;
+
     private Supplier $s;
 
     private User $c;
@@ -35,7 +40,7 @@ class BusinessRulesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Category::create(['id' => 'chairs', 'name' => 'Chairs', 'icon' => 'chair', 'grad_from' => '#000000', 'grad_to' => '#ffffff', 'active' => true]);
+        Category::firstOrCreate(['id' => 'chairs'], [ 'name' => 'Chairs', 'icon' => 'chair', 'grad_from' => '#000000', 'grad_to' => '#ffffff', 'active' => true, 'name' => 'Chairs']);
         $owner = User::create(['name' => 'Owner One', 'email' => 'o@x.ph', 'password' => 'secret123', 'roles' => ['customer'], 'status' => 'active']);
         $this->c = User::create(['name' => 'Cust One', 'email' => 'c@x.ph', 'password' => 'secret123', 'roles' => ['customer'], 'status' => 'active']);
         $this->s = Supplier::create([

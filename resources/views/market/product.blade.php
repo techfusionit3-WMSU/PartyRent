@@ -112,15 +112,15 @@
         @php($myCity = customer_city())
         <dt>Delivery / pickup</dt><dd>{{ $sup->fulfillmentLabel() }}{{ ! $p->delivery && $sup->offersDelivery() ? ' (this item: pickup only)' : '' }}{{ $sup->offersDelivery() ? ' · '.$sup->deliverySummary() : '' }}
           @if($myCity && $sup->offersDelivery() && $p->delivery)
-            @php($reach = $sup->deliveryTo($myCity))
-            @if($reach['ok'] && \App\Domain\Pricing::freeShipActive($sup))<div class="mb-1">@include('partials.free-ship-badge', ['s' => $sup]) <span class="small muted">Up to {{ money(setting('freeShipCap')) }} off delivery on {{ money(setting('freeShipMinSpend')) }}+ orders</span></div>@endif
-            <div class="small" style="color:{{ $reach['ok'] ? 'var(--green)' : '#B45309' }}">{{ $reach['ok'] ? 'Delivers to '.\App\Domain\Locations::name($myCity).' from '.money($reach['fee']) : ($sup->fulfillment === 'both' ? 'Pickup only in your area' : $reach['error']) }}</div>
+
+
+            <div class="small">@foreach($sup->deliveryAreas() as $a)<div>{{ $a }}</div>@endforeach</div>
           @elseif(! $myCity && $sup->offersDelivery())
             <div class="small muted">@auth<a href="{{ route('profile') }}">Set your city</a>@else Log in and set your city @endauth to see the delivery fee.</div>
           @endif
         </dd>
         @if($p->handling_fee > 0)<dt>Handling</dt><dd>{{ money($p->handling_fee) }} {{ $p->handling_per === 'unit' ? 'per unit' : 'per order' }} when delivered</dd>@endif
-        <dt>Payment arrangements</dt><dd>{{ collect($sup->arrangements)->map(fn ($a) => \App\Models\Payment::ARR_LABEL[$a])->implode(', ') }}</dd>
+        <dt>Payment arrangements</dt><dd>{{ collect(\App\Domain\Finance::plansOf($sup))->map(fn ($a) => \App\Domain\Finance::PLAN_LABEL[$a])->implode(', ') }}</dd>
         <dt>Payment methods</dt><dd>{{ collect($sup->methods)->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }}</dd>
         <dt>Security deposit</dt><dd>{{ $sup->depositLabel() }} (refundable)</dd>
         <dt>Cancellation</dt><dd>{{ $sup->pol('cancellation') }}</dd>

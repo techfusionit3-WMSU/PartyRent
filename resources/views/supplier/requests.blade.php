@@ -18,9 +18,9 @@
           <td data-label="Products"><div class="small" style="max-width:260px">{{ collect($r->lines)->map(fn ($l) => ($l['type'] === 'package' ? '📦 ' : '').inv()->itemName($l))->implode(', ') }}</div></td>
           <td data-label="Rental dates">{{ fmt_range($r->start_date, $r->end_date) }}<div class="small muted">{{ count($r->dates()) }} day(s) · {{ $r->totalUnits() }} units</div></td>
           <td data-label="Amount" class="num"><b>{{ money($r->pricing['payable']) }}</b></td>
-          <td data-label="Payment"><div class="small">{{ \App\Models\Payment::ARR_LABEL[$r->arrangement] }}<br>{{ \App\Models\Payment::METHOD_LABEL[$r->method] ?? $r->method }}</div></td>
+          <td data-label="Payment"><div class="small">{{ (\App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '') }}<br>{{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</div></td>
           <td data-label="Submitted"><span class="small">{{ time_ago($r->created_at) }}</span></td>
-          <td data-label="Status">@include('partials.badges', ['status' => $r->status])@if($conf)<div><span class="badge b-red mt-1">Stock conflict</span></div>@endif @if($r->status === 'pending')<div class="mt-1">{!! $r->fin()['upfrontPaid'] ? '<span class="badge b-green">Down payment received</span>' : '<span class="badge b-gold">Awaiting down payment</span>' !!}</div>@elseif(! $conf && ! in_array($r->status, ['pending', 'declined', 'cancelled'], true))<div class="mt-1">@include('partials.badges', ['pay' => $r->fin()['status']])</div>@endif</td>
+          <td data-label="Status">@include('partials.badges', ['status' => $r->status])@if($conf)<div><span class="badge b-red mt-1">Stock conflict</span></div>@endif</td>
           <td><a class="btn btn-sm {{ $r->status === 'pending' ? 'btn-primary' : '' }}" href="{{ route('supplier.requests.show', $r) }}">{{ $r->status === 'pending' ? 'Review' : 'Open' }}</a></td>
         </tr>
       @endforeach

@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="{{ asset('css/layout.css') }}">
 @php
     $iconSet = array_intersect_key((require app_path('Support/icons.php'))['icons'], array_flip(['check', 'alert', 'info', 'x', 'trash', 'plus', 'left', 'right', 'send']));
-    $prRoutes = ['schedule' => route('api.schedule'), 'calendar' => route('api.calendar'), 'locations' => route('api.locations'), 'deliveryPreview' => route('api.delivery-preview'),'chat' => route('ai.chat'), 'alternatives' => $alternativesUrl ?? null];
+    $prRoutes = ['schedule' => route('api.schedule'), 'calendar' => route('api.calendar'), 'locations' => route('api.locations'),'chat' => route('ai.chat'), 'alternatives' => $alternativesUrl ?? null];
     $prMap = \Illuminate\Support\Arr::only(config('partyrent.map'), ['center', 'zoom', 'bounds', 'tiles', 'attribution']);
     $flash = [];
     foreach (['success', 'error', 'warn', 'info'] as $k) { if (session($k)) { $flash[] = [$k, session($k)]; } }

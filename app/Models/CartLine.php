@@ -19,7 +19,7 @@ class CartLine extends Model
     /** The line in the shape the domain services use. `sel` = package choices / add-ons / guests. */
     public function toLine(): array
     {
-        $l = ['id' => 'c'.$this->id, 'type' => $this->type, 'ref_id' => (int) $this->ref_id, 'days' => $this->days ?? []];
+        $l = ['id' => $this->id, 'type' => $this->type, 'ref_id' => (int) $this->ref_id, 'days' => $this->days ?? [], 'selected' => $this->selected ?? true];
         if ($this->type === 'package') {
             $l['sel'] = $this->sel ?? [];
         }

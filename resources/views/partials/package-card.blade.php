@@ -1,6 +1,7 @@
+{{-- Marketplace package card (reference UI.packageCard). --}}
 @php
-    $dates = $dates ?? [];
-    $avail = inv()->packageMinAvailable($k->id, $dates);
+    $dates = $dates ?? \App\Support\RentalPeriod::dates();
+    $avail = $dates ? inv()->packageMinAvailable($k->id, $dates) : null;
     $v = \App\Domain\Pricing::packageValue($k);
     $link = route('packages.show', $k);
 @endphp
@@ -10,6 +11,6 @@
     <a class="p-name" href="{{ $link }}">{{ $k->name }}</a>
     <div class="p-sup">{{ $k->supplier->name }} · {{ $k->supplier->city }}</div>
     <div class="small muted">{{ count($k->items) }} items included</div>
-    <div class="p-meta"><div class="p-price">{{ money_short($k->price) }} <small>/ day</small></div>@if($avail > 0)<span class="small muted">{{ $avail }} avail.</span>@else<span class="small" style="color:var(--red)">Booked</span>@endif</div>
+    <div class="p-meta"><div class="p-price">{{ money_short($k->price) }} <small>/ day</small></div>@if($avail !== null)@if($avail > 0)<span class="small muted">{{ $avail }} available</span>@else<span class="small" style="color:var(--red)">Fully booked</span>@endif @endif</div>
   </div>
 </article>

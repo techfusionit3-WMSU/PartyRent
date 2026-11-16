@@ -1,4 +1,4 @@
-{{-- Personal vs Business choice + business documents. $d = rental partner attributes (may be empty); $choose = show the Personal/Business cards --}}
+{{-- Personal vs Business choice + business documents. $d = supplier attributes (may be empty); $choose = show the Personal/Business cards --}}
 @php
     $bo = fn ($k, $def = null) => old($k, $d[$k] ?? $def);
     $type = $bo('account_type', 'personal');

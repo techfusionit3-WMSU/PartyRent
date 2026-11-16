@@ -20,14 +20,14 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     public const ADMIN_PERMS = [
         'customers.view' => 'View customer accounts',
         'customers.manage' => 'Activate / suspend customers',
-        'suppliers.view' => 'View rental partner accounts',
-        'suppliers.manage' => 'Activate / suspend rental partners',
-        'applications.review' => 'Approve / reject rental partner applications',
+        'suppliers.view' => 'View supplier accounts',
+        'suppliers.manage' => 'Activate / suspend suppliers',
+        'applications.review' => 'Approve / reject supplier applications',
         'listings.view' => 'View product listings',
         'listings.manage' => 'Hide / restore listings',
         'categories.manage' => 'Manage categories',
         'transactions.view' => 'View transactions & reservations',
-        'payouts.manage' => 'Release & send rental partner payouts',
+        'payouts.manage' => 'Release & send supplier payouts',
         'complaints.manage' => 'Handle complaints',
         'reports.view' => 'View reports',
     ];
@@ -60,7 +60,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         ];
     }
 
-    /** The rental partner shop this user OWNS (any status). Use shop() for the shop they work in. */
+    /** The supplier shop this user OWNS (any status). Use shop() for the shop they work in. */
     public function supplier(): HasOne
     {
         return $this->hasOne(Supplier::class, 'owner_id');
@@ -152,7 +152,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return 'customer';
     }
 
-    /** Can use Rental Partner mode (owner of an approved shop, or staff of a verified business). */
+    /** Can use Supplier mode (owner of an approved shop, or staff of a verified business). */
     public function isApprovedSupplier(): bool
     {
         return $this->shop() !== null;

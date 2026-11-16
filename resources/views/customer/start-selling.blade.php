@@ -4,14 +4,14 @@
 <div class="page-head"><div><h1>Start Selling on PartyRent</h1><p>Turn your party supplies into income — using your existing account.
   @if($existing && $existing->status === 'rejected')<span class="badge b-red">Previous application rejected: {{ $existing->reject_reason }}</span>@endif</p></div></div>
 <div class="wizard-steps" id="wsteps">@foreach(['Account & shop', 'Contact', 'Fulfillment', 'Payments', 'Policies', 'Review'] as $i => $t)<div class="ws {{ $i === 0 ? 'on' : '' }}" data-ws="{{ $i }}"><span>Step {{ $i + 1 }}</span>{{ $t }}</div>@endforeach</div>
-<form class="card" id="wf" method="POST" action="{{ route('start-selling.submit') }}" enctype="multipart/form-data" style="max-width:760px" novalidate data-confirm-title="Submit rental partner application?" data-confirm="Your rental partner profile will be linked to this account ({{ auth()->user()->email }}). You can keep renting as a customer." data-confirm-ok="Submit">
+<form class="card" id="wf" method="POST" action="{{ route('start-selling.submit') }}" enctype="multipart/form-data" style="max-width:760px" novalidate data-confirm-title="Submit supplier application?" data-confirm="Your supplier profile will be linked to this account ({{ auth()->user()->email }}). You can keep renting as a customer." data-confirm-ok="Submit">
   @csrf
   @include('partials.shop-fields', ['accountStep' => true])
   <section data-step="5">
     <h2>Review</h2>
     <div class="review-sum" id="reviewSum"></div>
-    <p class="small muted">Check the details, or go back to change them. Your rental partner profile will be linked to this account ({{ auth()->user()->email }}) and you can keep renting as a customer.</p>
-    @if(setting('requireSupplierApproval', true))<div class="alert alert-info mt-2">{{ icon('info') }}<div>PartyRent reviews new rental partners. Your application will be <b>Pending Review</b> until an admin approves it. You keep full access to your customer account meanwhile.</div></div>@endif
+    <p class="small muted">Check the details, or go back to change them. Your supplier profile will be linked to this account ({{ auth()->user()->email }}) and you can keep renting as a customer.</p>
+    @if(setting('requireSupplierApproval', true))<div class="alert alert-info mt-2">{{ icon('info') }}<div>PartyRent reviews new suppliers. Your application will be <b>Pending Review</b> until an admin approves it. You keep full access to your customer account meanwhile.</div></div>@endif
   </section>
   <div class="row between mt-3"><button type="button" class="btn" id="back">{{ icon('left') }}Back</button><button type="button" class="btn btn-primary" id="next">Continue{{ icon('right') }}</button><button class="btn btn-primary hidden" id="submitApp" data-busy="Submitting…">Submit application{{ icon('right') }}</button></div>
 </form>

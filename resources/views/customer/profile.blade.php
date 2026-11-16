@@ -5,7 +5,7 @@
 <div class="card row wrap mb-3">
   <span class="avatar lg">{{ $u->initials() }}</span>
   <div class="grow"><h1 class="mb-0">{{ $u->name }}</h1><div class="muted">{{ $u->email }} · Member since {{ fmt_date($u->created_at) }}</div>
-    <div class="row wrap gap-sm mt-1"><span class="badge b-pink">Customer</span>@if($sup)<span class="badge {{ ['approved' => 'b-purple', 'pending' => 'b-gold'][$sup->status] ?? 'b-red' }}">Rental Partner · {{ $sup->status === 'pending' ? 'Pending Review' : ucfirst($sup->status) }}</span>@endif</div>
+    <div class="row wrap gap-sm mt-1"><span class="badge b-pink">Customer</span>@if($sup)<span class="badge {{ ['approved' => 'b-purple', 'pending' => 'b-gold'][$sup->status] ?? 'b-red' }}">Supplier · {{ $sup->status === 'pending' ? 'Pending Review' : ucfirst($sup->status) }}</span>@endif</div>
   </div>
   <div class="row wrap">
     @if($sup && $sup->status === 'approved')

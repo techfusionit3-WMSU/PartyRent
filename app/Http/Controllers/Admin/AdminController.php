@@ -302,7 +302,7 @@ class AdminController extends Controller
     {
         $this->need($request, 'reports.view');
         extract($this->reportData($request));
-        $rows = [['Request', 'Created', 'Customer', 'Rental Partner', 'City', 'Event type', 'Start', 'End', 'Status', 'Total', 'Verified paid', 'Balance', 'Payment status']];
+        $rows = [['Request', 'Created', 'Customer', 'Supplier', 'City', 'Event type', 'Start', 'End', 'Status', 'Total', 'Verified paid', 'Balance', 'Payment status']];
         foreach ($inRange->sortBy('created_at') as $r) {
             $f = $r->fin();
             $rows[] = [$r->code, $r->created_at->toDateString(), $r->customer->name, $r->supplier->name, $r->supplier->city, $r->event_type, $r->start_date, $r->end_date, RentalRequest::statusLabel($r->status), $f['payable'], $f['paidRental'], $f['balance'], $f['status']];

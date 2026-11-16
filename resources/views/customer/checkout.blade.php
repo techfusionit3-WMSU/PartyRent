@@ -9,8 +9,9 @@
 <div class="crumbs"><a href="{{ route('cart') }}">Rental List</a> / Checkout</div>
 <div class="page-head"><div><h1>Checkout</h1><p>{{ collect($orders)->sum(fn ($o) => count($o['lines'])) }} selected item(s) from <b>{{ count($orders) }} shop{{ count($orders) > 1 ? 's' : '' }}</b>. Each shop gets its own rental order, payment plan and payment schedule.</p></div></div>
 @include('partials.period-banner')
+@php($state = ['orders' => $orders, 'shared' => ['eventName' => '', 'eventType' => '', 'contactName' => $u->name, 'contactPhone' => $u->phone, 'instructions' => '']])
 <form id="cf" novalidate class="grid grid-side"
-  data-checkout='@json(['orders' => $orders, 'shared' => ['eventName' => '', 'eventType' => '', 'contactName' => $u->name, 'contactPhone' => $u->phone, 'instructions' => '']])'
+  data-checkout='@json($state)'
   data-quote="{{ route('checkout.quote') }}" data-submit="{{ route('checkout.submit') }}" data-today="{{ today_iso() }}">
   <div class="stack">
     <div class="card"><h3>Event & contact details</h3><div class="form-grid">

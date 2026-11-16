@@ -4,9 +4,9 @@
 <div class="page-head"><div><h1>{{ active_role() === 'superadmin' ? 'Platform overview' : 'Admin dashboard' }}</h1><p>{{ fmt_date(today_iso()) }} · {{ setting('platformName') }}</p></div>@if($pendingApps)<a class="btn btn-primary" href="{{ route('admin.applications') }}">{{ icon('file') }}Review {{ $pendingApps }} application{{ $pendingApps > 1 ? 's' : '' }}</a>@endif</div>
 <div class="stats">
   @include('partials.stat', ['label' => 'Registered users', 'value' => $users, 'sub' => $customers.' customers', 'icon' => 'users', 'color' => 'purple', 'href' => route('admin.users')])
-  @include('partials.stat', ['label' => 'Approved rental partners', 'value' => $suppliers, 'sub' => $pendingApps.' pending review', 'icon' => 'store', 'color' => 'pink', 'href' => route('admin.applications')])
+  @include('partials.stat', ['label' => 'Approved suppliers', 'value' => $suppliers, 'sub' => $pendingApps.' pending review', 'icon' => 'store', 'color' => 'pink', 'href' => route('admin.applications')])
   @include('partials.stat', ['label' => 'Published listings', 'value' => $listings, 'icon' => 'box', 'color' => 'sky'])
-  @include('partials.stat', ['label' => 'Pending requests', 'value' => $pending, 'sub' => 'awaiting rental partners', 'icon' => 'clock', 'color' => 'gold', 'href' => route('admin.transactions', ['status' => 'pending'])])
+  @include('partials.stat', ['label' => 'Pending requests', 'value' => $pending, 'sub' => 'awaiting suppliers', 'icon' => 'clock', 'color' => 'gold', 'href' => route('admin.transactions', ['status' => 'pending'])])
   @include('partials.stat', ['label' => 'Active rentals', 'value' => $active, 'icon' => 'truck', 'color' => 'teal', 'href' => route('admin.transactions')])
   @include('partials.stat', ['label' => 'Overdue payments', 'value' => $overdue, 'icon' => 'alert', 'color' => 'red', 'href' => route('admin.transactions')])
   @include('partials.stat', ['label' => 'Completed rentals', 'value' => $completed, 'icon' => 'check', 'color' => 'teal'])

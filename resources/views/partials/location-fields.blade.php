@@ -1,8 +1,8 @@
 {{--
-  Rental Partner location (inside shop-fields): location type, address and a map pin.
+  Supplier location (inside shop-fields): location type, address and a map pin.
   Not every seller has a shop: home-based sellers keep their exact spot private until a pickup is accepted,
   and sellers with no pickup location only name their city (pin optional, used for delivery distance).
-  $d = rental partner attributes.
+  $d = supplier attributes.
 --}}
 @php
     $type = old('location_type', $d['location_type'] ?? 'shop');

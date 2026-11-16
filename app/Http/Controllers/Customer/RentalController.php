@@ -87,7 +87,7 @@ class RentalController extends Controller
         $data = $request->validate(['reason' => 'required|string|max:500']);
         $res = Rentals::cancelRequest($r, $data['reason']);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Request cancelled. The rental partner has been notified.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Request cancelled. The supplier has been notified.' : $res['error']);
     }
 
     /** Customer payment submission — pending until a cashier verifies it. */
@@ -112,7 +112,7 @@ class RentalController extends Controller
             return $res['ok'] ? redirect()->away($res['url']) : back()->withInput()->with('error', $res['error']);
         }
         if (! in_array($data['method'], $r->supplier->methods, true)) {
-            return back()->with('error', 'This rental partner does not accept that payment method.');
+            return back()->with('error', 'This supplier does not accept that payment method.');
         }
         $bank = in_array($data['method'], ['bank', 'debit'], true);
         if ($bank && ! $request->hasFile('proof')) {

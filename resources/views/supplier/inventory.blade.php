@@ -29,7 +29,7 @@
     @if($p->isSale())
     <p class="small muted">{{ $p->stockOnHand() }} {{ $p->unitWord() }} on hand{{ $p->low_stock_at !== null ? ' · alert at '.$p->low_stock_at : '' }}{{ $p->lead_days ? ' · order '.$p->lead_days.' day(s) ahead' : '' }}{{ $p->perishable && $p->shelf_life_days ? ' · keeps '.$p->shelf_life_days.' day(s)' : '' }}. Stock goes down for good when an order is released.</p>
     <form method="POST" action="{{ route('supplier.inventory.restock', $p) }}" class="card card-flat" style="padding:14px">@csrf
-      <div class="form-grid"><div class="field"><label class="small">Add quantity</label><input class="input input-sm" type="number" min="1" name="qty" required></div><div class="field"><label class="small">Note</label><input class="input input-sm" name="note" maxlength="255" placeholder="e.g. Delivery from rental partner"></div></div>
+      <div class="form-grid"><div class="field"><label class="small">Add quantity</label><input class="input input-sm" type="number" min="1" name="qty" required></div><div class="field"><label class="small">Note</label><input class="input input-sm" name="note" maxlength="255" placeholder="e.g. Delivery from supplier"></div></div>
       <button class="btn btn-sm btn-primary">{{ icon('plus') }}Restock</button>
     </form>
     <h4 class="mt-3">Stock movements</h4>

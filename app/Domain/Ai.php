@@ -366,7 +366,7 @@ class Ai
             $sameColor = (bool) array_intersect($x->colors ?? [], $p->colors ?? []);
             $sameTheme = (bool) array_intersect($x->themes ?? [], $p->themes ?? []);
             $reason = $x->supplier_id !== $p->supplier_id
-                ? ($sameColor ? 'Same color from another rental partner' : 'Different style from another rental partner')
+                ? ($sameColor ? 'Same color from another supplier' : 'Different style from another supplier')
                 : ($sameColor ? 'Similar item from the same shop' : 'Alternative design from the same shop');
             $out[] = ['product' => $x, 'supplier' => $x->supplier, 'reason' => $reason.($sameTheme ? ', matches your theme' : ''), 'score' => ($sameColor ? 3 : 0) + ($sameTheme ? 2 : 0) + $x->rating, 'unit' => Pricing::unitPrice($x, max(array_map('intval', $days) ?: [1]))];
         }
@@ -411,7 +411,7 @@ class Ai
             return $reply('Please type a question. 😊');
         }
         if (preg_match(self::FORBIDDEN, $t) && ! preg_match('/how|paano|policy|can i|pwede/', $t)) {
-            return $reply("I can't do that — I'm an assistant only. Accepting, cancelling, reserving, changing prices and verifying payments are always done by you, the rental partner or our cashier. I can explain how to do it or show you where: ".self::a(route('rentals.index'), 'My Rentals').'.');
+            return $reply("I can't do that — I'm an assistant only. Accepting, cancelling, reserving, changing prices and verifying payments are always done by you, the supplier or our cashier. I can explain how to do it or show you where: ".self::a(route('rentals.index'), 'My Rentals').'.');
         }
         if (preg_match('/^\s*(hi|hello|hey|kumusta|kamusta|good (morning|afternoon|evening))\b/', $t)) {
             return $reply('Hi'.($user ? ' '.e($user->firstName()) : '').'! 🎉 I can find party supplies, check availability, explain payments, or track your requests. What are you planning?', ['Plan a party for 50 guests', 'Monoblock chair prices', 'My request status']);
@@ -441,10 +441,10 @@ class Ai
             return $reply('Your active requests:<br>'.$mine->map(fn ($r) => '• '.self::a(route('rentals.show', $r), $r->code).' '.e($r->event_name).' — <b>'.e(RentalRequest::statusLabel($r->status)).'</b>, '.e($r->fin()['status']))->implode('<br>'));
         }
         if (preg_match('/(become a supplier|start selling|magbenta|sell my|mag-supplier|rent out my|open a shop)/', $t)) {
-            return $reply('You can become a rental partner with the same account: open your profile menu → <b>Start Selling</b>, complete the 6-step form, and once approved you can switch between Customer and Rental Partner Mode. '.self::a(route('start-selling'), 'Start Selling →'));
+            return $reply('You can become a supplier with the same account: open your profile menu → <b>Start Selling</b>, complete the 6-step form, and once approved you can switch between Customer and Supplier Mode. '.self::a(route('start-selling'), 'Start Selling →'));
         }
         if (preg_match('/(how (do|to) (i )?rent|paano (mag)?renta|paano umupa|how does it work|steps)/', $t)) {
-            return $reply("Renting on PartyRent:<br>1. Find items or a package and pick dates & quantities (you can set a different quantity per day).<br>2. Add to your Rental List and submit a request.<br>3. The rental partner reviews and accepts (it stays <b>Pending</b> until then).<br>4. Pay according to the rental partner's payment policy — payments count once verified by our cashier.<br>5. Receive the items, enjoy, then return them for inspection.");
+            return $reply("Renting on PartyRent:<br>1. Find items or a package and pick dates & quantities (you can set a different quantity per day).<br>2. Add to your Rental List and submit a request.<br>3. The supplier reviews and accepts (it stays <b>Pending</b> until then).<br>4. Pay according to the supplier's payment policy — payments count once verified by our cashier.<br>5. Receive the items, enjoy, then return them for inspection.");
         }
         if (preg_match('/(plan|planning|prepare|help me|tulungan|mag-?organize).*(party|event|wedding|debut|birthday|kasal|binyag|reunion)|\d+\s*(guests|bisita|pax)/', $t)) {
             return $reply('Let me build a checklist from real listings. '.self::a(route('ai', ['q' => $message]), 'Open the AI Event Planner with your description →'));
@@ -474,7 +474,7 @@ class Ai
         $list = ($cats || $sup) ? $list->values() : collect();
 
         if (preg_match('/(deposit|security)/', $t)) {
-            return $reply('A <b>security deposit</b> is refundable and kept separate from your rental charges. After the items are returned and inspected, the rental partner refunds it in full or deducts repair/replacement fees for damaged or missing items — you will see the damage report first.'.($sup ? '<br>'.e($sup->name).': '.e($sup->depositLabel()).'.' : ''));
+            return $reply('A <b>security deposit</b> is refundable and kept separate from your rental charges. After the items are returned and inspected, the supplier refunds it in full or deducts repair/replacement fees for damaged or missing items — you will see the damage report first.'.($sup ? '<br>'.e($sup->name).': '.e($sup->depositLabel()).'.' : ''));
         }
         if (preg_match('/(pay|payment|bayad|down ?payment|dp|reservation fee|installment|hulugan|gcash|bank|cod|cash)/', $t)) {
             if ($sup) {
@@ -483,7 +483,7 @@ class Ai
                 return $reply('<b>'.e($sup->name).'</b> accepts '.e(implode(', ', array_map(fn ($m) => Payment::METHOD_LABEL[$m] ?? $m, $sup->methods))).'.<br>Arrangements: '.e(implode(', ', array_map(fn ($a) => Payment::ARR_LABEL[$a] ?? $a, $sup->arrangements))).'.<br>Reservation fee: '.($resFee ? money($resFee).($sup->pol('reservationCredited') ? ' (credited toward the down payment)' : ' (charged on top of the rental)') : 'none').'.<br>Down payment: '.($sup->pol('downValue') ? e($sup->downLabel()) : 'not required').'.');
             }
 
-            return $reply('Each rental partner sets its own payment rules. Common options: <b>Full Payment</b>, <b>Down Payment</b> (e.g. 30%), <b>Installments</b>, or a <b>Reservation Fee</b> then balance. If a reservation fee is "credited", it counts toward your down payment — it is never charged twice. Bank transfers need a reference number and proof; they count once our cashier verifies them. Ask me about a specific shop, e.g. "Happy Moments payment policy".', ['Happy Moments payment policy', 'Elegant Occasion payment policy']);
+            return $reply('Each supplier sets its own payment rules. Common options: <b>Full Payment</b>, <b>Down Payment</b> (e.g. 30%), <b>Installments</b>, or a <b>Reservation Fee</b> then balance. If a reservation fee is "credited", it counts toward your down payment — it is never charged twice. Bank transfers need a reference number and proof; they count once our cashier verifies them. Ask me about a specific shop, e.g. "Happy Moments payment policy".', ['Happy Moments payment policy', 'Elegant Occasion payment policy']);
         }
         if (preg_match('/(deliver|delivery|pickup|pick up|hatid|kunin)/', $t)) {
             $show = $sup ? collect([$sup]) : Supplier::approved()->get();
@@ -491,7 +491,7 @@ class Ai
             return $reply($show->map(fn ($s) => '• <b>'.e($s->name).'</b> ('.e($s->city).'): '.e($s->fulfillmentLabel()).($s->offersDelivery() ? ' — '.e($s->deliverySummary()) : ''))->implode('<br>'));
         }
         if (preg_match('/(cancel|cancellation|ikansela)/', $t)) {
-            return $reply('You can cancel a <b>Pending</b> request anytime. For accepted requests, each rental partner has a free-cancellation window (for example, 3 days before the rental). Open the request in '.self::a(route('rentals.index'), 'My Rentals').' and use <b>Cancel request</b> to see the exact policy before confirming.');
+            return $reply('You can cancel a <b>Pending</b> request anytime. For accepted requests, each supplier has a free-cancellation window (for example, 3 days before the rental). Open the request in '.self::a(route('rentals.index'), 'My Rentals').' and use <b>Cancel request</b> to see the exact policy before confirming.');
         }
         if ($list->isNotEmpty() && preg_match('/(available|availability|may available|meron|libre|free on|in stock|stock)/', $t)) {
             $dates = $f['start'] ? date_range($f['start'], $f['end']) : [today_iso()];
@@ -510,6 +510,6 @@ class Ai
             return $reply('<b>'.e($sup->name).'</b> — '.e($sup->city).', rated '.$sup->rating.'★. '.e($sup->description).'<br>'.self::a(route('suppliers.show', $sup), 'Visit shop →'));
         }
 
-        return $reply("I'm not sure about that, and I don't want to guess. I can only answer using PartyRent's listings, rental partner policies and your own requests. Try asking about prices, availability, payments, delivery or your request status — or contact support at ".e(Settings::get('supportEmail')).'.', ['How do I rent?', 'Tiffany chair prices', 'Delivery options']);
+        return $reply("I'm not sure about that, and I don't want to guess. I can only answer using PartyRent's listings, supplier policies and your own requests. Try asking about prices, availability, payments, delivery or your request status — or contact support at ".e(Settings::get('supportEmail')).'.', ['How do I rent?', 'Tiffany chair prices', 'Delivery options']);
     }
 }

@@ -127,7 +127,7 @@
   var nameEl = form.querySelector('[name="name"]'), catEl = form.querySelector('[name="category_id"]');
   var f = { kg: form.querySelector('[name="weight_kg"]'), l: form.querySelector('[name="length_cm"]'), w: form.querySelector('[name="width_cm"]'), h: form.querySelector('[name="height_cm"]') };
   var tip = document.getElementById('sizeTip'), current = null;
-  // fields the rental partner typed into are never overwritten automatically
+  // fields the supplier typed into are never overwritten automatically
   Object.keys(f).forEach(function (k) {
     if (f[k].value !== '' && +f[k].value > 0) f[k].dataset.mine = '1';
     f[k].addEventListener('input', function () { f[k].dataset.mine = f[k].value === '' ? '' : '1'; });

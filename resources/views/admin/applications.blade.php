@@ -1,7 +1,7 @@
-@extends('layouts.dash', ['title' => 'Rental Partner Applications', 'nav' => 'applications'])
+@extends('layouts.dash', ['title' => 'Supplier Applications', 'nav' => 'applications'])
 
 @section('content')
-<div class="page-head"><div><h1>Rental Partner applications</h1><p>Approve shops before they can list items. Applicants keep their customer account either way.</p></div></div>
+<div class="page-head"><div><h1>Supplier applications</h1><p>Approve shops before they can list items. Applicants keep their customer account either way.</p></div></div>
 <div class="tabs">@foreach(['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'business' => 'Business checks'] as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('admin.applications', ['tab' => $k]) }}">{{ $l }}<span class="count">{{ $counts[$k] ?? 0 }}</span></a>@endforeach</div>
 @if($list->isEmpty())
   <div class="card">@include('partials.empty', ['emoji' => '📄', 'title' => 'No applications here'])</div>
@@ -19,7 +19,7 @@
         @if($s->status === 'pending')
           <div class="row wrap mt-2" style="justify-content:flex-end;gap:8px">
             <form method="POST" action="{{ route('admin.applications.review', $s) }}" class="row" style="gap:6px">@csrf<input type="hidden" name="decision" value="reject"><input class="input input-sm" name="reason" required placeholder="Reason for rejection" style="width:260px"><button class="btn btn-danger btn-sm">Reject</button></form>
-            <form method="POST" action="{{ route('admin.applications.review', $s) }}" data-confirm="Approve {{ $s->name }}? The shop and its listings become visible to customers." data-confirm-title="Approve rental partner?" data-confirm-ok="Approve">@csrf<input type="hidden" name="decision" value="approve"><button class="btn btn-success btn-sm">{{ icon('check') }}Approve</button></form>
+            <form method="POST" action="{{ route('admin.applications.review', $s) }}" data-confirm="Approve {{ $s->name }}? The shop and its listings become visible to customers." data-confirm-title="Approve supplier?" data-confirm-ok="Approve">@csrf<input type="hidden" name="decision" value="approve"><button class="btn btn-success btn-sm">{{ icon('check') }}Approve</button></form>
           </div>
         @endif
         @if($tab === 'business')

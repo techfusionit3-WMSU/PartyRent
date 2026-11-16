@@ -155,7 +155,7 @@ class XenditPayouts
             }
             $p->update(['status' => 'paid', 'paid_at' => now(), 'failure' => null]);
             Notifier::notify($p->supplier->owner_id, 'supplier', 'Payout sent 💸', money($p->net).' was sent to your '.$p->methodLabel().' account through Xendit. Reference '.$p->reference.' ('.$p->code.').', route('supplier.payouts', [], false));
-            Notifier::audit('Payout received by rental partner', $p->code.' · '.money($p->net).' · Xendit '.$p->reference);
+            Notifier::audit('Payout received by supplier', $p->code.' · '.money($p->net).' · Xendit '.$p->reference);
 
             return 'paid';
         });

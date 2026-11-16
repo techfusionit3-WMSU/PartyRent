@@ -81,7 +81,7 @@ class Payouts
             return ['ok' => false, 'error' => 'Payouts are released once the rental is completed.'];
         }
         if ($r->status === 'cancelled' && $r->cancel_free) {
-            return ['ok' => false, 'error' => $r->code.' was cancelled for free: the customer is refunded in full, nothing goes to the rental partner.'];
+            return ['ok' => false, 'error' => $r->code.' was cancelled for free: the customer is refunded in full, nothing goes to the supplier.'];
         }
         if (Payout::where('rental_request_id', $r->id)->exists()) {
             return ['ok' => false, 'error' => 'This request was already released for payout.'];

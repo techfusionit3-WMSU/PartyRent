@@ -2,8 +2,8 @@
 
 @php($canManage = auth()->user()->hasPerm('listings.manage'))
 @section('content')
-<div class="page-head"><div><h1>Listings & packages</h1><p>Hide listings that break the rules — the rental partner is notified. Prices and stock stay under the rental partner's control.</p></div>
-  <form method="GET" class="row wrap" style="gap:6px"><input type="hidden" name="view" value="{{ $view }}"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search item or rental partner" style="width:220px">
+<div class="page-head"><div><h1>Listings & packages</h1><p>Hide listings that break the rules — the supplier is notified. Prices and stock stay under the supplier's control.</p></div>
+  <form method="GET" class="row wrap" style="gap:6px"><input type="hidden" name="view" value="{{ $view }}"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search item or supplier" style="width:220px">
     @if($view === 'items')<select class="input input-sm" name="status" style="width:auto" data-autosubmit><option value="">All statuses</option>@foreach(['active', 'hidden', 'draft'] as $s)<option value="{{ $s }}" @selected($status === $s)>{{ ucfirst($s) }}</option>@endforeach</select>@endif
     <button class="btn btn-sm">Search</button></form>
 </div>
@@ -12,9 +12,9 @@
   @if($list->isEmpty())@include('partials.empty', ['text' => 'No listings match.'])@else
   <div class="table-wrap"><table class="table cards">
     @if($view === 'items')
-      <thead><tr><th>Item</th><th>Rental Partner</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th></th></tr></thead><tbody>
+      <thead><tr><th>Item</th><th>Supplier</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $p)
-        <tr><td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">★ {{ rating_text($p) }} · {{ $p->rent_count }} rentals</div></div></div></td><td data-label="Rental Partner">{{ $p->supplier->name }}<div class="small muted">{{ ucfirst($p->supplier->status) }}</div></td><td data-label="Category">{{ $p->category->name ?? '' }}</td><td data-label="Price" class="num">{{ money($p->basePrice()) }}</td><td data-label="Stock" class="num">{{ $p->total_stock }}</td>
+        <tr><td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><b>{{ $p->name }}</b><div class="small muted">★ {{ rating_text($p) }} · {{ $p->rent_count }} rentals</div></div></div></td><td data-label="Supplier">{{ $p->supplier->name }}<div class="small muted">{{ ucfirst($p->supplier->status) }}</div></td><td data-label="Category">{{ $p->category->name ?? '' }}</td><td data-label="Price" class="num">{{ money($p->basePrice()) }}</td><td data-label="Stock" class="num">{{ $p->total_stock }}</td>
           <td data-label="Status"><span class="badge {{ ['active' => 'b-green', 'hidden' => 'b-red'][$p->status] ?? 'b-gray' }}">{{ ucfirst($p->status) }}</span></td>
           <td>@if($canManage && $p->status !== 'inactive')
             @if($p->status === 'active')
@@ -25,9 +25,9 @@
           @endif</td></tr>
       @endforeach</tbody>
     @else
-      <thead><tr><th>Package</th><th>Rental Partner</th><th class="num">Items</th><th class="num">Price / day</th><th>Status</th><th></th></tr></thead><tbody>
+      <thead><tr><th>Package</th><th>Supplier</th><th class="num">Items</th><th class="num">Price / day</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $k)
-        <tr><td data-label="Package"><b>{{ $k->emoji }} {{ $k->name }}</b></td><td data-label="Rental Partner">{{ $k->supplier->name }}</td><td data-label="Items" class="num">{{ count($k->items) }}</td><td data-label="Price" class="num">{{ money($k->price) }}</td><td data-label="Status"><span class="badge {{ $k->active ? 'b-green' : 'b-red' }}">{{ $k->active ? 'Active' : 'Hidden' }}</span></td>
+        <tr><td data-label="Package"><b>{{ $k->emoji }} {{ $k->name }}</b></td><td data-label="Supplier">{{ $k->supplier->name }}</td><td data-label="Items" class="num">{{ count($k->items) }}</td><td data-label="Price" class="num">{{ money($k->price) }}</td><td data-label="Status"><span class="badge {{ $k->active ? 'b-green' : 'b-red' }}">{{ $k->active ? 'Active' : 'Hidden' }}</span></td>
           <td>@if($canManage)<form method="POST" action="{{ route('admin.packages.status', $k) }}" @if($k->active) data-confirm-title="Hide {{ $k->name }}?" data-confirm="It disappears from the marketplace. Requests already booked keep their copy." data-confirm-ok="Hide" data-danger @endif>@csrf<button class="btn btn-xs {{ $k->active ? 'btn-danger' : '' }}">{{ $k->active ? 'Hide' : 'Restore' }}</button></form>@endif</td></tr>
       @endforeach</tbody>
     @endif

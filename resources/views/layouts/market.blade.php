@@ -8,11 +8,11 @@
     @include('partials.brand')
     <form class="mk-search" role="search" action="{{ route('home') }}" method="GET">
       <span>{{ icon('search') }}</span>
-      <input name="q" placeholder="Search chairs, tents, rental partners…" aria-label="Search" value="{{ request('q') }}">
+      <input name="q" placeholder="Search chairs, tents, suppliers…" aria-label="Search" value="{{ request('q') }}">
       <button type="submit" formaction="{{ route('ai') }}" class="ai-toggle" title="Describe your event and let AI build the search">{{ icon('sparkle') }}<span>AI Search</span></button>
     </form>
     <nav class="mk-nav">
-      @foreach([['home', 'home', 'Browse'], ['packages', 'packages.index', 'Packages'], ['suppliers', 'suppliers.index', 'Rental Partners'], ['rentals', 'rentals.index', 'My Rentals']] as [$k, $r, $l])
+      @foreach([['home', 'home', 'Browse'], ['packages', 'packages.index', 'Packages'], ['suppliers', 'suppliers.index', 'Suppliers'], ['rentals', 'rentals.index', 'My Rentals']] as [$k, $r, $l])
         <a href="{{ route($r) }}" class="{{ $nav === $k ? 'active' : '' }}">{{ $l }}</a>
       @endforeach
     </nav>
@@ -42,9 +42,9 @@
 
 <footer class="mk-footer"><div class="container">
   <div class="cols">
-    <div>@include('partials.brand')<p class="mt-2">The party supplies rental marketplace for Filipino celebrations — discover, schedule, and rent from trusted local rental partners.</p><p class="small">{{ setting('supportEmail') }} · {{ setting('supportPhone') }}</p></div>
+    <div>@include('partials.brand')<p class="mt-2">The party supplies rental marketplace for Filipino celebrations — discover, schedule, and rent from trusted local suppliers.</p><p class="small">{{ setting('supportEmail') }} · {{ setting('supportPhone') }}</p></div>
     <div><h4>Rent</h4><ul><li><a href="{{ route('home') }}">Browse supplies</a></li><li><a href="{{ route('packages.index') }}">Rental packages</a></li><li><a href="{{ route('ai') }}">AI event planner</a></li></ul></div>
-    <div><h4>Sell</h4><ul><li><a href="{{ route('start-selling') }}">Start selling</a></li><li><a href="{{ route('suppliers.index') }}">Our rental partners</a></li></ul></div>
+    <div><h4>Sell</h4><ul><li><a href="{{ route('start-selling') }}">Start selling</a></li><li><a href="{{ route('suppliers.index') }}">Our suppliers</a></li></ul></div>
     <div><h4>Account</h4><ul>@auth<li><a href="{{ route('rentals.index') }}">My rentals</a></li><li><a href="{{ route('notifications') }}">Notifications</a></li>@else<li><a href="{{ route('login') }}">Log in</a></li><li><a href="{{ route('register') }}">Create an account</a></li>@endauth</ul></div>
   </div>
   <hr style="border-color:rgba(255,255,255,.1)">
@@ -53,7 +53,7 @@
 
 <nav class="bottom-nav" aria-label="Main">
   <a href="{{ route('home') }}" class="{{ in_array($nav, ['browse', 'home'], true) ? 'active' : '' }}">{{ icon('grid') }}Browse</a>
-  <a href="{{ route('suppliers.index') }}" class="{{ $nav === 'suppliers' ? 'active' : '' }}">{{ icon('store') }}Rental Partners</a>
+  <a href="{{ route('suppliers.index') }}" class="{{ $nav === 'suppliers' ? 'active' : '' }}">{{ icon('store') }}Suppliers</a>
   <a href="{{ route('ai') }}" class="fab {{ $nav === 'ai' ? 'active' : '' }}" aria-label="AI Planner">{{ icon('sparkle') }}</a>
   <a href="{{ route('rentals.index') }}" class="{{ $nav === 'rentals' ? 'active' : '' }}">{{ icon('list') }}Requests @auth @if($shellPendingRentals)<span class="bn-dot">{{ $shellPendingRentals }}</span>@endif @endauth</a>
   <a href="{{ auth()->check() ? route('profile') : route('login') }}" class="{{ $nav === 'profile' ? 'active' : '' }}">{{ icon('user') }}Profile</a>

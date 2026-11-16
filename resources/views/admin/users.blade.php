@@ -1,9 +1,9 @@
-@extends('layouts.dash', ['title' => 'Customers & Rental Partners', 'nav' => 'users'])
+@extends('layouts.dash', ['title' => 'Customers & Suppliers', 'nav' => 'users'])
 
 @section('content')
-<div class="page-head"><div><h1>Customers & rental partners</h1><p>Suspended accounts can't log in. Staff accounts are managed by the superadmin.</p></div>
+<div class="page-head"><div><h1>Customers & suppliers</h1><p>Suspended accounts can't log in. Staff accounts are managed by the superadmin.</p></div>
   <form method="GET"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search name or email" style="width:240px"></form></div>
-<div class="card pad-0"><div class="table-wrap"><table class="table cards"><thead><tr><th>User</th><th>Roles</th><th>Rental Partner shop</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>
+<div class="card pad-0"><div class="table-wrap"><table class="table cards"><thead><tr><th>User</th><th>Roles</th><th>Supplier shop</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>
   @foreach($list as $u)
     <tr>
       <td data-label="User"><div class="row"><span class="avatar">{{ $u->initials() }}</span><div><b>{{ $u->name }}</b><div class="small muted">{{ $u->email }} · {{ $u->phone }}</div></div></div></td>

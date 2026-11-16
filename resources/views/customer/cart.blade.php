@@ -48,7 +48,7 @@
               <form method="POST" action="{{ route('cart.remove', $l['id']) }}" data-confirm="Remove this item and its schedule from your rental list?" data-confirm-title="Remove item?" data-confirm-ok="Remove" data-danger>@csrf @method('DELETE')<button class="btn btn-xs btn-ghost">{{ icon('trash') }}Remove</button></form>
             </div>
             <form class="row wrap mt-1" style="gap:8px;align-items:flex-end" method="POST" action="{{ route('cart.time', $l['id']) }}">@csrf
-              <div class="time-pair" style="max-width:340px;flex:1 1 260px"><label class="small">Start time@include('partials.time-select', ['name' => 'start', 'value' => $t['start'], 's' => $s, 'attrs' => 'data-autosubmit aria-label="Start time"'])</label><label class="small">End time@include('partials.time-select', ['name' => 'end', 'value' => $t['end'], 's' => $s, 'attrs' => 'data-autosubmit aria-label="End time"'])</label></div>
+              <div class="time-pair" style="max-width:340px;flex:1 1 260px"><label class="small">Start time @include('partials.time-select', ['name' => 'start', 'value' => $t['start'], 's' => $s, 'attrs' => 'data-autosubmit aria-label="Start time"'])</label><label class="small">End time @include('partials.time-select', ['name' => 'end', 'value' => $t['end'], 's' => $s, 'attrs' => 'data-autosubmit aria-label="End time"'])</label></div>
               <div class="small"><span class="badge b-purple plain">{{ icon('clock', 'width:13px;height:13px') }} {{ \App\Domain\Slots::time($l) ? \App\Domain\Slots::duration($l)['label'] : 'All day' }}</span>@if($hl = \App\Domain\Slots::hourLimitLabel($item))<div class="muted">{{ $hl }}</div>@endif</div>
             </form>
             </div></div>

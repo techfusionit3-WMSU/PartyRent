@@ -144,7 +144,7 @@ class CartController extends Controller
             $st = Slots::settings($s);
             $cfg = Finance::planConfig($s);
             $orders[] = [
-                'supplier_id' => $s->id, 'cart_line_ids' => array_column($chosen, 'id'), 'first' => $dates->first(), 'last' => $dates->last(), 'eventDate' => $dates->first(),
+                'supplier_id' => $s->id, 'cart_line_ids' => array_column($chosen, 'id'), 'first' => $dates->first(), 'last' => $dates->last(), 'range' => fmt_range($dates->first(), $dates->last()), 'eventDate' => $dates->first(),
                 'fulfillment' => $s->fulfillment === 'pickup' ? 'pickup' : 'delivery', 'plan' => self::firstPlan($s), 'method' => 'online', 'services' => [],
                 'destinations' => [['id' => 'd1', 'label' => 'Event venue', 'address' => $u->address ?: '', 'zoneId' => '', 'deliveryTime' => $st['open'], 'contactName' => '', 'contactPhone' => '']],
                 'lines' => array_map(fn ($l) => ['cart_id' => $l['id'], 'name' => inv()->itemName($l), 'type' => $l['type'], 'days' => Rentals::cleanDays($l['days']),

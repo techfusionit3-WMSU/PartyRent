@@ -18,7 +18,7 @@ class AccountController extends Controller
         $mode = $request->input('mode') === 'supplier' ? 'supplier' : 'customer';
         $u = $request->user();
         if ($mode === 'supplier' && ! $u->isApprovedSupplier()) {
-            return back()->with('error', 'Your rental partner profile is not approved yet.');
+            return back()->with('error', 'Your supplier profile is not approved yet.');
         }
         session(['mode' => $mode]);
 

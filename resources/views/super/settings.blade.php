@@ -14,11 +14,11 @@
     <div class="field"><label>Overdue grace period (days)</label><input class="input" type="number" min="0" max="30" name="overdueGraceDays" required value="{{ old('overdueGraceDays', $s['overdueGraceDays']) }}"><div class="hint">Days after a due date before a payment counts as overdue.</div></div>
     <div class="field"><label>Maximum rental dates per item</label><input class="input" type="number" min="1" max="90" name="maxRentalDays" required value="{{ old('maxRentalDays', $s['maxRentalDays']) }}"></div>
   </div>
-    <label class="check"><input type="checkbox" name="requireSupplierApproval" value="1" @checked($s['requireSupplierApproval'])> New rental partners need admin approval before going live</label>
+    <label class="check"><input type="checkbox" name="requireSupplierApproval" value="1" @checked($s['requireSupplierApproval'])> New suppliers need admin approval before going live</label>
     <label class="check"><input type="checkbox" name="aiEnabled" value="1" @checked($s['aiEnabled'])> PartyRent Assist (AI chat & planner) is enabled</label>
   </div>
   <div class="card"><h3>Delivery: PartyRent standard rates</h3>
-    <p class="small muted">Used by rental partners who choose "PartyRent standard rates" (like Shopee). Fee = first kg + each extra kg (rounded up), by route. A product's charged weight is its weight or its size weight (L × W × H ÷ divisor), whichever is bigger.</p>
+    <p class="small muted">Used by suppliers who choose "PartyRent standard rates" (like Shopee). Fee = first kg + each extra kg (rounded up), by route. A product's charged weight is its weight or its size weight (L × W × H ÷ divisor), whichever is bigger.</p>
     <div class="table-wrap mb-1"><table class="table"><thead><tr><th>Route</th><th>First kg (₱)</th><th>Each extra kg (₱)</th></tr></thead><tbody>
       @foreach(['local' => 'Same province (Metro Manila = one)', 'island' => 'Same island group', 'inter' => 'Another island group'] as $t => $tl)
         <tr><td>{{ $tl }}</td><td><input class="input input-sm" type="number" min="0" step="0.01" name="shipFirstKg[{{ $t }}]" required value="{{ old('shipFirstKg.'.$t, $s['shipFirstKg'][$t] ?? 0) }}" aria-label="First kg, {{ $tl }}"></td><td><input class="input input-sm" type="number" min="0" step="0.01" name="shipPerKg[{{ $t }}]" required value="{{ old('shipPerKg.'.$t, $s['shipPerKg'][$t] ?? 0) }}" aria-label="Each extra kg, {{ $tl }}"></td></tr>
@@ -30,8 +30,8 @@
     </div>
   </div>
   <div class="card"><h3>Free Shipping program</h3>
-    <label class="check mb-1"><input type="checkbox" name="freeShipEnabled" value="1" @checked($s['freeShipEnabled'])> Program is on (rental partners can join; customers get vouchers)</label>
-    <p class="small muted">Like Shopee: rental partners who join pay extra commission. Their customers get a delivery voucher paid by PartyRent, and the rental partner still receives the full delivery fee.</p>
+    <label class="check mb-1"><input type="checkbox" name="freeShipEnabled" value="1" @checked($s['freeShipEnabled'])> Program is on (suppliers can join; customers get vouchers)</label>
+    <p class="small muted">Like Shopee: suppliers who join pay extra commission. Their customers get a delivery voucher paid by PartyRent, and the supplier still receives the full delivery fee.</p>
     <div class="form-grid">
       <div class="field"><label>Extra commission for members (%)</label><input class="input" type="number" min="0" max="20" step="0.1" name="freeShipExtraPct" required value="{{ old('freeShipExtraPct', $s['freeShipExtraPct']) }}"></div>
       <div class="field"><label>Minimum items total (₱)</label><input class="input" type="number" min="0" step="1" name="freeShipMinSpend" required value="{{ old('freeShipMinSpend', $s['freeShipMinSpend']) }}"></div>
@@ -46,7 +46,7 @@
       <p class="small mb-1"><span class="badge {{ $xendit['live'] ? 'b-green' : 'b-gold' }}">{{ $xendit['live'] ? 'Live' : 'Test mode' }}</span> <b>Xendit.</b> Customers see <b>Pay online</b> ({{ $xendit['methods'] ? implode(', ', $xendit['methods']) : 'every channel turned on in your Xendit dashboard' }}). Paid invoices are verified automatically, with no cashier step.</p>
       <p class="small muted mb-0">Webhook: in the Xendit dashboard (Settings → Webhooks) set <b>Invoices → Invoice paid</b> to <code>{{ route('webhooks.xendit') }}</code> and copy the verification token into <code>XENDIT_CALLBACK_TOKEN</code>. {{ $xendit['webhook'] ? 'Callback token is set.' : 'Callback token is not set yet. Payments still confirm when the customer returns from checkout.' }}</p>
     @elseif(\App\Domain\OnlinePay::practice())
-      <p class="small mb-1"><span class="badge b-purple">Practice mode</span> <b>Pay online</b> opens a built-in practice checkout with Pay / Fail buttons. No gateway account, no real money. Everything after paying (automatic verification, receipts, the rental partner's "Down payment received") works like the real thing.</p>
+      <p class="small mb-1"><span class="badge b-purple">Practice mode</span> <b>Pay online</b> opens a built-in practice checkout with Pay / Fail buttons. No gateway account, no real money. Everything after paying (automatic verification, receipts, the supplier's "Down payment received") works like the real thing.</p>
       <p class="small muted mb-0">To take real payments, sign up at Xendit and put your secret key in <code>.env</code> as <code>XENDIT_SECRET_KEY</code> (the <code>xnd_development_…</code> key is free to test with). It replaces practice mode as soon as it is set. Practice mode never runs on a production server.</p>
     @elseif($gateway === 'paymongo')
       <p class="small mb-1"><span class="badge {{ $paymongo['live'] ? 'b-green' : 'b-gold' }}">{{ $paymongo['live'] ? 'Live' : 'Test mode' }}</span> <b>PayMongo.</b> Customers see <b>Pay online</b> ({{ implode(', ', $paymongo['methods']) }}). Paid checkouts are verified automatically, with no cashier step.</p>
@@ -55,9 +55,9 @@
       <p class="small muted mb-0">Off. To turn it on, put your Xendit secret key in <code>.env</code> as <code>XENDIT_SECRET_KEY</code> (the <code>xnd_development_…</code> key is free to test with), then reload.</p>
     @endif
   </div>
-  <div class="card"><h3>Rental Partner payouts</h3>
+  <div class="card"><h3>Supplier payouts</h3>
     <label class="check"><input type="checkbox" name="payoutAuto" value="1" @checked($s['payoutAuto']) @disabled(! \App\Domain\XenditPayouts::enabled())> Send payouts automatically through Xendit</label>
-    <p class="small muted mb-0 mt-1">@if(\App\Domain\XenditPayouts::enabled())When a rental is completed, the rental partner's share goes straight to their GCash or bank account, like Shopee. Off: admins click <b>Send via Xendit</b> on Rental Partner payouts. Needs a Xendit key with <b>Money-out: Write</b>.@else Needs Xendit (<code>XENDIT_SECRET_KEY</code>). Until then, admins send payouts by hand and record the reference.@endif</p>
+    <p class="small muted mb-0 mt-1">@if(\App\Domain\XenditPayouts::enabled())When a rental is completed, the supplier's share goes straight to their GCash or bank account, like Shopee. Off: admins click <b>Send via Xendit</b> on Supplier payouts. Needs a Xendit key with <b>Money-out: Write</b>.@else Needs Xendit (<code>XENDIT_SECRET_KEY</code>). Until then, admins send payouts by hand and record the reference.@endif</p>
   </div>
   <div class="row"><button class="btn btn-primary btn-lg">Save settings</button></div>
 </form>

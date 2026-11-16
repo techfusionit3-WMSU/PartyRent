@@ -3,7 +3,7 @@
 @php
     $opt = fn ($v, $l, $cur) => '<option value="'.e($v).'"'.((string) $v === (string) $cur ? ' selected' : '').'>'.e($l).'</option>';
     $qs = fn (array $over) => route('home', array_filter(array_merge($st, $over), fn ($v) => $v !== '' && $v !== null && $v !== 'recommended' && $v !== 'items'));
-    $labels = ['q' => 'Keyword', 'category' => 'Category', 'supplier' => 'Rental Partner', 'city' => 'Location', 'event' => 'Event', 'color' => 'Color', 'theme' => 'Theme', 'min' => 'Min ₱', 'max' => 'Max ₱', 'qty' => 'Qty', 'avail' => 'Available only', 'delivery' => 'Delivery', 'pickup' => 'Pickup', 'rating' => 'Rating ≥'];
+    $labels = ['q' => 'Keyword', 'category' => 'Category', 'supplier' => 'Supplier', 'city' => 'Location', 'event' => 'Event', 'color' => 'Color', 'theme' => 'Theme', 'min' => 'Min ₱', 'max' => 'Max ₱', 'qty' => 'Qty', 'avail' => 'Available only', 'delivery' => 'Delivery', 'pickup' => 'Pickup', 'rating' => 'Rating ≥'];
     $filterCount = count(array_filter(array_diff_key($st, ['q' => 1, 'start' => 1, 'end' => 1, 'qty' => 1, 'sort' => 1, 'view' => 1]), fn ($v) => $v !== ''));
 @endphp
 
@@ -33,7 +33,7 @@
     <svg class="confetti" viewBox="0 0 400 400" preserveAspectRatio="none" style="width:100%;height:100%">{{ confetti_svg() }}</svg>
     <div>
       <h1>{{ auth()->check() ? 'Hi '.auth()->user()->firstName().', what are we celebrating?' : 'Rent everything your party needs.' }}</h1>
-      <p class="mb-0">{{ $supCount }} verified rental partners · {{ $prodCount }} items · {{ $pkgs->count() }} packages — with real-time availability for every date.</p>
+      <p class="mb-0">{{ $supCount }} verified suppliers · {{ $prodCount }} items · {{ $pkgs->count() }} packages — with real-time availability for every date.</p>
       <form class="hero-ai mt-2" method="GET" action="{{ route('ai') }}">
         <label for="heroAi" class="small strong" style="display:block;margin-bottom:6px">Describe your event — English or Filipino</label>
         <div class="row" style="gap:8px;align-items:stretch"><textarea id="heroAi" name="q" rows="1" style="min-height:44px" placeholder="e.g. Outdoor birthday for 50 guests, pink theme, on {{ fmt_date(add_days(today_iso(), 13), false) }}"></textarea><button class="btn" style="background:#fff;color:var(--brand);border-color:#fff;white-space:nowrap">{{ icon('sparkle') }}Plan with AI</button></div>
@@ -96,7 +96,7 @@
     @if($compare->isNotEmpty())
       <div class="card mb-2"><div class="card-head"><h3>Compare items</h3><a class="btn btn-xs btn-ghost" href="{{ $qs([]) }}">Close</a></div>
         <div class="table-wrap"><table class="table"><thead><tr><th></th>@foreach($compare as $p)<th style="text-transform:none;font-size:.86rem;color:var(--ink)">{{ $p->name }}</th>@endforeach</tr></thead><tbody>
-          <tr><td class="muted strong">Rental Partner</td>@foreach($compare as $p)<td>{{ $p->supplier->name }}</td>@endforeach</tr>
+          <tr><td class="muted strong">Supplier</td>@foreach($compare as $p)<td>{{ $p->supplier->name }}</td>@endforeach</tr>
           <tr><td class="muted strong">Location</td>@foreach($compare as $p)<td>{{ $p->supplier->city }}</td>@endforeach</tr>
           <tr><td class="muted strong">Daily price</td>@foreach($compare as $p)<td>{{ money($p->basePrice()) }}@if($p->bulkLine())<div class="small muted">{{ $p->bulkLine() }}</div>@endif</td>@endforeach</tr>
           <tr><td class="muted strong">Available {{ $dates ? fmt_range($dates[0], end($dates)) : 'today' }}</td>@foreach($compare as $p)<td><b>{{ inv()->minAvailable($p->id, $dates) }}</b> of {{ $p->total_stock }}</td>@endforeach</tr>

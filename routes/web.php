@@ -117,7 +117,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/reviews', [ReviewController::class, 'supplierIndex'])->name('reviews');
     Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])->name('reviews.reply');
     Route::get('/shop', [SupplierController::class, 'shop'])->name('shop');
-    Route::put('/shop', [SupplierController::class, 'updateShop'])->name('shop.update');
+    Route::match(['put', 'post'], '/shop', [SupplierController::class, 'updateShop'])->name('shop.update');
     Route::post('/shop/business', [\App\Http\Controllers\Supplier\StaffController::class, 'business'])->name('business');
     Route::get('/team', [\App\Http\Controllers\Supplier\TeamController::class, 'index'])->name('team');
     Route::post('/team', [\App\Http\Controllers\Supplier\TeamController::class, 'store'])->name('team.store');

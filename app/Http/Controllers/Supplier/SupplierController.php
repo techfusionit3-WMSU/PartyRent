@@ -144,20 +144,137 @@ class SupplierController extends Controller
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payment rejected. Customer notified.' : $res['error']);
     }
 
+    public const SHOP_TABS = ['profile' => 'Shop profile', 'delivery' => 'Delivery & pickup', 'hours' => 'Rental hours', 'plans' => 'Payment plans', 'services' => 'Services & fees', 'damage' => 'Damage policy', 'policies' => 'Business policies'];
+
+    /** Reference SP.shop: seven tabs, each saving its own section. */
     public function shop(Request $request)
     {
         $s = $request->user()->shop();
+        $tab = array_key_exists($request->query('tab'), self::SHOP_TABS) ? $request->query('tab') : 'profile';
 
-        return view('supplier.shop', ['s' => $s, 'd' => $s->toArray(), 'p' => $s->policy ?? [], 'logos' => StartSellingController::LOGOS, 'previewCity' => $s->city_code]);
+        return view('supplier.shop', ['s' => $s, 'tab' => $tab, 'tabs' => self::SHOP_TABS, 'd' => $s->toArray(), 'logos' => StartSellingController::LOGOS,
+            'cats' => \App\Models\Category::where('active', true)->orderBy('sort')->get()]);
     }
 
+    /** Reference Services.saveShopSettings (+ profile / policies). Booked requests keep their quoted terms. */
     public function updateShop(Request $request)
     {
         $s = $request->user()->shop();
-        $v = $request->validate(StartSellingController::rules(), StartSellingController::messages());
-        $s->update(StartSellingController::toAttributes($v));
-        Notifier::audit('Updated shop profile', $s->name);
+        $section = (string) $request->input('section', 'profile');
+        $back = fn ($ok, $msg) => redirect()->route('supplier.shop', ['tab' => $section])->with($ok ? 'success' : 'error', $msg)->withInput($ok ? [] : $request->input());
+        switch ($section) {
+            case 'profile':
+                $v = $request->validate([
+                    'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
+                    'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'], 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',
+                    'color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'location_type' => 'required|in:shop,home,none',
+                    ...\App\Support\AddressInput::rules('shop_addr', $request->input('location_type', 'shop') !== 'none'),
+                    'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
+                ], StartSellingController::messages());
+                $addr = \App\Support\AddressInput::attributes($v['shop_addr'] ?? []);
+                if ($loc = StartSellingController::locationErrors($v + ['fulfillment' => $s->fulfillment], $addr['city_code'])) {
+                    throw \Illuminate\Validation\ValidationException::withMessages($loc);
+                }
+                $pin = isset($v['lat'], $v['lng']) && $v['lat'] !== null ? [round((float) $v['lat'], 7), round((float) $v['lng'], 7)] : [null, null];
+                $s->update(['name' => trim($v['name']), 'description' => trim($v['description']), 'logo' => $v['logo'], 'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'],
+                    'color' => $v['color'] ?? $s->color, 'city' => \App\Domain\Locations::name($addr['city_code']), ...$addr, 'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1]]);
+                break;
+            case 'delivery':
+                $v = $request->validate(['fulfillment' => 'required|in:delivery,pickup,both', 'delivery_fee' => 'required|numeric|min:0', 'zones' => 'nullable|array', 'zones.*.name' => 'nullable|string|max:80', 'zones.*.fee' => 'nullable|numeric']);
+                $zones = [];
+                foreach (array_values($v['zones'] ?? []) as $i => $z) {
+                    if (trim((string) ($z['name'] ?? '')) === '' && ($z['fee'] ?? '') === '') {
+                        continue; // blank new row
+                    }
+                    if (mb_strlen(trim((string) $z['name'])) < 2 || ! is_numeric($z['fee'] ?? null) || $z['fee'] < 0) {
+                        return $back(false, 'Every delivery zone needs a name and a fee of ₱0 or more.');
+                    }
+                    $zones[] = ['id' => $s->delivery_zones[$i]['id'] ?? 'z'.($i + 1), 'name' => trim($z['name']), 'fee' => (float) $z['fee']];
+                }
+                if ($v['fulfillment'] !== 'delivery' && $s->location_type === 'none') {
+                    return $back(false, 'Without a pickup location you can only offer delivery. Set a location on the Shop profile tab first.');
+                }
+                $clash = RentalRequest::where('supplier_id', $s->id)->whereIn('status', Finance::ACTIVE)->get()->filter(fn ($r) => ($v['fulfillment'] === 'pickup' && $r->fulfillment === 'delivery') || ($v['fulfillment'] === 'delivery' && $r->fulfillment === 'pickup'))->count();
+                $s->update(['fulfillment' => $v['fulfillment'], 'delivery_fee' => (float) $v['delivery_fee'], 'delivery_zones' => $zones]);
+                Notifier::audit('Updated delivery settings', $s->name);
+                if ($clash) {
+                    return $back(true, 'Shop settings saved. Note: '.$clash.' accepted rental(s) still use the previous fulfillment option and will be honored.');
+                }
+                break;
+            case 'hours':
+                $v = $request->validate(['open' => ['required', 'regex:/^([01]\d|2[0-4]):[0-5]\d$/'], 'close' => ['required', 'regex:/^([01]\d|2[0-4]):[0-5]\d$/'], 'prepHours' => 'required|numeric|min:0|max:24', 'recoveryHours' => 'required|numeric|min:0|max:24']);
+                if (\App\Domain\Slots::toMin($v['close']) <= \App\Domain\Slots::toMin($v['open'])) {
+                    return $back(false, 'Rental hours must end later than they start.');
+                }
+                $s->update(['time_settings' => array_merge(\App\Domain\Slots::DEFAULT, (array) $s->time_settings, ['open' => $v['open'], 'close' => $v['close'], 'prepHours' => (float) $v['prepHours'], 'recoveryHours' => (float) $v['recoveryHours']])]);
+                inv()->flush();
+                Notifier::audit('Updated rental hours', $s->name.' · '.\App\Domain\Slots::fmt12($v['open']).'–'.\App\Domain\Slots::fmt12($v['close']).', prep '.$v['prepHours'].'h, recovery '.$v['recoveryHours'].'h');
+                break;
+            case 'plans':
+                $v = $request->validate(['methods' => 'nullable|array', 'methods.*' => 'in:cod,bank,debit', 'plans' => 'required|array', 'depositType' => 'required|in:fixed,percent', 'depositValue' => 'required|numeric|min:0']);
+                $pp = [];
+                foreach (Finance::PLANS as $k) {
+                    $in = (array) ($v['plans'][$k] ?? []);
+                    $pp[$k] = ['enabled' => ! empty($in['enabled'])] + array_map(fn ($x) => is_numeric($x) ? $x + 0 : $x, array_intersect_key($in, Finance::DEFAULT_PLANS[$k]));
+                    $pp[$k] = array_merge(Finance::DEFAULT_PLANS[$k], $pp[$k]);
+                }
+                if ($e = Finance::validatePlanConfig($pp)) {
+                    return $back(false, $e);
+                }
+                if (empty($v['methods'])) {
+                    return $back(false, 'Keep at least one payment method.');
+                }
+                if ($v['depositType'] === 'percent' && $v['depositValue'] > 100) {
+                    return $back(false, 'Deposit percentage cannot exceed 100%.');
+                }
+                $s->update(['payment_plans' => $pp, 'methods' => array_values(array_unique($v['methods'])), 'policy' => array_merge((array) $s->policy, ['depositType' => $v['depositType'], 'depositValue' => (float) $v['depositValue']])]);
+                Notifier::audit('Updated payment plans', $s->name.' · '.collect(Finance::plansOf($s->fresh()))->map(fn ($k) => Finance::PLAN_LABEL[$k])->implode(', '));
+                break;
+            case 'services':
+                $list = [];
+                foreach (array_values((array) $request->input('services', [])) as $i => $x) {
+                    if (trim((string) ($x['name'] ?? '')) === '' && ($x['amount'] ?? '') === '') {
+                        continue;
+                    }
+                    if (mb_strlen(trim((string) $x['name'])) < 3 || ! is_numeric($x['amount'] ?? null) || $x['amount'] < 0) {
+                        return $back(false, 'Every service needs a name (3+ characters) and an amount of ₱0 or more.');
+                    }
+                    $list[] = ['id' => $x['id'] ?? ('sv'.($i + 1)), 'name' => trim($x['name']), 'description' => trim((string) ($x['description'] ?? '')), 'amount' => (float) $x['amount'], 'per' => ($x['per'] ?? '') === 'location' ? 'location' : 'order', 'required' => ! empty($x['required'])];
+                }
+                $s->update(['services' => $list]);
+                Notifier::audit('Updated services', $s->name);
+                break;
+            case 'damage':
+                $read = function ($o) {
+                    $o = (array) $o;
 
-        return back()->with('success', 'Shop profile saved. New prices and policies apply to new requests only — submitted requests keep their quoted terms.');
+                    return ['repairable' => ['enabled' => ! empty($o['rep_on']), 'pct' => (float) ($o['rep_pct'] ?? 0)], 'nonRepairable' => ['enabled' => ! empty($o['non_on']), 'pct' => (float) ($o['non_pct'] ?? 0)],
+                        'lost' => ['enabled' => ! empty($o['lost_on']), 'brand_new' => (float) ($o['lost_brand_new'] ?? 0), 'good_as_new' => (float) ($o['lost_good_as_new'] ?? 0), 'used' => (float) ($o['lost_used'] ?? 0)]];
+                };
+                $dp = $read($request->input('d', [])) + ['categories' => []];
+                foreach ((array) $request->input('c', []) as $cid => $o) {
+                    $dp['categories'][(string) $cid] = $read($o);
+                }
+                if (($add = (string) $request->input('addCategory')) !== '' && \App\Models\Category::whereKey($add)->exists()) {
+                    $dp['categories'][$add] ??= ['repairable' => $dp['repairable'], 'nonRepairable' => $dp['nonRepairable'], 'lost' => $dp['lost']];
+                }
+                if (($rm = (string) $request->input('removeCategory')) !== '') {
+                    unset($dp['categories'][$rm]);
+                }
+                if ($e = \App\Domain\Damage::validatePolicy($dp)) {
+                    return $back(false, $e);
+                }
+                $s->update(['damage_policy' => $dp]);
+                Notifier::audit('Updated damage policy', $s->name);
+                break;
+            case 'policies':
+                $v = $request->validate(['cancelDays' => 'nullable|integer|min:0|max:30', 'cancellation' => 'required|string|max:1000', 'returns' => 'required|string|max:1000', 'conditions' => 'required|string|max:1000']);
+                $s->update(['policy' => array_merge((array) $s->policy, ['cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions']])]);
+                break;
+            default:
+                return $back(false, 'Unknown settings section.');
+        }
+
+        return $back(true, 'Shop settings saved.');
     }
 }

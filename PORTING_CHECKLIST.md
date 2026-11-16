@@ -64,9 +64,9 @@ from the first row that is not `verified`.
 | locations (stock by location, transfers, movement log) | M | todo | |
 | calendar | E | done | 1440 matched (default item by id, legend, out-of-month days, holds line) |
 | payments | E | done | Payment Monitoring per reference: verification queue (review modal, verify/reject via supplier.payments.verify/reject), balances by order, overdue, records; SupplierPaymentsTest |
-| damages (+ damage policy) | E | in progress | page per SP.damages done; Damage policy tab in shop settings pending |
+| damages (+ damage policy) | E | done | page per SP.damages; policy edited on Shop settings → Damage policy tab |
 | reports (8 reports, CSV) | E | done | reference charts (bars, line, hbars incl. pct), tables; app CSV download kept |
-| shop (zones, services, damage policy, payment plans, rental hours) | P | todo | |
+| shop (zones, services, damage policy, payment plans, rental hours) | P | done | 7 tabs per reference, one section per save (SupplierController::updateShop); app address/location/pin on profile tab; ShopSettingsTest |
 | team (Org Admin, Cashier, Inventory Staff, Staff) | P (`staff`) | done | TeamRolesTest 6 green; screenshot pending |
 | Org permissions (`Auth.orgCan`) on nav + actions | P (`canShop`) | done | ShopStaff::ORG_PERMS + ROUTE_PERMS, nav filtered |
 | Mode switch customer ⇄ supplier | E | todo | |

@@ -260,7 +260,7 @@ class StartSellingController extends Controller
     }
 
     /** Location type ↔ fulfillment ↔ pin rules. Not every seller has a shop, but anyone offering pickup needs a pin. */
-    private static function locationErrors(array $v, ?string $cityCode): array
+    public static function locationErrors(array $v, ?string $cityCode): array
     {
         $errors = [];
         $type = $v['location_type'];

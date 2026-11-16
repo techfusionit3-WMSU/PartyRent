@@ -979,59 +979,60 @@ class Rentals
         return $peak;
     }
 
-    /** Return inspection: updates inventory counters by condition and records compensation. */
+    /**
+     * Record the CONFIRMED return inspection (reference Services.recordInspection): compensation from the
+     * supplier's damage policy (Damage::assess). Repairable units → damaged (until marked repaired),
+     * non-repairable → written_off, not returned → missing. Compensation can only be recorded once.
+     */
     public static function recordInspection(RentalRequest $r, array $data): array
     {
         if ($r->status !== 'return_pending') {
             return self::fail('Inspection can only be recorded when the rental is Return Pending.');
         }
-        $peak = self::peakUnits($r);
-        $items = [];
-        foreach ($peak as $pid => $released) {
-            $it = $data['items'][$pid] ?? [];
-            $g = fn ($k) => max(0, (int) ($it[$k] ?? 0));
-            $row = ['productId' => $pid, 'returned' => $g('returned'), 'good' => $g('good'), 'minor' => $g('minor'), 'major' => $g('major'), 'total' => $g('total'), 'missing' => $g('missing'), 'repairFee' => max(0, (float) ($it['repairFee'] ?? 0)), 'replaceFee' => max(0, (float) ($it['replaceFee'] ?? 0))];
-            $name = inv()->product($pid)?->name ?? 'Item';
-            if ($row['good'] + $row['minor'] + $row['major'] + $row['total'] !== $row['returned']) {
-                return self::fail($name.': good + minor + major + completely damaged must equal returned ('.$row['returned'].').');
-            }
-            if ($row['returned'] + $row['missing'] !== $released) {
-                return self::fail($name.': returned + missing must equal released quantity ('.$released.').');
-            }
-            $value = (float) (inv()->product($pid)?->replacement_value ?? 0);
-            $affected = $row['minor'] + $row['major'] + $row['total'] + $row['missing'];
-            if ($value > 0 && $row['repairFee'] + $row['replaceFee'] > $value * $affected + 0.001) {
-                return self::fail($name.': charges can be at most the replacement value ('.money($value).' × '.$affected.' damaged or missing = '.money($value * $affected).').');
-            }
-            $items[] = $row;
+        if ($r->inspection) {
+            return self::fail('This rental has already been inspected — compensation cannot be charged twice.');
         }
-        $comp = 0.0;
-        DB::transaction(function () use ($r, $items, $data, &$comp) {
-            foreach ($items as $it) {
+        if (empty($data['confirmed'])) {
+            return self::fail('Review and confirm the damage assessment before it is finalized.');
+        }
+        $as = Damage::assess($r, (array) ($data['items'] ?? []));
+        if (! $as['ok']) {
+            return self::fail($as['errors'][0]);
+        }
+        $comp = $as['total'];
+        DB::transaction(function () use ($r, $as, $data, $comp) {
+            foreach ($as['items'] as $it) {
                 $p = Product::lockForUpdate()->find($it['productId']);
                 if (! $p) {
                     continue;
                 }
-                $p->damaged += $it['major'] + $it['total'];
-                $p->missing += $it['missing'];
+                $p->damaged += $it['repairable'];
+                $p->written_off += $it['nonRepairable'];
+                $p->missing += $it['lost'];
                 $p->save();
-                if ($it['minor']) {
-                    Hold::create(['product_id' => $p->id, 'type' => 'maintenance', 'qty' => $it['minor'], 'start_date' => today_iso(), 'end_date' => add_days(today_iso(), 3), 'note' => 'Minor damage from '.$r->code.' — for repair']);
+                foreach ([['repairable', 'damaged', 'repairable damage (unavailable until repaired)'], ['nonRepairable', 'write_off', 'non-repairable'], ['lost', 'lost', 'lost / not returned']] as [$k, $type, $note]) {
+                    if ($it[$k]) {
+                        StockMovement::create(['product_id' => $p->id, 'qty' => -$it[$k], 'type' => $type, 'rental_request_id' => $r->id, 'user_id' => auth()->id(), 'balance' => $p->stockOnHand(), 'note' => $r->code.' — '.$note, 'created_at' => now()]);
+                    }
                 }
-                $comp += $it['repairFee'] + $it['replaceFee'];
             }
-            $summary = implode(', ', array_map(fn ($i) => $i['returned'].'× '.(inv()->product($i['productId'])?->name ?? ''), $items));
-            $r->fulfillment_log = array_merge($r->fulfillment_log ?? [], ['returnDate' => $data['returnDate'] ?? today_iso(), 'returnedQty' => $summary]);
-            $r->inspection = ['at' => now()->toIso8601String(), 'by' => auth()->id(), 'items' => $items, 'notes' => $data['notes'] ?? '', 'photos' => $data['photos'] ?? [], 'compensation' => r2($comp), 'settlement' => $comp > 0 ? 'pending' : 'settled'];
+            $summary = implode(', ', array_map(fn ($i) => $i['returned'].'/'.$i['rented'].'× '.(inv()->product($i['productId'])?->name ?? ''), $as['items']));
+            $returnDate = $data['returnDate'] ?? today_iso();
+            $r->fulfillment_log = array_merge($r->fulfillment_log ?? [], ['returnDate' => $returnDate, 'returnedQty' => $summary]);
+            $now = now()->toIso8601String();
+            $r->inspection = ['at' => $now, 'by' => auth()->id(), 'returnDate' => $returnDate, 'items' => $as['items'], 'notes' => $data['notes'] ?? '', 'photos' => $data['photos'] ?? [], 'compensation' => $comp, 'settlement' => $comp > 0 ? 'pending' : 'settled', 'confirmed' => true, 'confirmedAt' => $now];
             $r->status = 'inspection';
             $r->save();
-            self::history($r, 'inspection', $comp > 0 ? 'Damage/missing items recorded: '.money($comp) : 'All items returned in good condition');
+            self::history($r, 'inspection', $comp > 0 ? 'Damage assessment confirmed: '.money($comp).' compensation' : 'All items returned in good condition');
         });
         self::changed($r);
-        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? 'Damage report' : 'Return inspection done', $comp > 0 ? 'The supplier recorded damaged/missing items for '.$r->code.'. Compensation: '.money($comp).'. View the report for details.' : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
-        Notifier::audit('Recorded return inspection', $r->code.' · compensation '.money($comp));
+        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? 'Damage report' : 'Return inspection done', $comp > 0 ? 'The supplier confirmed damaged or missing items for '.$r->code.'. Compensation: '.money($comp).'. Open the rental to see the breakdown and evidence.' : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
+        if ($comp > 0 && $r->supplier) {
+            Notifier::finance($r->supplier, 'Damage compensation due', $r->code.': '.money($comp).' compensation recorded.', route('cashier.balances'));
+        }
+        Notifier::audit('Confirmed return inspection', $r->code.' · compensation '.money($comp));
 
-        return self::ok();
+        return self::ok(['assessment' => $as]);
     }
 
     /** Settle the deposit vs compensation (deducted | paid | waived) and record the deposit refund. */

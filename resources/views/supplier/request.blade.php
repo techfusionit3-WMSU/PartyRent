@@ -158,25 +158,35 @@
 @endif
 
 @if($r->status === 'return_pending')
+@php($C = \App\Domain\Damage::CONDITIONS)
 <div class="modal-backdrop hidden" id="inspectModal"><div class="modal lg" role="dialog" aria-modal="true"><div class="modal-head"><h3>Return inspection · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.inspection', $r) }}" enctype="multipart/form-data" id="inspForm">@csrf<div class="modal-body">
-    <p class="small muted">Count returned units and classify their condition. Damaged (major/total) and missing units are removed from available stock; minor damage goes to a 3-day maintenance hold. Fees are entered by you — never by AI.</p>
+  <form method="POST" action="{{ route('supplier.requests.inspection', $r) }}" enctype="multipart/form-data" id="inspForm" novalidate>@csrf<input type="hidden" name="confirmed" value="1"><div class="modal-body">
+    <p class="small muted">Count the returned units and classify any damage. Compensation is calculated automatically from <b>your damage policy</b>: product value × compensation % × affected quantity. Units not returned count as <b>Lost or Not Returned</b>. Nothing is charged until you review and confirm.</p>
     <div class="field"><label>Return date</label><input class="input" type="date" name="returnDate" value="{{ today_iso() }}" required style="max-width:200px"></div>
     @foreach(inv()->saleDemand($r->lines) as $spid => $sq)
       <div class="card card-flat mb-1 soft" style="padding:10px 14px"><div class="row between"><b>{{ inv()->product($spid)?->name }}</b><span class="small">{{ $sq }} sold · <span class="badge b-gold plain">Consumed — not returned</span></span></div></div>
     @endforeach
     @foreach($peak as $pid => $q)
-      @php($rv = (float) (inv()->product($pid)->replacement_value ?? 0))
-      <div class="card card-flat mb-1" style="padding:14px" data-insp data-value="{{ $rv }}" data-major-pct="{{ setting('majorDamagePct', 50) }}"><div class="row between mb-1"><b>{{ inv()->product($pid)->name }}</b><span class="small muted">Released (peak day): {{ $q }}@if($rv) · Replacement value {{ money($rv) }} each @endif</span></div>
-        <div class="form-grid" style="grid-template-columns:repeat(6,minmax(0,1fr))">@foreach([['returned', 'Returned', $q], ['good', 'Good', $q], ['minor', 'Minor damage', 0], ['major', 'Major damage', 0], ['total', 'Completely damaged', 0], ['missing', 'Missing', 0]] as [$k, $l, $v])<div class="field"><label class="small">{{ $l }}</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][{{ $k }}]" value="{{ $v }}"></div>@endforeach</div>
-        @if($rv)<p class="small muted mb-1" data-insp-hint>Charges fill in automatically: completely damaged or missing = {{ money($rv) }} each, major damage = {{ setting('majorDamagePct', 50) }}%. Add a repair fee for minor damage. You can change the amounts, up to {{ money($rv) }} per damaged or missing piece.</p>@else<p class="small muted mb-1">Tip: set a replacement value on this item so charges fill in automatically next time.</p>@endif
-        <div class="form-grid"><div class="field"><label class="small">Repair fees (₱)</label><input class="input input-sm" type="number" min="0" step="0.01" name="items[{{ $pid }}][repairFee]" value="0"></div><div class="field"><label class="small">Replacement fees (₱)</label><input class="input input-sm" type="number" min="0" step="0.01" name="items[{{ $pid }}][replaceFee]" value="0"></div></div>
+      @php($p = inv()->product($pid))
+      @php($rt = \App\Domain\Damage::rates($r->supplier, $p))
+      @php($pcs = ['repairable' => $rt['repairable']['enabled'] ? +$rt['repairable']['pct'] : 0, 'nonRepairable' => $rt['nonRepairable']['enabled'] ? +$rt['nonRepairable']['pct'] : 0, 'lost' => $rt['lost']['enabled'] ? +$rt['lost']['pct'] : 0])
+      <div class="card card-flat mb-1" data-insp data-name="{{ $p->name }}" data-rented="{{ $q }}" data-value="{{ (float) $p->replacement_value }}" data-pcts="{{ json_encode($pcs) }}" style="padding:14px">
+        <div class="row between wrap mb-1"><div><b>{{ $p->name }}</b><div class="small muted">Rented: {{ $q }} · condition before rental: {{ $C[$rt['condition']] }} · product value {{ money($p->replacement_value ?? 0) }}</div></div>
+          <div class="row wrap gap-sm">@foreach([['repairable', 'Repairable'], ['nonRepairable', 'Non-repairable'], ['lost', 'Lost ('.$C[$rt['condition']].')']] as [$k, $lbl])<span class="badge {{ $rt[$k]['enabled'] ? 'b-gray' : 'b-red' }} plain">{{ $lbl }}: {{ $rt[$k]['enabled'] ? +$rt[$k]['pct'].'%' : 'off' }}</span>@endforeach @if($rt['source'] === 'category')<span class="badge b-purple plain">category rule</span>@endif</div></div>
+        <div class="form-grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+          <div class="field"><label class="small">Returned</label><input class="input input-sm" type="number" min="0" max="{{ $q }}" name="items[{{ $pid }}][returned]" data-k="returned" value="{{ $q }}"></div>
+          <div class="field"><label class="small">Repairable damage</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][repairable]" data-k="repairable" value="0"></div>
+          <div class="field"><label class="small">Non-repairable damage</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][nonRepairable]" data-k="nonRepairable" value="0"></div>
+          <div class="field"><label class="small">Lost / not returned</label><input class="input input-sm" type="number" data-k="lost" value="0" readonly tabindex="-1" aria-label="Lost units (rented minus returned)"></div>
+        </div>
+        <div class="field"><label class="small">Description of the damage or loss</label><textarea class="input" name="items[{{ $pid }}][description]" data-k="description" rows="2" placeholder="e.g. Two chairs with cracked legs"></textarea></div>
+        <div class="row between small"><span class="muted" data-calc></span><b data-amt>₱0.00</b></div><div class="error-text" data-err></div>
       </div>
     @endforeach
-    <div class="field"><label>Inspection notes</label><textarea class="input" name="notes" placeholder="Describe any damage…"></textarea></div>
+    <div class="field"><label>Inspection notes</label><textarea class="input" name="notes" placeholder="General notes for the customer…"></textarea></div>
     <div class="field"><label>Photo evidence (up to 4)</label><input class="input" type="file" name="photos[]" accept="image/*" multiple></div>
-    <p class="small muted mb-0">Rule: good + minor + major + completely damaged = returned, and returned + missing = released.</p>
-  </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Save inspection</button></div></form>
+    <div class="sum-line total"><span>Total compensation</span><span id="compT">₱0.00</span></div>
+  </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Review assessment</button></div></form>
 </div></div>
 @endif
 
@@ -216,32 +226,52 @@
 @endif
 @push('scripts')
 <script>
-// Pre-fill charges from the replacement value until the supplier types their own amount.
-(function () {
-  document.querySelectorAll('[data-insp]').forEach(function (box) {
-    var v = +box.dataset.value || 0; if (!v) return;
-    var pct = (+box.dataset.majorPct || 0) / 100;
-    var get = function (k) { var i = box.querySelector('[name$="[' + k + ']"]'); return i ? (+i.value || 0) : 0; };
-    var repl = box.querySelector('[name$="[replaceFee]"]');
-    repl.addEventListener('input', function () { repl.dataset.touched = '1'; });
-    box.addEventListener('input', function (e) {
-      if (e.target === repl || repl.dataset.touched) return;
-      repl.value = Math.round((get('total') + get('missing') + get('major') * pct) * v * 100) / 100;
-    });
-  });
-})();
-// Like the prototype: warn when units are damaged or missing but no fee was entered.
+// Return inspection (reference inspectFlow): live compensation per damage policy, then review & confirm.
 (function () {
   var f = document.getElementById('inspForm'); if (!f) return;
-  f.addEventListener('submit', function () {
+  var peso = function (n) { return '₱' + (Math.round(n * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var cards = Array.prototype.slice.call(f.querySelectorAll('[data-insp]'));
+  var calc = function () {
+    var errors = [], items = [];
+    cards.forEach(function (c) {
+      var g = function (k) { return Math.max(0, Math.floor(+c.querySelector('[data-k=' + k + ']').value || 0)); };
+      var rented = +c.dataset.rented, v = +c.dataset.value || 0, pc = JSON.parse(c.dataset.pcts), name = c.dataset.name;
+      var it = { name: name, returned: g('returned'), repairable: g('repairable'), nonRepairable: g('nonRepairable'), desc: c.querySelector('[data-k=description]').value.trim() };
+      it.lost = Math.max(0, rented - it.returned);
+      var amt = function (k) { return Math.round(v * pc[k] / 100 * it[k] * 100) / 100; };
+      it.pc = pc; it.total = amt('repairable') + amt('nonRepairable') + amt('lost');
+      var errs = [];
+      if (it.returned > rented) errs.push('returned (' + it.returned + ') cannot exceed the quantity rented (' + rented + ').');
+      if (it.repairable + it.nonRepairable > it.returned) errs.push('damaged units (' + (it.repairable + it.nonRepairable) + ') cannot exceed the units returned (' + it.returned + ').');
+      if (it.repairable + it.nonRepairable + it.lost > 0 && !it.desc) errs.push('describe the damage or loss.');
+      c.querySelector('[data-k=lost]').value = it.lost;
+      c.querySelector('[data-amt]').textContent = peso(it.total);
+      c.querySelector('[data-calc]').textContent = [it.repairable ? it.repairable + ' × ' + peso(v) + ' × ' + pc.repairable + '%' : '', it.nonRepairable ? it.nonRepairable + ' × ' + peso(v) + ' × ' + pc.nonRepairable + '%' : '', it.lost ? it.lost + ' lost × ' + peso(v) + ' × ' + pc.lost + '%' : ''].filter(Boolean).join(' + ') || 'No damage or loss';
+      var er = c.querySelector('[data-err]'); er.textContent = errs.join(' '); er.style.display = errs.length ? 'block' : 'none';
+      errs.forEach(function (e) { errors.push(name + ': ' + e); });
+      items.push(it);
+    });
+    var total = items.reduce(function (s, i) { return s + i.total; }, 0);
+    document.getElementById('compT').textContent = peso(total);
+    return { errors: errors, items: items, total: total };
+  };
+  f.addEventListener('input', calc); calc();
+  f.addEventListener('submit', function (e) {
     if (f.dataset.confirmed) return;
-    var sum = function (re) { var t = 0; f.querySelectorAll('input').forEach(function (i) { if (re.test(i.name)) t += +i.value || 0; }); return t; };
-    var dmg = sum(/\[(minor|major|total|missing)\]$/), fees = sum(/\[(repairFee|replaceFee)\]$/);
-    if (dmg > 0 && fees <= 0) {
-      f.dataset.confirmTitle = 'No fees entered';
-      f.dataset.confirm = dmg + ' unit(s) are damaged or missing but no compensation was entered. Continue without charging the customer?';
-      f.dataset.confirmOk = 'Continue';
-    } else { delete f.dataset.confirm; }
+    var as = calc();
+    if (as.errors.length) {
+      e.preventDefault(); e.stopImmediatePropagation(); delete f.dataset.confirm;
+      if (window.PR && window.PR.toast) window.PR.toast(as.errors[0], 'error'); else alert(as.errors[0]);
+      return;
+    }
+    var aff = as.items.filter(function (i) { return i.repairable || i.nonRepairable || i.lost; });
+    var cell = function (q, pc) { return q ? q + ' × ' + pc + '%' : '—'; };
+    f.dataset.confirmTitle = 'Confirm damage assessment?';
+    f.dataset.confirmOk = 'Confirm & finalize';
+    f.dataset.confirm = 'Confirm the damage assessment';
+    f.dataset.confirmHtml = (aff.length ? '<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th class="num">Repairable</th><th class="num">Non-repairable</th><th class="num">Lost</th><th class="num">Compensation</th></tr></thead><tbody>' + aff.map(function (i) { return '<tr><td>' + esc(i.name) + '</td><td class="num">' + cell(i.repairable, i.pc.repairable) + '</td><td class="num">' + cell(i.nonRepairable, i.pc.nonRepairable) + '</td><td class="num">' + cell(i.lost, i.pc.lost) + '</td><td class="num"><b>' + peso(i.total) + '</b></td></tr>'; }).join('') + '</tbody></table></div>' : '<p>All items were returned in good condition — no compensation.</p>') +
+      '<div class="sum-line total"><span>Total compensation</span><span>' + peso(as.total) + '</span></div><ul class="small muted"><li>Repairable units stay unavailable until you mark them repaired.</li><li>Non-repairable and lost units are removed from usable inventory.</li><li>The customer sees the breakdown, explanation and photos. The charge is kept separate from the rental fee and can only be recorded once.</li></ul>';
   });
 })();
 </script>

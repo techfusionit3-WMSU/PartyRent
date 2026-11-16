@@ -27,10 +27,13 @@ floating bar + modal), post-login "Select Rental Dates / I'm Just Browsing" prom
 AuthController flashes `RentalPeriod::ASK`), supplier card, seeded ratings kept (no Reviews::recalcAll in seeder),
 UI "Rental Partner" → "Supplier" everywhere, "Booked" → "Accepted", plan badge `@include('partials.badges', ['planBadge' => …])`.
 NEXT, in order:
-1. `partials/inspection-report.blade.php` → port reference `Shared.inspectionReport` (items have rented/returned/
-   repairable/nonRepairable/lost/condition/value/pcts/amounts/total; CONDITIONS brand_new|good_as_new|used). This is
-   the current PagesTest 500 ("Undefined array key good"). Then the v4 return inspection (damage policy %) in
-   Rentals::recordInspection + supplier request inspect modal + supplier damages page.
+1. DONE (2026-11-16 pm): v4 return inspection. `App\Domain\Damage` (CONDITIONS, policy/rates incl. category
+   overrides, assess); `Rentals::recordInspection` needs `confirmed`, repairable→damaged, nonRepairable→written_off,
+   lost→missing (+ stock_movements), once only, finance notify; inspection-report partial, supplier inspect modal
+   (live calc + "Review assessment" confirm with HTML body — app.js confirmDialog now takes `data-confirm-html`;
+   `window.PR.toast` exposed), damages page per SP.damages. `ReplacementValueTest` rewritten (policy tests).
+   NOT yet: shop "Damage policy" tab (supplier/shop?tab=damage), product form condition select still old
+   Excellent/Good list (→ brand_new|good_as_new|used), "mark repaired" action on inventory.
 2. Make `PagesTest` green (smoke test of all pages), then rewrite the other red feature tests for the v4 flows
    (one checkout POST /checkout JSON, payments only after accept, shop cashier cashier@elegantoccasion.ph).
 3. Remaining customer pages: product (C3 TikTok-style later), packages, package, suppliers, ai, rentals, payments,

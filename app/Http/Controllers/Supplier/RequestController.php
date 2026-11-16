@@ -113,9 +113,9 @@ class RequestController extends Controller
         foreach ((array) $request->file('photos', []) as $file) {
             $photos[] = $file->store('inspections', 'public');
         }
-        $res = Rentals::recordInspection($r, ['returnDate' => $request->input('returnDate'), 'notes' => $request->input('notes'), 'items' => (array) $request->input('items', []), 'photos' => $photos]);
+        $res = Rentals::recordInspection($r, ['returnDate' => $request->input('returnDate'), 'notes' => $request->input('notes'), 'items' => (array) $request->input('items', []), 'photos' => $photos, 'confirmed' => $request->boolean('confirmed')]);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Inspection saved. Inventory updated by condition.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Inspection confirmed. Inventory updated by condition.' : $res['error']);
     }
 
     public function settle(Request $request, RentalRequest $rentalRequest)

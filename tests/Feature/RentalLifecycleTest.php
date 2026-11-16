@@ -104,11 +104,13 @@ class RentalLifecycleTest extends TestCase
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'ongoing', 'receivedBy' => 'Maria', 'releaseDate' => today_iso(), 'releaseQty' => '4 tables'])->assertSessionHas('success');
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'return_pending'])->assertSessionHas('success');
 
-        // 7. inspection: of 6 released, 5 returned (1 major damage), 1 missing, ₱500 replacement
-        $this->post("/supplier/requests/{$r->code}/inspection", ['returnDate' => today_iso(), 'items' => [$table->id => ['returned' => 5, 'good' => 4, 'minor' => 0, 'major' => 1, 'total' => 0, 'missing' => 1, 'repairFee' => 0, 'replaceFee' => 500]]])
+        // 7. inspection: of 6 released, 5 returned (1 repairable), 1 lost; ₱250 value × 100% (default policy, condition per seed)
+        $table->update(['replacement_value' => 250, 'condition' => 'brand_new']);
+        inv()->flush();
+        $this->post("/supplier/requests/{$r->code}/inspection", ['returnDate' => today_iso(), 'confirmed' => 1, 'items' => [$table->id => ['returned' => 5, 'repairable' => 2, 'nonRepairable' => 0, 'description' => 'Chipped tops; one missing']]])
             ->assertSessionHas('success');
         $table->refresh();
-        $this->assertSame(1, $table->damaged);
+        $this->assertSame(2, $table->damaged);
         $this->assertSame(1, $table->missing);
         $r->refresh();
         $this->assertSame('inspection', $r->status);

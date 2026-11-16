@@ -37,6 +37,7 @@
   }
 
   /* ---------- toasts ---------- */
+  window.PR = window.PR || {}; window.PR.toast = (m, t) => toast(m, t);
   function toast(msg, type) {
     let box = $('.toasts'); if (!box) { box = document.createElement('div'); box.className = 'toasts'; box.setAttribute('role', 'status'); document.body.appendChild(box); }
     const t = document.createElement('div'); t.className = 'toast ' + (type || '');
@@ -51,7 +52,7 @@
   function confirmDialog(o) {
     return new Promise(res => {
       const bd = document.createElement('div'); bd.className = 'modal-backdrop';
-      bd.innerHTML = '<div class="modal sm" role="dialog" aria-modal="true"><div class="modal-head"><h3>' + esc(o.title || 'Please confirm') + '</h3><button class="icon-btn" data-x aria-label="Close">' + svg('x') + '</button></div><div class="modal-body"><p style="margin:0">' + esc(o.message || 'Are you sure?') + '</p></div><div class="modal-foot"><button class="btn" data-x>Cancel</button><button class="btn ' + (o.danger ? 'btn-danger' : 'btn-primary') + '" data-ok>' + esc(o.ok || 'Confirm') + '</button></div></div>';
+      bd.innerHTML = '<div class="modal ' + (o.html ? '' : 'sm') + '" role="dialog" aria-modal="true"><div class="modal-head"><h3>' + esc(o.title || 'Please confirm') + '</h3><button class="icon-btn" data-x aria-label="Close">' + svg('x') + '</button></div><div class="modal-body">' + (o.html || '<p style="margin:0">' + esc(o.message || 'Are you sure?') + '</p>') + '</div><div class="modal-foot"><button class="btn" data-x>Cancel</button><button class="btn ' + (o.danger ? 'btn-danger' : 'btn-primary') + '" data-ok>' + esc(o.ok || 'Confirm') + '</button></div></div>';
       document.body.appendChild(bd); document.body.style.overflow = 'hidden';
       const done = v => { bd.remove(); if (!$$('.modal-backdrop:not(.hidden)').length) document.body.style.overflow = ''; res(v); };
       bd.addEventListener('click', e => { if (e.target === bd || e.target.closest('[data-x]')) done(false); if (e.target.closest('[data-ok]')) done(true); });
@@ -88,7 +89,7 @@
     const f = e.target;
     if (f.dataset.confirm && !f.dataset.confirmed) {
       e.preventDefault();
-      const ok = await confirmDialog({ title: f.dataset.confirmTitle, message: f.dataset.confirm, ok: f.dataset.confirmOk, danger: f.hasAttribute('data-danger') });
+      const ok = await confirmDialog({ title: f.dataset.confirmTitle, message: f.dataset.confirm, html: f.dataset.confirmHtml, ok: f.dataset.confirmOk, danger: f.hasAttribute('data-danger') });
       if (ok) { f.dataset.confirmed = '1'; if (f.requestSubmit) f.requestSubmit(); else f.submit(); }
       return;
     }

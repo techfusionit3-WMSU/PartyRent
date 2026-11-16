@@ -16,22 +16,24 @@
   <input type="hidden" name="def" id="defInput" value="{{ json_encode($startDef) }}">
   <div class="stack">
     <div class="card"><h3>Package details</h3>
-      <div class="form-grid" style="grid-template-columns:100px 1fr"><div class="field"><label for="pkEmoji">Emoji</label><input class="input" id="pkEmoji" name="emoji" value="{{ old('emoji', $k->emoji) }}" maxlength="4"></div><div class="field"><label for="pkName">Package name</label><input class="input" id="pkName" name="name" required minlength="3" value="{{ old('name', $k->name) }}"></div></div>
+      <div class="form-grid" style="grid-template-columns:100px 1fr"><div class="field"><label for="pkEmoji">Emoji / icon</label><input class="input" id="pkEmoji" name="emoji" value="{{ old('emoji', $k->emoji) }}" maxlength="4"></div><div class="field"><label for="pkName">Package name</label><input class="input" id="pkName" name="name" required minlength="3" value="{{ old('name', $k->name) }}"></div></div>
       <div class="field"><label for="pkDesc">Description</label><textarea class="input" id="pkDesc" name="description" required>{{ old('description', $k->description) }}</textarea></div>
-      <div class="field"><label for="pkCond">Conditions</label><textarea class="input" id="pkCond" name="conditions" placeholder="e.g. Setup included with delivery. Food is prepared the morning of the event.">{{ old('conditions', $k->conditions) }}</textarea></div>
-      <div class="field"><label>Events</label><div class="row wrap gap-sm">@foreach($events as $e)@php($on = in_array($e, old('events', $k->events ?? []), true))<label class="chip {{ $on ? 'active' : '' }}"><input type="checkbox" name="events[]" value="{{ $e }}" @checked($on) hidden>{{ $e }}</label>@endforeach</div></div>
-    </div>
-
-    <div class="card"><h3>Tier <span class="small muted">(optional)</span></h3>
-      <p class="small muted">Offer Silver, Gold and Platinum versions of the same package. Packages with the same group name show a tier switch for customers. Tip: build one, then use Duplicate on the Packages page for the next tier.</p>
-      <div class="form-grid"><div class="field"><label for="tierGroup">Group name</label><input class="input" id="tierGroup" name="tier_group" maxlength="60" list="tierGroups" value="{{ old('tier_group', $k->tier_group) }}" placeholder="e.g. Wedding"><datalist id="tierGroups">@foreach($groups as $g)<option value="{{ $g }}">@endforeach</datalist></div>
-        <div class="field"><label for="tierLabel">Tier name</label><input class="input" id="tierLabel" name="tier_label" maxlength="30" value="{{ old('tier_label', $k->tier_label) }}" placeholder="e.g. Gold"></div></div>
-    </div>
-
-    <div class="card"><h3>Stages <span class="small muted">(optional)</span></h3>
-      <p class="small muted">For events with parts, like a wedding: Preparation, Ceremony, Reception. Put each item or service in a stage below; customers give every stage its own time and venue when they book.</p>
-      <div id="stages"></div>
-      <button type="button" class="btn btn-sm mt-1" id="addStage">{{ icon('plus') }}Add stage</button>
+      @php($evNow = old('events', $k->events ?? []))
+      <div class="field"><label for="evType">Rental event</label>
+        <div class="row wrap gap-sm" id="evTags">@foreach($evNow as $e)<span class="chip active" data-ev="{{ $e }}"><input type="hidden" name="events[]" value="{{ $e }}">{{ $e }} <button type="button" class="x" data-ev-rm aria-label="Remove {{ $e }}" style="background:none;border:0;color:inherit;cursor:pointer;padding:0">✕</button></span>@endforeach</div>
+        <div class="row gap-sm mt-1"><input class="input grow" id="evType" list="evList" maxlength="40" placeholder="Type an event, or pick one below"><datalist id="evList">@foreach($events as $e)<option value="{{ $e }}">@endforeach</datalist><button type="button" class="btn" id="evAdd">{{ icon('plus') }}Add</button></div>
+        <div class="row wrap gap-sm mt-1" id="evPick">@foreach($events as $e)<button type="button" class="chip" data-ev-pick="{{ $e }}" @if(in_array($e, $evNow, true)) hidden @endif>+ {{ $e }}</button>@endforeach</div>
+        <div class="hint">Customers find the package when they filter by these events.</div></div>
+      <div class="field"><label for="pkCond">Package conditions</label><textarea class="input" id="pkCond" name="conditions" placeholder="e.g. Price is per day. Setup included with delivery.">{{ old('conditions', $k->conditions) }}</textarea></div>
+      <div class="form-grid"><div class="field"><label for="pkMinH">Minimum rental hours <span class="muted">(optional)</span></label><input class="input" type="number" id="pkMinH" name="min_hours" min="0.5" max="720" step="0.5" value="{{ old('min_hours', $k->min_hours ?: '') }}"></div>
+        <div class="field"><label for="pkMaxH">Maximum rental hours <span class="muted">(optional)</span></label><input class="input" type="number" id="pkMaxH" name="max_hours" min="0.5" max="720" step="0.5" value="{{ old('max_hours', $k->max_hours ?: '') }}">@error('max_hours')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div></div>
+      @php($photo = ($k->images ?? [])[0] ?? null)
+      <div class="field"><label for="pkPhoto">Package photo</label>
+        <div class="row gap-sm top"><div id="photoPrev" class="thumb" style="width:96px;height:96px;border-radius:12px;overflow:hidden;background:var(--surface-2);flex:none;display:grid;place-items:center">@if($photo)<img src="{{ asset('storage/'.$photo) }}" alt="Package photo" style="width:100%;height:100%;object-fit:cover">@else<span class="small muted">No photo</span>@endif</div>
+          <div class="grow"><input type="file" id="pkPhoto" accept="image/jpeg,image/png,image/webp" class="input"><div class="hint">You crop it to a square after choosing it.</div>
+            @if($photo)<label class="check small mt-1"><input type="checkbox" name="clear_photo" value="1" id="clearPhoto"> Remove the current photo</label>@endif
+            @error('photo')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div></div>
+        <input type="hidden" name="photo" id="photoData"></div>
     </div>
 
     <div class="card"><h3>What's inside</h3>
@@ -44,6 +46,23 @@
         <button type="button" class="btn btn-sm" data-add="choice">{{ icon('plus') }}Customer choice</button>
         <button type="button" class="btn btn-sm" data-add="addon">{{ icon('plus') }}Optional add-on</button>
       </div>
+    </div>
+
+    <div class="card"><h3>Inventory</h3>
+      <p class="small muted">Reserving a package deducts each included item from your inventory. Figures use the default options.</p>
+      <div id="stockBox" class="small muted">Add rental items or consumables to see how many packages your stock covers.</div>
+    </div>
+
+    <div class="card"><h3>Stages <span class="small muted">(optional)</span></h3>
+      <p class="small muted">For events with parts, like a wedding: Preparation, Ceremony, Reception. Put each item or service in a stage below; customers give every stage its own time and venue when they book.</p>
+      <div id="stages"></div>
+      <button type="button" class="btn btn-sm mt-1" id="addStage">{{ icon('plus') }}Add stage</button>
+    </div>
+
+    <div class="card"><h3>Tier <span class="small muted">(optional)</span></h3>
+      <p class="small muted">Offer Silver, Gold and Platinum versions of the same package. Packages with the same group name show a tier switch for customers. Tip: build one, then use Duplicate on the Packages page for the next tier.</p>
+      <div class="form-grid"><div class="field"><label for="tierGroup">Group name</label><input class="input" id="tierGroup" name="tier_group" maxlength="60" list="tierGroups" value="{{ old('tier_group', $k->tier_group) }}" placeholder="e.g. Wedding"><datalist id="tierGroups">@foreach($groups as $g)<option value="{{ $g }}">@endforeach</datalist></div>
+        <div class="field"><label for="tierLabel">Tier name</label><input class="input" id="tierLabel" name="tier_label" maxlength="30" value="{{ old('tier_label', $k->tier_label) }}" placeholder="e.g. Gold"></div></div>
     </div>
 
     <div class="card"><h3>Guests <span class="small muted">(optional)</span></h3>
@@ -65,6 +84,12 @@
 </form>
 
 <div class="modal-backdrop hidden" id="pkgPreview"><div class="modal lg" role="dialog" aria-modal="true" aria-label="Customer preview"><div class="modal-head"><h3>Customer preview</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div><div class="modal-body pad-0" id="previewBody"></div></div></div>
+
+<div class="modal-backdrop hidden" id="cropModal"><div class="modal" role="dialog" aria-modal="true" aria-label="Crop photo"><div class="modal-head"><h3>Crop photo</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+  <div class="modal-body"><p class="small muted">Drag the photo to position it inside the square. Use the slider to zoom.</p>
+    <canvas id="cropCv" width="320" height="320" style="display:block;margin:0 auto;width:min(320px,100%);aspect-ratio:1;border-radius:12px;cursor:grab;touch-action:none;background:var(--surface-2)"></canvas>
+    <div class="field mt-2"><label for="cropZoom">Zoom</label><input type="range" id="cropZoom" min="1" max="3" step="0.01" value="1"></div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn btn-primary" id="cropOk">Use photo</button></div></div></div>
 
 @push('scripts')
 <script>
@@ -167,12 +192,15 @@
     document.getElementById('defInput').value = JSON.stringify(def);
     clearTimeout(timer);
     timer = setTimeout(function () {
-      if (!def.components.length) { $('#priceBox').innerHTML = '<div class="small muted">Add components to see the price.</div>'; $('#pkgMsgs').innerHTML = ''; return; }
+      if (!def.components.length) { $('#priceBox').innerHTML = '<div class="small muted">Add components to see the price.</div>'; $('#pkgMsgs').innerHTML = ''; $('#stockBox').innerHTML = '<span class="small muted">Add rental items or consumables to see how many packages your stock covers.</span>'; return; }
       post(@json(route('supplier.packages.price')), { def: def }).then(function (r) {
         var rows = r.rows.map(function (x) { return '<div class="row between small"><span>' + x.qty + '× ' + esc(x.name) + (x.group !== 'included' ? ' <span class="muted">(' + x.group + ')</span>' : '') + '</span><span class="muted">' + esc(x.cost) + '</span></div>'; }).join('');
         $('#priceBox').innerHTML = '<div class="row between"><span class="strong">Customer pays</span><b class="price">' + esc(r.packageText) + '</b></div>' +
           '<div class="small muted mb-1">' + esc(r.perDayText) + ' per day + ' + esc(r.onceText) + ' once · default options' + (r.usesGuests ? ', ' + r.guests + ' guests' : '') + '</div>' + rows +
           '<div class="row between small mt-1"><span>Separately</span><span>' + esc(r.separateText) + '</span></div>' + (r.savings > 0 ? '<div class="small" style="color:var(--green)">Customer saves ' + esc(r.savingsText) + '</div>' : '');
+        var st = r.stock;
+        $('#stockBox').innerHTML = st && st.counts ? '<div class="row wrap" style="gap:16px"><div><div class="price">' + st.today + '</div><div class="small muted">packages available today</div></div><div><div class="price">' + st.min30 + '</div><div class="small muted">lowest in the next 30 days</div></div></div>' + (st.limit ? '<div class="small mt-1">Limited by <b>' + esc(st.limit) + '</b></div>' : '')
+          : '<span class="small muted">Add rental items or consumables to see how many packages your stock covers.</span>';
         $('#pkgMsgs').innerHTML = (r.error ? '<div class="alert alert-danger small">' + esc(r.error) + '</div>' : '') + r.warnings.map(function (w) { return '<div class="alert alert-warn small">' + esc(w) + '</div>'; }).join('');
       }).catch(function () { $('#priceBox').innerHTML = '<div class="small muted">Price unavailable right now.</div>'; });
     }, 250);
@@ -223,6 +251,67 @@
     post(@json(route('supplier.packages.preview')), { def: def, name: $('#pkName').value }, 'text/html').then(function (h) { box.innerHTML = h; }).catch(function (err) { box.innerHTML = '<div class="alert alert-danger">' + esc(err.message) + '</div>'; });
   });
   render();
+
+  // Rental event tags: pick from the list or type your own (change list C8)
+  var evTags = $('#evTags'), evType = $('#evType');
+  function hasEv(v) { return Array.prototype.some.call(evTags.querySelectorAll('[data-ev]'), function (c) { return c.getAttribute('data-ev').toLowerCase() === v.toLowerCase(); }); }
+  function syncPick() { document.querySelectorAll('[data-ev-pick]').forEach(function (b) { b.hidden = hasEv(b.getAttribute('data-ev-pick')); }); }
+  function addEv(v) {
+    v = String(v || '').replace(/\s+/g, ' ').trim().replace(/(^|\s)\S/g, function (c) { return c.toUpperCase(); });
+    if (!v || hasEv(v)) return;
+    if (evTags.querySelectorAll('[data-ev]').length >= 12) { window.PR.toast('Up to 12 events.', 'warn'); return; }
+    var c = document.createElement('span'); c.className = 'chip active'; c.setAttribute('data-ev', v);
+    c.innerHTML = '<input type="hidden" name="events[]" value="' + esc(v) + '">' + esc(v) + ' <button type="button" class="x" data-ev-rm aria-label="Remove ' + esc(v) + '" style="background:none;border:0;color:inherit;cursor:pointer;padding:0">✕</button>';
+    evTags.appendChild(c); syncPick();
+  }
+  $('#evAdd').addEventListener('click', function () { addEv(evType.value); evType.value = ''; evType.focus(); });
+  evType.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addEv(evType.value); evType.value = ''; } });
+  document.addEventListener('click', function (e) {
+    var rm = e.target.closest('[data-ev-rm]'); if (rm) { rm.closest('[data-ev]').remove(); syncPick(); return; }
+    var pk = e.target.closest('[data-ev-pick]'); if (pk) addEv(pk.getAttribute('data-ev-pick'));
+  });
+
+  // Package photo: crop to a square in the browser, posted as a JPEG data URL (change list C8; no GD on the server).
+  // State = the image point shown at the centre of the square, so zooming keeps the same spot in the middle.
+  var cv = $('#cropCv'), cx = cv.getContext('2d'), zoom = $('#cropZoom'), img = null, ctr = { x: 0, y: 0 }, drag = null, OUT = 800;
+  function scale() { return Math.max(cv.width / img.width, cv.height / img.height) * +zoom.value; }
+  function clampCtr() {
+    var k = scale(), hw = cv.width / 2 / k, hh = cv.height / 2 / k;
+    ctr.x = Math.min(img.width - hw, Math.max(hw, ctr.x)); ctr.y = Math.min(img.height - hh, Math.max(hh, ctr.y));
+  }
+  function paint(c, size) {
+    var k = scale() * size / cv.width;
+    c.fillStyle = '#fff'; c.fillRect(0, 0, size, size);
+    c.drawImage(img, size / 2 - ctr.x * k, size / 2 - ctr.y * k, img.width * k, img.height * k);
+  }
+  function draw() { if (!img) return; clampCtr(); paint(cx, cv.width); }
+  $('#pkPhoto').addEventListener('change', function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { window.PR.toast('Choose a JPG, PNG or WebP image.', 'error'); e.target.value = ''; return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var im = new Image();
+      im.onload = function () { img = im; zoom.value = 1; ctr = { x: im.width / 2, y: im.height / 2 }; draw(); window.PRUI.openModal($('#cropModal')); };
+      im.onerror = function () { window.PR.toast('That image could not be opened.', 'error'); };
+      im.src = rd.result;
+    };
+    rd.readAsDataURL(f);
+  });
+  zoom.addEventListener('input', draw);
+  function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+  cv.addEventListener('pointerdown', function (e) { if (!img) return; drag = { p: pt(e), c: { x: ctr.x, y: ctr.y } }; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; });
+  cv.addEventListener('pointermove', function (e) { if (!drag) return; var p = pt(e), k = scale(); ctr.x = drag.c.x - (p.x - drag.p.x) / k; ctr.y = drag.c.y - (p.y - drag.p.y) / k; draw(); });
+  ['pointerup', 'pointercancel'].forEach(function (t) { cv.addEventListener(t, function () { drag = null; cv.style.cursor = 'grab'; }); });
+  $('#cropOk').addEventListener('click', function () {
+    if (!img) return;
+    var out = document.createElement('canvas'); out.width = out.height = OUT;
+    paint(out.getContext('2d'), OUT);
+    var url = out.toDataURL('image/jpeg', 0.85);
+    $('#photoData').value = url;
+    $('#photoPrev').innerHTML = '<img src="' + url + '" alt="Package photo" style="width:100%;height:100%;object-fit:cover">';
+    if ($('#clearPhoto')) $('#clearPhoto').checked = false;
+    window.PRUI.closeModal($('#cropModal'));
+  });
 })();
 </script>
 @endpush

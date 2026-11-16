@@ -54,9 +54,12 @@ NEXT, in order:
         refuses times outside the item frame (frame may wrap past midnight) and back-to-back dates when overnight
         is off (only for items WITH a frame). Product page: "Item time frame" + "Item rental policy" rows; rent-times
         line shows the frame. updateProduct saves location stock + product in one DB transaction (DomainException).
-     b. Package form (C8): reference SP.packages form modal fields (name, emoji, description, items, fixed price,
-        events, conditions, min/max hours, photo) + C8 (Rental event tags type-or-pick, square crop on upload,
-        inventory section after items). App editor = supplier/package-form.blade.php (components/options kept).
+     b. DONE (2026-11-17): Package form C8. Details card = reference fields: emoji/icon, name, description,
+        "Rental event" tags (type or pick, stored in `events`, max 12, title-cased), package conditions, min/max
+        rental hours (migration 2026_11_17_000300 packages.max_hours), photo with in-browser square crop
+        (canvas → 800px JPEG data URL `photo`, server checks with getimagesizefromstring, stores packages/*.jpg;
+        `clear_photo` removes). Inventory card right after "What's inside" (packagePrice JSON `stock`: today,
+        min30, limiting item). Order: Details, What's inside, Inventory, Stages, Tier, Guests. NOT browser-checked yet.
      c. Mode switch customer ⇄ supplier check; C3 product page TikTok-style; C9–C13 change list.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from

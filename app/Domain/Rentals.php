@@ -1607,6 +1607,11 @@ class Rentals
             'stages' => $def['stages'] ?: null, 'tier_group' => $data['tier_group'] ?? null, 'tier_label' => ($data['tier_group'] ?? null) ? ($data['tier_label'] ?? null) : null,
             'is_draft' => (bool) ($data['draft'] ?? false),
         ];
+        foreach (['min_hours', 'max_hours'] as $h) { // reference package form: optional rental hour limits
+            if (array_key_exists($h, $data)) {
+                $attrs[$h] = $data[$h];
+            }
+        }
         if (isset($data['images'])) {
             $attrs['images'] = $data['images'];
         }

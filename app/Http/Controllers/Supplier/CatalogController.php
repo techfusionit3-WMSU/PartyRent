@@ -317,18 +317,51 @@ class CatalogController extends Controller
             'conditions' => 'nullable|string|max:1000', 'events' => 'nullable|array', 'events.*' => 'string|max:40',
             'def' => 'required', 'draft' => 'nullable|boolean',
             'tier_group' => 'nullable|string|max:60', 'tier_label' => 'nullable|string|max:30',
+            'min_hours' => 'nullable|numeric|min:0.5|max:720', 'max_hours' => 'nullable|numeric|min:0.5|max:720',
+            'photo' => 'nullable|string|max:3000000', 'clear_photo' => 'nullable|boolean',
         ]);
+        if (($v['min_hours'] ?? null) && ($v['max_hours'] ?? null) && $v['max_hours'] < $v['min_hours']) {
+            throw ValidationException::withMessages(['max_hours' => 'Maximum hours cannot be less than the minimum.']);
+        }
+        // Rental event tags: picked from the list or typed (change list C8)
+        $events = collect($v['events'] ?? [])->map(fn ($e) => ucwords(trim(preg_replace('/\s+/', ' ', $e))))->filter()->unique(fn ($e) => mb_strtolower($e))->take(12)->values()->all();
 
         return array_merge($this->defInput($request), [
             'name' => trim($v['name']), 'emoji' => $v['emoji'] ?? '', 'description' => trim($v['description']), 'conditions' => trim((string) ($v['conditions'] ?? '')),
-            'events' => $v['events'] ?? [], 'draft' => $request->boolean('draft'),
+            'events' => $events, 'draft' => $request->boolean('draft'),
             'tier_group' => trim((string) ($v['tier_group'] ?? '')) ?: null, 'tier_label' => trim((string) ($v['tier_label'] ?? '')) ?: null,
+            'min_hours' => ($v['min_hours'] ?? null) ? (float) $v['min_hours'] : null, 'max_hours' => ($v['max_hours'] ?? null) ? (float) $v['max_hours'] : null,
         ]);
+    }
+
+    /**
+     * Package photo: the form crops it to a square in the browser (change list C8) and posts a JPEG/PNG data URL.
+     * Returns the new images list, or null to keep the current one.
+     */
+    private function packagePhoto(Request $request): ?array
+    {
+        $raw = (string) $request->input('photo', '');
+        if ($raw === '') {
+            return $request->boolean('clear_photo') ? [] : null;
+        }
+        if (! preg_match('#^data:image/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$#', $raw, $m) || ! ($bytes = base64_decode($m[2], true))) {
+            throw ValidationException::withMessages(['photo' => 'The photo could not be read. Choose a JPG or PNG image.']);
+        }
+        $info = @getimagesizefromstring($bytes);
+        if (! $info || ! in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+            throw ValidationException::withMessages(['photo' => 'The photo could not be read. Choose a JPG or PNG image.']);
+        }
+        $path = 'packages/'.\Illuminate\Support\Str::random(32).'.'.($m[1] === 'jpeg' ? 'jpg' : $m[1]);
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $bytes);
+
+        return [$path];
     }
 
     public function storePackage(Request $request)
     {
-        $res = Rentals::savePackage($this->sup($request), $this->packageData($request));
+        $data = $this->packageData($request);
+        $data['images'] = $this->packagePhoto($request) ?? [];
+        $res = Rentals::savePackage($this->sup($request), $data);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }
@@ -338,7 +371,12 @@ class CatalogController extends Controller
 
     public function updatePackage(Request $request, Package $package)
     {
-        $res = Rentals::savePackage($this->sup($request), $this->packageData($request), $this->ownPackage($request, $package));
+        $k = $this->ownPackage($request, $package);
+        $data = $this->packageData($request);
+        if (($photo = $this->packagePhoto($request)) !== null) {
+            $data['images'] = $photo;
+        }
+        $res = Rentals::savePackage($this->sup($request), $data, $k);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }
@@ -361,7 +399,30 @@ class CatalogController extends Controller
             'separateText' => money($pp['separate']), 'savings' => $pp['savings'], 'savingsText' => money($pp['savings']),
             'usesGuests' => Packages::usesGuests($def), 'guests' => $pp['sel']['guests'],
             'rows' => array_map(fn ($r) => ['group' => $r['group'], 'kind' => $r['kind'], 'name' => $r['name'], 'qty' => $r['qty'], 'cost' => money($r['cost']), 'charge' => money($r['charge'])], $pp['rows']),
+            'stock' => $def['components'] ? $this->packageStock($def) : null,
         ]);
+    }
+
+    /**
+     * Inventory card of the package form (reference packages list: "N available today · min M next 30 days ·
+     * Limited by X"), worked out from the unsaved definition with the default options.
+     */
+    private function packageStock(array $def): array
+    {
+        $days = array_map(fn ($i) => add_days(today_iso(), $i), range(0, 29));
+        $avail = array_map(fn ($d) => inv()->packageAvailableOn(0, $d, null, null, $def), $days);
+        $limit = null;
+        $u = Packages::units($def, null);
+        foreach (['rent', 'sale'] as $kind) {
+            foreach ($u[$kind] as $pid => $q) {
+                $n = intdiv($kind === 'rent' ? inv()->availableOn($pid, today_iso()) : inv()->saleAvailable($pid), max(1, $q));
+                if ($limit === null || $n < $limit['n']) {
+                    $limit = ['n' => $n, 'name' => inv()->product($pid)?->name, 'per' => $q];
+                }
+            }
+        }
+
+        return ['today' => $avail[0], 'min30' => min($avail), 'limit' => $limit ? $limit['name'].' ('.$limit['per'].' per package)' : null, 'counts' => (bool) $limit];
     }
 
     /** What the customer will see (contents + choices), rendered from the unsaved definition. */

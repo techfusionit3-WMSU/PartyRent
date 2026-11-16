@@ -53,6 +53,39 @@ class PackagesTest extends TestCase
         return array_merge(['name' => 'Fiesta Bundle', 'emoji' => '🎈', 'description' => 'Tables, cupcakes and a setup crew.', 'conditions' => '', 'events' => ['Birthday'], 'def' => json_encode($def), 'draft' => '0'], $over);
     }
 
+    public function test_package_form_events_hours_photo_and_inventory(): void
+    {
+        $cup = $this->cupcakes();
+        $this->as('juan@demo.ph', 'supplier')->get('/supplier/packages/new')->assertOk()->assertSee('Rental event')->assertSee('Package photo')->assertSee('Inventory');
+
+        // inventory card: packages the stock covers, and the limiting item
+        $stock = $this->postJson('/supplier/packages/price', ['def' => $this->def($cup->id)])->assertOk()->json('stock');
+        $this->assertTrue($stock['counts']);
+        $this->assertTrue($stock['today'] >= 1 && $stock['today'] <= 10); // never more than the 10 cupcake trays
+        $this->assertLessThanOrEqual($stock['today'], $stock['min30']);
+        $this->assertStringContainsString('per package', $stock['limit']);
+
+        // a 1×1 PNG, as the browser crop would post it
+        $png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $this->post('/supplier/packages', $this->form($this->def($cup->id), ['events' => ['Birthday', ' baby  shower', 'birthday'], 'min_hours' => 3, 'max_hours' => 8, 'photo' => $png]))
+            ->assertSessionHas('success');
+        $k = Package::where('name', 'Fiesta Bundle')->firstOrFail();
+        $this->assertSame(['Birthday', 'Baby Shower'], $k->events);
+        $this->assertSame([3.0, 8.0], [$k->min_hours, $k->max_hours]);
+        $this->assertCount(1, $k->images);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($k->images[0]);
+
+        // max below min, and a photo that is not an image, are refused
+        $this->put("/supplier/packages/{$k->id}", $this->form($this->def($cup->id), ['min_hours' => 5, 'max_hours' => 2]))->assertSessionHasErrors('max_hours');
+        $this->put("/supplier/packages/{$k->id}", $this->form($this->def($cup->id), ['photo' => 'data:image/png;base64,'.base64_encode('not an image')]))->assertSessionHasErrors('photo');
+        // editing without a new photo keeps it; "remove" clears it
+        $this->put("/supplier/packages/{$k->id}", $this->form($this->def($cup->id)))->assertSessionHas('success');
+        $this->assertCount(1, $k->fresh()->images);
+        $this->put("/supplier/packages/{$k->id}", $this->form($this->def($cup->id), ['clear_photo' => '1']))->assertSessionHas('success');
+        $this->assertSame([], $k->fresh()->images);
+    }
+
     public function test_supplier_builds_a_package_with_components_and_options(): void
     {
         $cup = $this->cupcakes();

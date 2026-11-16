@@ -23,6 +23,7 @@ class Product extends Model
             'delivery' => 'boolean',
             'pickup' => 'boolean',
             'handling_fee' => 'float',
+            'allow_overnight' => 'boolean', 'hidden_at' => 'datetime', 'written_off' => 'integer', 'max_hours' => 'float',
             'replacement_value' => 'float',
             'min_hours' => 'float', 'buffer_min' => 'integer',
             'weight_kg' => 'float', 'length_cm' => 'float', 'width_cm' => 'float', 'height_cm' => 'float',
@@ -73,6 +74,10 @@ class Product extends Model
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function category(): BelongsTo { return $this->belongsTo(Category::class); }
     public function holds(): HasMany { return $this->hasMany(Hold::class); }
+    public function locationStock(): HasMany { return $this->hasMany(LocationStock::class); }
+
+    /** [inventory_location_id => qty] (the reference stockByLocation). */
+    public function stockByLocation(): array { return $this->locationStock->pluck('qty', 'inventory_location_id')->map(fn ($q) => (int) $q)->all(); }
     public function reviews(): HasMany { return $this->hasMany(Review::class); }
 
     /** Published listing from an approved supplier. */

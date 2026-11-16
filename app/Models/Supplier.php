@@ -14,6 +14,8 @@ class Supplier extends Model
     {
         return [
             'methods' => 'array',
+            'company' => 'array', 'application' => 'array', 'payment_plans' => 'array', 'time_settings' => 'array',
+            'delivery_zones' => 'array', 'services' => 'array', 'damage_policy' => 'array',
             'arrangements' => 'array',
             'policy' => 'array',
             'delivery' => 'array',
@@ -38,6 +40,7 @@ class Supplier extends Model
     public function isVerifiedBusiness(): bool { return $this->isBusiness() && $this->biz_status === 'verified'; }
     public function accountLabel(): string { return $this->isBusiness() ? 'Business' : 'Personal'; }
     public function products(): HasMany { return $this->hasMany(Product::class); }
+    public function locations(): HasMany { return $this->hasMany(InventoryLocation::class)->orderBy('id'); }
     public function payouts(): HasMany { return $this->hasMany(Payout::class); }
 
     public function hasPayoutAccount(): bool { return (bool) $this->payout_method && $this->payout_account_name && $this->payout_account_no; }

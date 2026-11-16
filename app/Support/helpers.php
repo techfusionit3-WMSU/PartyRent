@@ -68,6 +68,14 @@ if (! function_exists('add_days')) {
     }
 }
 
+if (! function_exists('add_months')) {
+    /** Same day n months later, clamped to the month's last day (U.addMonths). */
+    function add_months(string $date, int $n): string
+    {
+        return Carbon::parse($date)->addMonthsNoOverflow($n)->toDateString();
+    }
+}
+
 if (! function_exists('diff_days')) {
     function diff_days(string $a, string $b): int
     {

@@ -45,14 +45,17 @@ class Payouts
         $pct ??= r2(self::pct() + (float) ($p['commissionExtraPct'] ?? 0));
         $income = r2(max(0, $f['paidRental'] - $f['refunded']));
         $delivery = r2(min($income, (float) ($p['deliveryFee'] ?? 0)));
-        $items = r2($income - $delivery);
-        $voucher = $r->status === 'completed' ? r2((float) ($p['delivery']['voucher'] ?? 0)) : 0.0;
+        // Change list: service fees go to the platform and are not part of the supplier's payout share.
+        $service = r2(min($income - $delivery, (float) ($p['serviceFee'] ?? 0)));
+        $items = r2($income - $delivery - $service);
+        $voucher = $r->status === 'completed' ? r2((float) ($p['voucher'] ?? 0)) : 0.0;
         $comp = r2($f['compPaidDirect'] + $f['depositApplied']);
         $commission = r2($items * $pct / 100);
 
         return [
-            'income' => $income, 'items' => $items, 'delivery' => $delivery, 'voucher' => $voucher,
+            'income' => $income, 'items' => $items, 'delivery' => $delivery, 'service' => $service, 'voucher' => $voucher,
             'pct' => $pct, 'commission' => $commission, 'compensation' => $comp,
+            // payout = items − commission + delivery + voucher (+ damage compensation passed through)
             'net' => r2($items - $commission + $delivery + $voucher + $comp),
         ];
     }

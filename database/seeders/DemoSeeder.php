@@ -451,7 +451,7 @@ class DemoSeeder extends Seeder
                 unset($it);
                 $r->installment_plan = ['status' => 'approved', 'items' => $items, 'proposedAt' => $this->ts(-20)->toIso8601String(), 'reviewedAt' => $this->ts(-18)->toIso8601String(), 'reviewedBy' => $this->U['u5']];
             }
-            $r->created_at = $this->ts($created, 11);
+            $r->created_at = $this->ts($created, ['PR-0003' => 15, 'PR-0004' => 9, 'PR-0005' => 11][$code] ?? 10);
             $r->save();
             foreach ($hist as $h) {
                 RequestEvent::create(['rental_request_id' => $r->id, 'status' => $h[0], 'user_id' => $this->U[$h[2]], 'note' => $h[3] ?? null, 'created_at' => $this->ts($h[1])]);

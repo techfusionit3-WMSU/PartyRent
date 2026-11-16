@@ -4,7 +4,7 @@
 @php($ip = $r->installment_plan)
 @php($plan = $p['plan'] ?? 'full')
 <div class="row between mb-1"><h3 class="mb-0">Payment summary</h3>@include('partials.badges', ['pay' => $f['status']])</div>
-<div class="row wrap gap-sm mb-1"><span class="badge b-purple plain">{{ \App\Domain\Finance::PLAN_LABEL[$plan] }}</span>@if($f['reservationConfirmed'])<span class="badge b-green plain">{{ $plan === 'full' ? 'Order confirmed' : 'Reservation confirmed' }}</span>@endif @if($f['pendingRental'])<span class="badge b-gold plain">Awaiting verification: {{ money($f['pendingRental']) }}</span>@endif</div>
+<div class="row wrap gap-sm mb-1">@include('partials.badges', ['planBadge' => $plan])@if($f['reservationConfirmed'])<span class="badge b-green plain">{{ $plan === 'full' ? 'Order confirmed' : 'Reservation confirmed' }}</span>@endif @if($f['pendingRental'])<span class="badge b-gold plain">Awaiting verification: {{ money($f['pendingRental']) }}</span>@endif</div>
 @include('partials.rental-charges', ['q' => $p])
 @if($plan === 'full')
   <div class="sum-line"><span class="muted">Full Payment (100%)</span><span>{{ money($p['total']) }}</span></div>
@@ -18,7 +18,7 @@
 <div class="sum-line"><span class="muted">Verified payments</span><span style="color:var(--green)">− {{ money($f['paidRental']) }}</span></div>
 @if($f['pendingRental'])<div class="sum-line"><span class="muted">Pending verification</span><span style="color:#B45309">{{ money($f['pendingRental']) }}</span></div>@endif
 @if($f['refunded'])<div class="sum-line"><span class="muted">Refunded</span><span>{{ money($f['refunded']) }}</span></div>@endif
-<div class="sum-line total"><span>Remaining balance</span><span class="price">{{ money($f['balance']) }}</span></div>
+<div class="sum-line total"><span>Outstanding balance</span><span class="price">{{ money($f['balance']) }}</span></div>
 
 @if($f['schedule'])
   <div class="mt-2"><div class="label mb-1">Payment schedule</div>

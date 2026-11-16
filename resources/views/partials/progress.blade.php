@@ -3,8 +3,8 @@
 @else
   @php
       $steps = $r->fulfillment === 'pickup'
-          ? [['pending', 'Requested'], ['accepted', 'Booked'], ['in_progress', 'Preparing'], ['ready_pickup', 'Ready for pickup'], ['ongoing', 'Ongoing'], ['return_pending', 'Return'], ['inspection', 'Inspection'], ['completed', 'Completed']]
-          : [['pending', 'Requested'], ['accepted', 'Booked'], ['in_progress', 'Preparing'], ['out_delivery', 'Out for delivery'], ['ongoing', 'Ongoing'], ['return_pending', 'Return'], ['inspection', 'Inspection'], ['completed', 'Completed']];
+          ? [['pending', 'Requested'], ['accepted', 'Accepted'], ['in_progress', 'Preparing'], ['ready_pickup', 'Ready for pickup'], ['ongoing', 'Ongoing'], ['return_pending', 'Return'], ['inspection', 'Inspection'], ['completed', 'Completed']]
+          : [['pending', 'Requested'], ['accepted', 'Accepted'], ['in_progress', 'Preparing'], ['out_delivery', 'Out for delivery'], ['ongoing', 'Ongoing'], ['return_pending', 'Return'], ['inspection', 'Inspection'], ['completed', 'Completed']];
       $idx = collect($steps)->search(fn ($s) => $s[0] === $r->status);
       $done = $r->status === 'completed';
   @endphp

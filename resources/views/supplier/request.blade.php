@@ -1,4 +1,4 @@
-@extends('layouts.dash', ['title' => $r->code, 'nav' => 'requests'])
+@extends('layouts.dash', ['title' => 'Request Details', 'nav' => 'requests'])
 
 @php
     $hints = ['accepted' => 'Prepare the items once payments are in order.', 'in_progress' => $r->fulfillment === 'delivery' ? 'Send the items out for delivery.' : 'Notify the customer that items are ready for pickup.', 'ready_pickup' => 'Record who picked up the items.', 'out_delivery' => 'Record who received the delivery.', 'ongoing' => 'Mark the rental for return after the event ('.fmt_date($r->end_date).').', 'return_pending' => 'Count and inspect returned items.', 'inspection' => 'Settle the security deposit and complete the rental.'];
@@ -8,7 +8,7 @@
 
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.requests') }}">Rental Requests</a> / {{ $r->code }}</div>
-<div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@if($r->status !== 'pending')@include('partials.badges', ['pay' => $f['status']])@endif</div></div>
+<div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@if($r->status !== 'pending')@include('partials.badges', ['pay' => $f['status']])@endif@include('partials.badges', ['planBadge' => $r->plan])</div></div>
 <div class="card mb-2">@include('partials.progress')</div>
 
 {{-- next step --}}
@@ -102,7 +102,7 @@
         @else<p class="muted small">The customer has not proposed a schedule yet.</p>@endif
       </div>
     @endif
-    <div class="card"><h3>Requested items & daily quantities</h3>@include('partials.lines-table', ['pricing' => $r->pricing])</div>
+    <div class="card"><h3>Requested items, times & daily quantities</h3>@include('partials.lines-table', ['pricing' => $r->pricing, 'r' => $r, 'showSource' => true])</div>
     @php($pendPays = $r->payments->where('status', 'pending'))
     <div class="card"><div class="card-head"><h3>Payments</h3>@if($canRecord)<button class="btn btn-sm" data-modal="cashModal">{{ icon('cash') }}Record payment</button>@endif</div>
       @if($pendPays->count())<div class="alert alert-warn mb-1">{{ icon('clock') }}<div class="grow">{{ $pendPays->count() }} payment(s) awaiting verification. @if($finOK)<a class="btn btn-xs btn-primary" href="{{ route('supplier.payments', ['tab' => 'verify']) }}">Review in Payments</a>@else Your Cashier or Organization Admin verifies them.@endif</div></div>@endif
@@ -113,12 +113,13 @@
   <aside class="stack">
     <div class="card"><h3>Customer</h3>
       <div class="row mb-1"><span class="avatar">{{ $c->initials() }}</span><div><b>{{ $c->name }}</b><div class="small muted">{{ $custHist->count() }} request(s) on PartyRent · {{ $custHist->where('status', 'completed')->count() }} completed</div></div></div>
-      <dl class="kv"><dt>Contact</dt><dd>{{ $r->contact_name }}<br>{{ $r->contact_phone }}<br>{{ $c->email }}</dd><dt>Payment</dt><dd>{{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }} · {{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</dd><dt>Fulfillment</dt><dd>{{ $r->fulfillment === 'delivery' ? 'Delivery' : 'Pickup at your shop' }}</dd></dl>
+      <dl class="kv"><dt>Contact</dt><dd>{{ $r->contact_name }}<br>{{ $r->contact_phone }}<br>{{ $c->email }}</dd><dt>Payment</dt><dd>{{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }} · {{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</dd></dl>
       @if($r->instructions)<div class="alert alert-info mt-1">{{ icon('message') }}<div class="small"><b>Instructions:</b> {{ $r->instructions }}</div></div>@endif
     </div>
     <div class="card"><h3>{{ $r->fulfillment === 'delivery' ? (count($r->destinations ?? []) > 1 ? count($r->destinations).' delivery locations' : 'Delivery location') : 'Pickup' }}</h3>@if($r->fulfillment === 'delivery')@include('partials.destinations')@else<div class="small">Pickup at <b>{{ $r->supplier->address }}</b><div class="muted">{{ $r->supplier->hours }}</div></div>@endif</div>
     <div class="card">@include('partials.payment-summary')</div>
-    <form class="card" method="POST" action="{{ route('supplier.requests.notes', $r) }}">@csrf<h3>Supplier notes</h3><div class="field"><textarea class="input" name="notes" rows="3" placeholder="Notes are visible to the customer.">{{ $r->supplier_notes }}</textarea></div><button class="btn btn-sm">{{ icon('edit') }}Save notes</button></form>
+    <div class="card"><h3>Supplier notes</h3><p class="small">@if($r->supplier_notes){{ $r->supplier_notes }}@else<span class="muted">No notes yet. Notes are visible to the customer.</span>@endif</p>@if(auth()->user()->orgCan('orders.manage'))<button class="btn btn-sm" data-modal="notesModal">{{ icon('edit') }}Edit notes</button>@endif</div>
+    <div class="modal-backdrop hidden" id="notesModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Supplier notes</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div><form method="POST" action="{{ route('supplier.requests.notes', $r) }}">@csrf<div class="modal-body"><div class="field"><label for="sn">Notes for this rental (visible to customer)</label><textarea class="input" id="sn" name="notes" rows="4">{{ $r->supplier_notes }}</textarea></div></div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Save notes</button></div></form></div></div>
     @if(! empty($r->fulfillment_log['releaseDate']))
       <div class="card"><h3>Release & return log</h3><dl class="kv"><dt>Released</dt><dd>{{ fmt_date($r->fulfillment_log['releaseDate']) }}</dd><dt>Quantity</dt><dd>{{ $r->fulfillment_log['releaseQty'] ?? '' }}</dd><dt>Received by</dt><dd>{{ $r->fulfillment_log['receivedBy'] ?? '' }}</dd>@if(! empty($r->fulfillment_log['returnDate']))<dt>Returned</dt><dd>{{ fmt_date($r->fulfillment_log['returnDate']) }}</dd><dt>Returned qty</dt><dd>{{ $r->fulfillment_log['returnedQty'] ?? '' }}</dd>@endif</dl></div>
     @endif

@@ -12,7 +12,7 @@ class RentalRequest extends Model
 {
     public const STATUS = [
         'pending' => ['Pending', 'b-gold'],
-        'accepted' => ['Booked', 'b-sky'],
+        'accepted' => ['Accepted', 'b-sky'],
         'declined' => ['Declined', 'b-red'],
         'cancelled' => ['Cancelled', 'b-gray'],
         'in_progress' => ['In Progress', 'b-purple'],

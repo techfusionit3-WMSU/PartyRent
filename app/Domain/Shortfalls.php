@@ -370,15 +370,54 @@ class Shortfalls
                 $refund = r2($paidBefore['paidRental'] - $paidBefore['refunded']);
                 $changes[] = 'Booking cancelled';
             } else {
-                $r->update(['lines' => $lines]);
-                $q = Pricing::quoteRequest($r->fresh());
-                $credits = array_merge($r->pricing['credits'] ?? [], ($d['credit'] ?? 0) > 0 ? [['label' => 'Shortfall '.$c->code.' · '.self::TYPES[$d['type']], 'amount' => (float) $d['credit']]] : []);
-                $off = r2(array_sum(array_column($credits, 'amount')));
-                $q['credits'] = $credits;
-                foreach (['rentalFee', 'itemsSubtotal', 'total', 'payable'] as $k) {
-                    $q[$k] = r2(max(0, $q[$k] - $off));
+                // The customer's quoted price is honored: only the CHANGE is applied to the stored snapshot —
+                // the difference between quoting the old and the new lines today, then the agreed credit.
+                $q = $r->pricing;
+                if ($lines !== $r->lines) {
+                    // removed units come off at the booked unit rates (patch the stored line rows) …
+                    $delta = 0.0;
+                    $cut = $removed;
+                    foreach ($q['lines'] as $li => $ql) {
+                        if (($ql['type'] ?? '') !== 'item' || (int) $ql['refId'] !== $c->product_id) {
+                            continue;
+                        }
+                        foreach ($ql['days'] as $di => $row) {
+                            $n = min((int) ($cut[$row['date']] ?? 0), (int) $row['qty']);
+                            if ($n <= 0) {
+                                continue;
+                            }
+                            $cut[$row['date']] -= $n;
+                            $q['lines'][$li]['days'][$di]['qty'] = (int) $row['qty'] - $n;
+                            $q['lines'][$li]['days'][$di]['subtotal'] = r2((float) $row['unit'] * ((int) $row['qty'] - $n));
+                            $delta -= r2((float) $row['unit'] * $n);
+                        }
+                        $q['lines'][$li]['days'] = array_values(array_filter($q['lines'][$li]['days'], fn ($x) => $x['qty'] > 0));
+                        $sum = r2(array_sum(array_column($q['lines'][$li]['days'], 'subtotal')));
+                        $q['lines'][$li]['total'] = r2(max(0, $sum - ($ql['discount']['amount'] ?? 0)));
+                        $q['lines'][$li]['rent'] = $q['lines'][$li]['total'];
+                    }
+                    // … and a substitute is added at its current price
+                    if ($d['type'] === 'substitute') {
+                        $sq = Pricing::quoteLine(end($lines), null, $r->created_at?->format('Y-m-d'));
+                        $q['lines'][] = $sq;
+                        $delta += (float) $sq['total'];
+                    }
+                    $q['lines'] = array_values(array_filter($q['lines'], fn ($x) => ! empty($x['days']) || ! empty($x['once'])));
+                    foreach (['rentalFee', 'itemsSubtotal', 'rentalSubtotal', 'total', 'payable'] as $k) {
+                        if (isset($q[$k])) {
+                            $q[$k] = r2(max(0, (float) $q[$k] + $delta));
+                        }
+                    }
+                    $r->update(['lines' => $lines]);
                 }
-                $q['finalBalance'] = r2(max(0, $q['total'] - $q['reservationFee'] - $q['downPayment']));
+                $credit = (float) ($d['credit'] ?? 0);
+                $q['credits'] = array_merge($q['credits'] ?? [], $credit > 0 ? [['label' => 'Shortfall '.$c->code.' · '.self::TYPES[$d['type']], 'amount' => $credit]] : []);
+                foreach (['rentalFee', 'itemsSubtotal', 'total', 'payable'] as $k) {
+                    if (isset($q[$k])) {
+                        $q[$k] = r2(max(0, (float) $q[$k] - $credit));
+                    }
+                }
+                $q['finalBalance'] = r2(max(0, $q['total'] - ($q['reservationFee'] ?? 0) - ($q['downPayment'] ?? 0)));
                 $r->update(['pricing' => $q]);
                 $r->refresh();
                 $r->finCache = null;

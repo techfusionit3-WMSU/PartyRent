@@ -86,8 +86,10 @@ NEXT, in order:
         substitute | delay | refund | cancel (+ credit). apply(): lines, BookingDays::sync, pricing re-snapshot
         with pricing['credits'], pending 'refund' Payment (recorded_by system) when paid > new total, notify shop
         finance. escalateDue() (page loads + `partyrent:escalate-cases` every 15 min) → admin.cases → settle.
-        case-alert partial on both booking pages. ShortfallCasesTest (5). Browser check pending.
-        NEXT: browser check of C12, then C13 Xendit (refund permission! pending shortfall refunds → Xendit refund,
+        case-alert partial on both booking pages. ShortfallCasesTest (5). Browser-checked (drv/cases.js): found + fixed
+        apply() re-quoting the whole booking at today's rules (₱629 drift) — now the stored quote is honored: removed
+        units come off at the booked unit rates, a substitute is added at its current price, then the credit.
+        NEXT: C13 Xendit (refund permission! pending shortfall refunds → Xendit refund,
         payout reduction), then cashier/admin/super.
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from

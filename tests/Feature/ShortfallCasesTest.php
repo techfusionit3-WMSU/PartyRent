@@ -117,6 +117,7 @@ class ShortfallCasesTest extends TestCase
         $this->assertSame('countered', $c->fresh()->status);
         // customer counters with a refund; the shop accepts → price, refund and timeline follow
         $this->asCustomer($carlo)->post(route('cases.propose', $c), ['type' => 'refund', 'credit' => 150, 'note' => 'Refund the 20 chairs and the hassle.'])->assertSessionHas('success');
+        $p->update(['tiers' => [['min' => 1, 'max' => null, 'price' => 50]]]); // later price changes never touch the quoted price
         $this->asSupplier()->post(route('cases.respond', $c), ['answer' => 'accept'])->assertSessionHas('success');
         $c->refresh();
         $b->refresh();
@@ -134,6 +135,7 @@ class ShortfallCasesTest extends TestCase
         $c = ShortfallCase::first();
         // partial: 20 fewer chairs on d1, price follows the units
         $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'partial', 'credit' => 0])->assertSessionHas('success');
+        $p->update(['tiers' => [['min' => 1, 'max' => null, 'price' => 20]]]); // removed units come off at the booked ₱10
         $this->asCustomer($carlo)->post(route('cases.respond', $c), ['answer' => 'accept'])->assertSessionHas('success');
         $b->refresh();
         $this->assertSame([$d1 => 10, $d2 => 30], $b->lines[0]['days']);

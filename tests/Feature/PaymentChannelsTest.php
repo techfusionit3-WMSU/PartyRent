@@ -22,6 +22,12 @@ class PaymentChannelsTest extends TestCase
 
     protected string $seeder = \Database\Seeders\DemoSeeder::class;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->accepted('PR-0003'); // v4: payments only after accept
+    }
+
     private function as(string $email, string $mode): static
     {
         return $this->actingAs(User::where('email', $email)->firstOrFail())->withSession(['mode' => $mode]);
@@ -96,22 +102,22 @@ class PaymentChannelsTest extends TestCase
         $this->post("/superadmin/pay-accounts/{$gcash->id}/delete")->assertSessionHas('error');
 
         // other roles can't manage accounts
-        $this->as('cashier@partyrent.ph', 'cashier')->get('/superadmin/pay-accounts')->assertRedirect(); // role middleware sends them home
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/superadmin/pay-accounts')->assertRedirect(); // role middleware sends them home
     }
 
     public function test_monthly_limit_moves_customers_to_another_account(): void
     {
         $r = $this->req('PR-0003');
-        $amt = $r->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($r)['amount'] - 200; // leave room in the balance for the ₱100 below
         $gcash = $this->acc('GCash');
         $gcash->update(['monthly_cap' => $amt + 50]); // room for this payment and ₱50 more
         $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertSee('data-room="'.round($amt + 50, 2).'"', false); // the form hides it per amount
 
-        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'reference' => 'GC-1', 'proof' => $this->proof()])
+        $this->post('/rentals/PR-0003/payments', ['type' => 'full', 'amount' => $amt, 'method' => 'bank', 'reference' => 'GC-1', 'proof' => $this->proof()])
             ->assertSessionHas('error', fn ($e) => str_contains($e, 'Choose which PartyRent account'));
-        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $this->acc('Maya')->id, 'reference' => 'GC-1', 'proof' => $this->proof()])
+        $this->post('/rentals/PR-0003/payments', ['type' => 'full', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $this->acc('Maya')->id, 'reference' => 'GC-1', 'proof' => $this->proof()])
             ->assertSessionHas('error', fn ($e) => str_contains($e, 'no longer accepting'));
-        $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $gcash->id, 'reference' => 'GC-1', 'proof' => $this->proof()])
+        $this->post('/rentals/PR-0003/payments', ['type' => 'full', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $gcash->id, 'reference' => 'GC-1', 'proof' => $this->proof()])
             ->assertSessionHas('success');
         $p = Payment::where('reference', 'GC-1')->firstOrFail();
         $this->assertSame($gcash->id, $p->pay_account_id);
@@ -125,18 +131,18 @@ class PaymentChannelsTest extends TestCase
             ->assertSessionHas('success');
 
         // the cashier sees where to look
-        $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertSee('Paid to')->assertSee('GCash 0917 555 0142');
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertSee('Paid to')->assertSee('GCash 0917 555 0142');
         $this->super()->get('/superadmin/pay-accounts')->assertSee(money(50).' left');
 
         // a rejected payment frees the room again
-        $this->as('cashier@partyrent.ph', 'cashier')->post("/cashier/payments/{$p->code}/reject", ['reason' => 'not found']);
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->post("/cashier/payments/{$p->code}/reject", ['reason' => 'not found']);
         $this->assertEquals($amt + 50, $gcash->room());
     }
 
     public function test_a_reference_number_can_only_be_used_once(): void
     {
         $r = $this->req('PR-0003');
-        $amt = $r->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($r)['amount'];
         $bdo = $this->acc('BDO')->id;
         $this->as('jose@demo.ph', 'customer');
         // BDO-884120 is verified on TXN-10001; spacing and case don't matter
@@ -150,7 +156,7 @@ class PaymentChannelsTest extends TestCase
         $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => 1, 'method' => 'bank', 'pay_account' => $bdo, 'reference' => 'UB22O1A9', 'proof' => $this->proof()])->assertSessionHas('error');
 
         // the cashier's own bank records are checked too, and can say which account received it
-        $this->as('cashier@partyrent.ph', 'cashier')
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])
             ->post('/cashier/record', ['request' => 'PR-0001', 'type' => 'installment', 'method' => 'bank', 'amount' => 10, 'date' => today_iso(), 'reference' => 'BDO-884377'])
             ->assertSessionHas('error', fn ($e) => str_contains($e, 'already used'));
         $this->get('/cashier/record?request=PR-0001')->assertSee('Received into');
@@ -167,7 +173,7 @@ class PaymentChannelsTest extends TestCase
             'date' => today_iso(), 'reference' => 'bdo884377', 'status' => 'pending', 'recorded_by' => 'customer', 'submitted_at' => now()]);
         $this->assertSame('BDO884377', $p->reference_key);
 
-        $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertOk()->assertSee('Reference already used')->assertSee('TXN-10002');
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertOk()->assertSee('Reference already used')->assertSee('TXN-10002');
         $this->post('/cashier/payments/TXN-99001/verify')->assertSessionHas('error', fn ($e) => str_contains($e, 'already verified'));
         $this->assertSame('pending', $p->fresh()->status);
     }
@@ -208,7 +214,7 @@ class PaymentChannelsTest extends TestCase
     {
         $this->paymongo();
         $r = $this->req('PR-0003');
-        $amt = $r->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($r)['amount'];
 
         $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertSee('Pay online');
         $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online'])->assertRedirect('https://checkout.paymongo.com/cs_test_1');
@@ -218,7 +224,7 @@ class PaymentChannelsTest extends TestCase
         $p = Payment::where('gateway', 'paymongo')->firstOrFail();
         $this->assertSame(['awaiting', 'online', 'cs_test_1'], [$p->status, $p->method, $p->gateway_ref]);
         $this->assertEquals(0, $r->fresh()->fin()['pendingRental']); // not counted until paid
-        $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertDontSee($p->code); // not the cashier's job
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertDontSee($p->code); // not the cashier's job
 
         // back from checkout before paying
         $this->as('jose@demo.ph', 'customer')->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('warn');
@@ -231,7 +237,7 @@ class PaymentChannelsTest extends TestCase
         $this->assertSame(['verified', 'pay_test_9', 25.0], [$p->status, $p->reference, $p->gateway_fee]);
         $this->assertNotNull($p->receipt_no);
         $this->assertNull($p->verified_by);
-        $this->assertTrue($r->fresh()->fin()['upfrontPaid']);
+        $this->assertTrue($r->fresh()->fin()['reservationConfirmed']);
 
         // a second return (or the webhook) changes nothing
         $this->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('success');
@@ -241,7 +247,7 @@ class PaymentChannelsTest extends TestCase
     public function test_cancelled_checkout_is_discarded(): void
     {
         $this->paymongo();
-        $amt = $this->req('PR-0003')->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($this->req('PR-0003'))['amount'];
         $this->as('jose@demo.ph', 'customer')->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
         $p = Payment::where('gateway', 'paymongo')->firstOrFail();
         $this->get("/rentals/PR-0003/payments/{$p->code}/online?cancelled=1")->assertSessionHas('warn', fn ($m) => str_contains($m, 'Nothing was charged'));
@@ -252,7 +258,7 @@ class PaymentChannelsTest extends TestCase
     public function test_starting_again_replaces_an_unpaid_checkout(): void
     {
         $this->paymongo();
-        $amt = $this->req('PR-0003')->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($this->req('PR-0003'))['amount'];
         $this->as('jose@demo.ph', 'customer');
         $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
         $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
@@ -262,7 +268,7 @@ class PaymentChannelsTest extends TestCase
     public function test_webhook_requires_a_valid_signature_and_settles_the_payment(): void
     {
         $this->paymongo();
-        $amt = $this->req('PR-0003')->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($this->req('PR-0003'))['amount'];
         $this->as('jose@demo.ph', 'customer')->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
         $p = Payment::where('gateway', 'paymongo')->firstOrFail();
 
@@ -282,7 +288,7 @@ class PaymentChannelsTest extends TestCase
     {
         $this->paymongo();
         $r = $this->req('PR-0003');
-        $amt = $r->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($r)['amount'];
         $this->as('jose@demo.ph', 'customer')->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
         $p = Payment::where('gateway', 'paymongo')->firstOrFail();
 
@@ -291,7 +297,7 @@ class PaymentChannelsTest extends TestCase
         $p->refresh();
         $this->assertSame('pending', $p->status);
         $this->assertStringContainsString('Needs review', $p->notes);
-        $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertSee($p->code)->assertSee('Paid online through PayMongo');
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertSee($p->code)->assertSee('Paid online through PayMongo');
     }
 
     public function test_online_payment_hidden_and_refused_when_not_configured(): void

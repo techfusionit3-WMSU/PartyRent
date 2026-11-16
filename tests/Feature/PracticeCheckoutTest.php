@@ -22,6 +22,7 @@ class PracticeCheckoutTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->accepted('PR-0003'); // v4: payments only after accept
         config(['services.paymongo.secret_key' => '', 'services.paymongo.fake' => true]);
         Http::preventStrayRequests(); // practice mode must never call PayMongo
     }
@@ -34,7 +35,7 @@ class PracticeCheckoutTest extends TestCase
     private function start(): array
     {
         $r = RentalRequest::where('code', 'PR-0003')->firstOrFail();
-        $amt = $r->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($r)['amount'];
         $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertSee('Pay online')->assertSee('Practice mode');
         $res = $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
         $p = Payment::where('gateway', 'paymongo')->latest('id')->firstOrFail();
@@ -62,11 +63,10 @@ class PracticeCheckoutTest extends TestCase
         $this->assertStringStartsWith('pay_practice_', $p->reference);
         $this->assertStringContainsString('Maya', $p->notes);
         $this->assertNotNull($p->receipt_no);
-        $this->assertTrue($r->fresh()->fin()['upfrontPaid']);
-        $this->assertTrue(AppNotification::where('user_id', $r->supplier->owner_id)->where('title', 'like', 'Down payment received%')->exists());
+        $this->assertTrue($r->fresh()->fin()['reservationConfirmed']);
+        $this->assertTrue(AppNotification::where('user_id', $r->supplier->owner_id)->where('title', 'Payment verified')->exists());
 
-        // the supplier can now accept; the finished checkout page just sends the customer back
-        $this->as('juan@demo.ph', 'supplier')->post('/supplier/requests/PR-0003/accept');
+        // the finished checkout page just sends the customer back
         $this->as('jose@demo.ph', 'customer')->get('/practice-checkout/'.$p->gateway_ref)->assertRedirect('/rentals/PR-0003');
     }
 
@@ -83,34 +83,6 @@ class PracticeCheckoutTest extends TestCase
     }
 
     /** Checkout asks for the first payment right away instead of just saving the request. */
-    public function test_checkout_goes_straight_to_payment(): void
-    {
-        $maria = User::where('email', 'maria@demo.ph')->firstOrFail();
-        \App\Models\CartLine::where('user_id', $maria->id)->delete();
-        $shop = \App\Models\Supplier::where('owner_id', User::where('email', 'juan@demo.ph')->value('id'))->firstOrFail();
-        $table = \App\Models\Product::where('supplier_id', $shop->id)->where('name', 'like', 'Rectangular%')->firstOrFail(); // ₱180/day
-        $d = add_days(today_iso(), 20);
-        $form = fn (array $over) => array_merge(['eventName' => 'Pay Now Party', 'eventType' => 'Birthday', 'eventDate' => $d, 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'bank', 'agree' => '1'], $over);
-
-        $this->as('maria@demo.ph', 'customer')->post('/cart', ['type' => 'item', 'ref_id' => $table->id, 'days' => json_encode([$d => 5])]);
-        $this->get('/checkout/'.$shop->id.'?arrangement=full')->assertOk()->assertSee('Pay now to confirm')->assertSee('Place request')->assertSee('Pay online')
-            ->assertSee('data-due-cod="Down payment (rest on delivery)|', false);
-
-        // online: the request is saved and the customer lands on the checkout for the full ₱900
-        $res = $this->post('/checkout/'.$shop->id, $form(['payWith' => 'online']));
-        $r = RentalRequest::where('event_name', 'Pay Now Party')->firstOrFail();
-        $p = Payment::where('rental_request_id', $r->id)->firstOrFail();
-        $res->assertRedirect(route('paymongo.practice', $p->gateway_ref));
-        $this->assertEquals([900.0, 'full', 'awaiting'], [$p->amount, $p->type, $p->status]);
-
-        // transfer: back to the request with the payment form opened
-        $this->post('/cart', ['type' => 'item', 'ref_id' => $table->id, 'days' => json_encode([$d => 2])]);
-        $this->post('/checkout/'.$shop->id, $form(['eventName' => 'Transfer Party', 'payWith' => 'transfer']))
-            ->assertRedirect(route('rentals.show', ['rentalRequest' => RentalRequest::where('event_name', 'Transfer Party')->value('code'), 'pay' => 1]))
-            ->assertSessionHas('success', fn ($m) => str_contains($m, 'Pay the full payment of ₱360.00'));
-    }
-
     public function test_never_runs_in_production(): void
     {
         $this->app['env'] = 'production';

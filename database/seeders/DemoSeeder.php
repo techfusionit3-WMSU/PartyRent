@@ -98,12 +98,23 @@ class DemoSeeder extends Seeder
         $this->holds();
         $this->packages();
         $this->requests();
+        $this->payAccounts();
         $this->payments();
         $this->payouts();
         $this->reviewsAndComplaints();
         $this->notifications();
         $this->audit();
         $this->cart();
+    }
+
+    /** App-only: PartyRent's own collection accounts for bank / e-wallet transfers (superadmin Pay accounts). */
+    protected function payAccounts(): void
+    {
+        \App\Models\PayAccount::insert([
+            ['type' => 'gcash', 'label' => 'GCash', 'account_name' => 'PartyRent Rentals Inc.', 'account_no' => '0917 555 0142', 'monthly_cap' => 100000, 'active' => true, 'sort' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['type' => 'bank', 'label' => 'BDO', 'account_name' => 'PartyRent Rentals Inc.', 'account_no' => '0012 3456 7890', 'monthly_cap' => null, 'active' => true, 'sort' => 2, 'created_at' => now(), 'updated_at' => now()],
+            ['type' => 'maya', 'label' => 'Maya', 'account_name' => 'PartyRent Rentals Inc.', 'account_no' => '0918 555 0199', 'monthly_cap' => 100000, 'active' => false, 'sort' => 3, 'created_at' => now(), 'updated_at' => now()],
+        ]);
     }
 
     protected function settings(): void

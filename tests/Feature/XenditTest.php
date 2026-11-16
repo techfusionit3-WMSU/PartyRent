@@ -26,6 +26,7 @@ class XenditTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->accepted('PR-0003'); // v4: payments only after accept
         // practice mode is on in the local .env; a Xendit key must take over from it
         config(['services.paymongo.fake' => true, 'services.paymongo.secret_key' => '',
             'services.xendit.secret_key' => 'xnd_development_abc', 'services.xendit.callback_token' => 'cb_tok', 'services.xendit.methods' => ['GCASH', 'PAYMAYA']]);
@@ -49,7 +50,7 @@ class XenditTest extends TestCase
     private function startPayment(): array
     {
         $r = RentalRequest::where('code', 'PR-0003')->firstOrFail();
-        $amt = $r->fin()['upfront']['amount'];
+        $amt = \App\Domain\Finance::suggestedNext($r)['amount'];
         $this->as('jose@demo.ph', 'customer')->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online'])
             ->assertRedirect('https://checkout-staging.xendit.co/web/inv_1');
 
@@ -87,7 +88,7 @@ class XenditTest extends TestCase
         $this->assertSame(['verified', 'ewc_9', 23.5], [$p->status, $p->reference, $p->gateway_fee]);
         $this->assertStringContainsString('via GCash', $p->notes);
         $this->assertNotNull($p->receipt_no);
-        $this->assertTrue($r->fresh()->fin()['upfrontPaid']);
+        $this->assertTrue($r->fresh()->fin()['reservationConfirmed']);
     }
 
     public function test_cancelled_invoice_is_expired_and_discarded(): void
@@ -118,7 +119,7 @@ class XenditTest extends TestCase
         $this->invoice = $this->paid($p->code, $amt - 5);
         $this->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('success', fn ($m) => str_contains($m, 'cashier'));
         $this->assertSame('pending', $p->fresh()->status);
-        $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertSee($p->code)->assertSee('Paid online through Xendit');
+        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertSee($p->code)->assertSee('Paid online through Xendit');
     }
 
     public function test_refused_invoice_shows_the_error_and_leaves_no_payment(): void

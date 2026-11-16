@@ -110,6 +110,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/', [SupplierController::class, 'dashboard'])->name('dashboard');
     Route::get('/schedule', [SupplierController::class, 'schedule'])->name('schedule');
     Route::get('/payments', [SupplierController::class, 'payments'])->name('payments');
+    Route::post('/payments/{payment}/verify', [SupplierController::class, 'verifyPayment'])->name('payments.verify');
+    Route::post('/payments/{payment}/reject', [SupplierController::class, 'rejectPayment'])->name('payments.reject');
     Route::get('/payouts', [\App\Http\Controllers\Supplier\PayoutController::class, 'index'])->name('payouts');
     Route::put('/payouts/account', [\App\Http\Controllers\Supplier\PayoutController::class, 'updateAccount'])->name('payouts.account');
     Route::get('/reviews', [ReviewController::class, 'supplierIndex'])->name('reviews');

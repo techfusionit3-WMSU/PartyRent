@@ -63,7 +63,7 @@ from the first row that is not `verified`.
 | inventory (stock, holds, damaged/missing) | E | done | Inventory Management per reference: 8 stats, written off, Update stock per location (Rentals::setLocationStock), hold + condition modals, hold schedule; InventoryPageTest |
 | locations (stock by location, transfers, movement log) | M | todo | |
 | calendar | E | todo | |
-| payments | E | todo | |
+| payments | E | done | Payment Monitoring per reference: verification queue (review modal, verify/reject via supplier.payments.verify/reject), balances by order, overdue, records; SupplierPaymentsTest |
 | damages (+ damage policy) | E | in progress | page per SP.damages done; Damage policy tab in shop settings pending |
 | reports (8 reports, CSV) | E | todo | |
 | shop (zones, services, damage policy, payment plans, rental hours) | P | todo | |

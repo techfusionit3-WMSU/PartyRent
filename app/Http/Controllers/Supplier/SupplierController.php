@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Supplier;
 
 use App\Domain\Finance;
 use App\Domain\Notifier;
+use App\Domain\Rentals;
 use App\Http\Controllers\Customer\StartSellingController;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
@@ -14,10 +15,6 @@ use Illuminate\Http\Request;
 
 class SupplierController extends Controller
 {
-    /**
-     * Minimal dashboard: what needs doing now, four key numbers, and what's coming up.
-     * Charts and detailed counts live on Reports / Inventory.
-     */
     /** Reference SP.dashboard: stats, charts and the upcoming schedule. */
     public function dashboard(Request $request)
     {
@@ -109,20 +106,42 @@ class SupplierController extends Controller
         ]);
     }
 
+    /** Reference SP.payments "Payment Monitoring": the shop verifies its own payments. */
     public function payments(Request $request)
     {
-        $sup = $request->user()->shop();
-        $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
+        $u = $request->user();
+        $sup = $u->shop();
+        $reqs = RentalRequest::where('supplier_id', $sup->id)->whereIn('status', array_merge(Finance::ACTIVE, ['completed', 'cancelled']))->with(['payments', 'customer'])->get();
         $pays = Payment::whereIn('rental_request_id', $reqs->pluck('id'))->with('rentalRequest.customer')->orderByDesc('submitted_at')->get();
-        $tab = in_array($request->query('tab'), ['pending', 'verified', 'rejected', 'overdue'], true) ? $request->query('tab') : 'all';
+        $fins = $reqs->map(fn ($r) => ['r' => $r, 'f' => $r->fin()]);
+        $canVerify = Rentals::canFinance($sup->id, 'payments.verify', $u);
+        $tab = in_array($request->query('tab'), ['verify', 'balances', 'overdue', 'history'], true) ? $request->query('tab') : ($canVerify ? 'verify' : 'balances');
 
         return view('supplier.payments', [
-            'pays' => in_array($tab, ['pending', 'verified', 'rejected'], true) ? $pays->where('status', $tab) : $pays,
-            'overdue' => $reqs->filter(fn ($r) => $r->isActive() && $r->fin()['isOverdue']), 'tab' => $tab, 'all' => $pays,
-            'income' => $pays->where('status', 'verified')->whereIn('type', Finance::RENTAL_TYPES)->sum('amount') - $pays->where('status', 'verified')->where('type', 'refund')->sum('amount'),
-            'outstanding' => $reqs->filter->isActive()->sum(fn ($r) => $r->fin()['balance']),
-            'depositsHeld' => $reqs->sum(fn ($r) => $r->fin()['depositHeld']),
+            'tab' => $tab, 'canVerify' => $canVerify, 'pays' => $pays, 'pend' => $pays->where('status', 'pending')->values(), 'fins' => $fins,
+            'cashiers' => \App\Models\ShopStaff::where('supplier_id', $sup->id)->where('role', 'cashier')->with('user')->get()->pluck('user')->filter(fn ($x) => $x && $x->status === 'active'),
+            'collected' => (float) $pays->where('status', 'verified')->whereIn('type', Finance::RENTAL_TYPES)->sum('amount'),
+            'outstanding' => (float) $fins->filter(fn ($x) => in_array($x['r']->status, Finance::ACTIVE, true))->sum(fn ($x) => $x['f']['balance']),
+            'overdue' => $fins->filter(fn ($x) => $x['f']['isOverdue']),
+            'depositsHeld' => (float) $fins->sum(fn ($x) => $x['f']['depositHeld']),
         ]);
+    }
+
+    public function verifyPayment(Request $request, Payment $payment)
+    {
+        abort_unless($payment->rentalRequest?->supplier_id === $request->user()->shop()->id, 404);
+        $res = Rentals::verifyPayment($payment, $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Verified · receipt '.$res['payment']->receipt_no.' · '.$payment->rentalRequest->fresh()->fin()['status'] : $res['error']);
+    }
+
+    public function rejectPayment(Request $request, Payment $payment)
+    {
+        abort_unless($payment->rentalRequest?->supplier_id === $request->user()->shop()->id, 404);
+        $data = $request->validate(['reason' => 'required|string|max:500']);
+        $res = Rentals::rejectPayment($payment, $data['reason'], $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payment rejected. Customer notified.' : $res['error']);
     }
 
     public function shop(Request $request)

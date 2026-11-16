@@ -29,6 +29,37 @@ class Pricing
         return $t;
     }
 
+    /**
+     * Change list C3: the bulk discounts as one short plain-language line instead of a quantity-price table,
+     * e.g. "₱5 off per piece for orders of 100+" (+ "· up to ₱8 off at 200+" when there are more steps). '' without discounts.
+     */
+    public static function bulkLine(Product $p): string
+    {
+        $t = self::sortedTiers($p);
+        if (count($t) < 2) {
+            return '';
+        }
+        $base = (float) $t[0]['price'];
+        $word = $p->unitWord() ?: 'piece';
+        $amt = fn (float $n) => fmod(round($n, 2), 1.0) == 0.0 ? money_short($n) : money($n);
+        $parts = [];
+        foreach (array_slice($t, 1) as $x) {
+            $off = $base - (float) $x['price'];
+            if ($off <= 0) {
+                continue;
+            }
+            $parts[] = [$off, $x['min']];
+        }
+        if (! $parts) {
+            return '';
+        }
+        // one short line: the first step, plus the deepest discount when there are more
+        $line = $amt($parts[0][0]).' off per '.$word.' for orders of '.$parts[0][1].'+';
+        $last = end($parts);
+
+        return count($parts) > 1 ? $line.' · up to '.$amt($last[0]).' off at '.$last[1].'+' : $line;
+    }
+
     public static function tierFor(Product $p, int $qty): array
     {
         $tiers = self::sortedTiers($p);

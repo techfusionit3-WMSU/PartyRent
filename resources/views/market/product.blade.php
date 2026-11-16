@@ -1,30 +1,39 @@
-@extends('layouts.market', ['title' => $p->name, 'nav' => 'browse', 'alternativesUrl' => route('products.alternatives', $p)])
+@extends('layouts.market', ['title' => $p->name, 'nav' => 'browse', 'alternativesUrl' => route('products.alternatives', $p), 'bodyClass' => 'pdx-page'])
 
+{{--
+  Product listing page, TikTok-Shop style (change list C3) with separate layouts:
+  web = thumbnail rail + large photo | buy column (price banner, title, rent box), then shop card and detail cards;
+  mobile = swipeable full-width photos with a counter, price banner, title, rent box, sections, and a sticky
+  action bar (shop · Add to Rental List · Request Rental) in place of the bottom nav.
+  The quantity-price table is replaced by one plain bulk discount line (Pricing::bulkLine).
+--}}
 @section('content')
-<div class="crumbs"><a href="{{ route('home') }}">Browse</a> / <a href="{{ route('home', ['category' => $cat->id]) }}">{{ $cat->name }}</a> / {{ $p->name }}</div>
-<div class="pd">
-  <div class="pd-gallery">
-    <div class="main">@include('partials.img', ['item' => $p])</div>
-    @if(count($p->images ?? []) > 1)<div class="thumbs">@foreach($p->images as $im)<img src="{{ asset('storage/'.$im) }}" alt="Photo of {{ $p->name }}">@endforeach</div>@endif
-    <div class="card mt-2"><h3>Availability calendar</h3><div data-calendar data-kind="item" data-id="{{ $p->id }}" data-month="{{ substr($start, 0, 7) }}" data-need="{{ $qty }}"></div></div>
+@php($imgs = $p->images ?? [])
+@php($bulk = \App\Domain\Pricing::bulkLine($p))
+<div class="crumbs pdx-crumbs"><a href="{{ route('home') }}">Browse</a> / <a href="{{ route('home', ['category' => $cat->id]) }}">{{ $cat->name }}</a> / {{ $p->name }}</div>
+<div class="pdx">
+  <div class="pdx-media">
+    @if(count($imgs) > 1)<div class="pdx-thumbs" role="tablist" aria-label="Photos">@foreach($imgs as $i => $im)<button type="button" class="{{ $i ? '' : 'on' }}" data-pdx-go="{{ $i }}" aria-label="Photo {{ $i + 1 }}"><img src="{{ asset('storage/'.$im) }}" alt=""></button>@endforeach</div>@endif
+    <div class="pdx-stage">
+      <div class="pdx-track" id="pdxTrack">
+        @forelse($imgs as $im)<div class="pdx-slide"><img src="{{ asset('storage/'.$im) }}" alt="Photo of {{ $p->name }}"></div>
+        @empty<div class="pdx-slide">@include('partials.img', ['item' => $p, 'artSize' => '42%'])</div>@endforelse
+      </div>
+      @if(count($imgs) > 1)<span class="pdx-count" id="pdxCount">1/{{ count($imgs) }}</span>@endif
+    </div>
   </div>
 
-  <div @unless($p->isHourly()) data-rentbox @endunless data-type="item" data-max-days="{{ setting('maxRentalDays', 30) }}">
-    <span class="badge b-purple plain">{{ $cat->name }}</span> <span class="badge b-gray plain">Condition: {{ \App\Domain\Damage::conditionLabel($p->condition) }}</span>
-    <h1 class="mt-1">{{ $p->name }}</h1>
-    <div class="row wrap small muted">@if($reviews->count())<span class="stars">{{ stars($p->rating) }}</span><a href="#reviews">{{ number_format($p->rating, 1) }} · {{ $reviews->count() }} {{ $reviews->count() === 1 ? 'review' : 'reviews' }}</a>@else<span>No reviews yet</span>@endif<span>· {{ $p->rent_count }} rentals</span></div>
-    <div class="mt-2"><span class="price-lg">{{ money($p->basePrice()) }}</span> <span class="muted">/ {{ $p->unit }}</span></div>
-    @if(! $p->isSale())<div class="mt-1"><span class="badge {{ $p->max_rental_days ? 'b-purple' : 'b-gray' }} plain">{{ icon('clock', 'width:13px;height:13px') }} {{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '') : 'No Rental Duration Limit' }}</span></div>@endif
-    @if(! $p->isSale() && $p->replacement_value)<div class="small muted mt-1">{{ icon('info', 'width:14px;height:14px;vertical-align:-2px') }} Replacement value: <b>{{ money($p->replacement_value) }}</b> per piece. This is the most you would pay if one is lost or destroyed.</div>@endif
-    @if(count($p->tiers) > 1)
-      <div class="mt-1"><div class="small strong mb-1">Quantity-based pricing ({{ $p->isHourly() ? 'per hour' : 'per day' }})</div><div class="tiers">
-        @foreach(\App\Domain\Pricing::sortedTiers($p) as $t)<div class="tier" data-tier data-min="{{ $t['min'] }}" data-max="{{ $t['max'] }}"><b>{{ money($t['price']) }}</b>{{ $t['min'] }}{{ $t['max'] ? '–'.$t['max'] : '+' }} pcs</div>@endforeach
-      </div></div>
-    @endif
-    <p class="mt-2">{{ $p->description }}</p>
-    <div class="row wrap gap-sm mb-2">
-      @foreach($p->colors ?? [] as $c)<span class="tag"><span class="swatch" title="{{ $c }}" style="background:{{ color_hex($c) }}"></span> {{ $c }}</span>@endforeach
-      @foreach($p->themes ?? [] as $t)<span class="tag">{{ $t }}</span>@endforeach
+  <div class="pdx-buy" @unless($p->isHourly()) data-rentbox @endunless data-type="item" data-max-days="{{ setting('maxRentalDays', 30) }}">
+    <div class="pdx-price">
+      <div><span class="pdx-amt">{{ money($p->basePrice()) }}</span> <span class="pdx-unit">/ {{ $p->unit }}</span></div>
+      @if($bulk)<div class="pdx-bulk">{{ icon('tag', 'width:14px;height:14px;vertical-align:-2px') }} {{ $bulk }}</div>@endif
+    </div>
+    <h1 class="pdx-title">{{ $p->name }}</h1>
+    <div class="pdx-meta">@if($reviews->count())<span class="stars">{{ stars($p->rating) }}</span> <a href="#reviews">{{ number_format($p->rating, 1) }} ({{ $reviews->count() }})</a>@else<span>No reviews yet</span>@endif<span class="dotsep">{{ $p->rent_count }} rented</span></div>
+    <div class="row wrap gap-sm mt-1">
+      <span class="badge b-purple plain">{{ $cat->name }}</span><span class="badge b-gray plain">{{ \App\Domain\Damage::conditionLabel($p->condition) }}</span>
+      @if(! $p->isSale())<span class="badge {{ $p->max_rental_days ? 'b-purple' : 'b-gray' }} plain">{{ icon('clock', 'width:13px;height:13px') }} {{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '') : 'No Rental Duration Limit' }}</span>@endif
+      @if($p->delivery && $sup->offersDelivery())<span class="badge b-sky plain">{{ icon('truck', 'width:13px;height:13px') }} Delivery</span>@endif
     </div>
 
     @if($p->isHourly())
@@ -44,7 +53,7 @@
       @if($own)
         <div class="alert alert-info">{{ icon('info') }}<div>This is your own listing. <a href="{{ route('supplier.products.edit', $p) }}">Edit in Supplier Mode</a></div></div>
       @else
-        <div class="row wrap mt-1"><button class="btn btn-outline btn-lg grow" name="then" value="list">{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout">Request Rental</button></div>
+        <div class="row wrap mt-1 pdx-cta"><a class="btn btn-lg pdx-cta-shop" href="{{ route('suppliers.show', $sup) }}" aria-label="Visit {{ $sup->name }}">{{ icon('store') }}<span>Shop</span></a><button class="btn btn-outline btn-lg grow" name="then" value="list">{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout">Request Rental</button></div>
       @endif
       <p class="small muted mt-1 mb-0">The time is only held once the supplier accepts your request.</p>
     </form>
@@ -106,41 +115,72 @@
       @if($own)
         <div class="alert alert-info">{{ icon('info') }}<div>This is your own listing. <a href="{{ route('supplier.products.edit', $p) }}">Edit in Supplier Mode</a></div></div>
       @else
-        <div class="row wrap mt-1"><button class="btn btn-outline btn-lg grow" name="then" value="list" data-rent-submit>{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout" data-rent-submit>Request Rental</button></div>
+        <div class="row wrap mt-1 pdx-cta"><a class="btn btn-lg pdx-cta-shop" href="{{ route('suppliers.show', $sup) }}" aria-label="Visit {{ $sup->name }}">{{ icon('store') }}<span>Shop</span></a><button class="btn btn-outline btn-lg grow" name="then" value="list" data-rent-submit>{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout" data-rent-submit>Request Rental</button></div>
       @endif
       <p class="small muted mt-1 mb-0">Submitting a request does not reserve the items until the supplier accepts it.</p>
     </form>
     @endif
-
-    <div class="card mt-2">
-      <div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }}</div></div><a class="btn btn-sm" href="{{ route('suppliers.show', $sup) }}">View Supplier Profile</a></div>
-      <hr>
-      <dl class="kv">
-        @php($myCity = customer_city())
-        <dt>Delivery / pickup</dt><dd>{{ $sup->fulfillmentLabel() }}{{ ! $p->delivery && $sup->offersDelivery() ? ' (this item: pickup only)' : '' }}{{ $sup->offersDelivery() ? ' · '.$sup->deliverySummary() : '' }}
-          @if($myCity && $sup->offersDelivery() && $p->delivery)
-
-
-            <div class="small">@foreach($sup->deliveryAreas() as $a)<div>{{ $a }}</div>@endforeach</div>
-          @elseif(! $myCity && $sup->offersDelivery())
-            <div class="small muted">@auth<a href="{{ route('profile') }}">Set your city</a>@else Log in and set your city @endauth to see the delivery fee.</div>
-          @endif
-        </dd>
-        @if($p->handling_fee > 0)<dt>Handling</dt><dd>{{ money($p->handling_fee) }} {{ $p->handling_per === 'unit' ? 'per unit' : 'per order' }} when delivered</dd>@endif
-        <dt>Payment plans</dt><dd>{{ collect(\App\Domain\Finance::plansOf($sup))->map(fn ($a) => \App\Domain\Finance::PLAN_LABEL[$a])->implode(', ') }}</dd>
-        @php($sst = \App\Domain\Slots::settings($sup))
-        <dt>Rental hours</dt><dd>{{ \App\Domain\Slots::fmt12($sst['open']) }} – {{ \App\Domain\Slots::fmt12($sst['close']) }} · {{ +$sst['prepHours'] }}h preparation / {{ +$sst['recoveryHours'] }}h recovery between bookings</dd>
-        @if($frame = \App\Domain\Slots::frameLabel($p))<dt>Item time frame</dt><dd>{{ $frame }}</dd>@endif
-        <dt>Payment methods</dt><dd>{{ collect($sup->methods)->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }}</dd>
-        <dt>Security deposit</dt><dd>{{ $sup->depositLabel() }} (refundable)</dd>
-        @if(! $p->isSale())<dt>Rental duration</dt><dd>{{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '').' per booking' : 'No Rental Duration Limit' }}</dd>@endif
-        <dt>Cancellation</dt><dd>{{ $sup->pol('cancellation') }}</dd>
-        <dt>Returns</dt><dd>{{ $sup->pol('returns') }}</dd>
-        @if(! $p->isSale() && $p->rental_policy)<dt>Item rental policy</dt><dd style="white-space:pre-line">{{ $p->rental_policy }}</dd>@endif
-      </dl>
-    </div>
   </div>
 </div>
+
+<a class="card pdx-shop" href="{{ route('suppliers.show', $sup) }}">
+  <div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div>
+  <div class="grow" style="min-width:0"><div class="strong ellipsis">{{ $sup->name }}</div><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }}</div></div>
+  <span class="btn btn-sm">View Supplier Profile</span>
+</a>
+
+<div class="pdx-sections">
+  <section class="card"><h3>Description</h3>
+    <p class="pdx-desc">{{ $p->description }}</p>
+    <dl class="kv">
+      <dt>Category</dt><dd>{{ $cat->name }}</dd>
+      <dt>Condition</dt><dd>{{ \App\Domain\Damage::conditionLabel($p->condition) }}</dd>
+      @if($p->colors)<dt>Colors</dt><dd><div class="row wrap gap-sm">@foreach($p->colors as $c)<span class="tag"><span class="swatch" title="{{ $c }}" style="background:{{ color_hex($c) }}"></span> {{ $c }}</span>@endforeach</div></dd>@endif
+      @if($p->themes)<dt>Themes</dt><dd><div class="row wrap gap-sm">@foreach($p->themes as $t)<span class="tag">{{ $t }}</span>@endforeach</div></dd>@endif
+      @if(! $p->isSale())<dt>Stock</dt><dd>{{ $p->total_stock }} {{ $p->unitWord() }}{{ $p->total_stock === 1 ? '' : 's' }} in total</dd>@endif
+      @if(! $p->isSale() && $p->replacement_value)<dt>Replacement value</dt><dd>{{ money($p->replacement_value) }} per {{ $p->unitWord() }}: the most you would pay if one is lost or destroyed.</dd>@endif
+      @if(! $p->isSale() && $p->rental_policy)<dt>Item rental policy</dt><dd style="white-space:pre-line">{{ $p->rental_policy }}</dd>@endif
+    </dl>
+  </section>
+
+  <section class="card"><h3>Availability calendar</h3><div data-calendar data-kind="item" data-id="{{ $p->id }}" data-month="{{ substr($start, 0, 7) }}" data-need="{{ $qty }}"></div></section>
+
+  <section class="card pdx-wide"><h3>Delivery &amp; policies</h3>
+    <dl class="kv">
+      @php($myCity = customer_city())
+      <dt>Delivery / pickup</dt><dd>{{ $sup->fulfillmentLabel() }}{{ ! $p->delivery && $sup->offersDelivery() ? ' (this item: pickup only)' : '' }}{{ $sup->offersDelivery() ? ' · '.$sup->deliverySummary() : '' }}
+        @if($myCity && $sup->offersDelivery() && $p->delivery)
+          <div class="small">@foreach($sup->deliveryAreas() as $a)<div>{{ $a }}</div>@endforeach</div>
+        @elseif(! $myCity && $sup->offersDelivery())
+          <div class="small muted">@auth<a href="{{ route('profile') }}">Set your city</a>@else Log in and set your city @endauth to see the delivery fee.</div>
+        @endif
+      </dd>
+      @if($p->handling_fee > 0)<dt>Handling</dt><dd>{{ money($p->handling_fee) }} {{ $p->handling_per === 'unit' ? 'per unit' : 'per order' }} when delivered</dd>@endif
+      <dt>Payment plans</dt><dd>{{ collect(\App\Domain\Finance::plansOf($sup))->map(fn ($a) => \App\Domain\Finance::PLAN_LABEL[$a])->implode(', ') }}</dd>
+      @php($sst = \App\Domain\Slots::settings($sup))
+      <dt>Rental hours</dt><dd>{{ \App\Domain\Slots::fmt12($sst['open']) }} – {{ \App\Domain\Slots::fmt12($sst['close']) }} · {{ +$sst['prepHours'] }}h preparation / {{ +$sst['recoveryHours'] }}h recovery between bookings</dd>
+      @if($frame = \App\Domain\Slots::frameLabel($p))<dt>Item time frame</dt><dd>{{ $frame }}</dd>@endif
+      <dt>Payment methods</dt><dd>{{ collect($sup->methods)->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }}</dd>
+      <dt>Security deposit</dt><dd>{{ $sup->depositLabel() }} (refundable)</dd>
+      @if(! $p->isSale())<dt>Rental duration</dt><dd>{{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '').' per booking' : 'No Rental Duration Limit' }}</dd>@endif
+      <dt>Cancellation</dt><dd>{{ $sup->pol('cancellation') }}</dd>
+      <dt>Returns</dt><dd>{{ $sup->pol('returns') }}</dd>
+    </dl>
+  </section>
+</div>
+
+@push('scripts')
+<script>
+// Photo gallery: swipe (scroll-snap) on mobile, thumbnail rail on web; counter follows the visible photo.
+(function () {
+  var tr = document.getElementById('pdxTrack'); if (!tr) return;
+  var cnt = document.getElementById('pdxCount'), th = document.querySelectorAll('[data-pdx-go]'), n = tr.children.length;
+  function at() { return Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth)); }
+  tr.addEventListener('scroll', function () { var i = at(); if (cnt) cnt.textContent = (i + 1) + '/' + n; th.forEach(function (b, j) { b.classList.toggle('on', j === i); }); }, { passive: true });
+  th.forEach(function (b) { b.addEventListener('click', function () { tr.scrollTo({ left: +b.getAttribute('data-pdx-go') * tr.clientWidth, behavior: 'smooth' }); }); });
+})();
+</script>
+@endpush
 
 <div class="section">@include('partials.reviews-block', ['reviews' => $reviews, 'showItem' => false, 'title' => 'Customer reviews', 'emptyText' => 'Be the first: rent this item and share how it went — photos and videos welcome.'])</div>
 @if($related->isNotEmpty())@include('market._section', ['title' => 'More from '.$sup->name, 'items' => $related])@endif

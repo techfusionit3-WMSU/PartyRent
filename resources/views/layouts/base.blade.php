@@ -34,7 +34,7 @@ window.PR = {
 <script src="{{ asset('js/charts.js') }}" defer></script>
 @stack('head')
 </head>
-<body>
+<body @if(! empty($bodyClass)) class="{{ $bodyClass }}" @endif>
 @yield('body')
 @stack('scripts')
 </body>

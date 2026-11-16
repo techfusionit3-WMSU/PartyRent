@@ -400,3 +400,49 @@
 .browse-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .browse-tools .row { gap: 8px; }
 @media (max-width: 768px) { .browse-sticky { top: calc(var(--mk-head, 64px) + 4px); } .browse-sticky .date-bar { padding: 10px 12px; gap: 8px; } }
+
+/* ---------- product listing page, TikTok-Shop style (change list C3): web + mobile layouts ---------- */
+.pdx { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.pdx-media { display: flex; gap: 12px; position: sticky; top: calc(var(--mk-head, 64px) + 16px); }
+.pdx-thumbs { display: flex; flex-direction: column; gap: 8px; flex: none; max-height: 560px; overflow: auto; }
+.pdx-thumbs button { width: 68px; height: 68px; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; cursor: pointer; background: none; }
+.pdx-thumbs button.on { border-color: var(--brand); }
+.pdx-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pdx-stage { position: relative; flex: 1; min-width: 0; aspect-ratio: 1 / 1; border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-2); }
+.pdx-track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.pdx-track::-webkit-scrollbar { display: none; }
+.pdx-slide { flex: 0 0 100%; height: 100%; scroll-snap-align: start; display: grid; place-items: center; font-size: 8rem; }
+.pdx-slide img { width: 100%; height: 100%; object-fit: cover; }
+.pdx-count { position: absolute; right: 12px; bottom: 12px; padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, .55); color: #fff; font: 700 .75rem var(--font); }
+.pdx-price { padding: 14px 18px; border-radius: 16px; background: var(--grad); color: #fff; }
+.pdx-amt { font: 800 1.9rem/1.1 var(--font); }
+.pdx-unit { opacity: .85; font-weight: 600; }
+.pdx-bulk { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 8px; background: rgba(255, 255, 255, .2); font-size: .84rem; font-weight: 700; }
+.pdx-title { margin: 14px 0 6px; font-size: 1.45rem; line-height: 1.3; }
+.pdx-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .86rem; color: var(--muted); }
+.pdx-meta .dotsep::before { content: "·"; margin-right: 8px; }
+.pdx-buy > form.card { margin-top: 16px; }
+.pdx-cta-shop { display: none; }
+.pdx-shop { display: flex; align-items: center; gap: 12px; margin-top: 24px; color: inherit; text-decoration: none; }
+.pdx-shop:hover { text-decoration: none; border-color: var(--brand); }
+.pdx-sections { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: start; }
+.pdx-wide { grid-column: 1 / -1; }
+.pdx-desc { white-space: pre-line; }
+@media (max-width: 768px) {
+  .pdx-page .bottom-nav { display: none; }
+  .pdx-page .mk-main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .pdx-crumbs { display: none; }
+  .pdx { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .pdx-media { position: static; margin: -16px -14px 0; }
+  .pdx-thumbs { display: none; }
+  .pdx-stage { border-radius: 0; }
+  .pdx-price { margin: 0 -14px; padding: 12px 14px; border-radius: 0; }
+  .pdx-amt { font-size: 1.6rem; }
+  .pdx-title { margin-top: 12px; font-size: 1.15rem; }
+  .pdx-sections { grid-template-columns: minmax(0, 1fr); }
+  .pdx-cta { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; flex-wrap: nowrap; gap: 8px; margin: 0 !important; padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(30, 20, 51, .08); }
+  .pdx-cta .btn { min-height: 46px; padding: 0 12px; font-size: .86rem; white-space: nowrap; }
+  .pdx-cta .btn-outline svg { display: none; }
+  .pdx-cta-shop { display: inline-flex; flex: none; flex-direction: column; gap: 0; padding: 0 6px !important; border: 0; background: none; font-size: .66rem !important; color: var(--ink-2); }
+  .pdx-cta-shop svg { width: 22px; height: 22px; }
+}

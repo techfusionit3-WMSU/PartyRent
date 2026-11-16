@@ -138,7 +138,7 @@ from the first row that is not `verified`.
 |---|---|---|
 | C1 Merge index + browse; sticky date bar + filters | in progress | WIP 448074f, pre-port |
 | C2 Shop name replaces "Switch to supplier" | done | partials/profile-menu |
-| C3 Product page TikTok-Shop style (mobile + web); one-line bulk discount text | todo | |
+| C3 Product page TikTok-Shop style (mobile + web); one-line bulk discount text | done | Pricing::bulkLine; .pdx layout; browser-checked |
 | C4 Service-fee rule (consecutive same place = 1; place change +1; each separate block +1) | verified | Pricing::serviceVisits + test |
 | C5 Rent request: delivery zone, location UI, Delivery→Pickup grouping bug | done | public/js/checkout.js |
 | C6 Checkout: charges collapsible in Order Summary; RF / DP / total outside | done | customer/_checkout-summary |

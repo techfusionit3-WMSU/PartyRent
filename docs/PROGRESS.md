@@ -61,7 +61,14 @@ NEXT, in order:
         `clear_photo` removes). Inventory card right after "What's inside" (packagePrice JSON `stock`: today,
         min30, limiting item). Order: Details, What's inside, Inventory, Stages, Tier, Guests. Browser-checked
         at 1440 + 390 (scratchpad drv/pkgform.js, app :8034): tags, crop → 800×800, inventory card, publish; no errors.
-     c. Mode switch customer ⇄ supplier check; C3 product page TikTok-style; C9–C13 change list.
+     c. DONE (2026-11-17): mode switch checked vs reference Auth.guard (employees may browse customer mode, no
+        switch button in their shell) + TeamRolesTest::test_mode_switch_both_ways. C3 product page TikTok-style
+        (market/product.blade.php, `.pdx*` CSS at end of layout.css, body class via `$bodyClass` in layouts.base):
+        web = thumb rail + photo | price banner + title + rent box, shop card, Description / Calendar / Delivery &
+        policies cards; mobile = swipe gallery 1/N, full-width price banner, sticky CTA bar (Shop · Add · Request),
+        bottom nav hidden. `Pricing::bulkLine` replaces the tier table. Browser-checked (drv/pdx.js).
+        NEXT: C9–C13 change list (C9 inventory "All N units", C10 calendar mobile, C11 Discounts page,
+        C12 shortfall/dispute cases, C13 Xendit checks).
      d. Cashier pages (scope everything per shop: Rentals::canFinance / ShopStaff cashier → supplier_id;
         un-skip PayoutsTest::test_shop_cashier_sees_only_their_shop), then admin (applications: view docs from
         private disk + 'revision' decision), then superadmin.

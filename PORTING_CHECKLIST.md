@@ -67,7 +67,7 @@ from the first row that is not `verified`.
 | damages (+ damage policy) | E | done | page per SP.damages; policy edited on Shop settings → Damage policy tab |
 | reports (8 reports, CSV) | E | done | reference charts (bars, line, hbars incl. pct), tables; app CSV download kept |
 | shop (zones, services, damage policy, payment plans, rental hours) | P | done | 7 tabs per reference, one section per save (SupplierController::updateShop); app address/location/pin on profile tab; ShopSettingsTest |
-| team (Org Admin, Cashier, Inventory Staff, Staff) | P (`staff`) | done | TeamRolesTest 6 green; screenshot pending |
+| team (Org Admin, Cashier, Inventory Staff, Staff) | P (`staff`) | done | TeamRolesTest 6 green; 1440 identical |
 | Org permissions (`Auth.orgCan`) on nav + actions | P (`canShop`) | done | ShopStaff::ORG_PERMS + ROUTE_PERMS, nav filtered |
 | Mode switch customer ⇄ supplier | E | todo | |
 

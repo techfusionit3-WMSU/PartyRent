@@ -32,7 +32,7 @@ from the first row that is not `verified`.
 | Page / flow | Laravel today | Status | Note |
 |---|---|---|---|
 | browse (sort tabs, compare bar) | E | todo | |
-| ai (interpret → checklist → packages) | E | todo | |
+| ai (interpret → checklist → packages) | E | done | 1440 compared incl. results; app city typeahead kept |
 | suppliers | E | done | 1440 compared; seeded ratings shown; live search button removed |
 | supplier shop (payment plans, policies) | E | done | ported from C.supplier; screenshot pending |
 | product (availability calendar, rental charges estimate) | E | in progress | 1440 compared: time selects + duration (partials/rent-times), duration badge, condition label, supplier rows; C3 redesign + Rental Charges block pending |

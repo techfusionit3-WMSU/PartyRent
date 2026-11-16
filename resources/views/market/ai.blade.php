@@ -68,8 +68,8 @@
   @php($pickable = collect($plan['rows'])->filter(fn ($r) => $r['best'])->count())
   <div class="row wrap between" style="padding:16px 18px;border-top:1px solid var(--line)">
     @if($pickable)
-      <span class="small muted"><b>Check the box</b> beside each suggested item you want, then add them to your Rental List. Prices come from each supplier's listing; you can change per-day quantities later in your Rental List.</span>
-      <div class="right"><button class="btn btn-primary" id="aiAdd">{{ icon('cart') }}Add checked items to Rental List</button><div class="small" id="aiAddHint" style="color:var(--red,#dc2626)" hidden>Check the box beside at least one item first.</div></div>
+      <span class="small muted" style="flex:1 1 320px">Prices come from each supplier's listing. Estimates use the same quantity each day — you can change per-day quantities in your Rental List.</span>
+      <div class="right"><button class="btn btn-primary" id="aiAdd">{{ icon('cart') }}Add selected to Rental List</button><div class="small" id="aiAddHint" style="color:var(--red,#dc2626)" hidden>Check the box beside at least one item first.</div></div>
     @else
       <span class="small muted">No suppliers have listed these items yet, so there's nothing to add. Try other items above, or browse all listings.</span>
       <button class="btn btn-primary" type="button" disabled>{{ icon('cart') }}Nothing to add yet</button>

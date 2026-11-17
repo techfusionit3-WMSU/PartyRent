@@ -16,19 +16,23 @@ use Illuminate\Http\Request;
 class SupplierController extends Controller
 {
     /** Reference SP.dashboard: stats, charts and the upcoming schedule. */
+    /**
+     * Supplier dashboard, kept short on purpose (user decision 2026-11-17): what needs the owner now
+     * (requests to answer, payments to check), what is coming up, and how the money is doing.
+     * Stock, paid/unpaid counts and category figures live on Inventory, Payments and Reports.
+     */
     public function dashboard(Request $request)
     {
         $u = $request->user();
         $sup = $u->shop();
         $T = today_iso();
         $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
-        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'deleted')->with('category')->get();
-        inv()->primeProducts($prods);
-        $snap = $prods->reject->isSale()->map(fn ($p) => inv()->breakdown($p->id, $T));
         $ids = $reqs->pluck('id');
         $pend = $reqs->where('status', 'pending');
         $booked = ['accepted', 'in_progress', 'ready_pickup', 'out_delivery'];
-        $fins = $reqs->filter(fn ($r) => in_array($r->status, Finance::ACTIVE, true) || $r->status === 'completed')->map(fn ($r) => $r->fin());
+        $upcoming = $reqs->whereIn('status', $booked)->sortBy('start_date')->values();
+        $out = $reqs->whereIn('status', ['ongoing', 'return_pending', 'inspection']);
+        $fins = $reqs->filter(fn ($r) => in_array($r->status, Finance::ACTIVE, true))->map(fn ($r) => $r->fin());
         $ver = Payment::whereIn('rental_request_id', $ids)->where('status', 'verified')->get();
         $revBy = fn ($m) => (float) $ver->filter(fn ($p) => str_starts_with((string) $p->date, $m) && in_array($p->type, Finance::RENTAL_TYPES, true))->sum('amount')
             - (float) $ver->filter(fn ($p) => str_starts_with((string) $p->date, $m) && $p->type === 'refund')->sum('amount');
@@ -38,46 +42,39 @@ class SupplierController extends Controller
             $d = now()->startOfMonth()->subMonths($i);
             $months[] = ['key' => $d->format('Y-m'), 'label' => $d->format('M')];
         }
-        $live = $reqs->reject(fn ($r) => in_array($r->status, ['declined', 'cancelled', 'pending'], true));
         $units = [];
-        $catRev = [];
-        foreach ($live as $r) {
+        foreach ($reqs->reject(fn ($r) => in_array($r->status, ['declined', 'cancelled', 'pending'], true)) as $r) {
             foreach (inv()->demandMap($r->lines) as $m) {
                 foreach ($m as $pid => $q) {
                     $units[$pid] = ($units[$pid] ?? 0) + $q;
                 }
             }
-            foreach ($r->pricing['lines'] ?? [] as $l) {
-                $cat = ($l['type'] ?? '') === 'package' ? 'Packages' : (inv()->product($l['refId'] ?? 0)?->category?->name ?? 'Other');
-                $catRev[$cat] = ($catRev[$cat] ?? 0) + (float) ($l['total'] ?? 0);
-            }
         }
         arsort($units);
-        arsort($catRev);
-        $statusGroups = [['Pending', ['pending']], ['Upcoming', $booked], ['Ongoing / returning', ['ongoing', 'return_pending', 'inspection']], ['Completed', ['completed']], ['Declined / cancelled', ['declined', 'cancelled']]];
+        $prods = Product::where('supplier_id', $sup->id)->whereNotIn('status', ['deleted', 'archived'])->get();
+        inv()->primeProducts($prods);
+        $repair = $prods->reject->isSale()->sum(function ($p) use ($T) {
+            $b = inv()->breakdown($p->id, $T);
+
+            return $b['maintenance'] + $b['damaged'] + $b['missing'];
+        });
 
         return view('supplier.dashboard', [
             'sup' => $sup, 'pend' => $pend, 'money' => $u->orgCan('payments.view'), 'canProd' => $u->orgCan('products.manage'),
             'conflicts' => $pend->filter(fn ($r) => inv()->check($r->lines, $r->id)['bad'])->values(),
+            'hasProducts' => $prods->isNotEmpty(),
             'stats' => [
-                'listed' => $prods->where('status', 'active')->count(), 'prodCount' => $prods->count(),
-                'total' => $snap->sum('total'), 'available' => $snap->sum('available'), 'reserved' => $snap->sum('reserved'),
-                'outOfService' => $snap->sum(fn ($b) => $b['maintenance'] + $b['damaged'] + $b['missing'] + $b['setaside']), 'maintenance' => $snap->sum('maintenance'),
-                'accepted' => $reqs->whereIn('status', $booked)->count(), 'ongoing' => $reqs->whereIn('status', ['ongoing', 'return_pending', 'inspection'])->count(),
-                'completed' => $reqs->where('status', 'completed')->count(),
+                'upcoming' => $upcoming->count(), 'next' => $upcoming->first()?->start_date,
+                'out' => $out->count(), 'returning' => $out->whereIn('status', ['return_pending', 'inspection'])->count(),
                 'pendingPay' => $pendingPay->count(), 'pendingPayAmt' => (float) $pendingPay->sum('amount'),
-                'partly' => $fins->where('status', 'Partially Paid')->count(), 'fully' => $fins->where('status', 'Fully Paid')->count(),
                 'overdue' => $fins->where('isOverdue', true)->count(), 'overdueAmt' => (float) $fins->where('isOverdue', true)->sum('overdueAmount'),
-                'revenue' => $revBy(substr($T, 0, 7)),
+                'revenue' => $revBy(substr($T, 0, 7)), 'repair' => $repair,
             ],
             'charts' => [
-                'monthly' => array_map(fn ($m) => ['label' => $m['label'], 'value' => $reqs->filter(fn ($r) => $r->created_at?->format('Y-m') === $m['key'])->count()], $months),
                 'revenue' => array_map(fn ($m) => ['label' => $m['label'], 'value' => $revBy($m['key'])], $months),
-                'top' => collect($units)->take(6)->map(fn ($v, $pid) => ['label' => inv()->product($pid)?->name ?? 'Item', 'value' => $v])->values()->all(),
-                'status' => array_map(fn ($g) => ['label' => $g[0], 'value' => $reqs->whereIn('status', $g[1])->count()], $statusGroups),
-                'category' => collect($catRev)->map(fn ($v, $k) => ['label' => $k, 'value' => $v])->values()->all(),
+                'top' => collect($units)->take(5)->map(fn ($v, $pid) => ['label' => inv()->product($pid)?->name ?? 'Item', 'value' => $v])->values()->all(),
             ],
-            'upcoming' => $reqs->whereIn('status', $booked)->sortBy('start_date')->take(6),
+            'upcoming' => $upcoming->take(6),
         ]);
     }
 

@@ -53,7 +53,7 @@ from the first row that is not `verified`.
 ## Supplier & organization staff
 | Page / flow | Laravel today | Status | Note |
 |---|---|---|---|
-| dashboard (charts, upcoming schedule) | E (simplified 11-12) | done | reference stats + 5 charts (public/js/charts.js port, partials/chart) + upcoming; 1440 identical |
+| dashboard (charts, upcoming schedule) | E (simplified 11-12) | done | user change 2026-11-17: deliberately simpler than reference, 6 cards (new requests, check payments, upcoming, with customers, overdue, revenue), upcoming rentals with payment status, revenue line, most rented; no 'reserved' wording |
 | requests (6 tabs) | E | done | 1440 identical (Accepted / Upcoming) |
 | request (availability date+time, allocation, schedule approve/reject, accept, release, inspect, settle) | E | in progress | 390+1440 match for pending view; v4 inspection (damage policy) done |
 | schedule (next 14 days) | E | done | 1440 identical |

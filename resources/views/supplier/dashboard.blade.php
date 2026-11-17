@@ -34,7 +34,7 @@
       <p class="muted">No upcoming rentals yet.</p>
     @endforelse
   </div>
-  @if($money)<div class="card"><div class="card-head"><h3>Revenue</h3><span class="small muted">Last 6 months</span></div>@include('partials.chart', ['kind' => 'line', 'rows' => $charts['revenue'], 'opts' => ['money' => true, 'color' => '#E11D74', 'label' => 'Revenue']])</div>@endif
+  @if($money)<div class="card"><div class="card-head"><h3>Revenue</h3><span class="small muted">Last 6 months</span></div>@if(collect($charts['revenue'])->sum('value') != 0)@include('partials.chart', ['kind' => 'line', 'rows' => $charts['revenue'], 'opts' => ['money' => true, 'color' => '#E11D74', 'label' => 'Revenue']])@else<p class="muted">No payments yet. Your income shows here once customers pay.</p>@endif</div>@endif
   @if($charts['top'])<div class="card"><div class="card-head"><h3>Most rented items</h3><span class="small muted">Units booked</span></div>@include('partials.chart', ['kind' => 'hbars', 'rows' => $charts['top'], 'opts' => ['color' => '#7C3AED']])</div>@endif
 </div>
 @endsection

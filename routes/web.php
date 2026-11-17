@@ -115,6 +115,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
 
     Route::get('/start-selling', [StartSellingController::class, 'show'])->name('start-selling');
     Route::post('/start-selling', [StartSellingController::class, 'submit'])->name('start-selling.submit');
+    Route::post('/start-selling/check', [StartSellingController::class, 'check'])->name('start-selling.check');
 });
 
 /* ---------- supplier mode ---------- */

@@ -229,21 +229,68 @@
     if (step === steps.length - 1) review();
   }
   var toast = function (m) { if (window.PR && window.PR.toast) window.PR.toast(m, 'error'); else alert(m); };
+  var PHONE_MSG = 'Enter a valid PH mobile number (e.g. 0917 555 0101).';
+  // Same format the server accepts: 09XX XXX XXXX, +639XX XXX XXXX or 639XXXXXXXXX.
+  $$('[data-phone]').forEach(function (i) { i.pattern = '(\\+?63|0)9\\d{2}[\\s\\-]?\\d{3}[\\s\\-]?\\d{4}'; i.setAttribute('inputmode', 'tel'); i.placeholder = i.placeholder || '0917 555 0101'; });
+  // Error text under a field (reuses the server-rendered one when there is one).
+  function showErr(i, msg) {
+    var fd = i && i.closest('.field'); if (!fd) return;
+    var et = fd.querySelector('.error-text'); if (!et) { et = document.createElement('div'); et.className = 'error-text'; fd.appendChild(et); }
+    et.textContent = msg; et.style.display = ''; fd.classList.add('invalid');
+  }
+  function clearErr(i) { var fd = i && i.closest('.field'); if (!fd) return; fd.classList.remove('invalid'); var et = fd.querySelector('.error-text'); if (et) et.style.display = 'none'; }
+  // "app.personal.phone" → the input named app[personal][phone] (or methods[] for "methods.0").
+  function inputFor(key) {
+    var p = key.split('.'); if (/^\d+$/.test(p[p.length - 1])) p.pop();
+    var n = p[0] + p.slice(1).map(function (x) { return '[' + x + ']'; }).join('');
+    return f.querySelector('[name="' + n + '"]:not([disabled])') || f.querySelector('[name="' + n + '[]"]:not([disabled])');
+  }
+  function showServerErrors(errs) {
+    var first = null;
+    Object.keys(errs || {}).forEach(function (k) { var m = [].concat(errs[k])[0], i = inputFor(k); showErr(i, m); if (!first) first = { i: i, m: m }; });
+    if (first) { toast(first.m); if (first.i && first.i.type !== 'hidden') { first.i.focus({ preventScroll: true }); first.i.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }
+  }
   function valid() {
-    var ok = true;
-    $$('input,select,textarea', steps[step]).forEach(function (i) { if (i.disabled || i.closest('[hidden], .hidden, .is-closed')) return; var fd = i.closest('.field'); if (!i.checkValidity()) { ok = false; fd && fd.classList.add('invalid'); } else { fd && fd.classList.remove('invalid'); } });
+    var ok = true, firstBad = null;
+    $$('input,select,textarea', steps[step]).forEach(function (i) {
+      if (i.disabled || i.type === 'file' || i.closest('[hidden], .hidden, .is-closed')) return;
+      if (!i.checkValidity()) { ok = false; showErr(i, i.hasAttribute('data-phone') && i.validity.patternMismatch ? PHONE_MSG : i.validationMessage); firstBad = firstBad || i; } else clearErr(i);
+    });
     if (step === 0 && !type()) { toast('Choose Individual Supplier or Organization / Company Supplier.'); return false; }
     if (step === 2 && missingDocs().length) { toast('Please upload: ' + missingDocs().join(', ') + '.'); return false; }
     if (step === 4) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } if (!f.querySelector('[name="offerPlans[]"]:checked')) { toast('Offer at least one payment plan.'); return false; } }
+    if (!ok) { toast('Please fix the highlighted fields before continuing.'); firstBad.focus({ preventScroll: true }); firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     return ok;
   }
+  // Ask the server to check this step with the same rules as the final submit (documents are checked above, not uploaded yet).
+  function serverCheck() {
+    var fd = new FormData(f);
+    Array.from(fd.keys()).forEach(function (k) { if (k.indexOf('docs[') === 0) fd.delete(k); });
+    fd.append('step', step);
+    return fetch(@json(route('start-selling.check')), { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); });
+  }
+  f.addEventListener('input', function (e) { if (e.target.closest('.field.invalid') && e.target.checkValidity()) clearErr(e.target); });
   f.addEventListener('change', function (e) {
     if (e.target.matches('[data-doc]')) { var file = e.target.files[0], row = e.target.closest('[data-docrow]'), b = row.querySelector('[data-docname]');
       if (file && file.size > 10 * 1024 * 1024) { toast('Files must be 10 MB or smaller.'); e.target.value = ''; return; }
       if (file) { b.hidden = false; b.querySelector('span').textContent = file.name; } else if (b.dataset.had !== '1') b.hidden = true; }
     if (e.target.matches('[data-type], #ctype, [data-applies], [name=fulfillment]')) draw();
   });
-  document.getElementById('next').addEventListener('click', function () { if (!valid()) return; step++; draw(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  var nextBtn = document.getElementById('next');
+  nextBtn.addEventListener('click', function () {
+    if (!valid()) return;
+    nextBtn.disabled = true;
+    serverCheck().then(function (res) {
+      nextBtn.disabled = false;
+      if (res.ok) { step++; draw(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      if (res.status === 422 && res.d.errors) {
+        if (typeof res.d.step === 'number' && res.d.step < step) { step = res.d.step; draw(); }
+        showServerErrors(res.d.errors); return;
+      }
+      toast(res.status === 419 ? 'Your session expired. Reload the page and sign in again.' : 'Could not check this step. Please try again.');
+    }).catch(function () { nextBtn.disabled = false; toast('Could not check this step. Check your connection and try again.'); });
+  });
   document.getElementById('back').addEventListener('click', function () { step--; draw(); });
   @if($errors->any())
     step = {{ $errorStep }};
@@ -251,6 +298,9 @@
     step = 1;
   @endif
   draw();
+  @if($errors->any())
+    showServerErrors(@json($errors->toArray()));
+  @endif
 })();
 </script>
 @endpush

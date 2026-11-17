@@ -38,6 +38,8 @@ class StartSellingController extends Controller
             'docs' => [], 'applicable' => [],
             'payout' => ['method' => 'bank', 'provider' => '', 'accountName' => '', 'accountNumber' => '', 'financeContact' => ''],
         ], (array) ($existing?->application ?? []));
+        // Documents uploaded on a submit that failed validation are kept (see submit()).
+        $app['docs'] = array_merge((array) ($app['docs'] ?? []), (array) session('apply_docs', []));
 
         return view('customer.start-selling', [
             'existing' => $existing, 'logos' => self::LOGOS, 'steps' => self::STEPS, 'app' => $app,
@@ -52,35 +54,34 @@ class StartSellingController extends Controller
         ]);
     }
 
+    /** Wizard step (0-based) that holds a field; keys like "methods.0" or "methods.*" belong to "methods". */
+    public static function stepOfKey(string $k): int
+    {
+        $k = preg_replace('/\.(\*|\d+)$/', '', $k);
+
+        return match (true) {
+            $k === 'app.type' => 0,
+            str_starts_with($k, 'app.personal'), str_starts_with($k, 'app.identity'), str_starts_with($k, 'app.company'), str_starts_with($k, 'app.representative') => 1,
+            str_starts_with($k, 'docs'), str_starts_with($k, 'app.applicable') => 2,
+            str_starts_with($k, 'app.payout') => 5,
+            in_array($k, ['fulfillment', 'delivery_fee', 'methods', 'offerPlans', 'depositType', 'depositValue'], true) => 4,
+            in_array($k, ['cancelDays', 'cancellation', 'returns', 'conditions'], true) => 6,
+            default => 3,
+        };
+    }
+
     /** Wizard step that holds the first field with an error. */
     private static function errorStep(array $keys): int
     {
-        $step = 7;
-        foreach ($keys as $k) {
-            $step = min($step, match (true) {
-                $k === 'app.type' => 0,
-                str_starts_with($k, 'app.personal'), str_starts_with($k, 'app.identity'), str_starts_with($k, 'app.company'), str_starts_with($k, 'app.representative') => 1,
-                str_starts_with($k, 'docs') => 2,
-                str_starts_with($k, 'app.payout') => 5,
-                in_array($k, ['fulfillment', 'delivery_fee', 'methods', 'offerPlans', 'depositType', 'depositValue'], true) => 4,
-                in_array($k, ['cancelDays', 'cancellation', 'returns', 'conditions'], true) => 6,
-                default => 3,
-            });
-        }
-
-        return $step;
+        return $keys ? min(array_map(self::stepOfKey(...), $keys)) : 7;
     }
 
-    public function submit(Request $request)
+    /** Validation rules and messages for the whole application (the final submit and each step's check use the same ones). */
+    private static function applicationRules(Request $request): array
     {
-        $u = $request->user();
-        if ($u->staffOf) {
-            return back()->with('error', 'Staff of another shop cannot open their own shop.');
-        }
-        $existing = $u->supplier;
         $phone = ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'];
         $type = $request->input('app.type');
-        $v = $request->validate([
+        $rules = [
             'app.type' => 'required|in:individual,organization',
             'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
             'phone' => $phone, 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',
@@ -107,11 +108,74 @@ class StartSellingController extends Controller
                 'app.business.productTypes' => 'required|string|max:300',
             ]),
             'app.payout.method' => 'required|in:bank,ewallet', 'app.payout.provider' => 'required|string|max:80', 'app.payout.accountName' => 'required|string|max:120', 'app.payout.accountNumber' => 'required|string|max:40',
-        ], [
+        ];
+        $badPhone = 'Enter a valid PH mobile number (e.g. 0917 555 0101).';
+        $messages = [
             'app.type.required' => 'Choose Individual Supplier or Organization / Company Supplier.', 'methods.required' => 'Select at least one payment method.', 'offerPlans.required' => 'Offer at least one payment plan.',
-            'app.personal.birthDate.before_or_equal' => 'You must be at least 18 years old.', 'phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).',
+            'app.personal.birthDate.before_or_equal' => 'You must be at least 18 years old.',
+            'phone.regex' => $badPhone, 'app.personal.phone.regex' => $badPhone, 'app.company.phone.regex' => $badPhone, 'app.representative.phone.regex' => $badPhone,
             ...AddressInput::messages('shop_addr'),
-        ]);
+        ];
+
+        return [$rules, $messages];
+    }
+
+    /** Checks that need more than one field (pickup pin, deposit %). Keys point at the step to fix. */
+    private static function crossChecks(Request $request): array
+    {
+        $errors = [];
+        $in = $request->only(['location_type', 'fulfillment', 'lat', 'lng']) + ['location_type' => 'shop', 'fulfillment' => 'both', 'lat' => null, 'lng' => null];
+        $errors += self::locationErrors($in, AddressInput::attributes((array) $request->input('shop_addr', []))['city_code']);
+        if ($request->input('depositType') === 'percent' && (float) $request->input('depositValue', 0) > 100) {
+            $errors['depositValue'] = 'Deposit percentage cannot exceed 100%.';
+        }
+
+        return $errors;
+    }
+
+    /**
+     * "Continue" in the wizard: validate only the current step's fields with the same rules as the final submit,
+     * so a wrong number is caught on its own step instead of after the last one.
+     */
+    public function check(Request $request)
+    {
+        $step = (int) $request->input('step', 0);
+        [$rules, $messages] = self::applicationRules($request);
+        $rules = array_filter($rules, fn ($k) => self::stepOfKey($k) === $step && ! str_starts_with($k, 'docs'), ARRAY_FILTER_USE_KEY);
+        $errors = \Illuminate\Support\Facades\Validator::make($request->all(), $rules, $messages)->errors()->toArray();
+        // Pin and deposit rules depend on other steps; check them once the steps they need are filled in.
+        // A missing pin is only known to matter once Delivery/Pickup is chosen (step 4); a pin that is placed is checked right away.
+        if (! $errors && $step >= 3) {
+            $hasPin = filled($request->input('lat')) && filled($request->input('lng'));
+            foreach (self::crossChecks($request) as $k => $m) {
+                if (self::stepOfKey($k) <= $step && ! ($step === 3 && $k === 'lat' && ! $hasPin)) {
+                    $errors[$k] = [$m];
+                }
+            }
+        }
+
+        return $errors
+            ? response()->json(['errors' => $errors, 'step' => self::errorStep(array_keys($errors))], 422)
+            : response()->json(['ok' => true]);
+    }
+
+    public function submit(Request $request)
+    {
+        $u = $request->user();
+        if ($u->staffOf) {
+            return back()->with('error', 'Staff of another shop cannot open their own shop.');
+        }
+        $existing = $u->supplier;
+        $type = $request->input('app.type');
+        // Keep uploaded documents even if another field fails below: a browser cannot refill file inputs after a reload.
+        $request->validate(['docs' => 'nullable|array', 'docs.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:10240']);
+        $stash = (array) session('apply_docs', []);
+        foreach ((array) $request->file('docs', []) as $key => $file) {
+            $stash[$key] = ['name' => mb_substr($file->getClientOriginalName(), 0, 120), 'path' => $file->store('applications/'.$u->id, 'local'), 'size' => $file->getSize(), 'uploadedAt' => now()->toIso8601String()];
+        }
+        session(['apply_docs' => $stash]);
+        [$rules, $messages] = self::applicationRules($request);
+        $v = $request->validate($rules, $messages);
 
         $in = (array) $request->input('app', []);
         $old = (array) ($existing?->application ?? []);
@@ -128,11 +192,7 @@ class StartSellingController extends Controller
         // Documents: keep earlier uploads of the same supplier type, add new ones (private disk).
         $docs = ($old['type'] ?? null) === $type ? (array) ($old['docs'] ?? []) : [];
         $allowed = array_column(Applications::requirements($type, $app['company']['companyType'] ?? null), 'key');
-        foreach ((array) $request->file('docs', []) as $key => $file) {
-            if (in_array($key, $allowed, true)) {
-                $docs[$key] = ['name' => mb_substr($file->getClientOriginalName(), 0, 120), 'path' => $file->store('applications/'.$u->id, 'local'), 'size' => $file->getSize(), 'uploadedAt' => now()->toIso8601String()];
-            }
-        }
+        $docs = array_merge($docs, $stash);
         $app['docs'] = array_intersect_key($docs, array_flip($allowed));
         if ($e = Applications::validate($app)) {
             return back()->withInput()->withErrors([str_contains($e, 'document') ? 'docs' : 'app.type' => $e]);
@@ -184,6 +244,7 @@ class StartSellingController extends Controller
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }
+        session()->forget('apply_docs');
 
         return redirect()->route('start-selling')->with('success', $res['supplier']->status === 'approved' ? 'Your shop is approved!' : 'Application submitted for review.');
     }

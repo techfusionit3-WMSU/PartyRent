@@ -91,4 +91,45 @@ class SupplierApplicationTest extends TestCase
         $this->assertSame('permit-v2.pdf', $s->application['docs']['mayors_permit']['name']);
         $this->assertSame('revision', $s->application['history'][0]['status']);
     }
+
+    /** "Continue" checks each step on the server, so a bad number stops the applicant on that step. */
+    public function test_each_step_is_checked_before_continuing(): void
+    {
+        $jose = User::where('email', 'jose@demo.ph')->firstOrFail();
+        $form = $this->orgForm([]);
+        $this->actingAs($jose)->withSession(['mode' => 'customer']);
+
+        $bad = $form;
+        $bad['app']['company']['phone'] = '12345';
+        $this->postJson('/start-selling/check', $bad + ['step' => 1])->assertStatus(422)
+            ->assertJsonPath('step', 1)->assertJsonPath('errors', ['app.company.phone' => ['Enter a valid PH mobile number (e.g. 0917 555 0101).']]);
+        $this->postJson('/start-selling/check', $form + ['step' => 1])->assertOk();
+        // later steps' fields are not checked yet
+        $this->postJson('/start-selling/check', array_merge($bad, ['phone' => 'abc']) + ['step' => 0])->assertOk();
+
+        $this->postJson('/start-selling/check', array_merge($form, ['phone' => '0917']) + ['step' => 3])->assertStatus(422)->assertJsonValidationErrors('phone');
+        // no pin yet is fine on Shop details; once Pickup is offered (step 4) it sends the applicant back to step 3
+        $noPin = array_merge($form, ['lat' => null, 'lng' => null]);
+        $this->postJson('/start-selling/check', $noPin + ['step' => 3])->assertOk();
+        $this->postJson('/start-selling/check', $noPin + ['step' => 4])->assertStatus(422)->assertJsonPath('step', 3);
+        $this->postJson('/start-selling/check', array_merge($noPin, ['fulfillment' => 'delivery']) + ['step' => 4])->assertOk();
+        $this->postJson('/start-selling/check', array_merge($form, ['depositValue' => 150]) + ['step' => 4])->assertStatus(422)->assertJsonValidationErrors('depositValue');
+    }
+
+    /** A failed final submit keeps the documents already uploaded (file inputs cannot be refilled after a reload). */
+    public function test_uploaded_documents_survive_a_failed_submit(): void
+    {
+        Storage::fake('local');
+        $jose = User::where('email', 'jose@demo.ph')->firstOrFail();
+        $docs = ['cda_certificate' => $this->pdf('cda.pdf'), 'bir_cor' => $this->pdf('bir.pdf'), 'mayors_permit' => $this->pdf('permit.pdf'), 'rep_id' => $this->pdf('passport.pdf'), 'proof_of_authority' => $this->pdf('authority.pdf'), 'barangay_clearance' => $this->pdf('brgy.pdf')];
+        $bad = $this->orgForm($docs);
+        $bad['app']['representative']['phone'] = '0917';
+        $this->actingAs($jose)->withSession(['mode' => 'customer'])->post('/start-selling', $bad)->assertSessionHasErrors('app.representative.phone');
+        $this->get('/start-selling')->assertOk()->assertSee('permit.pdf');
+
+        // resubmitting without picking the files again works
+        $this->post('/start-selling', $this->orgForm([]))->assertSessionHas('success');
+        $this->assertCount(6, Supplier::where('name', 'Garcia Events')->firstOrFail()->application['docs']);
+        $this->assertNull(session('apply_docs'));
+    }
 }

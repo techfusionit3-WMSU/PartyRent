@@ -43,13 +43,12 @@ class StartSellingController extends Controller
 
         return view('customer.start-selling', [
             'existing' => $existing, 'logos' => self::LOGOS, 'steps' => self::STEPS, 'app' => $app,
-            'offerPlans' => $existing ? Finance::plansOf($existing) : ['standard', 'full'],
             'errorStep' => self::errorStep(array_keys(session('errors')?->getMessages() ?? [])),
             'd' => array_merge([
                 'name' => '', 'description' => '', 'logo' => '🎈', 'phone' => $u->phone, 'email' => $u->email,
                 'address_parts' => $u->address_parts, 'location_type' => 'shop', 'lat' => null, 'lng' => null, 'fulfillment' => 'both', 'methods' => ['cod', 'bank'],
                 'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM', 'delivery_fee' => 300,
-                'policy' => ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3, 'cancellation' => 'Free cancellation up to 3 days before the rental start date. The reservation fee is non-refundable.', 'returns' => 'Items must be returned clean and complete on the agreed date.', 'conditions' => 'Renter is responsible for damaged or missing items, charged according to our damage policy.'],
+                'policy' => ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3, 'cancellation' => 'Free cancellation up to 3 days before the rental start date. The down payment is non-refundable.', 'returns' => 'Items must be returned clean and complete on the agreed date.', 'conditions' => 'Renter is responsible for damaged or missing items, charged according to our damage policy.'],
             ], $existing?->toArray() ?? []),
         ]);
     }
@@ -64,7 +63,7 @@ class StartSellingController extends Controller
             str_starts_with($k, 'app.personal'), str_starts_with($k, 'app.identity'), str_starts_with($k, 'app.company'), str_starts_with($k, 'app.representative') => 1,
             str_starts_with($k, 'docs'), str_starts_with($k, 'app.applicable') => 2,
             str_starts_with($k, 'app.payout') => 5,
-            in_array($k, ['fulfillment', 'delivery_fee', 'methods', 'offerPlans', 'depositType', 'depositValue'], true) => 4,
+            in_array($k, ['fulfillment', 'delivery_fee', 'methods'], true) => 4,
             in_array($k, ['cancelDays', 'cancellation', 'returns', 'conditions'], true) => 6,
             default => 3,
         };
@@ -90,8 +89,6 @@ class StartSellingController extends Controller
             'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
             'fulfillment' => 'required|in:delivery,pickup,both', 'delivery_fee' => 'nullable|numeric|min:0',
             'methods' => 'required|array|min:1', 'methods.*' => 'in:cod,bank,debit',
-            'offerPlans' => 'required|array|min:1', 'offerPlans.*' => 'in:'.implode(',', Finance::PLANS),
-            'depositType' => 'required|in:percent,fixed', 'depositValue' => 'nullable|numeric|min:0',
             'cancelDays' => 'nullable|integer|min:0|max:30', 'cancellation' => 'required|string|max:1000', 'returns' => 'required|string|max:1000', 'conditions' => 'required|string|max:1000',
             'app.applicable' => 'nullable|array', 'app.applicable.*' => 'in:'.implode(',', Applications::allDocKeys()),
             'docs' => 'nullable|array', 'docs.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
@@ -111,7 +108,7 @@ class StartSellingController extends Controller
         ];
         $badPhone = 'Enter a valid PH mobile number (e.g. 0917 555 0101).';
         $messages = [
-            'app.type.required' => 'Choose Individual Supplier or Organization / Company Supplier.', 'methods.required' => 'Select at least one payment method.', 'offerPlans.required' => 'Offer at least one payment plan.',
+            'app.type.required' => 'Choose Individual Supplier or Organization / Company Supplier.', 'methods.required' => 'Select at least one payment method.',
             'app.personal.birthDate.before_or_equal' => 'You must be at least 18 years old.',
             'phone.regex' => $badPhone, 'app.personal.phone.regex' => $badPhone, 'app.company.phone.regex' => $badPhone, 'app.representative.phone.regex' => $badPhone,
             ...AddressInput::messages('shop_addr'),
@@ -120,15 +117,12 @@ class StartSellingController extends Controller
         return [$rules, $messages];
     }
 
-    /** Checks that need more than one field (pickup pin, deposit %). Keys point at the step to fix. */
+    /** Checks that need more than one field (pickup pin). Keys point at the step to fix. */
     private static function crossChecks(Request $request): array
     {
         $errors = [];
         $in = $request->only(['location_type', 'fulfillment', 'lat', 'lng']) + ['location_type' => 'shop', 'fulfillment' => 'both', 'lat' => null, 'lng' => null];
         $errors += self::locationErrors($in, AddressInput::attributes((array) $request->input('shop_addr', []))['city_code']);
-        if ($request->input('depositType') === 'percent' && (float) $request->input('depositValue', 0) > 100) {
-            $errors['depositValue'] = 'Deposit percentage cannot exceed 100%.';
-        }
 
         return $errors;
     }
@@ -204,14 +198,14 @@ class StartSellingController extends Controller
         if ($loc = self::locationErrors($v, $addr['city_code'])) {
             throw \Illuminate\Validation\ValidationException::withMessages($loc);
         }
-        if ($v['depositType'] === 'percent' && (float) ($v['depositValue'] ?? 0) > 100) {
-            return back()->withInput()->withErrors(['depositValue' => 'Deposit percentage cannot exceed 100%.']);
-        }
         $pin = isset($v['lat'], $v['lng']) && $v['lat'] !== null ? [round((float) $v['lat'], 7), round((float) $v['lng'], 7)] : [null, null];
+        // Payment plans and the security deposit are not asked in the application (terms differ per event and package);
+        // a new shop starts with the default plans and no deposit, and sets its own after approval.
         $plans = [];
         foreach (Finance::PLANS as $k) {
-            $plans[$k] = array_merge(Finance::DEFAULT_PLANS[$k], (array) ($existing?->payment_plans[$k] ?? []), ['enabled' => in_array($k, $v['offerPlans'], true)]);
+            $plans[$k] = array_merge(Finance::DEFAULT_PLANS[$k], (array) ($existing?->payment_plans[$k] ?? []));
         }
+        $oldPol = (array) ($existing?->policy ?? []);
         $provider = strtolower(trim((string) $app['payout']['provider']));
         $bank = collect(array_keys(\App\Domain\XenditPayouts::BANKS))->first(fn ($b) => strtolower($b) === $provider);
         $payout = [];
@@ -232,7 +226,7 @@ class StartSellingController extends Controller
             'fulfillment' => $v['fulfillment'], 'delivery_fee' => $v['fulfillment'] === 'pickup' ? 0 : (float) ($v['delivery_fee'] ?? 0),
             'delivery' => $existing?->delivery ?? \App\Models\Supplier::DELIVERY_DEFAULTS,
             'methods' => array_values(array_unique($v['methods'])), 'payment_plans' => $plans, 'arrangements' => [], // legacy column (v4 uses payment_plans)
-            'policy' => array_merge((array) ($existing?->policy ?? []), ['depositType' => $v['depositType'], 'depositValue' => (float) ($v['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions']]),
+            'policy' => array_merge($oldPol, ['depositType' => $oldPol['depositType'] ?? 'fixed', 'depositValue' => (float) ($oldPol['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions']]),
             'time_settings' => $existing?->time_settings ?: \App\Domain\Slots::DEFAULT,
             'damage_policy' => $existing?->damage_policy ?: \App\Domain\Damage::DEFAULT,
             'type' => $type, 'company' => $org ? ['legalName' => $app['company']['legalName'], 'companyType' => $app['company']['companyType']] : null,

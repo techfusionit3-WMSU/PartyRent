@@ -68,7 +68,9 @@ class SupplierApplicationTest extends TestCase
         $this->assertSame('Jose Garcia', $s->contact_person);
         $this->assertArrayNotHasKey('gov_id', $s->application['docs']); // not an organization document
         $this->assertCount(6, $s->application['docs']);
-        $this->assertSame(['standard', 'installment'], \App\Domain\Finance::plansOf($s));
+        // payment terms are not part of the application: defaults (offerPlans/deposit in the form are ignored), no deposit
+        $this->assertSame(['standard', 'full'], \App\Domain\Finance::plansOf($s));
+        $this->assertEquals(0, $s->policy['depositValue']);
         $this->assertSame(['bank', 'BPI'], [$s->payout_method, $s->payout_bank]);
         $this->assertEquals(400, $s->delivery_fee);
 
@@ -113,7 +115,8 @@ class SupplierApplicationTest extends TestCase
         $this->postJson('/start-selling/check', $noPin + ['step' => 3])->assertOk();
         $this->postJson('/start-selling/check', $noPin + ['step' => 4])->assertStatus(422)->assertJsonPath('step', 3);
         $this->postJson('/start-selling/check', array_merge($noPin, ['fulfillment' => 'delivery']) + ['step' => 4])->assertOk();
-        $this->postJson('/start-selling/check', array_merge($form, ['depositValue' => 150]) + ['step' => 4])->assertStatus(422)->assertJsonValidationErrors('depositValue');
+        // no payment percentages are asked in the application any more
+        $this->postJson('/start-selling/check', array_merge($form, ['depositValue' => 150, 'offerPlans' => []]) + ['step' => 4])->assertOk();
     }
 
     /** A failed final submit keeps the documents already uploaded (file inputs cannot be refilled after a reload). */

@@ -9,7 +9,6 @@
     $type = old('app.type', $app['type'] ?? '');
     $ctype = $ao('company.companyType', 'corporation');
     $methods = old('methods', $d['methods'] ?? ['cod', 'bank']);
-    $plans = old('offerPlans', $offerPlans);
     $pol = $d['policy'] ?? [];
     $applicable = old('app.applicable', $app['applicable'] ?? []);
     $docs = (array) ($app['docs'] ?? []);
@@ -140,10 +139,7 @@
     <div class="field"><label>Accepted payment methods</label>
       @foreach(['cod' => 'Cash on Delivery', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $k => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $k }}" @checked(in_array($k, $methods, true))> {{ $l }}</label>@endforeach
       {!! $err('methods') !!}</div>
-    <div class="field"><label>Payment plans you offer</label>
-      @foreach(\App\Domain\Finance::PLANS as $k)<label class="check"><input type="checkbox" name="offerPlans[]" value="{{ $k }}" @checked(in_array($k, $plans, true))> {{ \App\Domain\Finance::PLAN_LABEL[$k] }} <span class="small muted">— {{ \App\Domain\Finance::planSummary(null, $k) }}</span></label>@endforeach
-      {!! $err('offerPlans') !!}<div class="hint">Default percentages and deadlines can be changed in Shop Settings after approval.</div></div>
-    <div class="field"><label>Security deposit (refundable)</label><div class="row" style="gap:6px"><select class="input" name="depositType" style="width:160px"><option value="fixed" @selected(old('depositType', $pol['depositType'] ?? 'fixed') === 'fixed')>₱ fixed</option><option value="percent" @selected(old('depositType', $pol['depositType'] ?? 'fixed') === 'percent')>% of rental fee</option></select><input class="input" type="number" min="0" name="depositValue" value="{{ old('depositValue', $pol['depositValue'] ?? 500) }}"></div>{!! $err('depositValue') !!}</div>
+    <div class="alert alert-info">{{ icon('info') }}<div class="small">No down payment or deposit percentages are asked here. Payment terms differ per event and package, so you set them when you post each package, and in Shop Settings after approval.</div></div>
   </section>
 
   {{-- 6 · Payout --}}
@@ -208,7 +204,6 @@
     else { rows.push(['Applicant', val('app[personal][fullName]') + ' · born ' + (val('app[personal][birthDate]') || '—')]); rows.push(['ID', val('app[identity][idType]') + ' · ' + val('app[identity][idNumber]')]); }
     rows.push(['Shop contact', val('phone') + ' · ' + val('email')]);
     rows.push(['Address', [val('shop_addr[street]'), val('shop_addr[barangay]')].filter(Boolean).join(', ')]);
-    rows.push(['Payment plans', $$('[name="offerPlans[]"]:checked').map(function (c) { return c.parentNode.childNodes[1].textContent.trim(); }).join(', ')]);
     rows.push(['Methods', $$('[name="methods[]"]:checked').map(function (c) { return c.parentNode.textContent.trim(); }).join(', ')]);
     rows.push(['Payout', [val('app[payout][provider]'), val('app[payout][accountName]'), val('app[payout][accountNumber]')].join(' · ')]);
     var docs = $$('[data-docrow]').filter(function (r) { return !r.closest('[hidden]') && !r.querySelector('[data-docname]').hidden; }).map(function (r) { return '<span class="tag">' + esc(r.dataset.label) + '</span>'; }).join(' ');
@@ -258,7 +253,7 @@
     });
     if (step === 0 && !type()) { toast('Choose Individual Supplier or Organization / Company Supplier.'); return false; }
     if (step === 2 && missingDocs().length) { toast('Please upload: ' + missingDocs().join(', ') + '.'); return false; }
-    if (step === 4) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } if (!f.querySelector('[name="offerPlans[]"]:checked')) { toast('Offer at least one payment plan.'); return false; } }
+    if (step === 4) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } }
     if (!ok) { toast('Please fix the highlighted fields before continuing.'); firstBad.focus({ preventScroll: true }); firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     return ok;
   }

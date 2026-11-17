@@ -47,7 +47,7 @@ class StartSellingController extends Controller
             'd' => array_merge([
                 'name' => '', 'description' => '', 'logo' => '🎈', 'phone' => $u->phone, 'email' => $u->email,
                 'address_parts' => $u->address_parts, 'location_type' => 'shop', 'lat' => null, 'lng' => null, 'fulfillment' => 'both', 'methods' => ['cod', 'bank'],
-                'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM', 'delivery_fee' => 300,
+                'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM',
                 'policy' => ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3, 'cancellation' => 'Free cancellation up to 3 days before the rental start date. The down payment is non-refundable.', 'returns' => 'Items must be returned clean and complete on the agreed date.', 'conditions' => 'Renter is responsible for damaged or missing items, charged according to our damage policy.'],
             ], $existing?->toArray() ?? []),
         ]);
@@ -63,7 +63,7 @@ class StartSellingController extends Controller
             str_starts_with($k, 'app.personal'), str_starts_with($k, 'app.identity'), str_starts_with($k, 'app.company'), str_starts_with($k, 'app.representative') => 1,
             str_starts_with($k, 'docs'), str_starts_with($k, 'app.applicable') => 2,
             str_starts_with($k, 'app.payout') => 5,
-            in_array($k, ['fulfillment', 'delivery_fee', 'methods'], true) => 4,
+            in_array($k, ['fulfillment', 'methods'], true) => 4,
             in_array($k, ['cancelDays', 'cancellation', 'returns', 'conditions'], true) => 6,
             default => 3,
         };
@@ -87,7 +87,7 @@ class StartSellingController extends Controller
             'location_type' => 'required|in:shop,home,none',
             ...AddressInput::rules('shop_addr', $request->input('location_type', 'shop') !== 'none'),
             'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
-            'fulfillment' => 'required|in:delivery,pickup,both', 'delivery_fee' => 'nullable|numeric|min:0',
+            'fulfillment' => 'required|in:delivery,pickup,both',
             'methods' => 'required|array|min:1', 'methods.*' => 'in:cod,bank,debit',
             'cancelDays' => 'nullable|integer|min:0|max:30', 'cancellation' => 'required|string|max:1000', 'returns' => 'required|string|max:1000', 'conditions' => 'required|string|max:1000',
             'app.applicable' => 'nullable|array', 'app.applicable.*' => 'in:'.implode(',', Applications::allDocKeys()),
@@ -223,7 +223,7 @@ class StartSellingController extends Controller
             'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'],
             'city' => Locations::name($addr['city_code']), ...$addr,
             'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1],
-            'fulfillment' => $v['fulfillment'], 'delivery_fee' => $v['fulfillment'] === 'pickup' ? 0 : (float) ($v['delivery_fee'] ?? 0),
+            'fulfillment' => $v['fulfillment'], 'delivery_fee' => (float) ($existing?->delivery_fee ?? 0), // not asked in the application: set in Shop Settings (zones + standard rate)
             'delivery' => $existing?->delivery ?? \App\Models\Supplier::DELIVERY_DEFAULTS,
             'methods' => array_values(array_unique($v['methods'])), 'payment_plans' => $plans, 'arrangements' => [], // legacy column (v4 uses payment_plans)
             'policy' => array_merge($oldPol, ['depositType' => $oldPol['depositType'] ?? 'fixed', 'depositValue' => (float) ($oldPol['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions']]),

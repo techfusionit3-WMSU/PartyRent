@@ -135,11 +135,10 @@
     <div class="stack-sm">@foreach([['delivery', 'Delivery only', 'You bring items to the customer.'], ['pickup', 'Pickup only', 'Customers collect from your location.'], ['both', 'Both delivery and pickup', 'Let customers choose.']] as [$v, $l, $desc])
       <label class="card card-flat row" style="padding:12px 14px;cursor:pointer"><input type="radio" name="fulfillment" value="{{ $v }}" @checked($o('fulfillment', 'both') === $v) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $desc }}</div></div></label>
     @endforeach</div>{!! $err('fulfillment') !!}
-    <div class="field mt-2" id="dfee"><label>Standard delivery fee (₱ per delivery location)</label><input class="input" type="number" min="0" name="delivery_fee" value="{{ $o('delivery_fee', 300) }}"><div class="hint">You can add delivery zones with different rates later in Shop Settings.</div></div>
     <div class="field"><label>Accepted payment methods</label>
       @foreach(['cod' => 'Cash on Delivery', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $k => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $k }}" @checked(in_array($k, $methods, true))> {{ $l }}</label>@endforeach
       {!! $err('methods') !!}</div>
-    <div class="alert alert-info">{{ icon('info') }}<div class="small">No down payment or deposit percentages are asked here. Payment terms differ per event and package, so you set them when you post each package, and in Shop Settings after approval.</div></div>
+    <div class="alert alert-info">{{ icon('info') }}<div class="small">No delivery fee, down payment or deposit percentages are asked here. They differ per item, event and situation, so you set them in Shop Settings after approval and when you post each package.</div></div>
   </section>
 
   {{-- 6 · Payout --}}
@@ -193,7 +192,6 @@
     $$('[data-type]').forEach(function (r) { r.closest('.type-card').classList.toggle('on', r.checked); });
     $$('[data-org-label]').forEach(function (l) { if (!l.dataset.indLabel) l.dataset.indLabel = l.textContent; l.textContent = org() ? l.dataset.orgLabel : l.dataset.indLabel; });
     $$('[data-docrow]').forEach(function (row) { var c = row.querySelector('[data-applies]'); row.dataset.req = row.dataset.need === 'required' || (c && c.checked) ? '1' : ''; });
-    var df = document.getElementById('dfee'), ful = f.querySelector('[name=fulfillment]:checked'); if (df) df.classList.toggle('hidden', ful && ful.value === 'pickup');
   }
   function missingDocs() {
     return $$('[data-docrow]').filter(function (row) { return !row.closest('[hidden]') && row.dataset.req && row.querySelector('[data-docname]').hidden; }).map(function (row) { return row.dataset.label; });

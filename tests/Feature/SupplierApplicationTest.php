@@ -72,7 +72,7 @@ class SupplierApplicationTest extends TestCase
         $this->assertSame(['standard', 'full'], \App\Domain\Finance::plansOf($s));
         $this->assertEquals(0, $s->policy['depositValue']);
         $this->assertSame(['bank', 'BPI'], [$s->payout_method, $s->payout_bank]);
-        $this->assertEquals(400, $s->delivery_fee);
+        $this->assertEquals(0, $s->delivery_fee); // delivery fee is not asked in the application (form value ignored)
 
         // asked to revise → the applicant can edit and resubmit; documents already sent are kept
         $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();

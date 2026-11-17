@@ -74,7 +74,7 @@ from the first row that is not `verified`.
 ## Cashier
 | Page | Laravel today | Status | Note |
 |---|---|---|---|
-| dashboard | E | todo | |
+| dashboard | E | done | 8 stats, pending verifications (Review → verification #pay-id), overdue accounts, payments-by-method donut, recent receipts; 1440 identical |
 | verification | E | todo | |
 | record | E | todo | |
 | balances | E | todo | |
@@ -85,7 +85,7 @@ from the first row that is not `verified`.
 ## Admin
 | Page | Laravel today | Status | Note |
 |---|---|---|---|
-| dashboard | E | todo | |
+| dashboard | E | done | 10 stats, requests/month bars, status donut (5 groups), activity (no sign-ins), pending applications; 1440 identical |
 | users | E | todo | |
 | applications (approve / reject / request revision) | E | todo | |
 | listings (Products + Packages tabs; hide/unhide/delete rules) | P | todo | |
@@ -99,7 +99,7 @@ from the first row that is not `verified`.
 ## Superadmin
 | Page | Laravel today | Status | Note |
 |---|---|---|---|
-| dashboard | E | todo | |
+| dashboard | E | done | line trend + collection bars via partials.chart, activity per reference (no sign-ins); 1440 identical |
 | monitoring | E | todo | |
 | users | E | todo | |
 | reports | P (reuses admin) | todo | |

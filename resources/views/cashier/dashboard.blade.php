@@ -1,25 +1,35 @@
 @extends('layouts.dash', ['title' => 'Cashier Dashboard', 'nav' => 'dashboard'])
 
+{{-- Reference CS.dashboard --}}
 @section('content')
-<div class="page-head"><div><h1>Cashier dashboard</h1><p>{{ fmt_date(today_iso()) }} · only verified payments count toward customer balances.</p></div><div class="row wrap"><a class="btn" href="{{ route('cashier.record') }}">{{ icon('cash') }}Record payment</a><a class="btn btn-primary" href="{{ route('cashier.verification') }}">{{ icon('check') }}Verify payments{{ $pending->count() ? ' ('.$pending->count().')' : '' }}</a></div></div>
-<div class="stats">
-  @include('partials.stat', ['label' => 'Awaiting verification', 'value' => $pending->count(), 'sub' => money_short($pending->sum('amount')), 'icon' => 'clock', 'color' => 'gold', 'href' => route('cashier.verification')])
-  @include('partials.stat', ['label' => 'Collected today', 'value' => money_short($todayIn), 'sub' => $todayCount.' verified transactions', 'icon' => 'check', 'color' => 'teal', 'href' => route('cashier.history')])
-  @include('partials.stat', ['label' => 'Refunded today', 'value' => money_short($todayOut), 'sub' => 'rental & deposit refunds', 'icon' => 'cash', 'color' => 'purple'])
-  @include('partials.stat', ['label' => 'Overdue accounts', 'value' => $overdue->count(), 'sub' => money_short($overdue->sum(fn ($r) => $r->fin()['overdueAmount'])).' overdue', 'icon' => 'alert', 'color' => 'red', 'href' => route('cashier.balances')])
-  @include('partials.stat', ['label' => 'Outstanding balances', 'value' => money_short($outstanding), 'sub' => 'active rentals', 'icon' => 'clock', 'color' => 'pink', 'href' => route('cashier.balances')])
-  @include('partials.stat', ['label' => 'Deposits held', 'value' => money_short($depositsHeld), 'sub' => 'refundable, not income', 'icon' => 'shield', 'color' => 'sky'])
+<div class="page-head"><div><h1>Payment overview</h1><p>{{ fmt_date(today_iso()) }} · Cashier {{ auth()->user()->name }}@if($shop) · <b>{{ $shop->name }}</b>@endif</p></div><div class="row wrap"><a class="btn" href="{{ route('cashier.record') }}">{{ icon('cash') }}Record payment</a><a class="btn btn-primary" href="{{ route('cashier.verification') }}">{{ icon('check') }}Verify payments ({{ $pending->count() }})</a></div></div>
+<div class="stats mb-3">
+  @include('partials.stat', ['label' => "Today's verified payments", 'value' => money_short($today->sum('amount')), 'sub' => $today->count().' transactions', 'icon' => 'check', 'color' => 'teal'])
+  @include('partials.stat', ['label' => 'Pending verification', 'value' => $pending->count(), 'sub' => money_short($pending->sum('amount')), 'icon' => 'clock', 'color' => 'gold', 'href' => route('cashier.verification')])
+  @include('partials.stat', ['label' => 'Total verified', 'value' => money_short($totalVerified), 'sub' => 'all rental payments', 'icon' => 'card', 'color' => 'sky', 'href' => route('cashier.history')])
+  @include('partials.stat', ['label' => 'Partial payments', 'value' => $partial->count(), 'sub' => money_short($partialLeft).' remaining', 'icon' => 'cash', 'color' => 'purple', 'href' => route('cashier.balances')])
+  @include('partials.stat', ['label' => 'Overdue balances', 'value' => $overdue->count(), 'sub' => money_short($overdue->sum(fn ($r) => $r->fin()['overdueAmount'])).' overdue', 'icon' => 'alert', 'color' => 'red', 'href' => route('cashier.balances')])
+  @include('partials.stat', ['label' => 'Reservation fees (verified)', 'value' => money_short($reservationFees), 'icon' => 'tag', 'color' => 'pink'])
+  @include('partials.stat', ['label' => 'Down payments (verified)', 'value' => money_short($downPayments), 'icon' => 'tag', 'color' => 'purple'])
+  @include('partials.stat', ['label' => 'Deposits held', 'value' => money_short($depositsHeld), 'sub' => 'refundable', 'icon' => 'shield', 'color' => 'sky'])
 </div>
-<div class="grid grid-2 mt-3">
-  <div class="card"><div class="card-head"><h3>Oldest pending submissions</h3><a class="small strong" href="{{ route('cashier.verification') }}">Open queue</a></div>
-    @forelse($pending->take(6) as $p)
-      <div class="row between" style="padding:10px 0;border-bottom:1px solid var(--line)"><div><b>{{ $p->code }}</b> · {{ $p->rentalRequest->customer->name }}<div class="small muted">{{ $p->rentalRequest->code }} · {{ $p->typeLabel() }} · {{ $p->methodLabel() }} · {{ time_ago($p->submitted_at) }}</div></div><b>{{ money($p->amount) }}</b></div>
-    @empty <p class="muted">The queue is empty. 🎉</p> @endforelse
+<div class="grid grid-2">
+  <div class="card"><div class="card-head"><h3>Pending verifications</h3><a class="small strong" href="{{ route('cashier.verification') }}">Open queue</a></div>
+    @forelse($pending as $p)
+      <div class="row between" style="padding:10px 0;border-bottom:1px solid var(--line)"><div><b>{{ money($p->amount) }}</b> · {{ $p->typeLabel() }}<div class="small muted">{{ $p->rentalRequest->customer->name }} · {{ $p->rentalRequest->code }} · {{ $p->rentalRequest->supplier->name }}</div></div><a class="btn btn-sm btn-primary" href="{{ route('cashier.verification') }}#pay-{{ $p->id }}">Review</a></div>
+    @empty <p class="muted">Queue is clear 🎉</p> @endforelse
   </div>
-  <div class="card"><div class="card-head"><h3>Recently processed</h3><a class="small strong" href="{{ route('cashier.history') }}">History</a></div>
-    @forelse($recent as $p)
-      <div class="row between" style="padding:10px 0;border-bottom:1px solid var(--line)"><div><b>{{ $p->code }}</b> @include('partials.badges', ['ver' => $p->status])<div class="small muted">{{ $p->rentalRequest->code }} · {{ $p->verifier->name ?? '—' }} · {{ fmt_datetime($p->verified_at) }}</div></div><b>{{ $p->isOutflow() ? '− ' : '' }}{{ money($p->amount) }}</b></div>
-    @empty <p class="muted">Nothing processed yet.</p> @endforelse
+  <div class="card"><div class="card-head"><h3>Overdue accounts</h3><a class="small strong" href="{{ route('cashier.balances') }}">View all</a></div>
+    @forelse($overdue as $r)
+      @php($f = $r->fin())
+      <div class="row between" style="padding:10px 0;border-bottom:1px solid var(--line)"><div><b>{{ $r->code }}</b> · {{ $r->customer->name }}<div class="small muted">{{ $r->supplier->name }} · {{ collect($f['schedule'])->firstWhere('state', 'overdue')['label'] ?? '' }}</div></div><b style="color:var(--red)">{{ money($f['overdueAmount']) }}</b></div>
+    @empty <p class="muted">No overdue accounts.</p> @endforelse
+  </div>
+  <div class="card"><h3>Payments by method (verified)</h3>@include('partials.chart', ['kind' => 'donut', 'rows' => $byMethod, 'opts' => ['money' => true, 'center' => 'verified']])</div>
+  <div class="card"><div class="card-head"><h3>Recent receipts</h3><a class="small strong" href="{{ route('cashier.history') }}">All receipts</a></div>
+    @forelse($receipts as $p)
+      <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><div><b>{{ $p->receipt_no }}</b> · {{ money($p->amount) }}<div class="small muted">{{ $p->rentalRequest->code }} · {{ fmt_date($p->date) }}</div></div><a class="btn btn-xs" target="_blank" href="{{ route('payments.receipt', $p) }}">View</a></div>
+    @empty <p class="muted">No receipts yet.</p> @endforelse
   </div>
 </div>
 @endsection

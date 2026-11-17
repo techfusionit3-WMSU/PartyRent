@@ -12,7 +12,7 @@
       @php($over = in_array($p->type, \App\Domain\Finance::RENTAL_TYPES, true) && $p->amount > $f['balance'] + 0.001)
       @php($dups = $p->duplicates())
       @php($dupVerified = $dups->firstWhere('status', 'verified'))
-      <div class="card">
+      <div class="card" id="pay-{{ $p->id }}">
         <div class="row wrap between top">
           <div><div class="row gap-sm"><b>{{ $p->code }}</b>@include('partials.badges', ['ver' => $p->status])<span class="badge b-gray plain">by {{ $p->recorded_by }}</span></div>
             <div class="small muted mt-1">{{ $r->code }} · {{ $r->event_name }} · {{ $r->customer->name }}</div></div>

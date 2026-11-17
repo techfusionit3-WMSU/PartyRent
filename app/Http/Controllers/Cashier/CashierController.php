@@ -39,20 +39,27 @@ class CashierController extends Controller
     }
     public function dashboard(Request $request)
     {
+        // Reference CS.dashboard: 8 stats, pending verifications, overdue accounts, payments by method, recent receipts.
         Rentals::scanOverdue();
         $T = today_iso();
-        $active = $this->requests($request)->whereIn('status', Finance::ACTIVE)->with(['payments', 'customer'])->get();
-        $today = $this->payments($request)->where('status', 'verified')->whereDate('verified_at', $T)->get();
+        $active = $this->requests($request)->whereIn('status', Finance::ACTIVE)->with(['payments', 'customer', 'supplier'])->get();
+        $verified = $this->payments($request)->where('status', 'verified')->get();
+        $rental = $verified->whereIn('type', Finance::RENTAL_TYPES);
+        $today = $verified->filter(fn ($p) => $p->verified_at && $p->verified_at->format('Y-m-d') === $T);
+        $partial = $active->filter(fn ($r) => $r->fin()['status'] === 'Partially Paid');
 
         return view('cashier.dashboard', [
-            'pending' => $this->payments($request)->where('status', 'pending')->with('rentalRequest.customer')->orderBy('submitted_at')->get(),
-            'todayIn' => $today->whereNotIn('type', ['refund', 'deposit_refund'])->sum('amount'),
-            'todayOut' => $today->whereIn('type', ['refund', 'deposit_refund'])->sum('amount'),
-            'todayCount' => $today->count(),
-            'overdue' => $active->filter(fn ($r) => $r->fin()['isOverdue']),
-            'outstanding' => $active->sum(fn ($r) => $r->fin()['balance']),
-            'depositsHeld' => $this->requests($request)->whereIn('status', array_merge(Finance::ACTIVE, ['completed']))->with('payments')->get()->sum(fn ($r) => $r->fin()['depositHeld']),
-            'recent' => $this->payments($request)->where('status', '!=', 'pending')->with(['rentalRequest.customer', 'verifier'])->orderByDesc('verified_at')->take(8)->get(),
+            'shop' => $request->user()->shop(),
+            'pending' => $this->payments($request)->where('status', 'pending')->with(['rentalRequest.customer', 'rentalRequest.supplier'])->orderBy('submitted_at')->get(),
+            'today' => $today,
+            'totalVerified' => $rental->sum('amount'),
+            'partial' => $partial, 'partialLeft' => $partial->sum(fn ($r) => $r->fin()['balance']),
+            'overdue' => $active->filter(fn ($r) => $r->fin()['isOverdue'])->values(),
+            'reservationFees' => $verified->where('type', 'reservation')->sum('amount'),
+            'downPayments' => $verified->where('type', 'down')->sum('amount'),
+            'depositsHeld' => $this->requests($request)->with('payments')->get()->sum(fn ($r) => $r->fin()['depositHeld']),
+            'byMethod' => $rental->groupBy(fn ($p) => $p->methodLabel())->map(fn ($g, $k) => ['label' => $k, 'value' => $g->sum('amount')])->values()->all(),
+            'receipts' => $this->payments($request)->whereNotNull('receipt_no')->orderByDesc('verified_at')->take(6)->get(),
         ]);
     }
 

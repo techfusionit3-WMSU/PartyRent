@@ -49,7 +49,7 @@ class SuperController extends Controller
                 'rentals' => $reqs->where('supplier_id', $s->id)->whereNotIn('status', ['pending', 'declined'])->count(),
                 'value' => $counted->where('supplier_id', $s->id)->sum(fn ($r) => $r->fin()['payable']),
             ]),
-            'audit' => AuditLog::with('actor')->orderByDesc('created_at')->take(7)->get(),
+            'audit' => AuditLog::with('actor')->where('action', '!=', 'Signed in')->orderByDesc('created_at')->take(7)->get(),
         ]);
     }
 

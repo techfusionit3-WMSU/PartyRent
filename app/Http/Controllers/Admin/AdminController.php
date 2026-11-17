@@ -8,11 +8,13 @@ use App\Domain\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Complaint;
+use App\Models\Package;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\RentalRequest;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Support\Report;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
@@ -24,22 +26,27 @@ class AdminController extends Controller
 
     public function dashboard(Request $request)
     {
+        // Reference AD.dashboard: 10 stats, requests per month, status donut (5 groups), activity, pending applications.
         Rentals::scanOverdue();
-        $reqs = RentalRequest::with('payments')->get();
-        $ver = Payment::where('status', 'verified')->get();
+        $reqs = RentalRequest::get(['id', 'status', 'created_at']);
+        $customers = User::whereJsonContains('roles', 'customer')->get(['id', 'status']);
+        $sups = Supplier::with('owner:id,name,status')->get();
+        $count = fn (array $st) => $reqs->whereIn('status', $st)->count();
 
         return view('admin.dashboard', [
-            'users' => User::count(), 'customers' => User::whereJsonContains('roles', 'customer')->count(),
-            'suppliers' => Supplier::approved()->count(), 'pendingApps' => Supplier::where('status', 'pending')->count(),
-            'listings' => Product::where('status', 'active')->count(),
-            'active' => $reqs->filter->isActive()->count(), 'pending' => $reqs->where('status', 'pending')->count(),
-            'completed' => $reqs->where('status', 'completed')->count(),
-            'overdue' => $reqs->filter(fn ($r) => $r->isActive() && $r->fin()['isOverdue'])->count(),
-            'gmv' => $ver->whereIn('type', Finance::RENTAL_TYPES)->sum('amount') - $ver->where('type', 'refund')->sum('amount'),
-            'commission' => (float) setting('commissionPct', 5),
+            'customers' => $customers->count(), 'inactiveCustomers' => $customers->where('status', '!=', 'active')->count(),
+            'suppliers' => $sups->count(),
+            'activeSuppliers' => $sups->filter(fn ($s) => $s->status === 'approved' && $s->owner?->status === 'active')->count(),
+            'pendingApps' => $sups->where('status', 'pending')->sortByDesc('applied_at')->values(),
+            'listings' => Product::where('status', 'active')->count(), 'packages' => Package::live()->count(),
+            'requests' => $reqs->count(), 'pending' => $count(['pending']), 'active' => $count(Finance::ACTIVE),
+            'completed' => $count(['completed']), 'declined' => $count(['declined']), 'cancelled' => $count(['cancelled']),
             'openComplaints' => Complaint::where('status', '!=', 'resolved')->count(),
-            'byStatus' => collect(RentalRequest::STATUS)->map(fn ($v, $k) => ['label' => $v[0], 'value' => $reqs->where('status', $k)->count()])->values(),
-            'audit' => AuditLog::with('actor')->orderByDesc('created_at')->take(8)->get(),
+            'monthly' => array_map(fn ($m) => ['label' => $m['label'], 'value' => $reqs->filter(fn ($r) => $r->created_at->format('Y-m') === $m['key'])->count()], Report::months(6)),
+            'status' => collect([['Pending', ['pending']], ['Active', Finance::ACTIVE], ['Completed', ['completed']], ['Declined', ['declined']], ['Cancelled', ['cancelled']]])
+                ->map(fn ($g) => ['label' => $g[0], 'value' => $count($g[1])])->all(),
+            // Sign-ins stay in the full activity log; on the dashboard they would push out the actions worth seeing.
+            'audit' => AuditLog::with('actor')->where('action', '!=', 'Signed in')->orderByDesc('created_at')->take(8)->get(),
         ]);
     }
 

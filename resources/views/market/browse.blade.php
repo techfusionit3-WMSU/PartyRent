@@ -42,44 +42,24 @@
   </section>
   @endif
 
+  @include('market._browse-bar')
+
   <section class="section"><div class="section-title"><h2>Shop by category</h2><a class="small strong" href="#results">See all</a></div><div class="cat-grid">
     @foreach($cats as $c)<a class="cat-card" href="{{ $qs(['category' => $c->id]) }}#results"><div class="ce" style="background:linear-gradient(135deg,{{ $c->grad_from }},{{ $c->grad_to }})">{{ art($c->icon, '62%') }}</div><div class="cn">{{ $c->name }}</div><div class="cc">{{ $list->where('category_id', $c->id)->count() }} items</div></a>@endforeach
   </div></section>
   <section class="section"><div class="section-title"><h2>Shop by event</h2></div><div class="grid grid-3">
     @foreach($themes as [$e, $em, $bg])<a class="theme-card" style="background:{{ $bg }}" href="{{ $qs(['event' => $e]) }}#results"><span class="te">{{ $em }}</span><b>{{ $e }}</b><span>{{ $list->filter(fn ($p) => in_array($e, $p->events ?? [], true))->count() }} items · {{ $pkgs->filter(fn ($k) => in_array($e, $k->events ?? [], true))->count() }} packages</span></a>@endforeach
   </div></section>
-  @foreach([['Featured rentals', $home['featured'], ['sort' => 'rating']], [$u ? 'Recommended for you' : 'Most rented this season', $home['recommended'], ['sort' => 'popular']]] as [$title, $items, $more])
-    <section class="section"><div class="section-title"><h2>{{ $title }}</h2><a class="small strong" href="{{ $qs($more) }}#results">See more</a></div><div class="product-grid">@foreach($items as $p)@include('partials.product-card', ['p' => $p])@endforeach</div></section>
-  @endforeach
+  <section class="section"><div class="section-title"><h2>{{ $u ? 'Recommended for you' : 'Most rented this season' }}</h2><a class="small strong" href="{{ $qs(['sort' => 'popular']) }}#results">See more</a></div><div class="product-grid">@foreach($home['recommended'] as $p)@include('partials.product-card', ['p' => $p])@endforeach</div></section>
   @if($pkgs->isNotEmpty())<section class="section"><div class="section-title"><h2>Popular rental packages</h2><a class="small strong" href="{{ route('packages.index') }}">See more</a></div><div class="product-grid">@foreach($pkgs->take(4) as $k)@include('partials.package-card', ['k' => $k])@endforeach</div></section>@endif
   <section class="section"><div class="section-title"><h2>Featured suppliers</h2><a class="small strong" href="{{ route('suppliers.index') }}">All suppliers</a></div><div class="grid grid-3">@foreach($home['topSuppliers'] as $s)@include('partials.supplier-card', ['s' => $s])@endforeach</div></section>
-  @foreach([['Special bulk offers 🎁', $home['offers'], []], ['Recently added', $home['recent'], ['sort' => 'recent']]] as [$title, $items, $more])
-    <section class="section"><div class="section-title"><h2>{{ $title }}</h2><a class="small strong" href="{{ $qs($more) }}#results">See more</a></div><div class="product-grid">@foreach($items as $p)@include('partials.product-card', ['p' => $p])@endforeach</div></section>
-  @endforeach
 @else
   <div class="crumbs"><a href="{{ route('home') }}">Home</a> / {{ $cat ? $cat->name : ($st['q'] ? 'Search' : 'Browse') }}</div>
 @endif
 
 {{-- ================= browse ================= --}}
-<div class="page-head mt-2" id="results"><div><h1>{{ $landing ? 'Browse party supplies' : $heading }}</h1><p>{{ $list->count() }} {{ $st['view'] === 'packages' ? 'packages' : 'items' }}{{ $dates ? ' · availability for '.fmt_range($dates[0], end($dates)).($st['qty'] ? ' (need '.$st['qty'].'/day)' : '') : ' · select rental dates to see available stock' }}</p></div></div>
-<div class="browse-sticky">
-  <form class="card date-bar" id="dateBar" aria-label="Rental dates" method="GET" action="{{ route('home') }}#results">
-    @foreach(array_diff_key($st, ['start' => 1, 'end' => 1]) as $k => $v)@if($v !== '' && ! ($k === 'sort' && $v === 'recommended') && ! ($k === 'view' && $v === 'items'))<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endif @endforeach
-    <span class="db-label">{{ icon('calendar') }}Rental dates</span>
-    <div class="db-inputs"><input class="input input-sm" type="date" name="start" min="{{ today_iso() }}" value="{{ $st['start'] }}" aria-label="Start date" data-autosubmit><span class="muted">–</span><input class="input input-sm" type="date" name="end" min="{{ $st['start'] ?: today_iso() }}" value="{{ $st['end'] }}" aria-label="End date" data-autosubmit></div>
-    <div class="db-summary" aria-live="polite">@if($st['start'])<span>{{ \App\Support\RentalPeriod::rangeLabel($st['start'], $st['end']) }}</span><span class="db-sep">|</span><span class="badge b-purple plain">{{ \App\Support\RentalPeriod::durationLabel($nDays) }}</span>@else<span class="small muted" style="font-weight:500">Select dates to see available stock for your rental period</span>@endif</div>
-    @if($st['start'])<a class="btn btn-sm btn-ghost" href="{{ $qs(['start' => '', 'end' => '', 'clear' => 1]) }}#results">{{ icon('x') }}Clear dates</a>@endif
-  </form>
-  <div class="browse-tools">
-    <div class="seg"><a href="{{ $qs(['view' => 'items']) }}#results"><button type="button" class="{{ $st['view'] !== 'packages' ? 'active' : '' }}">Items</button></a><a href="{{ $qs(['view' => 'packages']) }}#results"><button type="button" class="{{ $st['view'] === 'packages' ? 'active' : '' }}">Packages</button></a></div>
-    <div class="row">
-      <button class="btn btn-sm" type="button" data-drawer="filterDrawer" aria-haspopup="dialog">{{ icon('filter') }}Filters @if($filterCount)<span class="filter-count">{{ $filterCount }}</span>@endif</button>
-      <form method="GET" action="{{ route('home') }}#results">@foreach(array_diff_key($st, ['sort' => 1]) as $k => $v)@if($v !== '')<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endif @endforeach
-        <select class="input input-sm" name="sort" style="width:auto" aria-label="Sort" data-autosubmit>@foreach([['recommended', 'Recommended'], ['price_asc', 'Lowest price'], ['price_desc', 'Highest price'], ['popular', 'Most popular'], ['recent', 'Recently added'], ['rating', 'Highest rated']] as [$v, $l])<option value="{{ $v }}" @selected($st['sort'] === $v)>{{ $l }}</option>@endforeach</select></form>
-    </div>
-  </div>
-</div>
-
+@unless($landing)@include('market._browse-bar')@endunless
+<div class="page-head mt-2" id="results"><div><h1>{{ $landing ? 'Browse party supplies' : $heading }}</h1><p>{{ $list->count() }} {{ $st['view'] === 'packages' ? 'packages' : 'items' }}{{ $dates ? ' · availability for '.fmt_range($dates[0], end($dates)).($st['qty'] ? ' (need '.$st['qty'].'/day)' : '') : ' · select a rental date to see available stock' }}</p></div></div>
 <div class="row wrap mb-2" style="gap:6px">
   @foreach($labels as $k => $l)
     @if($st[$k] !== '')

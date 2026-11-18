@@ -107,6 +107,27 @@
     if (i.matches && i.matches('[data-autosubmit]')) i.form.submit();
   });
 
+  /* ---------- one rental date by default, "Multiple days" toggle shows the end date ----------
+     <div data-multiday> [data-md-start] input, [data-md-toggle] checkbox, [data-md-end] wrapper (holds the end input).
+     Off: end = start (hidden). Fires a bubbling "multiday" event on the box after each change. */
+  $$('[data-multiday]').forEach(box => {
+    const start = $('[data-md-start]', box), t = $('[data-md-toggle]', box), endWrap = $('[data-md-end]', box);
+    if (!start || !t || !endWrap) return;
+    const end = endWrap.matches('input') ? endWrap : $('input', endWrap);
+    const fire = () => box.dispatchEvent(new CustomEvent('multiday', { bubbles: true, detail: { on: t.checked } }));
+    const sync = () => {
+      endWrap.classList.toggle('hidden', !t.checked); box.classList.toggle('md-on', t.checked);
+      if (end) { end.min = start.value || start.min; if (!t.checked) end.value = start.value; else if (end.value && start.value && end.value < start.value) end.value = start.value; }
+    };
+    start.addEventListener('change', () => { if (!t.checked && end) end.value = start.value; sync(); fire(); });
+    t.addEventListener('change', () => {
+      sync(); fire();
+      if (t.checked) { if (end && start.value && (!end.value || end.value <= start.value)) end.value = start.value; if (end) setTimeout(() => { try { end.showPicker ? end.showPicker() : end.focus(); } catch (_) { end.focus(); } }, 30); }
+      else if (start.value && start.matches('[data-autosubmit]')) start.form.submit();
+    });
+    sync();
+  });
+
   /* ---------- notifications ---------- */
   document.addEventListener('click', async e => {
     const b = e.target.closest('[data-mark-all]'); if (!b) return;

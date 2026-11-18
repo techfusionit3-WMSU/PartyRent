@@ -49,7 +49,6 @@
     @include('partials.brand', ['tag' => $tag])
     @if($sup)
       <div style="display:flex;gap:10px;align-items:center;padding:0 8px 12px"><div class="logo-tile" style="width:40px;height:40px;font-size:1.3rem;background:rgba(255,255,255,.1)">{{ $sup->logo }}</div><div class="small" style="color:#fff;font-weight:700;line-height:1.25">{{ $sup->name }}<div style="color:#8E83A8;font-weight:500">{{ $sup->city }}{{ $sup->type === 'organization' ? ' · Organization' : '' }}</div></div></div>
-      @unless($emp)<form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="customer"><button class="mode-switch">{{ icon('swap') }}Switch to Customer Mode</button></form>@endunless
     @endif
     @foreach($items as $it)
       @if(count($it) === 1)

@@ -2,16 +2,16 @@
 
 @section('body')
 @php($nav = $nav ?? '')
-@php($cats = \App\Models\Category::where('active', true)->orderBy('sort')->get())
 <header class="mk-header">
   <div class="container bar">
     @include('partials.brand')
-    <form class="mk-search" role="search" action="{{ route('home') }}" method="GET">
+    <form class="mk-search" id="mkSearch" role="search" action="{{ route('home') }}" method="GET">
       <span>{{ icon('search') }}</span>
       <input name="q" placeholder="Search chairs, tents, suppliers…" aria-label="Search" value="{{ request('q') }}">
-      <button type="submit" formaction="{{ route('ai') }}" class="ai-toggle" title="Describe your event and let AI build the search">{{ icon('sparkle') }}<span>AI Search</span></button>
+      <button type="submit" class="search-go">{{ icon('search') }}<span>Search</span></button>
     </form>
-    <nav class="mk-nav">
+    <button type="submit" form="mkSearch" formaction="{{ route('ai') }}" class="ai-square" title="AI Search: describe your event and let AI build the search" aria-label="AI Search">{{ icon('sparkle') }}<span>AI</span></button>
+    <nav class="mk-nav" aria-label="Main">
       @foreach([['home', 'home', 'Browse'], ['packages', 'packages.index', 'Packages'], ['suppliers', 'suppliers.index', 'Suppliers'], ['rentals', 'rentals.index', 'My Rentals']] as [$k, $r, $l])
         <a href="{{ route($r) }}" class="{{ $nav === $k ? 'active' : '' }}">{{ $l }}</a>
       @endforeach
@@ -27,11 +27,6 @@
       @endauth
     </div>
   </div>
-  @if(in_array($nav, ['home', 'browse'], true))
-    <div class="cat-strip"><div class="container scroll-x">
-      @foreach($cats as $c)<a href="{{ route('home', array_filter(['category' => $c->id] + request()->only(['start', 'end', 'qty', 'view']))) }}" class="{{ request('category') === $c->id ? 'active' : '' }}">{{ $c->name }}</a>@endforeach
-    </div></div>
-  @endif
   @yield('subheader')
 </header>
 

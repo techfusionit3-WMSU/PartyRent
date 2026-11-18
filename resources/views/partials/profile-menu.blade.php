@@ -12,6 +12,11 @@
     <div class="menu-head"><div class="strong">{{ $u->name }}</div><div class="small muted">{{ $u->email }}</div>
       @if(in_array($shellRole, ['supplier', 'cashier'], true) && $shop)<div class="small" style="margin-top:4px">{{ $shop->logo }} {{ $shop->name }}</div>@endif
     </div>
+    @if($shellRole === 'customer' && $sup && $sup->status === 'approved')
+      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="menu-switch-top" title="Switch to Supplier Mode">{{ icon('store') }}<span class="ellipsis">Switch to your shop<span class="sub ellipsis">{{ $sup->name }}</span></span></button></form>
+    @elseif($shellRole === 'supplier' && ! $emp)
+      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="customer"><button class="menu-switch-top">{{ icon('swap') }}<span>Switch to Customer Mode<span class="sub">Browse and rent as a customer</span></span></button></form>
+    @endif
     <div class="sep"></div>
     @if($shellRole === 'customer')
       <a href="{{ route('rentals.index') }}">{{ icon('list') }}My Rentals</a>
@@ -19,7 +24,6 @@
       <a href="{{ route('profile') }}">{{ icon('user') }}Profile & Settings</a>
       <div class="sep"></div>
       @if($sup && $sup->status === 'approved')
-        <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="menu-item menu-switch" title="Switch to Supplier Mode">{{ icon('store') }}<span class="ellipsis">{{ $sup->name }}</span></button></form>
       @elseif($sup && isset($appStatus[$sup->status]))
         <a href="{{ route('start-selling') }}">{{ icon('clock') }}Supplier application: <span class="badge {{ $appStatus[$sup->status][1] }}">{{ $appStatus[$sup->status][0] }}</span></a>
       @else
@@ -34,8 +38,6 @@
       <a href="{{ route('supplier.team') }}">{{ icon('users') }}Team & Roles</a>
       <a href="{{ route('suppliers.show', $shop) }}">{{ icon('eye') }}View Public Shop</a>
       <a href="{{ route('account') }}">{{ icon('user') }}Account</a>
-      <div class="sep"></div>
-      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="customer"><button class="menu-item menu-switch">{{ icon('swap') }}Switch to Customer Mode</button></form>
     @else
       <a href="{{ route('account') }}">{{ icon('user') }}Account Settings</a>
     @endif

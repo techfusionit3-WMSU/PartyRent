@@ -8,7 +8,7 @@
     $err = fn ($k) => $errors->has($k) ? '<div class="error-text" style="display:block">'.e($errors->first($k)).'</div>' : '';
     $type = old('app.type', $app['type'] ?? '');
     $ctype = $ao('company.companyType', 'corporation');
-    $methods = old('methods', $d['methods'] ?? ['cod', 'bank']);
+    $methods = old('methods', $d['methods'] ?? ['cash', 'bank']);
     $pol = $d['policy'] ?? [];
     $applicable = old('app.applicable', $app['applicable'] ?? []);
     $docs = (array) ($app['docs'] ?? []);
@@ -136,7 +136,7 @@
       <label class="card card-flat row" style="padding:12px 14px;cursor:pointer"><input type="radio" name="fulfillment" value="{{ $v }}" @checked($o('fulfillment', 'both') === $v) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $desc }}</div></div></label>
     @endforeach</div>{!! $err('fulfillment') !!}
     <div class="field"><label>Accepted payment methods</label>
-      @foreach(['cod' => 'Cash on Delivery', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $k => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $k }}" @checked(in_array($k, $methods, true))> {{ $l }}</label>@endforeach
+      @foreach(['cash' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $k => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $k }}" @checked(in_array($k, $methods, true))> {{ $l }}</label>@endforeach
       {!! $err('methods') !!}</div>
     <div class="alert alert-info">{{ icon('info') }}<div class="small">No delivery fee, down payment or deposit percentages are asked here. They differ per item, event and situation, so you set them in Shop Settings after approval and when you post each package.</div></div>
   </section>

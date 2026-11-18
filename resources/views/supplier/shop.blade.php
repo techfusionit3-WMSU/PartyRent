@@ -74,7 +74,7 @@
       <div class="alert alert-info">{{ icon('info') }}<div class="small">Example with your settings: a 6:00 AM – 11:00 AM booking blocks the units from {{ \App\Domain\Slots::fmt12(max(0, 360 - (int) round($ts['prepHours'] * 60))) }} to {{ \App\Domain\Slots::fmt12(660 + (int) round($ts['recoveryHours'] * 60)) }}. Minimum / maximum hours per booking are set on each product or package.</div></div>
       @break
     @case('plans')
-      <div class="field"><label>Accepted payment methods</label>@foreach(['cod' => 'Cash on Delivery', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $v => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $v }}" @checked(in_array($v, old('methods', $s->methods ?? []), true))> {{ $l }}</label> @endforeach</div>
+      <div class="field"><label>Accepted payment methods</label>@foreach(['cash' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $v => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $v }}" @checked(in_array($v, old('methods', $s->methods ?? []), true))> {{ $l }}</label> @endforeach</div>
       <p class="small muted">Payment deadlines count from the day you accept a request and never go past the event date. There is no separate reservation fee: once the down payment is paid, the booking is reserved and marked Partially Paid. The down payment is always credited to the order total.</p>
       @foreach(['standard' => [['downPct', 'Down payment (%)', 'min="0.5" max="100" step="0.5"'], ['downDays', 'Down payment due within (days)', 'min="0"']],
                 'full' => [['days', 'Full payment due within (days)', 'min="0"']],

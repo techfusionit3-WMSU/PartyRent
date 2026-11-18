@@ -137,7 +137,7 @@
         <div class="form-grid"><div class="field"><label>Reference number</label><input class="input" name="reference" value="{{ old('reference') }}" placeholder="e.g. 1012 345 678901" maxlength="80"><div class="hint">Each reference number can be used only once.</div></div><div class="field"><label>Payment date</label><input class="input" type="date" name="date" value="{{ today_iso() }}" max="{{ today_iso() }}"></div></div>
         <div class="field"><label>Payment proof</label><label class="upload-box" for="proof">{{ icon('upload') }}<div class="small">Upload a screenshot or photo of the receipt (JPG/PNG, up to 8 MB)</div></label><input type="file" id="proof" name="proof" accept="image/*" hidden><div class="small muted" id="proofName"></div></div>
       </div>
-      <div id="codBox" class="alert alert-warn hidden">{{ icon('cash') }}<div class="small"><b>Cash on Delivery:</b> hand the cash to the supplier's crew when the items arrive. They collect it for PartyRent and our cashier verifies it. You can also log it here with the amount you handed over.</div></div>
+      <div id="codBox" class="alert alert-info hidden">{{ icon('cash') }}<div class="small"><b>Paying in cash?</b> Hand the cash to {{ $sup->name }} — on delivery, at pickup or at their shop — and ask for the amount to be recorded under <b>{{ $r->code }}</b>. The shop records it on their side and your receipt appears on this page. <b>You don't need to submit anything here.</b> @if(! empty($chat))<a href="#chat" data-close>Message the shop</a> if you want to arrange it.@endif</div></div>
       <div class="field"><label>Notes (optional)</label><input class="input" name="notes" maxlength="255"></div>
       <p class="small muted mb-0">You pay PartyRent, not the supplier directly. We hold your payment and only release it to the supplier after your rental is completed. Transfers and cash show as <b>Pending Verification</b> until our cashier confirms them, and don't reduce your balance until then.</p>
     </div>
@@ -155,6 +155,8 @@
     document.getElementById('codBox').classList.toggle('hidden', bank || online);
     if (ob) ob.classList.toggle('hidden', !online);
     btn.textContent = online ? 'Continue to payment' : 'Submit payment';
+    btn.classList.toggle('hidden', !bank && !online); // cash: the shop records it, nothing to send
+    document.querySelectorAll('#pmf [name=notes]').forEach(function (n) { n.closest('.field').classList.toggle('hidden', !bank && !online); });
     btn.dataset.busy = online ? 'Opening checkout…' : 'Submitting…';
   };
   // hide accounts that can't take the amount this month (monthly limit)

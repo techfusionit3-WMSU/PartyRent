@@ -32,7 +32,7 @@
 </section>
 <section data-step="3">
   <h2>Payments</h2>
-  <div class="field"><label>Accepted payment methods</label>@foreach(['cod' => 'Cash on Delivery', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $v => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $v }}" @checked(in_array($v, $methods, true))> {{ $l }}</label>@endforeach{!! $err('methods') !!}</div>
+  <div class="field"><label>Accepted payment methods</label>@foreach(['cash' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $v => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $v }}" @checked(in_array($v, $methods, true))> {{ $l }}</label>@endforeach{!! $err('methods') !!}</div>
   <div class="field" id="payArr"><label>Payment arrangements you offer</label>
     <div class="arr-list">@foreach(\App\Models\Payment::ARR_LABEL as $v => $l)
       <div class="arr-opt">

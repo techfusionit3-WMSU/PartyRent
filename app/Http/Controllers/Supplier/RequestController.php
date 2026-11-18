@@ -172,8 +172,8 @@ class RequestController extends Controller
     public function recordCash(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);
-        $data = $request->validate(['type' => 'required|string', 'amount' => 'required|numeric|min:1', 'date' => 'required|date|before_or_equal:today', 'reference' => 'required|string|max:80', 'notes' => 'nullable|string|max:255']);
-        $res = Rentals::cashierRecord($r, array_merge($data, ['method' => $request->input('method', 'cash')]), $request->user());
+        $data = $request->validate(['type' => 'required|string', 'method' => 'nullable|in:cash,bank,debit', 'amount' => 'required|numeric|min:1', 'date' => 'required|date|before_or_equal:today', 'reference' => 'nullable|string|max:80', 'notes' => 'nullable|string|max:255']);
+        $res = Rentals::cashierRecord($r, array_merge($data, ['method' => $data['method'] ?? 'cash']), $request->user());
 
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payment recorded and verified. Receipt '.$res['payment']->receipt_no.' issued.' : $res['error']);
     }

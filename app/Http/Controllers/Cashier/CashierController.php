@@ -108,7 +108,7 @@ class CashierController extends Controller
             'method' => 'required|in:cash,bank,debit',
             'amount' => 'required|numeric|min:1',
             'date' => 'required|date|before_or_equal:today',
-            'reference' => 'required|string|max:80',
+            'reference' => 'nullable|string|max:80',
             'notes' => 'nullable|string|max:255',
             'pay_account' => 'nullable|integer',
         ]);

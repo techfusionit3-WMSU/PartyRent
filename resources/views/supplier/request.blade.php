@@ -217,7 +217,7 @@
 @if($canRecord)
 <div class="modal-backdrop hidden" id="cashModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Record payment · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
   <form method="POST" action="{{ route('supplier.requests.cash', $r) }}">@csrf<div class="modal-body">
-    <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">Record a payment your shop received outside PartyRent's online checkout (for example cash on delivery). It is verified at once and a receipt is issued.</div></div>
+    <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">Use this when {{ $c->name }} paid your shop directly — for example <b>cash handed over on delivery, at pickup or at your shop</b>. It is verified at once, a receipt is issued and the customer is notified. The customer doesn't need to do anything on the website.</div></div>
     <div class="form-grid">
       <div class="field"><label>Payment type</label><select class="input" name="type">
         @if($f['balance'] - $f['pendingRental'] > 0)<option value="{{ $sug['type'] }}">{{ $sug['label'] }}</option><option value="balance">Remaining balance</option>@endif
@@ -226,7 +226,8 @@
       </select></div>
       <div class="field"><label>Amount (₱)</label><input class="input" type="number" step="0.01" min="1" name="amount" required value="{{ $sug['amount'] ?: '' }}"></div>
       <div class="field"><label>Date received</label><input class="input" type="date" name="date" value="{{ today_iso() }}" max="{{ today_iso() }}" required></div>
-      <div class="field"><label>Acknowledgment / reference no.</label><input class="input" name="reference" required placeholder="e.g. AR-0021" maxlength="80"></div>
+      <div class="field"><label>Paid by</label><select class="input" name="method"><option value="cash">Cash (in person)</option><option value="bank">Bank transfer / e-wallet</option><option value="debit">Debit card</option></select></div>
+      <div class="field"><label>Reference / receipt no. <span class="muted">(optional for cash)</span></label><input class="input" name="reference" placeholder="e.g. AR-0021" maxlength="80"><div class="hint">Leave blank for cash — the receipt number we issue is the proof.</div></div>
     </div>
     <div class="field"><label>Notes</label><input class="input" name="notes" maxlength="255"></div>
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Record & issue receipt</button></div></form>

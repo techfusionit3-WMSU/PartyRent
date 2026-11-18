@@ -181,7 +181,7 @@ class PackagesTest extends TestCase
 
         $this->checkout($k->supplier_id, [
             'eventName' => 'Fiesta', 'eventType' => 'Birthday', 'eventDate' => $d1, 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod',
+            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cash',
         ])->assertOk()->assertJsonPath('ok', true);
         $r = RentalRequest::latest('id')->firstOrFail();
         $total = $r->pricing['total'];

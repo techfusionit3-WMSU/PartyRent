@@ -1365,12 +1365,15 @@ class Rentals
         if ($data['type'] !== 'refund' && ($err = self::validatePayment($r, $data))) {
             return self::fail($err);
         }
-        if (trim((string) ($data['reference'] ?? '')) === '') {
-            return self::fail('Enter the official reference / OR number.');
+        $code = self::nextPaymentCode();
+        // Cash handed over in person often has no slip: the receipt number we issue is the proof.
+        $ref = trim((string) ($data['reference'] ?? '')) ?: (($data['method'] ?? 'cash') === 'cash' ? 'IN-PERSON '.$code : '');
+        if ($ref === '') {
+            return self::fail('Enter the reference number of the transfer.');
         }
         $p = new Payment([
-            'code' => self::nextPaymentCode(), 'rental_request_id' => $r->id, 'type' => $data['type'], 'method' => $data['method'],
-            'amount' => r2($data['amount']), 'date' => $data['date'] ?? today_iso(), 'submitted_at' => now(), 'reference' => trim($data['reference']),
+            'code' => $code, 'rental_request_id' => $r->id, 'type' => $data['type'], 'method' => $data['method'],
+            'amount' => r2($data['amount']), 'date' => $data['date'] ?? today_iso(), 'submitted_at' => now(), 'reference' => $ref,
             'pay_account_id' => $data['type'] !== 'refund' && in_array($data['method'], ['bank', 'debit'], true) ? ($data['pay_account_id'] ?? null) : null,
             'notes' => $data['notes'] ?? null, 'status' => 'verified', 'verified_by' => $by->id, 'verified_at' => now(), 'recorded_by' => 'cashier',
         ]);

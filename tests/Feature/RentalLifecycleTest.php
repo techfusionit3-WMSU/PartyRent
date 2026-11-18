@@ -53,7 +53,7 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame($free2, inv()->availableOn($table->id, $d2)); // pending requests never consume stock
 
         // 2. v4: no payments before the supplier accepts
-        $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 100, 'method' => 'cod'])->assertSessionHas('error');
+        $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 100, 'method' => 'cash'])->assertSessionHas('error');
 
         // 3. the supplier accepts → stock is reserved per day
         $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept", ['note' => 'See you!'])->assertSessionHas('success');
@@ -78,7 +78,11 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame('Pending', $r->fresh()->fin()['status']); // v4: unverified payments don't count yet
         $this->assertEquals($total, $r->fresh()->fin()['pendingRental']);
         // overpaying is refused
-        $this->post("/rentals/{$r->code}/payments", ['type' => 'balance', 'amount' => 50, 'method' => 'cod'])->assertSessionHas('error');
+        $this->post("/rentals/{$r->code}/payments", ['type' => 'balance', 'amount' => 50, 'method' => 'bank', 'reference' => 'OVER-1', 'proof' => \Illuminate\Http\UploadedFile::fake()->createWithContent('p.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='))])->assertSessionHas('error');
+        // cash is paid to the shop in person and recorded by the shop: the customer has nothing to submit
+        $before = Payment::count();
+        $this->post("/rentals/{$r->code}/payments", ['type' => 'balance', 'amount' => 50, 'method' => 'cash'])->assertSessionHas('warn');
+        $this->assertSame($before, Payment::count());
 
         // 5. the shop's cashier verifies → receipt issued, fully paid
         $cashier = $this->shopCashier($r->code);
@@ -182,7 +186,7 @@ class RentalLifecycleTest extends TestCase
             'phone' => '0923 555 0707', 'email' => 'jose@demo.ph', 'hours' => 'Daily 8–6',
             'shop_addr' => ['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '137402000', 'barangay' => 'Marikina Heights', 'street' => '7 Sampaguita St.'],
             'location_type' => 'home', 'lat' => 14.6520, 'lng' => 121.1100,
-            'fulfillment' => 'both', 'delivery_fee' => 300, 'methods' => ['cod'], 'offerPlans' => ['full'],
+            'fulfillment' => 'both', 'delivery_fee' => 300, 'methods' => ['cash'], 'offerPlans' => ['full'],
             'depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 2,
             'cancellation' => 'Free up to 2 days before.', 'returns' => 'Return clean.', 'conditions' => 'Renter pays for damage.',
         ];

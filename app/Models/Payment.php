@@ -14,7 +14,7 @@ class Payment extends Model
     ];
 
     public const METHOD_LABEL = [
-        'cod' => 'Cash on Delivery', 'cash' => 'Cash (Over the Counter)', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit Card',
+        'cash' => 'Cash', 'cod' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit Card',
         'online' => 'Online (GCash, Maya, card)',
     ];
 

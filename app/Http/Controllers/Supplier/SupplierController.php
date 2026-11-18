@@ -208,7 +208,7 @@ class SupplierController extends Controller
                 Notifier::audit('Updated rental hours', $s->name.' · '.\App\Domain\Slots::fmt12($v['open']).'–'.\App\Domain\Slots::fmt12($v['close']).', prep '.$v['prepHours'].'h, recovery '.$v['recoveryHours'].'h');
                 break;
             case 'plans':
-                $v = $request->validate(['methods' => 'nullable|array', 'methods.*' => 'in:cod,bank,debit', 'plans' => 'required|array', 'depositType' => 'required|in:fixed,percent', 'depositValue' => 'required|numeric|min:0']);
+                $v = $request->validate(['methods' => 'nullable|array', 'methods.*' => 'in:cash,bank,debit', 'plans' => 'required|array', 'depositType' => 'required|in:fixed,percent', 'depositValue' => 'required|numeric|min:0']);
                 $pp = [];
                 foreach (Finance::PLANS as $k) {
                     $in = (array) ($v['plans'][$k] ?? []);

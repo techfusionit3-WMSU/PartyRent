@@ -101,7 +101,7 @@ class SaleItemsTest extends TestCase
         $this->post('/cart', ['type' => 'item', 'ref_id' => $p->id, 'days' => json_encode([$d => 7])])->assertSessionHas('success');
         $this->checkout($shop->id, [
             'eventName' => 'Cupcake Party', 'eventType' => 'Birthday', 'eventDate' => $d, 'fulfillment' => 'pickup',
-            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod',
+            'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cash',
         ])->assertOk()->assertJsonPath('ok', true);
         $r = RentalRequest::latest('id')->firstOrFail();
         $this->assertEquals(6300.0, $r->pricing['salesSubtotal']); // 7 × 900, sold once (not per day)

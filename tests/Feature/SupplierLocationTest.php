@@ -41,7 +41,7 @@ class SupplierLocationTest extends TestCase
             'location_type' => 'shop', 'shop_addr' => self::MARIKINA + ['barangay' => 'Marikina Heights', 'street' => '7 Sampaguita St.'],
             'lat' => 14.6520, 'lng' => 121.1100, 'fulfillment' => 'both',
             'delivery' => ['mode' => 'zones', 'zones' => [['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '', 'fee' => 300]]],
-            'methods' => ['cod'], 'arrangements' => ['full'], 'reservationFee' => 0, 'reservationCredited' => '1',
+            'methods' => ['cash'], 'arrangements' => ['full'], 'reservationFee' => 0, 'reservationCredited' => '1',
             'downType' => 'percent', 'downValue' => 0, 'installments' => 2, 'depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 2,
             'cancellation' => 'Free up to 2 days before.', 'returns' => 'Return clean.', 'conditions' => 'Renter pays for damage.',
         ], $over);

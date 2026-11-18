@@ -123,7 +123,7 @@ class RentalController extends Controller
         $data = $request->validate([
             'type' => 'required|in:reservation,down,installment,balance,full,deposit,compensation',
             'amount' => 'required|numeric|min:1',
-            'method' => 'required|in:cod,bank,debit,online',
+            'method' => 'required|in:cash,bank,debit,online',
             'reference' => 'nullable|string|max:80',
             'date' => 'nullable|date|before_or_equal:today',
             'notes' => 'nullable|string|max:255',
@@ -136,6 +136,10 @@ class RentalController extends Controller
             $res = OnlinePay::start($r, array_intersect_key($data, array_flip(['type', 'amount', 'notes'])));
 
             return $res['ok'] ? redirect()->away($res['url']) : back()->withInput()->with('error', $res['error']);
+        }
+        if ($data['method'] === 'cash' && $r->isActive()) {
+            // Cash goes straight to the shop (on delivery, at pickup or at the shop); the shop records it and the receipt appears here.
+            return back()->with('warn', 'Cash is paid to '.$r->supplier->name.' in person. They record it on their side and your receipt shows up here — nothing to submit.');
         }
         if (! in_array($data['method'], $r->supplier->methods, true)) {
             return back()->with('error', 'This supplier does not accept that payment method.');

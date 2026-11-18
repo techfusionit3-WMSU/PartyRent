@@ -30,7 +30,7 @@ class Finance
         'compensation' => 'Damage Compensation',
     ];
 
-    public const METHOD_LABEL = ['cod' => 'Cash on Delivery', 'cash' => 'Cash (Over the Counter)', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit Card', 'online' => 'Online payment (Xendit)'];
+    public const METHOD_LABEL = ['cash' => 'Cash', 'cod' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit Card', 'online' => 'Online payment (Xendit)'];
 
     public const PLANS = ['standard', 'full', 'installment'];
 

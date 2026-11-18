@@ -222,10 +222,10 @@ class BusinessRulesTest extends TestCase
         // services: Prep (required, per order) + Setup per visit: d1 at Home on 2 consecutive days = 1, Hall = 1
         $this->assertSame(250.0 + 300 * 2, $q['serviceFee']);
         $this->assertSame(675.0 + 800 + 850, $q['total']);
-        // Standard plan: fees credited, Final = Total − RF − DP
-        $this->assertSame(r2($q['total'] * 0.10), $q['reservationFee']);
+        // Standard plan: no reservation fee; down payment credited, Final = Total − DP
+        $this->assertSame(0.0, $q['reservationFee']);
         $this->assertSame(r2($q['total'] * 0.30), $q['downPayment']);
-        $this->assertSame(r2($q['total'] - $q['reservationFee'] - $q['downPayment']), $q['finalBalance']);
+        $this->assertSame(r2($q['total'] - $q['downPayment']), $q['finalBalance']);
         $this->assertSame(1000.0, $q['deposit']);
     }
 
@@ -254,20 +254,21 @@ class BusinessRulesTest extends TestCase
         $total = $r->pricing['total'];
         $this->assertEquals(1250.0, $total); // 10 × ₱100 + required ₱250 service
         $sched = Finance::schedule($r);
-        $this->assertSame(['res', 'down', 'bal'], array_column($sched, 'key'));
-        $this->assertSame([125.0, 375.0, 750.0], array_column($sched, 'amount'));
-        $this->assertSame(add_days(today_iso(), 3), $sched[0]['due']);
-        $this->assertSame($ev, $sched[2]['due']);
+        $this->assertSame(['down', 'bal'], array_column($sched, 'key'));
+        $this->assertSame([375.0, 875.0], array_column($sched, 'amount'));
+        $this->assertSame(add_days(today_iso(), 10), $sched[0]['due']);
+        $this->assertSame($ev, $sched[1]['due']);
 
         $pay = fn ($amt, $type, $status) => Payment::create(['code' => 'TXN-'.(++$this->seq), 'rental_request_id' => $r->id, 'type' => $type, 'method' => 'bank', 'amount' => $amt, 'date' => today_iso(), 'status' => $status, 'submitted_at' => now()->addSeconds($this->seq)]);
-        $pay(125, 'reservation', 'pending');
+        $pay(375, 'down', 'pending');
         $this->assertSame('Pending', $r->fresh()->fin()['status']);
-        $pay(125, 'reservation', 'verified');
+        $pay(375, 'down', 'verified');
+        // the verified down payment reserves the booking and marks it Partially Paid at once
         $f = Finance::summary($r->fresh());
         $this->assertSame('Partially Paid', $f['status']);
         $this->assertTrue($f['reservationConfirmed']);
-        $this->assertSame(1125.0, $f['balance']);
-        $pay(1125, 'balance', 'verified');
+        $this->assertSame(875.0, $f['balance']);
+        $pay(875, 'balance', 'verified');
         $this->assertSame('Fully Paid', Finance::summary($r->fresh())['status']);
     }
 
@@ -287,9 +288,11 @@ class BusinessRulesTest extends TestCase
         $cfg = Finance::planConfig($this->s);
         $this->assertNull(Finance::validatePlanConfig($cfg));
         $bad = $cfg;
-        $bad['standard']['resPct'] = 60;
-        $bad['standard']['downPct'] = 50;
-        $this->assertStringContainsString('cannot exceed 100%', Finance::validatePlanConfig($bad));
+        $bad['standard']['downPct'] = 0;
+        $this->assertStringContainsString('more than 0%', Finance::validatePlanConfig($bad));
+        $bad['standard']['downPct'] = 110;
+        $this->assertStringContainsString('at most 100%', Finance::validatePlanConfig($bad));
+        $this->assertArrayNotHasKey('resPct', Finance::planConfig($this->s)['standard']);
         $none = array_map(fn ($c) => ['enabled' => false] + $c, $cfg);
         $this->assertSame('Enable at least one payment plan.', Finance::validatePlanConfig($none));
 

@@ -104,7 +104,7 @@ class SupplierLocationTest extends TestCase
         $this->get('/checkout')->assertOk()->assertDontSee('88 Katipunan');
         $this->checkout($happy->id, ['eventName' => 'Quiet Pickup', 'eventType' => 'Birthday', 'eventDate' => $d, 'fulfillment' => 'pickup',
             'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'bank'])->assertOk()->assertJsonPath('ok', true);
-        $code = RentalRequest::where('event_name', 'Quiet Pickup')->value('code');
+        $code = RentalRequest::latest('id')->value('code');
         $this->get("/rentals/{$code}")->assertOk()->assertDontSee('88 Katipunan');
     }
 

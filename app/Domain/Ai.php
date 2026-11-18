@@ -478,12 +478,12 @@ class Ai
         }
         if (preg_match('/(pay|payment|bayad|down ?payment|dp|reservation fee|installment|hulugan|gcash|bank|cod|cash)/', $t)) {
             if ($sup) {
-                $resFee = $sup->pol('reservationFee', 0);
+                $plans = implode('<br>', array_map(fn ($k) => '<b>'.e(\App\Domain\Finance::PLAN_LABEL[$k]).'</b>: '.e(\App\Domain\Finance::planSummary($sup, $k)), \App\Domain\Finance::plansOf($sup)));
 
-                return $reply('<b>'.e($sup->name).'</b> accepts '.e(implode(', ', array_map(fn ($m) => Payment::METHOD_LABEL[$m] ?? $m, $sup->methods))).'.<br>Arrangements: '.e(implode(', ', array_map(fn ($a) => Payment::ARR_LABEL[$a] ?? $a, $sup->arrangements))).'.<br>Reservation fee: '.($resFee ? money($resFee).($sup->pol('reservationCredited') ? ' (credited toward the down payment)' : ' (charged on top of the rental)') : 'none').'.<br>Down payment: '.($sup->pol('downValue') ? e($sup->downLabel()) : 'not required').'.');
+                return $reply('<b>'.e($sup->name).'</b> accepts '.e(implode(', ', array_map(fn ($m) => Payment::METHOD_LABEL[$m] ?? $m, $sup->methods))).'.<br>'.$plans);
             }
 
-            return $reply('Each supplier sets its own payment rules. Common options: <b>Full Payment</b>, <b>Down Payment</b> (e.g. 30%), <b>Installments</b>, or a <b>Reservation Fee</b> then balance. If a reservation fee is "credited", it counts toward your down payment — it is never charged twice. Bank transfers need a reference number and proof; they count once our cashier verifies them. Ask me about a specific shop, e.g. "Happy Moments payment policy".', ['Happy Moments payment policy', 'Elegant Occasion payment policy']);
+            return $reply('Each supplier sets its own payment plans: <b>Full Payment</b>, <b>Down Payment</b> + final balance (e.g. 30% down), or <b>Installments</b>. There is no separate reservation fee — once your down payment (or full payment) is verified, your booking is reserved and marked Partially Paid. The down payment is credited to your total, never charged twice. Ask me about a specific shop, e.g. "Happy Moments payment policy".', ['Happy Moments payment policy', 'Elegant Occasion payment policy']);
         }
         if (preg_match('/(deliver|delivery|pickup|pick up|hatid|kunin)/', $t)) {
             $show = $sup ? collect([$sup]) : Supplier::approved()->get();

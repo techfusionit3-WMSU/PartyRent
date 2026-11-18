@@ -4,7 +4,7 @@
 @php($ip = $r->installment_plan)
 @php($plan = $p['plan'] ?? 'full')
 <div class="row between mb-1"><h3 class="mb-0">Payment summary</h3>@include('partials.badges', ['pay' => $f['status']])</div>
-<div class="row wrap gap-sm mb-1">@include('partials.badges', ['planBadge' => $plan])@if($f['reservationConfirmed'])<span class="badge b-green plain">{{ $plan === 'full' ? 'Order confirmed' : 'Reservation confirmed' }}</span>@endif @if($f['pendingRental'])<span class="badge b-gold plain">Awaiting verification: {{ money($f['pendingRental']) }}</span>@endif</div>
+<div class="row wrap gap-sm mb-1">@include('partials.badges', ['planBadge' => $plan])@if($f['reservationConfirmed'])<span class="badge b-green plain">{{ $plan === 'full' ? 'Order confirmed' : 'Reserved' }}</span>@endif @if($f['pendingRental'])<span class="badge b-gold plain">Awaiting verification: {{ money($f['pendingRental']) }}</span>@endif</div>
 @include('partials.rental-charges', ['q' => $p])
 @if($plan === 'full')
   <div class="sum-line"><span class="muted">Full Payment (100%)</span><span>{{ money($p['total']) }}</span></div>

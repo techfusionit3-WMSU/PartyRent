@@ -183,7 +183,7 @@ class PackagesTest extends TestCase
             'eventName' => 'Fiesta', 'eventType' => 'Birthday', 'eventDate' => $d1, 'fulfillment' => 'pickup',
             'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod',
         ])->assertOk()->assertJsonPath('ok', true);
-        $r = RentalRequest::where('event_name', 'Fiesta')->firstOrFail();
+        $r = RentalRequest::latest('id')->firstOrFail();
         $total = $r->pricing['total'];
         $this->assertEquals(4900.0, $total);
         $this->assertSame('Fiesta Bundle', $r->lines[0]['snap']['name']);

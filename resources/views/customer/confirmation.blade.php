@@ -14,7 +14,7 @@
   </div>
   <div class="card card-flat soft mt-2" style="text-align:left"><b>What happens next</b><ol class="small mb-0" style="padding-left:18px">
     <li>Each supplier reviews availability and its inventory allocation (status stays <b>Pending</b>).</li>
-    <li>Once accepted, that order's payment schedule appears in <b>My Rentals</b> — reservation fee first (or the full payment).</li>
+    <li>Once accepted, that order's payment schedule appears in <b>My Rentals</b> — down payment first (or the full payment), which reserves your booking.</li>
     @if($list->contains(fn ($r) => $r->plan === 'installment'))<li>Installment schedules are approved by the supplier before they take effect.</li>@endif
     <li>You pay online through PartyRent; each payment is confirmed automatically. Everything is due on or before the event date.</li>
   </ol></div>

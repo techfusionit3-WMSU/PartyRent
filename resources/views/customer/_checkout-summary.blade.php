@@ -1,4 +1,4 @@
-{{-- Checkout Order summary. Change list: Rental Charges collapsible (closed) per shop; reservation fee, down payment and total outside it. --}}
+{{-- Checkout Order summary. Change list: Rental Charges collapsible (closed) per shop; down payment and total outside it. --}}
 @foreach($orders as $o)
   @php($q = $o['summary']['q'])
   <div class="mb-2">
@@ -12,4 +12,4 @@
   </div>
 @endforeach
 @if(count($orders) > 1)<div class="sum-line total"><span>Combined total</span><span class="price">{{ money($total) }}</span></div>@endif
-<p class="small muted mb-0">Each shop's reservation fee, down payment and balance are calculated from its own order total.</p>
+<p class="small muted mb-0">Each shop's down payment and balance are calculated from its own order total.</p>

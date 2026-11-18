@@ -13,10 +13,9 @@
         if ($k === 'full') {
             return 'On ₱10,000: one payment of ₱10,000.00.';
         }
-        $res = 10000 * $c['resPct'] / 100;
         $dn = 10000 * $c['downPct'] / 100;
 
-        return 'On ₱10,000: reservation fee '.money($res).' + down payment '.money($dn).' + '.($k === 'installment' ? 'installments' : 'final balance').' '.money(10000 - $res - $dn).' = ₱10,000.00 (never added on top).';
+        return 'On ₱10,000: down payment '.money($dn).' (reserves the booking) + '.($k === 'installment' ? 'installments' : 'final balance').' '.money(10000 - $dn).' = ₱10,000.00 (never added on top).';
     };
     $pf = fn ($k, $n, $label, $v, $attrs = 'min="0"') => '<div class="field"><label>'.e($label).'</label><input class="input" type="number" name="plans['.$k.']['.$n.']" value="'.e($v).'" '.$attrs.'></div>';
     $dmg = \App\Domain\Damage::policy($s);
@@ -76,10 +75,10 @@
       @break
     @case('plans')
       <div class="field"><label>Accepted payment methods</label>@foreach(['cod' => 'Cash on Delivery', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $v => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $v }}" @checked(in_array($v, old('methods', $s->methods ?? []), true))> {{ $l }}</label> @endforeach</div>
-      <p class="small muted">Payment deadlines count from the day you accept a request and never go past the event date. Reservation fees are non-refundable and, like down payments, always credited to the order total.</p>
-      @foreach(['standard' => [['resPct', 'Reservation fee (%)', 'min="0" max="100" step="0.5"'], ['resDays', 'Reservation fee due within (days)', 'min="0"'], ['downPct', 'Down payment (%)', 'min="0" max="100" step="0.5"'], ['downDays', 'Down payment due within (days)', 'min="0"']],
+      <p class="small muted">Payment deadlines count from the day you accept a request and never go past the event date. There is no separate reservation fee: once the down payment is paid, the booking is reserved and marked Partially Paid. The down payment is always credited to the order total.</p>
+      @foreach(['standard' => [['downPct', 'Down payment (%)', 'min="0.5" max="100" step="0.5"'], ['downDays', 'Down payment due within (days)', 'min="0"']],
                 'full' => [['days', 'Full payment due within (days)', 'min="0"']],
-                'installment' => [['resPct', 'Reservation fee (%)', 'min="0" max="100" step="0.5"'], ['resDays', 'Reservation fee due within (days)', 'min="0"'], ['downPct', 'Down payment (%)', 'min="0" max="100" step="0.5"'], ['downDays', 'Down payment due within (days)', 'min="0"'], ['minMonths', 'Minimum months before the event', 'min="1" max="24"'], ['maxInstallments', 'Maximum number of installments', 'min="1" max="24"']]] as $k => $fields)
+                'installment' => [['downPct', 'Down payment (%)', 'min="0.5" max="99.5" step="0.5"'], ['downDays', 'Down payment due within (days)', 'min="0"'], ['minMonths', 'Minimum months before the event', 'min="1" max="24"'], ['maxInstallments', 'Maximum number of installments', 'min="1" max="24"']]] as $k => $fields)
         <div class="card card-flat mb-2" style="padding:14px"><label class="check"><input type="checkbox" name="plans[{{ $k }}][enabled]" value="1" @checked($cfg[$k]['enabled'])> <b>{{ \App\Domain\Finance::PLAN_LABEL[$k] }}</b></label>
           <div class="form-grid mt-1">@foreach($fields as [$n, $label, $attrs]){!! $pf($k, $n, $label, $cfg[$k][$n], $attrs) !!}@endforeach</div><div class="small muted">{{ $ex($k) }}</div></div>
       @endforeach

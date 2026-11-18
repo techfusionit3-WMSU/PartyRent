@@ -55,7 +55,7 @@ class CashierController extends Controller
             'totalVerified' => $rental->sum('amount'),
             'partial' => $partial, 'partialLeft' => $partial->sum(fn ($r) => $r->fin()['balance']),
             'overdue' => $active->filter(fn ($r) => $r->fin()['isOverdue'])->values(),
-            'reservationFees' => $verified->where('type', 'reservation')->sum('amount'),
+            'downPayments' => $verified->whereIn('type', ['down', 'reservation'])->sum('amount'),
             'downPayments' => $verified->where('type', 'down')->sum('amount'),
             'depositsHeld' => $this->requests($request)->with('payments')->get()->sum(fn ($r) => $r->fin()['depositHeld']),
             'byMethod' => $rental->groupBy(fn ($p) => $p->methodLabel())->map(fn ($g, $k) => ['label' => $k, 'value' => $g->sum('amount')])->values()->all(),

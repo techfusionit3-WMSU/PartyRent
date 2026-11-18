@@ -9,14 +9,12 @@
 <div class="crumbs"><a href="{{ route('cart') }}">Rental List</a> / Checkout</div>
 <div class="page-head"><div><h1>Checkout</h1><p>{{ collect($orders)->sum(fn ($o) => count($o['lines'])) }} selected item(s) from <b>{{ count($orders) }} shop{{ count($orders) > 1 ? 's' : '' }}</b>. Each shop gets its own rental order, payment plan and payment schedule.</p></div></div>
 @include('partials.period-banner')
-@php($state = ['orders' => $orders, 'shared' => ['eventName' => '', 'eventType' => '', 'contactName' => $u->name, 'contactPhone' => $u->phone, 'instructions' => '']])
+@php($state = ['orders' => $orders, 'shared' => ['contactName' => $u->name, 'contactPhone' => $u->phone, 'instructions' => '']])
 <form id="cf" novalidate class="grid grid-side"
   data-checkout='@json($state)'
   data-quote="{{ route('checkout.quote') }}" data-submit="{{ route('checkout.submit') }}" data-today="{{ today_iso() }}">
   <div class="stack">
-    <div class="card"><h3>Event & contact details</h3><div class="form-grid">
-      <div class="field full"><label for="ev-name">Event name</label><input class="input" id="ev-name" data-s="eventName" required minlength="3" placeholder="e.g. Sofia's 7th Birthday"><div class="error-text">Enter the event name (at least 3 characters).</div></div>
-      <div class="field"><label for="ev-type">Event type</label><select class="input" id="ev-type" data-s="eventType" required><option value="">Select…</option>@foreach($eventTypes as $e)<option>{{ $e }}</option>@endforeach</select><div class="error-text">Choose the event type.</div></div>
+    <div class="card"><h3>Contact details</h3><div class="form-grid">
       <div class="field"><label for="ev-cn">Contact person</label><input class="input" id="ev-cn" data-s="contactName" required value="{{ $u->name }}"></div>
       <div class="field"><label for="ev-cp">Contact number</label><input class="input" id="ev-cp" data-s="contactPhone" data-phone required value="{{ $u->phone }}"></div>
       <div class="field full"><label for="ev-in">Special instructions (optional)</label><textarea class="input" id="ev-in" data-s="instructions" rows="2" placeholder="Setup location, gate codes…"></textarea></div>

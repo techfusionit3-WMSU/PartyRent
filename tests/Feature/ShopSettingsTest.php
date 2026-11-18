@@ -44,8 +44,8 @@ class ShopSettingsTest extends TestCase
         $this->save('hours', ['open' => '07:00', 'close' => '21:00', 'prepHours' => 2, 'recoveryHours' => 0.5])->assertSessionHas('success');
         $this->assertSame(['07:00', '21:00', 2.0, 0.5], [$s->fresh()->time_settings['open'], $s->fresh()->time_settings['close'], (float) $s->fresh()->time_settings['prepHours'], (float) $s->fresh()->time_settings['recoveryHours']]);
 
-        // payment plans: reservation + down payment over 100% is refused; full only is fine
-        $plans = ['standard' => ['enabled' => 1, 'resPct' => 60, 'resDays' => 3, 'downPct' => 50, 'downDays' => 14]];
+        // payment plans: a 0% down payment is refused (it is what reserves the booking); full only is fine
+        $plans = ['standard' => ['enabled' => 1, 'downPct' => 0, 'downDays' => 14]];
         $this->save('plans', ['methods' => ['bank'], 'plans' => $plans, 'depositType' => 'fixed', 'depositValue' => 500])->assertSessionHas('error');
         $this->save('plans', ['methods' => [], 'plans' => ['full' => ['enabled' => 1, 'days' => 7]], 'depositType' => 'fixed', 'depositValue' => 500])->assertSessionHas('error');
         $this->save('plans', ['methods' => ['bank'], 'plans' => ['full' => ['enabled' => 1, 'days' => 7]], 'depositType' => 'percent', 'depositValue' => 10])->assertSessionHas('success');

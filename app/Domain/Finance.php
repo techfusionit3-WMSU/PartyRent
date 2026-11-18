@@ -8,12 +8,15 @@ use App\Models\Supplier;
 /**
  * Payment plans, schedule, balances and statuses (port of reference js/core/finance.js, v4).
  *
- *   Standard     Reservation Fee % + Down Payment % + Final Balance (due on the event date)
+ *   Standard     Down Payment % + Final Balance (due on the event date)
  *   Full         100 % in one payment
- *   Installment  Reservation Fee + Down Payment + installments the customer proposes; supplier approves.
+ *   Installment  Down Payment + installments the customer proposes; supplier approves.
+ *
+ * There is no separate reservation fee: once the down payment (or the full payment) is verified the
+ * booking is reserved and marked Partially Paid at once. Legacy 'reservation' payments still count as rental payments.
  *                Only when the event is at least `minMonths` away; every installment due by the event date.
  *
- * Reservation fee and down payment are always CREDITED: Final Balance = Total − Reservation Fee − Down Payment.
+ * The down payment is always CREDITED: Final Balance = Total − Down Payment.
  * Deadlines count from acceptance and never pass the event date. Only VERIFIED payments count.
  * Security deposits and damage compensation are tracked separately from rental charges.
  */
@@ -36,9 +39,9 @@ class Finance
     public const ACTIVE = ['accepted', 'in_progress', 'ready_pickup', 'out_delivery', 'ongoing', 'return_pending', 'inspection'];
 
     public const DEFAULT_PLANS = [
-        'standard' => ['enabled' => true, 'resPct' => 10, 'resDays' => 3, 'downPct' => 30, 'downDays' => 14],
+        'standard' => ['enabled' => true, 'downPct' => 30, 'downDays' => 14],
         'full' => ['enabled' => true, 'days' => 7],
-        'installment' => ['enabled' => false, 'resPct' => 10, 'resDays' => 3, 'downPct' => 20, 'downDays' => 14, 'minMonths' => 2, 'maxInstallments' => 6],
+        'installment' => ['enabled' => false, 'downPct' => 20, 'downDays' => 14, 'minMonths' => 2, 'maxInstallments' => 6],
     ];
 
     public const STATUS_BADGE = [
@@ -52,7 +55,8 @@ class Finance
         $c = $s?->payment_plans ?? [];
         $out = [];
         foreach (self::PLANS as $k) {
-            $out[$k] = array_merge(self::DEFAULT_PLANS[$k], $c[$k] ?? []);
+            // No reservation fee step (dropped): older saved settings may still carry resPct/resDays.
+            $out[$k] = array_diff_key(array_merge(self::DEFAULT_PLANS[$k], $c[$k] ?? []), ['resPct' => 1, 'resDays' => 1]);
         }
 
         return $out;
@@ -76,18 +80,11 @@ class Finance
                 continue;
             }
             $n = self::PLAN_LABEL[$k];
-            foreach (['resPct', 'downPct'] as $f) {
-                if (! is_numeric($c[$f] ?? null) || $c[$f] < 0 || $c[$f] > 100) {
-                    return $n.': percentages must be between 0% and 100%.';
-                }
+            if (! is_numeric($c['downPct'] ?? null) || $c['downPct'] <= 0 || $c['downPct'] > 100) {
+                return $n.': the down payment must be more than 0% and at most 100% (paying it reserves the booking).';
             }
-            if ($c['resPct'] + $c['downPct'] > 100) {
-                return $n.': the reservation fee and down payment together cannot exceed 100% of the total rental amount.';
-            }
-            foreach (['resDays', 'downDays'] as $f) {
-                if (! self::wholeIn($c[$f] ?? null, 0, 365)) {
-                    return $n.': payment deadlines must be whole days (0–365).';
-                }
+            if (! self::wholeIn($c['downDays'] ?? null, 0, 365)) {
+                return $n.': payment deadlines must be whole days (0–365).';
             }
         }
         if (! empty($cfg['installment']['enabled'])) {
@@ -98,8 +95,8 @@ class Finance
             if (! self::wholeIn($i['maxInstallments'] ?? null, 1, 24)) {
                 return 'Installment Payment Plan: the maximum number of installments must be 1–24.';
             }
-            if ($i['resPct'] + $i['downPct'] >= 100) {
-                return 'Installment Payment Plan: leave a balance to divide into installments (reservation fee + down payment must be below 100%).';
+            if ($i['downPct'] >= 100) {
+                return 'Installment Payment Plan: leave a balance to divide into installments (the down payment must be below 100%).';
             }
         }
         if (! empty($cfg['full']['enabled']) && ! self::wholeIn($cfg['full']['days'] ?? null, 0, 365)) {
@@ -120,13 +117,13 @@ class Finance
         $c = self::planConfig($s)[$plan];
         $dd = fn ($n) => (int) $n === 0 ? 'right after acceptance' : 'within '.$n.' day'.($n > 1 ? 's' : '').' of acceptance';
         if ($plan === 'full') {
-            return 'Pay 100% of the total in one payment '.$dd($c['days']).'. No separate reservation fee or down payment.';
+            return 'Pay 100% of the total in one payment '.$dd($c['days']).'. Paying it reserves your booking.';
         }
         if ($plan === 'standard') {
-            return 'Reservation Fee '.$c['resPct'].'% ('.$dd($c['resDays']).') + Down Payment '.$c['downPct'].'% ('.$dd($c['downDays']).') + Final Balance '.(100 - $c['resPct'] - $c['downPct']).'% on or before the event date. Fees are credited to your total.';
+            return 'Down Payment '.$c['downPct'].'% ('.$dd($c['downDays']).') + Final Balance '.(100 - $c['downPct']).'% on or before the event date. Paying the down payment reserves your booking; it is credited to your total.';
         }
 
-        return 'Reservation Fee '.$c['resPct'].'% + Down Payment '.$c['downPct'].'%, then the remaining '.(100 - $c['resPct'] - $c['downPct']).'% in installments you propose (up to '.$c['maxInstallments'].'), approved by the supplier and finished by the event date. Requires booking at least '.$c['minMonths'].' month'.($c['minMonths'] > 1 ? 's' : '').' before the event.';
+        return 'Down Payment '.$c['downPct'].'% (reserves your booking), then the remaining '.(100 - $c['downPct']).'% in installments you propose (up to '.$c['maxInstallments'].'), approved by the supplier and finished by the event date. Requires booking at least '.$c['minMonths'].' month'.($c['minMonths'] > 1 ? 's' : '').' before the event.';
     }
 
     /** Installment eligibility: the event must be at least `minMonths` months away. */
@@ -219,6 +216,7 @@ class Finance
         if ($plan === 'full') {
             $items[] = ['key' => 'full', 'type' => 'full', 'label' => 'Full Payment', 'due' => $due($t['days'] ?? 0), 'amount' => (float) $p['total']];
         } else {
+            // Bookings quoted before the reservation fee was dropped keep their stage.
             if (($p['reservationFee'] ?? 0) > 0) {
                 $items[] = ['key' => 'res', 'type' => 'reservation', 'label' => 'Reservation Fee ('.($t['resPct'] ?? 0).'%)', 'due' => $due($t['resDays'] ?? 0), 'amount' => (float) $p['reservationFee']];
             }

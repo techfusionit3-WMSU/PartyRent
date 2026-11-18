@@ -42,6 +42,19 @@ class Rentals
         return array_merge(['ok' => false, 'error' => $error], $extra);
     }
 
+    /** Booking name built from its lines, e.g. "Monobloc Chair rental" or "Kiddie Party Package + 2 more". */
+    public static function autoName(array $lines): string
+    {
+        $names = collect($lines)->map(fn ($l) => ($l['type'] ?? 'item') === 'package' ? Package::find($l['ref_id'])?->name : Product::find($l['ref_id'])?->name)
+            ->filter()->unique()->values();
+        if ($names->isEmpty()) {
+            return 'Rental';
+        }
+        $name = mb_strimwidth($names[0], 0, 90, '…');
+
+        return $names->count() > 1 ? $name.' + '.($names->count() - 1).' more' : $name.' rental';
+    }
+
     private static function ok(array $extra = []): array
     {
         return array_merge(['ok' => true, 'error' => null], $extra);
@@ -553,13 +566,11 @@ class Rentals
         if ($eventDate < $allDates[0] || $eventDate > end($allDates)) {
             return self::fail($s->name.': the event date must fall within the rental dates ('.fmt_range($allDates[0], end($allDates)).').');
         }
-        $eventName = trim((string) ($o['eventName'] ?? ''));
-        if (mb_strlen($eventName) < 3) {
-            return self::fail('Enter the event name.');
-        }
+        // Checkout no longer asks for an event name/type: name the booking after what is rented.
+        $eventName = trim((string) ($o['eventName'] ?? '')) ?: self::autoName($lines);
         $services = array_values(array_intersect($o['services'] ?? [], array_column($s->services ?? [], 'id')));
         $attrs = [
-            'customer_id' => $u->id, 'supplier_id' => $s->id, 'event_name' => $eventName, 'event_type' => $o['eventType'] ?? 'Other', 'event_date' => $eventDate,
+            'customer_id' => $u->id, 'supplier_id' => $s->id, 'event_name' => $eventName, 'event_type' => ($o['eventType'] ?? '') ?: 'Other', 'event_date' => $eventDate,
             'start_date' => $allDates[0], 'end_date' => end($allDates), 'fulfillment' => $fulfillment, 'destinations' => $destinations,
             'address' => $destinations[0]['address'] ?? '', 'contact_name' => $o['contactName'] ?? $u->name, 'contact_phone' => $o['contactPhone'] ?? $u->phone,
             'instructions' => $o['instructions'] ?? '', 'lines' => $lines, 'plan' => $plan, 'arrangement' => $plan, 'method' => $method, 'services' => $services,

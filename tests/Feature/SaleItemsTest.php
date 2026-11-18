@@ -103,7 +103,7 @@ class SaleItemsTest extends TestCase
             'eventName' => 'Cupcake Party', 'eventType' => 'Birthday', 'eventDate' => $d, 'fulfillment' => 'pickup',
             'contactName' => 'Maria Santos', 'contactPhone' => '0917 555 0101', 'arrangement' => 'full', 'method' => 'cod',
         ])->assertOk()->assertJsonPath('ok', true);
-        $r = RentalRequest::where('event_name', 'Cupcake Party')->firstOrFail();
+        $r = RentalRequest::latest('id')->firstOrFail();
         $this->assertEquals(6300.0, $r->pricing['salesSubtotal']); // 7 × 900, sold once (not per day)
 
         // v4: the supplier accepts first; payments follow

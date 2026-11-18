@@ -14,4 +14,36 @@
 <p class="center mt-2 small">New to PartyRent? <a href="{{ route('register') }}" class="strong">Create an account</a></p>
 
 <p class="center mt-2"><a href="{{ route('home') }}" class="small">← Continue browsing without logging in</a></p>
+
+@unless(app()->isProduction())
+@php
+  $demoGroups = [
+    'Customers' => [['Maria Santos', 'maria@demo.ph'], ['Jose Garcia', 'jose@demo.ph'], ['Miguel Torres (suspended)', 'miguel@demo.ph']],
+    'Suppliers (shop owners)' => [['Juan · Happy Moments', 'juan@demo.ph'], ['Ana · Celebration Hub', 'ana@demo.ph'], ['Carlo · Dream Events', 'carlo@demo.ph'], ['Liza · Elegant Occasion (org)', 'liza@demo.ph'], ['Ramon · Party Essentials', 'ramon@demo.ph'], ['Bea · pending application', 'bea@demo.ph'], ['Kristine · Aquino Events (pending)', 'kristine@demo.ph']],
+    'Shop staff (Elegant Occasion)' => [['Grace · Cashier', 'cashier@elegantoccasion.ph'], ['Rico · Inventory', 'inventory@elegantoccasion.ph'], ['Joy · Staff', 'staff@elegantoccasion.ph']],
+    'Platform' => [['Mark · Admin', 'admin@partyrent.ph'], ['Paolo · Admin (limited)', 'paolo.admin@partyrent.ph'], ['Patricia · Super admin', 'super@partyrent.ph']],
+  ];
+@endphp
+<div class="card card-flat mt-2" style="padding:14px">
+  <div class="strong mb-1">Demo accounts <span class="muted small">— password <code>demo123</code></span></div>
+  <p class="muted small" style="margin:0 0 8px">Click one to fill the form, then press Log in.</p>
+  @foreach($demoGroups as $group => $accounts)
+    <div class="small muted" style="margin:8px 0 4px">{{ $group }}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      @foreach($accounts as [$label, $email])
+        <button type="button" class="chip demo-login" data-email="{{ $email }}" title="{{ $email }}" style="padding:5px 10px;font-size:.78rem">{{ $label }}</button>
+      @endforeach
+    </div>
+  @endforeach
+</div>
+<script>
+  document.querySelectorAll('.demo-login').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.getElementById('email').value = b.dataset.email;
+      document.getElementById('password').value = 'demo123';
+      document.getElementById('password').focus();
+    });
+  });
+</script>
+@endunless
 @endsection

@@ -9,7 +9,7 @@
   @include('partials.stat', ['label' => 'Total verified', 'value' => money_short($totalVerified), 'sub' => 'all rental payments', 'icon' => 'card', 'color' => 'sky', 'href' => route('cashier.history')])
   @include('partials.stat', ['label' => 'Partial payments', 'value' => $partial->count(), 'sub' => money_short($partialLeft).' remaining', 'icon' => 'cash', 'color' => 'purple', 'href' => route('cashier.balances')])
   @include('partials.stat', ['label' => 'Overdue balances', 'value' => $overdue->count(), 'sub' => money_short($overdue->sum(fn ($r) => $r->fin()['overdueAmount'])).' overdue', 'icon' => 'alert', 'color' => 'red', 'href' => route('cashier.balances')])
-  @include('partials.stat', ['label' => 'Reservation fees (verified)', 'value' => money_short($reservationFees), 'icon' => 'tag', 'color' => 'pink'])
+  @include('partials.stat', ['label' => 'Down payments (verified)', 'value' => money_short($downPayments), 'icon' => 'tag', 'color' => 'pink'])
   @include('partials.stat', ['label' => 'Down payments (verified)', 'value' => money_short($downPayments), 'icon' => 'tag', 'color' => 'purple'])
   @include('partials.stat', ['label' => 'Deposits held', 'value' => money_short($depositsHeld), 'sub' => 'refundable', 'icon' => 'shield', 'color' => 'sky'])
 </div>

@@ -30,7 +30,7 @@
     <div class="card"><h3>Payment plans</h3><dl class="kv"><dt>Accepted methods</dt><dd>Online payment through PartyRent (Xendit)</dd>
       @foreach(\App\Domain\Finance::plansOf($s) as $k)<dt>{{ \App\Domain\Finance::PLAN_LABEL[$k] }}</dt><dd>{{ \App\Domain\Finance::planSummary($s, $k) }}</dd>@endforeach
       <dt>Security deposit</dt><dd>{{ ($pol['depositType'] ?? 'fixed') === 'percent' ? ($pol['depositValue'] ?? 0).'% of rental items' : money($pol['depositValue'] ?? 0) }} (refundable)</dd></dl>
-      <p class="small muted mb-0">Reservation fees are non-refundable but always credited to the total. Nothing may stay unpaid after the event date.</p></div>
+      <p class="small muted mb-0">Paying the down payment (or the full payment) reserves your booking, and it is always credited to the total. Nothing may stay unpaid after the event date.</p></div>
     <div class="card" style="grid-column:1/-1"><h3>Location</h3>@include('partials.supplier-location', ['reveal' => $own])</div>
     <div class="card"><h3>Business policies</h3>
       <p><b>Rental hours:</b> {{ \App\Domain\Slots::fmt12($ts['open']) }} – {{ \App\Domain\Slots::fmt12($ts['close']) }} ({{ $ts['prepHours'] }}h preparation and {{ $ts['recoveryHours'] }}h recovery between bookings)</p>

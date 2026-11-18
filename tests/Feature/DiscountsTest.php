@@ -89,7 +89,7 @@ class DiscountsTest extends TestCase
             ->post('/cart', ['type' => 'item', 'ref_id' => $p->id, 'days' => json_encode([$d => 2])])->assertSessionHas('success');
         $this->checkout($s->id, ['eventName' => 'Disc Party', 'eventType' => 'Birthday', 'eventDate' => $d, 'contactName' => 'Maria', 'contactPhone' => '0917 555 0101'])
             ->assertOk()->assertJsonPath('ok', true);
-        $r = \App\Models\RentalRequest::where('event_name', 'Disc Party')->firstOrFail();
+        $r = \App\Models\RentalRequest::latest('id')->firstOrFail();
         $gross = 2 * Pricing::unitPrice($p, 2);
         $this->assertEqualsWithDelta($gross * 0.2, $r->pricing['discount'], 0.01);
         $this->assertEqualsWithDelta($gross * 0.8, $r->pricing['rentalFee'], 0.01);

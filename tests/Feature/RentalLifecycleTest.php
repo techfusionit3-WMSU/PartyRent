@@ -46,7 +46,7 @@ class RentalLifecycleTest extends TestCase
             'orders' => [['supplier_id' => $shop->id, 'cart_line_ids' => $ids, 'eventDate' => $d1, 'fulfillment' => 'pickup', 'plan' => 'full', 'method' => 'bank']],
             'agree' => '1',
         ])->assertOk()->assertJsonPath('ok', true);
-        $r = RentalRequest::where('event_name', 'Test Party')->firstOrFail();
+        $r = RentalRequest::latest('id')->firstOrFail();
         $this->assertSame('pending', $r->status);
         $this->assertEquals(1800.0, $r->pricing['rentalFee']); // (4 + 6) × 180
         $this->assertSame(0, CartLine::where('user_id', $maria->id)->count());
@@ -196,7 +196,7 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame('individual', $s->type);
         $this->assertSame('Marikina City', $s->city);
         $this->assertSame('137402000', $s->city_code);
-        $this->assertSame(['full'], \App\Domain\Finance::plansOf($s));
+        $this->assertSame(['standard', 'full'], \App\Domain\Finance::plansOf($s));
         $this->assertSame('national-id.pdf', $s->application['docs']['gov_id']['name']);
         \Illuminate\Support\Facades\Storage::disk('local')->assertExists($s->application['docs']['gov_id']['path']);
         $this->assertSame('gcash', $s->payout_method); // payout account taken from the application

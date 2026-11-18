@@ -187,7 +187,7 @@ class DemoSeeder extends Seeder
     protected function suppliers(): void
     {
         $base = [
-            'cancellation' => 'Free cancellation up to 3 days before the rental start date. Cancellations within 3 days forfeit the reservation fee.',
+            'cancellation' => 'Free cancellation up to 3 days before the rental start date. Cancellations within 3 days forfeit the down payment.',
             'returns' => 'Items must be returned clean and complete on the agreed return date. Late returns are charged one extra rental day.',
             'conditions' => 'Renter is responsible for items while in their care. Damaged or missing items are charged at repair or replacement cost.',
         ];
@@ -198,24 +198,24 @@ class DemoSeeder extends Seeder
         // key, owner, name, logo, color, description, address, phone, email, hours, fulfillment, deliveryFee (fallback), methods, policy, rating, status, applied, v4
         $rows = [
             ['s1', 'u2', 'Happy Moments Party Rentals', '🎈', '#E11D74', 'Family-run party rentals serving Quezon City since 2016. Birthday setups, kiddie parties, and backyard celebrations made easy.', $A['juan'], '0918 555 0202', 'hello@happymoments.ph', 'Mon–Sun, 8:00 AM – 7:00 PM', 'both', 500, ['cod', 'bank', 'debit'], ['depositType' => 'fixed', 'depositValue' => 1000, 'cancelDays' => 3], 4.8, 'approved', -300, [
-                'type' => 'individual', 'payment_plans' => $plans(['resPct' => 10, 'resDays' => 3, 'downPct' => 30, 'downDays' => 10], 5, ['resPct' => 10, 'resDays' => 3, 'downPct' => 20, 'downDays' => 14, 'minMonths' => 2, 'maxInstallments' => 4]),
+                'type' => 'individual', 'payment_plans' => $plans(['downPct' => 30, 'downDays' => 10], 5, ['downPct' => 20, 'downDays' => 14, 'minMonths' => 2, 'maxInstallments' => 4]),
                 'time_settings' => ['open' => '06:00', 'close' => '22:00', 'prepHours' => 1, 'recoveryHours' => 1],
                 'delivery_zones' => [['id' => 'z1', 'name' => 'Quezon City', 'fee' => 350], ['id' => 'z2', 'name' => 'Marikina / San Juan', 'fee' => 450], ['id' => 'z3', 'name' => 'Manila / Caloocan', 'fee' => 600]],
                 'services' => [['id' => 'sv1', 'name' => 'Setup and installation', 'description' => 'Our crew arranges the tables, chairs and décor at the venue.', 'amount' => 300, 'per' => 'location', 'required' => false], ['id' => 'sv2', 'name' => 'Dismantling and packing', 'description' => 'Pack-up and pickup right after the event.', 'amount' => 200, 'per' => 'location', 'required' => false]],
                 'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Main Warehouse', '88 Katipunan Ave., Loyola Heights, Quezon City', 'Juan Dela Cruz', '0918 555 0202'), $loc('L2', 'Branch A – Marikina', '7 Gil Fernando Ave., Marikina', 'Nestor Dela Cruz', '0918 555 0222')]]],
-            ['s2', 'u3', 'Celebration Hub Rentals', '✨', '#7C3AED', 'Elegant Tiffany chairs, lights, and floral backdrops for debuts, weddings and milestone events in Pasig and the east of Metro Manila.', $A['ana'], '0919 555 0303', 'book@celebrationhub.ph', 'Mon–Sat, 9:00 AM – 6:00 PM', 'delivery', 800, ['bank', 'debit'], ['depositType' => 'percent', 'depositValue' => 15, 'cancelDays' => 5, 'cancellation' => 'Free cancellation up to 5 days before the event. The reservation fee is non-refundable.'], 4.6, 'approved', -280, [
-                'type' => 'individual', 'payment_plans' => $plans(['resPct' => 10, 'resDays' => 2, 'downPct' => 40, 'downDays' => 7], 3),
+            ['s2', 'u3', 'Celebration Hub Rentals', '✨', '#7C3AED', 'Elegant Tiffany chairs, lights, and floral backdrops for debuts, weddings and milestone events in Pasig and the east of Metro Manila.', $A['ana'], '0919 555 0303', 'book@celebrationhub.ph', 'Mon–Sat, 9:00 AM – 6:00 PM', 'delivery', 800, ['bank', 'debit'], ['depositType' => 'percent', 'depositValue' => 15, 'cancelDays' => 5, 'cancellation' => 'Free cancellation up to 5 days before the event. The down payment is non-refundable.'], 4.6, 'approved', -280, [
+                'type' => 'individual', 'payment_plans' => $plans(['downPct' => 40, 'downDays' => 7], 3),
                 'time_settings' => ['open' => '08:00', 'close' => '22:00', 'prepHours' => 2, 'recoveryHours' => 1],
                 'delivery_zones' => [['id' => 'z1', 'name' => 'Pasig', 'fee' => 500], ['id' => 'z2', 'name' => 'Mandaluyong / San Juan', 'fee' => 700]],
                 'services' => [['id' => 'sv1', 'name' => 'Equipment preparation', 'description' => 'Cleaning, cushion fitting and quality check before delivery.', 'amount' => 250, 'per' => 'order', 'required' => true], ['id' => 'sv2', 'name' => 'Styling and setup', 'description' => 'Arrangement of chairs, lights and backdrop by our stylist.', 'amount' => 800, 'per' => 'location', 'required' => false]],
                 'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Pasig Showroom', '12 Caruncho Ave., Pasig City', 'Ana Reyes', '0919 555 0303')]]],
             ['s3', 'u4', 'Dream Events Supplies', '🎪', '#0D9488', 'High-volume tents, banquet tables and pro sound for corporate events and big gatherings. Warehouse pickup in Makati.', $A['carlo'], '0920 555 0404', 'ops@dreamevents.ph', 'Mon–Sat, 7:00 AM – 6:00 PM', 'pickup', 0, ['cod', 'bank'], ['depositType' => 'fixed', 'depositValue' => 2000, 'cancelDays' => 2], 4.5, 'approved', -260, [
-                'type' => 'individual', 'payment_plans' => $plans(['resPct' => 10, 'resDays' => 3, 'downPct' => 20, 'downDays' => 7], 7),
+                'type' => 'individual', 'payment_plans' => $plans(['downPct' => 20, 'downDays' => 7], 7),
                 'time_settings' => ['open' => '07:00', 'close' => '21:00', 'prepHours' => 2, 'recoveryHours' => 2], 'delivery_zones' => [],
                 'services' => [['id' => 'sv1', 'name' => 'Tent assembly crew', 'description' => 'Two-person crew to assemble and dismantle tents at your venue.', 'amount' => 1500, 'per' => 'order', 'required' => false]],
                 'damage_policy' => $DMG(['repairable' => ['enabled' => true, 'pct' => 40]]), 'locations' => [$loc('L1', 'Makati Warehouse', '401 Chino Roces Ave., Makati City', 'Carlo Mendoza', '0920 555 0404')]]],
-            ['s4', 'u5', 'Elegant Occasion Rentals', '💍', '#B45309', 'Premium chiavari chairs, gold-and-white backdrops and lounge furniture for weddings and formal receptions across BGC and the south.', $A['liza'], '0921 555 0505', 'events@elegantoccasion.ph', 'Tue–Sun, 10:00 AM – 7:00 PM', 'both', 1200, ['bank', 'debit'], ['depositType' => 'fixed', 'depositValue' => 3000, 'cancelDays' => 7, 'cancellation' => 'Free cancellation up to 7 days before the event. Later cancellations forfeit the reservation fee and 20% of payments made.'], 4.9, 'approved', -240, [
-                'type' => 'organization', 'payment_plans' => $plans(['resPct' => 10, 'resDays' => 3, 'downPct' => 30, 'downDays' => 14], 7, ['resPct' => 10, 'resDays' => 3, 'downPct' => 20, 'downDays' => 14, 'minMonths' => 2, 'maxInstallments' => 6]),
+            ['s4', 'u5', 'Elegant Occasion Rentals', '💍', '#B45309', 'Premium chiavari chairs, gold-and-white backdrops and lounge furniture for weddings and formal receptions across BGC and the south.', $A['liza'], '0921 555 0505', 'events@elegantoccasion.ph', 'Tue–Sun, 10:00 AM – 7:00 PM', 'both', 1200, ['bank', 'debit'], ['depositType' => 'fixed', 'depositValue' => 3000, 'cancelDays' => 7, 'cancellation' => 'Free cancellation up to 7 days before the event. Later cancellations forfeit the down payment and 20% of payments made.'], 4.9, 'approved', -240, [
+                'type' => 'organization', 'payment_plans' => $plans(['downPct' => 30, 'downDays' => 14], 7, ['downPct' => 20, 'downDays' => 14, 'minMonths' => 2, 'maxInstallments' => 6]),
                 'time_settings' => ['open' => '06:00', 'close' => '23:00', 'prepHours' => 1, 'recoveryHours' => 1],
                 'delivery_zones' => [['id' => 'z1', 'name' => 'BGC / Taguig', 'fee' => 500], ['id' => 'z2', 'name' => 'Makati / Pasig', 'fee' => 700]],
                 'services' => [['id' => 'sv1', 'name' => 'Setup and installation', 'description' => 'Styling crew sets up furniture, backdrop and décor at each venue.', 'amount' => 300, 'per' => 'location', 'required' => true], ['id' => 'sv2', 'name' => 'Dismantling and packing', 'description' => 'Crew dismantles and packs everything after the event.', 'amount' => 200, 'per' => 'location', 'required' => true], ['id' => 'sv3', 'name' => 'On-site coordinator', 'description' => 'A coordinator stays during the event for adjustments.', 'amount' => 1500, 'per' => 'order', 'required' => false]],
@@ -223,15 +223,15 @@ class DemoSeeder extends Seeder
                 'locations' => [$loc('L1', 'Main Warehouse', 'Lot 4, 32nd St., Bonifacio Global City, Taguig', 'Rico Santos', '0917 800 1515'), $loc('L2', 'Branch A – Pasig', 'Ortigas Ave. Ext., Pasig City', 'Joy Lim', '0917 800 1616'), $loc('L3', 'Branch B – Makati', 'Pasong Tamo Ext., Makati City', 'Liza Navarro', '0921 555 0505')],
                 'company' => ['legalName' => 'Elegant Occasion Rentals Inc.', 'companyType' => 'corporation', 'natureOfBusiness' => 'Event furniture and décor rental', 'branches' => 3, 'representative' => 'Liza Navarro', 'position' => 'President']]],
             ['s5', 'u6', 'Party Essentials Shop', '🥳', '#2563EB', 'Affordable kiddie party must-haves in Manila: small chairs, kiddie tables, bubble machines, photo booth props and more.', $A['ramon'], '0922 555 0606', 'partyessentials@demo.ph', 'Mon–Sun, 8:00 AM – 8:00 PM', 'both', 350, ['cod', 'bank'], ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 1], 4.4, 'approved', -220, [
-                'type' => 'individual', 'payment_plans' => $plans(['resPct' => 0, 'resDays' => 2, 'downPct' => 50, 'downDays' => 5], 3),
+                'type' => 'individual', 'payment_plans' => $plans(['downPct' => 50, 'downDays' => 5], 3),
                 'time_settings' => ['open' => '08:00', 'close' => '21:00', 'prepHours' => 1, 'recoveryHours' => 1], 'delivery_zones' => [['id' => 'z1', 'name' => 'Manila', 'fee' => 250]],
                 'services' => [], 'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Sta. Cruz Shop', '1530 Rizal Ave., Sta. Cruz, Manila', 'Ramon Bautista', '0922 555 0606')]]],
             ['s6', 'u8', "Bea's Balloon Corner", '🎀', '#DB2777', 'Custom balloon garlands, arches and pastel party décor in Caloocan and nearby cities.', $A['bea'], '0924 555 0808', 'bea.balloons@demo.ph', 'Mon–Sat, 9:00 AM – 5:00 PM', 'both', 400, ['cod', 'bank'], ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3], 0, 'pending', -2, [
-                'type' => 'individual', 'payment_plans' => $plans(['resPct' => 10, 'resDays' => 3, 'downPct' => 40, 'downDays' => 7], 3),
+                'type' => 'individual', 'payment_plans' => $plans(['downPct' => 40, 'downDays' => 7], 3),
                 'time_settings' => ['open' => '09:00', 'close' => '20:00', 'prepHours' => 1, 'recoveryHours' => 1], 'delivery_zones' => [], 'services' => [], 'damage_policy' => $DMG(),
                 'locations' => [$loc('L1', 'Home studio', '19 Rizal Ave. Ext., Grace Park, Caloocan', 'Bea Mendoza', '0924 555 0808')]]],
             ['s7', 'u9', 'Aquino Events Corp.', '🏢', '#0EA5E9', 'Corporate event production company with two warehouses, offering staging, tents, lights and furniture for company events in the south of Metro Manila.', $A['aquino'], '(02) 8820 1234', 'partners@aquinoevents.ph', 'Mon–Sat, 8:00 AM – 6:00 PM', 'both', 900, ['bank'], ['depositType' => 'fixed', 'depositValue' => 2000, 'cancelDays' => 7], 0, 'pending', -1, [
-                'type' => 'organization', 'payment_plans' => $plans(['resPct' => 10, 'resDays' => 3, 'downPct' => 30, 'downDays' => 14], 7),
+                'type' => 'organization', 'payment_plans' => $plans(['downPct' => 30, 'downDays' => 14], 7),
                 'time_settings' => ['open' => '07:00', 'close' => '22:00', 'prepHours' => 2, 'recoveryHours' => 2], 'delivery_zones' => [], 'services' => [], 'damage_policy' => $DMG(),
                 'locations' => [$loc('L1', 'Parañaque Warehouse', '120 Dr. A. Santos Ave., Parañaque', 'Kristine Aquino', '0925 555 0909'), $loc('L2', 'Las Piñas Warehouse', 'Alabang–Zapote Rd., Las Piñas', 'Ben Aquino', '0925 555 0919')],
                 'company' => ['legalName' => 'Aquino Events Corporation', 'companyType' => 'corporation', 'natureOfBusiness' => 'Corporate event production and equipment rental', 'branches' => 2, 'representative' => 'Kristine Aquino', 'position' => 'Operations Director']]],
@@ -490,23 +490,19 @@ class DemoSeeder extends Seeder
                 $status === 'verified' ? ['receipt_no' => 'OR-'.substr($code, 4)] : [], $extra));
         };
         $st = fn ($k) => ['stage' => $k];
-        $pay('TXN-10001', 'PR-0001', 'reservation', 'bank', null, -4, 'verified', 'BDO-884120', $st('res'));
         $pay('TXN-10002', 'PR-0001', 'down', 'bank', null, -3, 'verified', 'BDO-884377', $st('down'));
         $pay('TXN-10003', 'PR-0001', 'balance', 'bank', 1000, 0, 'pending', 'BPI-551093', ['proof_name' => 'bpi-transfer-receipt.jpg', 'notes' => 'Partial final balance payment']);
         $pay('TXN-10004', 'PR-0002', 'full', 'debit', null, -9, 'verified', 'DC-7781-0021', $st('full'));
         $pay('TXN-10005', 'PR-0002', 'deposit', 'debit', 1000, -9, 'verified', 'DC-7781-0022');
-        $pay('TXN-10006', 'PR-0006', 'reservation', 'cash', null, -33, 'verified', 'CASH-0912', $st('res'));
         $pay('TXN-10024', 'PR-0006', 'down', 'cash', null, -30, 'verified', 'CASH-0931', $st('down'));
         $pay('TXN-10007', 'PR-0006', 'balance', 'cash', null, -20, 'verified', 'CASH-0957', $st('bal'));
         $pay('TXN-10008', 'PR-0006', 'deposit', 'cash', 2000, -20, 'verified', 'CASH-0958');
         $pay('TXN-10009', 'PR-0006', 'deposit_refund', 'cash', 1055, -15, 'verified', 'RF-0031', ['notes' => '₱945 damage compensation deducted from ₱2,000 deposit']);
-        $pay('TXN-10010', 'PR-0008', 'reservation', 'bank', null, -17, 'verified', 'UB-220145', $st('res'));
         $pay('TXN-10023', 'PR-0008', 'down', 'bank', null, -8, 'verified', 'UB-220377', $st('down'));
         $pay('TXN-10011', 'PR-0008', 'installment', 'bank', 6000, -6, 'rejected', 'UB-22O1A9', ['proof_name' => 'screenshot.png', 'reject_reason' => 'Reference number not found in bank statement. Please resubmit a clear receipt.']);
         $pay('TXN-10012', 'PR-0009', 'full', 'cash', null, -45, 'verified', 'CASH-0810', $st('full'));
         $pay('TXN-10013', 'PR-0009', 'deposit', 'cash', 500, -45, 'verified', 'CASH-0811');
         $pay('TXN-10014', 'PR-0009', 'deposit_refund', 'cash', 500, -44, 'verified', 'RF-0022');
-        $pay('TXN-10015', 'PR-0010', 'reservation', 'bank', null, -10, 'verified', 'MBTC-11902', $st('res'));
         $pay('TXN-10025', 'PR-0010', 'down', 'bank', null, -9, 'verified', 'MBTC-11950', $st('down'));
         $pay('TXN-10022', 'PR-0010', 'balance', 'cash', null, -1, 'verified', 'CASH-0998', $st('bal'));
         $pay('TXN-10016', 'PR-0010', 'deposit', 'cash', 2000, -1, 'verified', 'CASH-0999');
@@ -580,7 +576,7 @@ class DemoSeeder extends Seeder
         $spay = route('supplier.payments', ['tab' => 'verify'], false);
         $rows = [
             ['u1', 'customer', 'Request accepted', "Happy Moments Party Rentals accepted PR-0001 (Sofia's 7th Birthday). Down payment is now due.", $rent('PR-0001'), -4, true],
-            ['u1', 'customer', 'Payment verified', 'Your down payment for PR-0001 was verified. The reservation fee and down payment are credited to your total. Receipt OR-10002 is ready.', $rent('PR-0001'), -3, false],
+            ['u1', 'customer', 'Payment verified', 'Your down payment for PR-0001 was verified. Your booking is now reserved and the down payment is credited to your total. Receipt OR-10002 is ready.', $rent('PR-0001'), -3, false],
             ['u1', 'customer', 'Request submitted', "PR-0005 (Camille's Debut) was sent to Celebration Hub Rentals and is pending review.", $rent('PR-0005'), -1, false],
             ['u2', 'supplier', 'New rental request', 'Jose Garcia requested 40 Monoblock Chairs for '.fmt_date($this->D(5)).'. Check for inventory conflicts.', $sreq('PR-0003'), -1, false],
             ['u2', 'supplier', 'New rental request', "Bea Mendoza sent PR-0004 (Baby Liam's Christening).", $sreq('PR-0004'), 0, false],

@@ -8,7 +8,7 @@
 
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.requests') }}">Rental Requests</a> / {{ $r->code }}</div>
-<div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }} · {{ $r->event_type }} · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@if($r->status !== 'pending')@include('partials.badges', ['pay' => $f['status']])@endif@include('partials.badges', ['planBadge' => $r->plan])</div></div>
+<div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }}@if($r->event_type && $r->event_type !== 'Other') · {{ $r->event_type }}@endif · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@if($r->status !== 'pending')@include('partials.badges', ['pay' => $f['status']])@endif@include('partials.badges', ['planBadge' => $r->plan])</div></div>
 @include('partials.case-alert', ['r' => $r])
 <div class="card mb-2">@include('partials.progress')</div>
 
@@ -91,7 +91,7 @@
           <div class="table-wrap"><table class="table cards"><thead><tr><th>Installment</th><th>Due</th><th class="num">Amount</th></tr></thead><tbody>
             @foreach($ip['items'] as $i => $x)<tr><td data-label="Installment">Installment {{ $i + 1 }} of {{ count($ip['items']) }}</td><td data-label="Due">{{ fmt_date($x['due']) }}@if($x['due'] > $r->event_date) <span class="badge b-red">after event</span>@endif</td><td data-label="Amount" class="num"><b>{{ money($x['amount']) }}</b></td></tr>@endforeach
           </tbody></table></div>
-          <p class="small muted mt-1">Installment balance {{ money($r->pricing['finalBalance']) }} (after the {{ $r->pricing['terms']['resPct'] ?? 0 }}% reservation fee and {{ $r->pricing['terms']['downPct'] ?? 0 }}% down payment) · last allowed due date {{ fmt_date($r->event_date) }}.</p>
+          <p class="small muted mt-1">Installment balance {{ money($r->pricing['finalBalance']) }} (after the {{ $r->pricing['terms']['downPct'] ?? 0 }}% down payment@if(($r->pricing['reservationFee'] ?? 0) > 0) and {{ $r->pricing['terms']['resPct'] ?? 0 }}% reservation fee@endif) · last allowed due date {{ fmt_date($r->event_date) }}.</p>
           @if($ip['status'] === 'rejected')<div class="alert alert-danger">{{ icon('x') }}<div class="small">Rejected: {{ $ip['reason'] ?? '' }} — waiting for the customer to propose a new schedule.</div></div>@endif
           @if($ip['status'] === 'proposed' && auth()->user()->orgCan('orders.manage') && ! in_array($r->status, ['declined', 'cancelled', 'completed'], true))
             <div class="btn-group mt-1"><button class="btn btn-danger btn-sm" data-modal="ipRejModal">{{ icon('x') }}Reject schedule</button>

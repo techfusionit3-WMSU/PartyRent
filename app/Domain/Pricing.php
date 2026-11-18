@@ -12,7 +12,7 @@ use App\Models\Supplier;
  *   Rental Fee   – tiered (quantity-based) daily prices and package prices
  *   Delivery Fee – per delivery location, from the supplier's delivery zones
  *   Service Fee  – supplier services (setup, preparation, dismantling…)
- * Their sum is the order total, the basis for the payment plan (reservation fee, down payment,
+ * Their sum is the order total, the basis for the payment plan (down payment,
  * final balance / installments). Prices only ever come from supplier-configured data.
  *
  * App additions kept: sale (consumable) items priced once, package pricing modes, hourly items.
@@ -342,7 +342,7 @@ class Pricing
         $total = r2($rentalFee + $deliveryFee + $serviceFee);
         $plan = in_array($o['plan'] ?? null, Finance::PLANS, true) ? $o['plan'] : 'full';
         $terms = Finance::planConfig($s)[$plan];
-        $reservationFee = $plan === 'full' ? 0.0 : r2($total * ($terms['resPct'] ?? 0) / 100);
+        $reservationFee = 0.0; // no separate reservation fee: the down payment reserves the booking
         $downPayment = $plan === 'full' ? 0.0 : r2($total * ($terms['downPct'] ?? 0) / 100);
         $pol = $s?->policy ?? [];
         // The security deposit protects returnable items only.

@@ -145,8 +145,8 @@ class PaymentChannelsTest extends TestCase
         $amt = \App\Domain\Finance::suggestedNext($r)['amount'];
         $bdo = $this->acc('BDO')->id;
         $this->as('jose@demo.ph', 'customer');
-        // BDO-884120 is verified on TXN-10001; spacing and case don't matter
-        foreach (['BDO-884120', 'bdo 884120'] as $ref) {
+        // BDO-884377 is verified on TXN-10002; spacing and case don't matter
+        foreach (['BDO-884377', 'bdo 884377'] as $ref) {
             $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'bank', 'pay_account' => $bdo, 'reference' => $ref, 'proof' => $this->proof()])
                 ->assertSessionHas('error', fn ($e) => str_contains($e, 'already used'));
         }

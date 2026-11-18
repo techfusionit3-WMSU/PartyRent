@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Customer;
 
-use App\Domain\Ai;
 use App\Domain\Finance;
 use App\Domain\Pricing;
 use App\Domain\Rentals;
@@ -160,10 +159,10 @@ class CartController extends Controller
             ];
         }
         if (! $orders) {
-            return view('customer.checkout', ['orders' => [], 'u' => $u, 'eventTypes' => []]);
+            return view('customer.checkout', ['orders' => [], 'u' => $u, ]);
         }
 
-        return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'eventTypes' => array_merge(array_keys(Ai::EVENTS), ['Community', 'Other'])]);
+        return view('customer.checkout', ['orders' => $orders, 'u' => $u]);
     }
 
     /** Validate + price the checkout state (no save): per shop the review HTML, plus the order summary. */
@@ -178,7 +177,7 @@ class CartController extends Controller
             if (! $s) {
                 continue;
             }
-            $o = array_merge($shared, $o, ['eventName' => mb_strlen(trim((string) ($shared['eventName'] ?? ''))) >= 3 ? $shared['eventName'] : 'Event']);
+            $o = array_merge($shared, $o);
             $prep = Rentals::prepareOrder($u, $o);
             $q = $prep['ok'] ? $prep['attrs']['pricing'] : Pricing::quoteOrder(['supplier' => $s, 'lines' => array_map(fn ($l) => ['type' => $l['type'] ?? 'item', 'ref_id' => CartLine::find($l['cart_id'] ?? 0)?->ref_id] + $l, $o['lines'] ?? []),
                 'fulfillment' => $o['fulfillment'] ?? 'pickup', 'destinations' => $o['destinations'] ?? [], 'plan' => $o['plan'] ?? 'full', 'services' => $o['services'] ?? []]);
@@ -200,12 +199,12 @@ class CartController extends Controller
     public function submit(Request $request)
     {
         $request->validate([
-            'shared.eventName' => 'required|string|min:3|max:120', 'shared.eventType' => 'required|string|max:40',
             'shared.contactName' => 'required|string|max:120', 'shared.contactPhone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'],
             'shared.instructions' => 'nullable|string|max:1000', 'orders' => 'required|array|min:1', 'agree' => 'accepted',
         ], ['shared.contactPhone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'agree.accepted' => 'Please accept the shops\' policies.',
-            'shared.eventName.*' => 'Enter the event name (at least 3 characters).', 'shared.eventType.required' => 'Choose the event type.']);
-        $shared = (array) $request->input('shared');
+]);
+        // Renting needs only the customer's contact details: no event name/type (the booking is named after its items).
+        $shared = array_diff_key((array) $request->input('shared'), ['eventName' => 1, 'eventType' => 1]);
         $orders = array_map(fn ($o) => array_merge($shared, $o, ['installments' => $o['inst']['items'] ?? []]), (array) $request->input('orders'));
         $res = Rentals::submitOrders($request->user(), $orders);
         if (! $res['ok']) {

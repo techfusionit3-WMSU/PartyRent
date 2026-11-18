@@ -371,6 +371,7 @@ PartyRent, PartyRent holds the money and pays the supplier after the rental, min
 - [x] `PackagesTest`
 
 ## Notes (newest first)
+- 2026-11-19: Dev DB cleared to the 3 PartyRent admins (backup in `storage/app/backups/`); default seed is admins only (`SEED_DEMO=true` for the demo). Shop employees are now customer accounts with a `shop_staff` membership (status active/deactivated): they log in as customers and use "Switch to Business Mode" (cashier -> cashier workspace for that shop, others -> supplier workspace by role). Owners add people by email (existing account linked, else a new one with a temp password); no owner password resets.
 - 2026-11-10: PayMongo has paused new sign-ups; online payments stay hidden until the user gets keys. Dev DB: GCash cap 100k + Maya (off) added by tinker.
 - 2026-11-10: dev DB got demo PartyRent pay accounts via tinker (not reseeded). GD is not installed: tests use a base64 PNG, not `UploadedFile::fake()->image()`.
 - 2026-11-10: dev DB got its demo payouts additively (scratchpad `devpayouts.php`), not by reseeding; the browser run marked PO-10001 paid (ref GC-TEST-1) and set Juan's payout account to BPI.

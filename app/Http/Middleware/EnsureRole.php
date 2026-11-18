@@ -9,7 +9,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Page guard (port of Auth.guard): role:customer | supplier | cashier | admin | superadmin | staff.
- * Customer ⇄ Supplier mode is kept in the session; visiting a page of the other mode switches it.
+ * Customer ⇄ Supplier (Business) mode is kept in the session; visiting a page of the other mode switches it.
+ * A shop's cashier is a customer account whose Business Mode is the cashier workspace of that shop.
  */
 class EnsureRole
 {
@@ -36,7 +37,17 @@ class EnsureRole
 
             return $next($request);
         }
+        if (in_array('cashier', $roles, true) && $u->isShopCashier()) {
+            session(['mode' => 'supplier']);
+
+            return $next($request);
+        }
         if (in_array('supplier', $roles, true) && ! $u->isStaff()) {
+            if ($u->isShopCashier()) {
+                session(['mode' => 'supplier']);
+
+                return redirect()->route('cashier.dashboard');
+            }
             if ($u->isApprovedSupplier()) {
                 session(['mode' => 'supplier']);
 

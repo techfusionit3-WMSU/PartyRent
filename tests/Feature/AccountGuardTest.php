@@ -73,7 +73,8 @@ class AccountGuardTest extends TestCase
         $other = RentalRequest::where('supplier_id', '!=', $shop->id)->firstOrFail();
         $shop->update(['status' => 'suspended']);
 
-        $this->actingAs($grace->fresh())->withSession(['mode' => 'cashier'])
-            ->get('/cashier/record?request='.$other->code)->assertOk()->assertDontSee($other->customer->name);
+        // without an active shop there is no Business Mode, so the cashier workspace is closed to her
+        $this->actingAs($grace->fresh())->withSession(['mode' => 'supplier'])
+            ->get('/cashier/record?request='.$other->code)->assertRedirect()->assertDontSee($other->customer->name);
     }
 }

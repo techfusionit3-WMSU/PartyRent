@@ -116,7 +116,7 @@ class SupplierController extends Controller
 
         return view('supplier.payments', [
             'tab' => $tab, 'canVerify' => $canVerify, 'pays' => $pays, 'pend' => $pays->where('status', 'pending')->values(), 'fins' => $fins,
-            'cashiers' => \App\Models\ShopStaff::where('supplier_id', $sup->id)->where('role', 'cashier')->with('user')->get()->pluck('user')->filter(fn ($x) => $x && $x->status === 'active'),
+            'cashiers' => \App\Models\ShopStaff::where('supplier_id', $sup->id)->where('role', 'cashier')->where('status', 'active')->with('user')->get()->pluck('user')->filter(fn ($x) => $x && $x->status === 'active'),
             'collected' => (float) $pays->where('status', 'verified')->whereIn('type', Finance::RENTAL_TYPES)->sum('amount'),
             'outstanding' => (float) $fins->filter(fn ($x) => in_array($x['r']->status, Finance::ACTIVE, true))->sum(fn ($x) => $x['f']['balance']),
             'overdue' => $fins->filter(fn ($x) => $x['f']['isOverdue']),

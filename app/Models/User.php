@@ -66,9 +66,10 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return $this->hasOne(Supplier::class, 'owner_id');
     }
 
+    /** Active membership in a shop's team (a deactivated member keeps their customer account). */
     public function staffOf(): HasOne
     {
-        return $this->hasOne(ShopStaff::class);
+        return $this->hasOne(ShopStaff::class)->where('status', 'active');
     }
 
     /** The approved supplier this user works in: their own, or the one that employs them (Auth.supplierOf). */
@@ -100,10 +101,19 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return $r === 'org_admin' && $this->supplier?->status === 'approved' ? 'owner' : $r;
     }
 
-    /** Is this an employee account (cashier / inventory / staff) of a supplier? (Auth.isEmployee) */
+    /**
+     * Does this customer account work in someone else's shop (cashier / inventory / staff)? (Auth.isEmployee)
+     * Employees sign in as customers and switch to Business Mode for that shop.
+     */
     public function isEmployee(): bool
     {
-        return $this->staffOf !== null && ($this->hasRole('cashier') || $this->hasRole('employee'));
+        return $this->staffOf !== null && $this->supplier?->status !== 'approved';
+    }
+
+    /** A shop's own cashier: Business Mode opens the cashier workspace for that shop only. */
+    public function isShopCashier(): bool
+    {
+        return $this->isEmployee() && $this->orgRole() === 'cashier';
     }
 
     /** Organization permission check (Auth.orgCan). */
@@ -145,10 +155,6 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
                 return $r;
             }
         }
-        if ($this->hasRole('employee')) {
-            return 'supplier';
-        }
-
         return 'customer';
     }
 
@@ -165,7 +171,11 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
             return $this->defaultMode();
         }
 
-        return $mode === 'supplier' && $this->isApprovedSupplier() ? 'supplier' : 'customer';
+        if ($mode === 'supplier' && $this->isApprovedSupplier()) {
+            return $this->isShopCashier() ? 'cashier' : 'supplier';
+        }
+
+        return 'customer';
     }
 
     /** Route name of this user's home page for a mode. */
@@ -191,6 +201,9 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         }
         if ($this->hasRole('cashier')) {
             return in_array($perm, $this->cashier_perms ?? Settings::get('permissions.cashier', array_keys(self::CASHIER_PERMS)), true);
+        }
+        if ($this->isShopCashier()) {
+            return $this->orgCan($perm);
         }
 
         return false;

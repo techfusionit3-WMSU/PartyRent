@@ -62,42 +62,86 @@ class TeamRolesTest extends TestCase
     {
         $this->actingAs($this->owner())->withSession(['mode' => 'supplier']);
         $this->post('/supplier/team', ['name' => 'X Y', 'email' => 'x@demo.ph', 'role' => 'org_admin', 'password' => 'temp1234A'])->assertSessionHas('error');
-        $this->post('/supplier/team', ['name' => 'X Y', 'email' => 'maria@demo.ph', 'role' => 'staff', 'password' => 'temp1234A'])->assertSessionHas('error', 'That email already has a PartyRent account.');
+        // another shop's owner, platform staff and a new email without a proper password cannot be added
+        $this->post('/supplier/team', ['email' => 'ana@demo.ph', 'role' => 'staff'])->assertSessionHas('error');
+        $this->post('/supplier/team', ['email' => 'admin@partyrent.ph', 'role' => 'cashier'])->assertSessionHas('error');
         $this->post('/supplier/team', ['name' => 'X Y', 'email' => 'x@demo.ph', 'role' => 'staff', 'password' => 'short'])->assertSessionHas('error');
+        $this->post('/supplier/team', ['email' => 'nobody@demo.ph', 'role' => 'staff'])->assertSessionHas('error');
+        // someone already working for another shop
+        $this->post('/supplier/team', ['email' => 'cashier@elegantoccasion.ph', 'role' => 'cashier'])->assertSessionHas('error');
+    }
+
+    /** An existing customer account joins the team as it is: same login, Business Mode for the shop. */
+    public function test_existing_customer_account_joins_the_team(): void
+    {
+        $maria = User::where('email', 'maria@demo.ph')->firstOrFail();
+        $hash = $maria->password;
+        $this->actingAs($this->owner())->withSession(['mode' => 'supplier'])
+            ->post('/supplier/team', ['email' => 'MARIA@demo.ph', 'role' => 'cashier'])->assertSessionHas('success');
+        $maria->refresh();
+        $this->assertSame(['customer'], $maria->roles);
+        $this->assertSame($hash, $maria->password);
+        $this->assertSame($this->owner()->supplier->id, $maria->shop()->id);
+        $this->assertTrue($maria->isShopCashier());
+        $this->assertSame(1, \App\Models\AppNotification::where('user_id', $maria->id)->where('title', 'like', 'You joined%')->count());
+        // her own rentals stay hers in Customer Mode
+        $this->actingAs($maria)->withSession(['mode' => 'customer'])->get('/rentals')->assertOk();
     }
 
     public function test_inventory_staff_permissions(): void
     {
         $u = $this->add('inventory', 'stock@demo.ph');
-        $this->assertSame(['employee'], $u->roles);
-        $this->assertSame('supplier', $u->defaultMode());
-        $this->actingAs($u);
+        $this->assertSame(['customer'], $u->roles);
+        $this->assertSame('customer', $u->defaultMode());
+        $this->actingAs($u)->withSession(['mode' => 'customer']);
+        $this->get('/')->assertOk()->assertSee('Switch to Business Mode');
+        $this->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('supplier.dashboard'));
         $this->get('/supplier/products')->assertOk();
         $this->get('/supplier/inventory')->assertOk();
         $this->get('/supplier/payments')->assertRedirect('/supplier');
         $this->get('/supplier/team')->assertRedirect('/supplier');
-        $this->get('/supplier')->assertOk()->assertSee('Inventory Staff')->assertDontSee('Switch to Customer Mode');
+        $this->get('/supplier')->assertOk()->assertSee('Inventory Staff')->assertSee('Switch to Customer Mode');
     }
 
-    public function test_cashier_works_in_cashier_mode_for_their_shop(): void
+    public function test_cashier_logs_in_as_customer_and_switches_to_business_mode(): void
     {
         $u = $this->add('cashier', 'till@demo.ph');
-        $this->assertSame(['cashier'], $u->roles);
-        $this->assertSame('cashier', $u->defaultMode());
+        $this->assertSame(['customer'], $u->roles);
+        $this->assertSame('customer', $u->defaultMode());
         $this->assertTrue($u->orgCan('payments.verify'));
         $this->assertFalse($u->orgCan('products.manage'));
-        $this->actingAs($u)->get('/cashier')->assertOk();
+        $this->assertTrue($u->hasPerm('reports.view'));
+
+        $this->post('/logout');
+        $this->post('/login', ['email' => 'till@demo.ph', 'password' => 'temp1234A'])->assertRedirect(route('home'));
+        $this->assertSame('customer', session('mode'));
+        $this->get('/')->assertOk()->assertSee('Switch to Business Mode');
+        $this->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('cashier.dashboard'));
+        $this->assertSame('cashier', $u->fresh()->activeRole(session('mode')));
+        $this->get('/cashier')->assertOk()->assertSee('Switch to Customer Mode');
+        // a cashier's Business Mode is the cashier workspace, not the supplier one
+        $this->get('/supplier/products')->assertRedirect(route('cashier.dashboard'));
+        $this->post('/mode', ['mode' => 'customer'])->assertRedirect(route('home'));
+        $this->get('/rentals')->assertOk();
     }
 
-    public function test_change_role_reset_password_and_deactivate(): void
+    public function test_change_role_and_deactivate(): void
     {
         $u = $this->add('staff', 'crew@demo.ph');
         $this->actingAs($this->owner())->withSession(['mode' => 'supplier']);
         $this->put("/supplier/team/{$u->id}", ['role' => 'cashier'])->assertSessionHas('success');
         $this->assertSame('cashier', ShopStaff::where('user_id', $u->id)->value('role'));
-        $this->assertSame(['cashier'], $u->fresh()->roles);
+        $this->assertSame(['customer'], $u->fresh()->roles);
         $this->put("/supplier/team/{$u->id}", ['status' => 'deactivated'])->assertSessionHas('success');
-        $this->assertSame('deactivated', $u->fresh()->status);
+        // they lose the shop, not their own account
+        $this->assertSame('deactivated', ShopStaff::where('user_id', $u->id)->value('status'));
+        $this->assertSame('active', $u->fresh()->status);
+        $this->assertNull($u->fresh()->shop());
+        $this->actingAs($u->fresh())->withSession(['mode' => 'customer'])->post('/mode', ['mode' => 'supplier'])->assertSessionHas('error');
+        $this->get('/cashier')->assertRedirect();
+        // reactivate
+        $this->actingAs($this->owner())->withSession(['mode' => 'supplier'])->put("/supplier/team/{$u->id}", ['status' => 'active'])->assertSessionHas('success');
+        $this->assertNotNull($u->fresh()->shop());
         // the owner cannot be managed, nor can another shop's people
         $this->put('/supplier/team/'.$this->owner()->id, ['role' => 'staff'])->assertSessionHas('error');
         $ana = User::where('email', 'ana@demo.ph')->first();

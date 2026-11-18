@@ -119,7 +119,7 @@
   <aside class="stack">
     <div class="card"><h3>Customer</h3>
       <div class="row mb-1"><span class="avatar">{{ $c->initials() }}</span><div><b>{{ $c->name }}</b><div class="small muted">{{ $custHist->count() }} request(s) on PartyRent · {{ $custHist->where('status', 'completed')->count() }} completed</div></div></div>
-      <dl class="kv"><dt>Contact</dt><dd>{{ $r->contact_name }}<br>{{ $r->contact_phone }}<br>{{ $c->email }}</dd><dt>Payment</dt><dd>{{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }} · {{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</dd></dl>
+      <dl class="kv"><dt>Requested by</dt><dd>{{ $c->name }} <span class="muted">(account)</span><br>{{ $c->email }}@if($c->phone)<br>{{ $c->phone }}@endif</dd><dt>Contact on the day</dt><dd>{{ $r->contact_name ?: $c->name }}@if($r->contact_name && $r->contact_name !== $c->name) <span class="badge b-gray">not the account holder</span>@endif<br>{{ $r->contact_phone }}</dd><dt>Payment</dt><dd>{{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }} · {{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</dd></dl>
       @if($r->instructions)<div class="alert alert-info mt-1">{{ icon('message') }}<div class="small"><b>Instructions:</b> {{ $r->instructions }}</div></div>@endif
     </div>
     <div class="card"><h3>{{ $r->fulfillment === 'delivery' ? (count($r->destinations ?? []) > 1 ? count($r->destinations).' delivery locations' : 'Delivery location') : 'Pickup' }}</h3>@if($r->fulfillment === 'delivery')@include('partials.destinations')@else<div class="small">Pickup at <b>{{ $r->supplier->address }}</b><div class="muted">{{ $r->supplier->hours }}</div></div>@endif</div>

@@ -19,7 +19,10 @@ class CashierController extends Controller
     /** The shop this cashier works for, or null for a platform-wide cashier. */
     private function shopId(Request $request): ?int
     {
-        return $request->user()->shop()?->id;
+        // A shop's cashier stays tied to that shop even if it is suspended (never falls back to "all shops").
+        $u = $request->user();
+
+        return $u->shop()?->id ?? $u->staffOf?->supplier_id;
     }
 
     private function requests(Request $request)

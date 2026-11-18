@@ -285,6 +285,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .toasts { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; max-width: min(380px, calc(100vw - 32px)); }
 .toast { background: var(--ink); color: #fff; padding: 12px 16px; border-radius: 12px; box-shadow: var(--shadow-lg); font-size: .88rem; display: flex; gap: 10px; align-items: flex-start; animation: pop .2s ease; }
 .toast svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.account-switched { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2100; width: min(640px, calc(100vw - 32px)); background: #FFF7E6; color: var(--ink); border: 1px solid var(--gold); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 12px 14px; display: flex; gap: 12px; align-items: center; font-size: .88rem; }
+.account-switched > div { flex: 1; }
+@media (max-width: 560px) { .account-switched { flex-direction: column; align-items: stretch; } }
 .toast.success { background: #14532D; }
 .toast.error { background: #7F1D1D; }
 .toast.warn { background: #7C4A03; }

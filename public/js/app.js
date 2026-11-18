@@ -15,6 +15,48 @@
   // Pages restored from the back/forward cache carry an old CSRF token (e.g. after logging out),
   // so their forms would fail with "Page Expired". Reload them to get a fresh token.
   window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+
+  /* ---------- one account per page ----------
+     All tabs share one sign-in. Every write from this page says which account the page belongs to
+     (`_auth` field / X-Auth-Id header); the server refuses it if another account signed in meanwhile.
+     Other tabs are told at once (localStorage) and this page shows a "switched account" bar. */
+  const AUTH_ID = (document.querySelector('meta[name="auth-id"]') || {}).content || '0';
+  const AUTH_NAME = (document.querySelector('meta[name="auth-name"]') || {}).content || '';
+  try { localStorage.setItem('pr-auth', JSON.stringify({ id: AUTH_ID, name: AUTH_NAME })); } catch (e) { /* storage blocked */ }
+  document.addEventListener('submit', e => {
+    const f = e.target;
+    if (!(f instanceof HTMLFormElement) || (f.method || 'get').toLowerCase() === 'get') return;
+    let i = f.querySelector('input[name="_auth"]');
+    if (!i) { i = document.createElement('input'); i.type = 'hidden'; i.name = '_auth'; f.appendChild(i); }
+    i.value = AUTH_ID;
+  }, true);
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    init = init || {};
+    const method = (init.method || (input && input.method) || 'GET').toUpperCase();
+    const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+    if (method !== 'GET' && url.origin === location.origin) {
+      const h = new Headers(init.headers || (input && input.headers) || {});
+      h.set('X-Auth-Id', AUTH_ID);
+      init = Object.assign({}, init, { headers: h });
+    }
+    return nativeFetch(input, init);
+  };
+  function accountChanged(other) {
+    if (document.querySelector('.account-switched')) return;
+    const bar = document.createElement('div');
+    bar.className = 'account-switched'; bar.setAttribute('role', 'alert');
+    const now = other.id === '0' ? 'You signed out in another tab.' : 'You are now signed in as ' + (other.name || 'another account') + ' in another tab.';
+    bar.innerHTML = '<div><b>Account changed.</b> ' + esc(now) + ' This page still belongs to ' + esc(AUTH_NAME || 'the previous session') + ', so anything you send from it will be blocked.</div><button type="button" class="btn btn-primary btn-sm">Reload page</button>';
+    bar.querySelector('button').addEventListener('click', () => location.reload());
+    document.body.appendChild(bar);
+  }
+  const checkAccount = () => {
+    try { const o = JSON.parse(localStorage.getItem('pr-auth') || 'null'); if (o && String(o.id) !== AUTH_ID) accountChanged(o); } catch (e) { /* ignore */ }
+  };
+  window.addEventListener('storage', e => { if (e.key === 'pr-auth') checkAccount(); });
+  window.addEventListener('focus', checkAccount);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkAccount(); });
   // Sticky things under the market header (filters sidebar) need its real height, which changes when it wraps on phones.
   const mkHead = document.querySelector('.mk-header');
   if (mkHead) {

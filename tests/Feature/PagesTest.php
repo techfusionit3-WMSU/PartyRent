@@ -78,7 +78,10 @@ class PagesTest extends TestCase
     public function test_cashier_and_admin_pages_render(): void
     {
         $this->as('cashier@elegantoccasion.ph');
-        foreach (['/cashier', '/cashier/verification', '/cashier/record', '/cashier/record?request=PR-0001', '/cashier/balances', '/cashier/balances?tab=overdue', '/cashier/history', '/cashier/history?q=PR-0001', '/payments/TXN-10002/receipt', '/cashier/reports', '/cashier/reports?range=3m', '/cashier/reports.csv'] as $url) {
+        // a receipt of her own shop (other shops' receipts are hidden from a shop cashier — AccountGuardTest)
+        $own = \App\Models\Payment::whereNotNull('receipt_no')->whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', auth()->user()->shop()->id))->value('code');
+        $this->get('/payments/'.$own.'/receipt')->assertOk();
+        foreach (['/cashier', '/cashier/verification', '/cashier/record', '/cashier/record?request=PR-0001', '/cashier/balances', '/cashier/balances?tab=overdue', '/cashier/history', '/cashier/history?q=PR-0001', '/cashier/reports', '/cashier/reports?range=3m', '/cashier/reports.csv'] as $url) {
             $this->get($url)->assertOk();
         }
         $this->get('/admin')->assertRedirect();

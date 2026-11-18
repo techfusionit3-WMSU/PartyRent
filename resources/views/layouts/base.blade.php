@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#E11D74">
 <meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="auth-id" content="{{ auth()->id() ?? 0 }}">
+<meta name="auth-name" content="{{ auth()->user()?->name }}">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8E%89%3C/text%3E%3C/svg%3E">
 <title>{{ $title ?? 'Party Supplies Rental Marketplace' }} · {{ setting('platformName', 'PartyRent') }}</title>
 <meta name="description" content="PartyRent — AI-assisted party supplies rental management system.">

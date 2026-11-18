@@ -115,6 +115,7 @@
       @if($pendPays->count())<div class="alert alert-warn mb-1">{{ icon('clock') }}<div class="grow">{{ $pendPays->count() }} payment(s) awaiting verification. @if($finOK)<a class="btn btn-xs btn-primary" href="{{ route('supplier.payments', ['tab' => 'verify']) }}">Review in Payments</a>@else Your Cashier or Organization Admin verifies them.@endif</div></div>@endif
       @include('partials.payment-history')<p class="small muted mt-1 mb-0">Only verified payments reduce the balance. Duplicate reference numbers and amounts above the outstanding balance are blocked.</p></div>
     @include('partials.inspection-report')
+    @include('partials.request-chat', ['chatSide' => 'supplier'])
     <div class="card"><h3>Activity</h3>@include('partials.timeline')</div>
   </div>
   <aside class="stack">

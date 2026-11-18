@@ -47,9 +47,11 @@ class RequestController extends Controller
         $chk = inv()->check($r->lines, $r->id);
         $f = $r->fin();
         $locs = $r->supplier->locations;
+        $chat = ['rows' => \App\Domain\Chat::rows($r, 'supplier'), 'unread' => \App\Domain\Chat::unread($r, 'supplier')];
+        \App\Domain\Chat::markSeen($r, 'supplier');
 
         return view('supplier.request', [
-            'r' => $r, 'c' => $r->customer, 'f' => $f, 'chk' => $chk, 'conflicts' => $r->status === 'pending' ? $chk['bad'] : [],
+            'r' => $r, 'chat' => $chat, 'c' => $r->customer, 'f' => $f, 'chk' => $chk, 'conflicts' => $r->status === 'pending' ? $chk['bad'] : [],
             'showAvail' => in_array($r->status, ['pending', 'accepted', 'in_progress'], true), 'locs' => $locs,
             'canAlloc' => in_array($r->status, ['pending', 'accepted', 'in_progress'], true) && ($u->orgCan('orders.manage') || $u->orgCan('inventory.manage')) && $locs->count() > 1,
             'finOK' => Rentals::canFinance($r->supplier_id, 'payments.verify', $u), 'canRecord' => in_array($r->status, Finance::ACTIVE, true) && Rentals::canFinance($r->supplier_id, 'payments.record', $u),
@@ -58,6 +60,30 @@ class RequestController extends Controller
             'custHist' => RentalRequest::where('customer_id', $r->customer_id)->get(['status']),
             'peak' => $r->status === 'return_pending' ? Rentals::peakUnits($r) : [], 'sug' => Finance::suggestedNext($r),
         ]);
+    }
+
+
+    /** Chat with the customer: new messages as JSON (polling), or post one (JSON from the page, form fallback). */
+    public function messages(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $rows = \App\Domain\Chat::rows($r, 'supplier', (int) $request->query('after', 0));
+        if ($rows) {
+            \App\Domain\Chat::markSeen($r, 'supplier');
+        }
+
+        return response()->json(['ok' => true, 'messages' => $rows]);
+    }
+
+    public function sendMessage(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $res = \App\Domain\Chat::post($r, $request->user(), 'supplier', (string) $request->input('body', ''));
+        if ($request->expectsJson()) {
+            return response()->json($res['ok'] ? ['ok' => true, 'messages' => \App\Domain\Chat::rows($r, 'supplier', (int) $request->input('after', 0))] : $res, $res['ok'] ? 200 : 422);
+        }
+
+        return redirect()->to(url()->previous().'#chat')->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Message sent.' : $res['error']);
     }
 
     /** Change the inventory source of one line. */

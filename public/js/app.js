@@ -657,3 +657,45 @@
 
   window.PRUI = { toast, confirmDialog, openModal, closeModal, Scheduler, Calendar, AddressPicker, api, esc, icon: (n, st) => svg(n, st || 'width:16px;height:16px;vertical-align:-3px') };
 })();
+
+/* ---------- customer <-> shop chat on a rental request (partials/request-chat) ---------- */
+(function () {
+  const box = document.querySelector('[data-chat]');
+  if (!box) return;
+  const thread = box.querySelector('[data-thread]'), form = box.querySelector('form'), ta = form.querySelector('textarea');
+  const csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let last = +box.dataset.last || 0, busy = false;
+  const scroll = () => { thread.scrollTop = thread.scrollHeight; };
+  const add = rows => {
+    rows.forEach(m => {
+      if (m.id <= last) return;
+      last = m.id;
+      const e = thread.querySelector('[data-empty]'); if (e) e.remove();
+      const d = document.createElement('div'); d.className = 'rq-msg ' + (m.mine ? 'mine' : 'theirs');
+      d.innerHTML = '<div class="rq-meta">' + esc(m.mine ? 'You' : m.name) + ' · ' + esc(m.at) + '</div><div class="rq-body">' + esc(m.body) + '</div>';
+      thread.appendChild(d);
+    });
+    if (rows.length) scroll();
+  };
+  scroll();
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (busy || !ta.value.trim()) return;
+    busy = true; const btn = form.querySelector('button'); btn.disabled = true;
+    try {
+      const res = await fetch(form.action, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify({ body: ta.value, after: last }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) { ta.value = ''; add(data.messages || []); }
+      else window.PR.toast(data.error || data.message || 'Message not sent. Please try again.', 'error');
+    } catch (er) { window.PR.toast('Message not sent. Check your connection.', 'error'); }
+    busy = false; btn.disabled = false; ta.focus();
+  });
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit')); } });
+  const poll = async () => {
+    if (document.hidden || busy) return;
+    try { const res = await fetch(box.dataset.poll + '?after=' + last, { headers: { Accept: 'application/json' } }); if (res.ok) add((await res.json()).messages || []); } catch (er) { /* offline: try again later */ }
+  };
+  setInterval(poll, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+})();

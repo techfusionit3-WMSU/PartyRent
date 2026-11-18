@@ -58,12 +58,38 @@ class RentalController extends Controller
                 $types[] = ['compensation', 'Damage compensation', $f['compensationDue']];
             }
         }
+        $chat = ['rows' => \App\Domain\Chat::rows($r, 'customer'), 'unread' => \App\Domain\Chat::unread($r, 'customer')];
+        \App\Domain\Chat::markSeen($r, 'customer');
 
         return view('customer.rental', [
-            'r' => $r, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
+            'r' => $r, 'chat' => $chat, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
             'online' => OnlinePay::enabled(), 'accounts' => PayAccount::available(),
             'policy' => Rentals::cancelPolicy($r), 'reviewables' => $r->status === 'completed' ? Reviews::reviewables($r) : [],
         ]);
+    }
+
+
+    /** Chat with the shop: new messages as JSON (polling), or post one (JSON from the page, form fallback). */
+    public function messages(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $rows = \App\Domain\Chat::rows($r, 'customer', (int) $request->query('after', 0));
+        if ($rows) {
+            \App\Domain\Chat::markSeen($r, 'customer');
+        }
+
+        return response()->json(['ok' => true, 'messages' => $rows]);
+    }
+
+    public function sendMessage(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $res = \App\Domain\Chat::post($r, $request->user(), 'customer', (string) $request->input('body', ''));
+        if ($request->expectsJson()) {
+            return response()->json($res['ok'] ? ['ok' => true, 'messages' => \App\Domain\Chat::rows($r, 'customer', (int) $request->input('after', 0))] : $res, $res['ok'] ? 200 : 422);
+        }
+
+        return redirect()->to(url()->previous().'#chat')->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Message sent.' : $res['error']);
     }
 
     public function confirmation(Request $request, RentalRequest $rentalRequest)

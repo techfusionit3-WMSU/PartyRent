@@ -14,6 +14,7 @@
     <div class="card"><div class="card-head"><h3>Items & daily quantities</h3><span class="small muted">{{ fmt_range($r->start_date, $r->end_date) }}</span></div>@include('partials.lines-table', ['pricing' => $r->pricing])</div>
     @if($r->fulfillment === 'delivery' && $r->destinations)<div class="card"><h3>{{ count($r->destinations) > 1 ? 'Delivery & event locations' : 'Delivery location' }}</h3>@include('partials.destinations')</div>@endif
     @if($r->plan === 'installment')@include('partials.installment-card')@endif
+    @include('partials.request-chat', ['chatSide' => 'customer'])
     <div class="card"><div class="card-head"><h3>Payment history</h3>@if($payTypes)<button class="btn btn-primary btn-sm" data-modal="payModal">{{ icon('card') }}Make a payment</button>@endif</div>@include('partials.payment-history')</div>
     @include('partials.inspection-report')
     <div class="card"><h3>Activity</h3>@include('partials.timeline')</div>

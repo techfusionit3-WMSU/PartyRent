@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\ShopStaff;
+use App\Models\StaffInvite;
 use App\Models\User;
+use App\Notifications\StaffInviteMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /** Team & Roles: organization roles and permissions (port of Auth.ORG_PERMS / Services.addEmployee). */
@@ -21,13 +24,38 @@ class TeamRolesTest extends TestCase
         return User::where('email', 'juan@demo.ph')->firstOrFail();
     }
 
+    /** Owner (default Juan) invites $email; returns the emailed [path, code] (code null for an existing account). */
+    private function invite(string $role, string $email, ?User $owner = null): array
+    {
+        Notification::fake();
+        $this->actingAs($owner ?? $this->owner())->withSession(['mode' => 'supplier'])
+            ->post('/supplier/team', ['email' => $email, 'role' => $role])->assertSessionHas('success');
+        $mail = null;
+        Notification::assertSentOnDemand(StaffInviteMail::class, function ($n, $ch, $notifiable) use ($email, &$mail) {
+            $mail = $n;
+
+            return $notifiable->routes['mail'] === strtolower($email);
+        });
+
+        return [parse_url($mail->url, PHP_URL_PATH), $mail->code];
+    }
+
+    /** A new email: invited, then creates their own account with the emailed code and their own password. */
     private function add(string $role, string $email): User
     {
-        $this->actingAs($this->owner())->withSession(['mode' => 'supplier'])
-            ->post('/supplier/team', ['name' => 'New Person', 'email' => $email, 'phone' => '0917 000 0000', 'role' => $role, 'password' => 'temp1234A'])
+        [$path, $code] = $this->invite($role, $email);
+        $this->assertNotNull($code);
+        $this->assertNull(User::where('email', $email)->first(), 'no account before they confirm');
+        $this->post('/logout');
+        $this->get($path)->assertOk()->assertSee('Create account &amp; join', false);
+        $this->post($path.'/join', ['code' => $code, 'name' => 'New Person', 'phone' => '0917 000 0000', 'password' => 'temp1234A', 'password_confirmation' => 'temp1234A'])
             ->assertSessionHas('success');
+        $u = User::where('email', $email)->firstOrFail();
+        $this->assertAuthenticatedAs($u);
+        $this->assertTrue($u->hasVerifiedEmail());
+        $this->post('/logout');
 
-        return User::where('email', $email)->firstOrFail();
+        return $u;
     }
 
     public function test_owner_is_org_admin_and_sees_team_page(): void
@@ -61,29 +89,112 @@ class TeamRolesTest extends TestCase
     public function test_employee_rules(): void
     {
         $this->actingAs($this->owner())->withSession(['mode' => 'supplier']);
-        $this->post('/supplier/team', ['name' => 'X Y', 'email' => 'x@demo.ph', 'role' => 'org_admin', 'password' => 'temp1234A'])->assertSessionHas('error');
-        // another shop's owner, platform staff and a new email without a proper password cannot be added
+        $this->post('/supplier/team', ['email' => 'x@demo.ph', 'role' => 'org_admin'])->assertSessionHas('error');
+        // another shop's owner, platform staff and someone already working for another shop cannot be invited
         $this->post('/supplier/team', ['email' => 'ana@demo.ph', 'role' => 'staff'])->assertSessionHas('error');
         $this->post('/supplier/team', ['email' => 'admin@partyrent.ph', 'role' => 'cashier'])->assertSessionHas('error');
-        $this->post('/supplier/team', ['name' => 'X Y', 'email' => 'x@demo.ph', 'role' => 'staff', 'password' => 'short'])->assertSessionHas('error');
-        $this->post('/supplier/team', ['email' => 'nobody@demo.ph', 'role' => 'staff'])->assertSessionHas('error');
-        // someone already working for another shop
         $this->post('/supplier/team', ['email' => 'cashier@elegantoccasion.ph', 'role' => 'cashier'])->assertSessionHas('error');
+        $this->post('/supplier/team', ['email' => 'not-an-email', 'role' => 'staff'])->assertSessionHas('error');
+        $this->assertSame(0, StaffInvite::count());
+
+        // the live check in the form
+        $this->postJson('/supplier/team/check', ['email' => 'cashier@elegantoccasion.ph'])->assertJson(['state' => 'blocked']);
+        $this->postJson('/supplier/team/check', ['email' => 'nobody@demo.ph'])->assertJson(['state' => 'new']);
+        $this->postJson('/supplier/team/check', ['email' => 'maria@demo.ph'])->assertJson(['state' => 'existing'])
+            ->assertJsonMissing(['message' => 'Maria Santos'])->assertSee('M*** S.');
     }
 
-    /** An existing customer account joins the team as it is: same login, Business Mode for the shop. */
+    /** A new email gets a code; the person sets their own password. Wrong codes are limited. */
+    public function test_new_email_joins_with_the_emailed_code(): void
+    {
+        [$path, $code] = $this->invite('staff', 'fresh@demo.ph');
+        $this->get('/supplier/team')->assertSee('fresh@demo.ph')->assertSee('Invited · waiting');
+        // inviting the same email twice is refused
+        $this->post('/supplier/team', ['email' => 'fresh@demo.ph', 'role' => 'staff'])->assertSessionHas('error');
+        $this->post('/logout');
+
+        $wrong = $code === '000000' ? '111111' : '000000';
+        $form = ['name' => 'Fresh Hire', 'phone' => '0917 000 0001', 'password' => 'mypass123', 'password_confirmation' => 'mypass123'];
+        $this->post($path.'/join', ['code' => $wrong] + $form)->assertSessionHasErrors('code');
+        $this->assertNull(User::where('email', 'fresh@demo.ph')->first());
+        $this->post($path.'/join', ['code' => $code] + $form)->assertRedirect();
+        $u = User::where('email', 'fresh@demo.ph')->firstOrFail();
+        $this->assertSame($this->owner()->supplier->id, $u->shop()->id);
+        $this->assertSame('supplier', session('mode'));
+        $this->assertSame(0, StaffInvite::count());
+        // their own password works, and the link is used up
+        $this->post('/logout');
+        $this->post('/login', ['email' => 'fresh@demo.ph', 'password' => 'mypass123'])->assertRedirect();
+        $this->assertAuthenticatedAs($u);
+        $this->get($path)->assertOk()->assertSee('Invitation not available');
+    }
+
+    public function test_owner_can_resend_and_cancel_an_invitation(): void
+    {
+        [$path] = $this->invite('cashier', 'later@demo.ph');
+        $inv = StaffInvite::firstOrFail();
+        $this->post("/supplier/team/invites/{$inv->id}/resend")->assertSessionHas('error'); // wait 60 s
+        $this->travel(2)->minutes();
+        $this->post("/supplier/team/invites/{$inv->id}/resend")->assertSessionHas('success');
+        $this->get($path)->assertOk()->assertSee('Invitation not available'); // the old link no longer works
+        $this->delete("/supplier/team/invites/{$inv->id}")->assertSessionHas('success');
+        $this->assertSame(0, StaffInvite::count());
+        // another shop cannot touch Juan's invitations
+        $this->invite('cashier', 'again@demo.ph');
+        $liza = User::where('email', 'liza@demo.ph')->firstOrFail();
+        $other = StaffInvite::firstOrFail();
+        $this->actingAs($liza)->withSession(['mode' => 'supplier'])->delete("/supplier/team/invites/{$other->id}")->assertSessionHas('error');
+        $this->assertSame(1, StaffInvite::count());
+    }
+
+    /** Someone deactivated at one shop is free to join another; the first shop can't then reactivate them. */
+    public function test_deactivated_elsewhere_can_join_another_shop(): void
+    {
+        $liza = User::where('email', 'liza@demo.ph')->firstOrFail();
+        $grace = User::where('email', 'cashier@elegantoccasion.ph')->firstOrFail();
+        $this->actingAs($liza)->withSession(['mode' => 'supplier'])->put("/supplier/team/{$grace->id}", ['status' => 'deactivated'])->assertSessionHas('success');
+
+        [$path, $code] = $this->invite('cashier', $grace->email);
+        $this->assertNull($code, 'an existing account accepts instead of typing a code');
+        $this->post('/logout');
+        $this->get($path)->assertRedirect(route('login'));
+        $this->actingAs($grace)->withSession(['mode' => 'customer'])->get($path)->assertOk()->assertSee('Accept &amp; join', false);
+        $this->post($path.'/accept')->assertRedirect();
+        $grace->refresh();
+        $this->assertSame($this->owner()->supplier->id, $grace->shop()->id);
+        // Elegant Occasion still lists her as deactivated, and cannot reactivate her now
+        $this->assertSame('deactivated', ShopStaff::where('user_id', $grace->id)->where('supplier_id', $liza->supplier->id)->value('status'));
+        $this->actingAs($liza)->withSession(['mode' => 'supplier'])->put("/supplier/team/{$grace->id}", ['status' => 'active'])->assertSessionHas('error');
+        $this->assertSame($this->owner()->supplier->id, $grace->fresh()->shop()->id);
+    }
+
+    public function test_invitation_for_someone_else_and_decline(): void
+    {
+        [$path] = $this->invite('staff', 'maria@demo.ph');
+        $jose = User::where('email', 'jose@demo.ph')->firstOrFail();
+        $this->actingAs($jose)->withSession(['mode' => 'customer'])->get($path)->assertOk()->assertSee('this invitation is for');
+        $this->post($path.'/accept')->assertSessionHas('error');
+        $maria = User::where('email', 'maria@demo.ph')->firstOrFail();
+        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post($path.'/decline')->assertSessionHas('success');
+        $this->assertNull($maria->fresh()->shop());
+        $this->assertSame(0, StaffInvite::count());
+    }
+
+    /** An existing customer account joins the team as it is once they accept: same login, Business Mode for the shop. */
     public function test_existing_customer_account_joins_the_team(): void
     {
         $maria = User::where('email', 'maria@demo.ph')->firstOrFail();
         $hash = $maria->password;
-        $this->actingAs($this->owner())->withSession(['mode' => 'supplier'])
-            ->post('/supplier/team', ['email' => 'MARIA@demo.ph', 'role' => 'cashier'])->assertSessionHas('success');
+        [$path] = $this->invite('cashier', 'MARIA@demo.ph');
+        $this->assertNull($maria->fresh()->shop(), 'not on the team until she accepts');
+        $this->assertSame(1, \App\Models\AppNotification::where('user_id', $maria->id)->where('title', 'like', 'Invitation to join%')->count());
+        $this->actingAs($maria)->withSession(['mode' => 'customer'])->post($path.'/accept')->assertRedirect(route('cashier.dashboard'));
         $maria->refresh();
         $this->assertSame(['customer'], $maria->roles);
         $this->assertSame($hash, $maria->password);
         $this->assertSame($this->owner()->supplier->id, $maria->shop()->id);
         $this->assertTrue($maria->isShopCashier());
-        $this->assertSame(1, \App\Models\AppNotification::where('user_id', $maria->id)->where('title', 'like', 'You joined%')->count());
+        $this->assertSame(1, \App\Models\AppNotification::where('user_id', $this->owner()->id)->where('title', 'like', '%joined your team')->count());
         // her own rentals stay hers in Customer Mode
         $this->actingAs($maria)->withSession(['mode' => 'customer'])->get('/rentals')->assertOk();
     }

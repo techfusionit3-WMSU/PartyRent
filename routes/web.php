@@ -56,6 +56,12 @@ Route::middleware('guest')->group(function () {
 });
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
+/* ---------- team invitations (link from the email) ---------- */
+Route::get('/invite/{token}', [\App\Http\Controllers\InviteController::class, 'show'])->name('invite.show');
+Route::post('/invite/{token}/join', [\App\Http\Controllers\InviteController::class, 'join'])->middleware(['guest', 'throttle:10,1,invite-join'])->name('invite.join');
+Route::post('/invite/{token}/accept', [\App\Http\Controllers\InviteController::class, 'accept'])->middleware('auth')->name('invite.accept');
+Route::post('/invite/{token}/decline', [\App\Http\Controllers\InviteController::class, 'decline'])->middleware('auth')->name('invite.decline');
+
 /* ---------- any signed-in user ---------- */
 Route::middleware('auth')->group(function () {
     Route::post('/mode', [AccountController::class, 'switchMode'])->name('mode.switch');
@@ -137,7 +143,10 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::match(['put', 'post'], '/shop', [SupplierController::class, 'updateShop'])->name('shop.update');
     Route::post('/shop/business', [\App\Http\Controllers\Supplier\StaffController::class, 'business'])->name('business');
     Route::get('/team', [\App\Http\Controllers\Supplier\TeamController::class, 'index'])->name('team');
-    Route::post('/team', [\App\Http\Controllers\Supplier\TeamController::class, 'store'])->name('team.store');
+    Route::post('/team', [\App\Http\Controllers\Supplier\TeamController::class, 'store'])->middleware('throttle:20,1')->name('team.store');
+    Route::post('/team/check', [\App\Http\Controllers\Supplier\TeamController::class, 'check'])->middleware('throttle:30,1')->name('team.check');
+    Route::post('/team/invites/{invite}/resend', [\App\Http\Controllers\Supplier\TeamController::class, 'resend'])->name('team.resend');
+    Route::delete('/team/invites/{invite}', [\App\Http\Controllers\Supplier\TeamController::class, 'cancel'])->name('team.cancel');
     Route::put('/team/{user}', [\App\Http\Controllers\Supplier\TeamController::class, 'update'])->name('team.update');
     Route::redirect('/staff', '/supplier/team')->name('staff');
 

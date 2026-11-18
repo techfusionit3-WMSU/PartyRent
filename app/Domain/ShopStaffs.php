@@ -3,10 +3,13 @@
 namespace App\Domain;
 
 use App\Models\ShopStaff;
+use App\Models\StaffInvite;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Notifications\StaffInviteMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 /**
@@ -15,6 +18,10 @@ use Illuminate\Support\Str;
  * customer and switch to Business Mode: a Cashier gets the cashier workspace for that shop only; Inventory
  * Staff and Staff get the supplier workspace with their role's permissions.
  * The owner stays the Organization Admin.
+ *
+ * Nobody is added directly: the owner invites an email and the person confirms from that inbox. An existing
+ * account accepts while signed in; a new email enters the emailed code and sets their own password.
+ * One ACTIVE membership per account; someone deactivated elsewhere is free to join.
  */
 class ShopStaffs
 {
@@ -29,11 +36,68 @@ class ShopStaffs
         return $out;
     }
 
+    /** Masked name for the email check, so the form cannot be used to look people up ("Juan Dela Cruz" → "J*** C."). */
+    public static function maskName(string $name): string
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+        $first = $parts[0] ?? '';
+        $last = count($parts) > 1 ? end($parts) : '';
+
+        return mb_substr($first, 0, 1).'***'.($last !== '' ? ' '.mb_substr($last, 0, 1).'.' : '');
+    }
+
+    /** Why this account cannot join shop $s (null = it can). */
+    public static function blocker(User $u, Supplier $s): ?string
+    {
+        if ($u->isStaff()) {
+            return 'That email belongs to a PartyRent staff account and cannot join a shop.';
+        }
+        if ($u->supplier) {
+            return 'That account already has its own supplier profile. One account can only work for one business.';
+        }
+        $active = ShopStaff::where('user_id', $u->id)->where('status', 'active')->first();
+        if ($active && $active->supplier_id !== $s->id) {
+            return 'That account already works for another business. They need to be removed there first.';
+        }
+        if ($active) {
+            return $u->name.' is already on your team.';
+        }
+        if (! $u->isActive()) {
+            return 'That account is '.$u->status.' and cannot be added.';
+        }
+
+        return null;
+    }
+
     /**
-     * Add an employee by email. An existing PartyRent customer account is linked as it is (they keep their own
-     * password); a new email gets a customer account with the temporary password the owner shares.
+     * What happens if the owner invites this email (the live check in the Add employee form).
+     * state: existing | new (can invite) · blocked | invited (cannot)
      */
-    public static function add(Supplier $s, User $by, array $data): array
+    public static function check(Supplier $s, string $email): array
+    {
+        $email = Str::lower(trim($email));
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['state' => 'blocked', 'message' => 'Enter a valid email address.'];
+        }
+        if (StaffInvite::where('supplier_id', $s->id)->where('email', $email)->exists()) {
+            return ['state' => 'invited', 'message' => 'You already invited this email. Use Resend in the team list.'];
+        }
+        $u = User::where('email', $email)->first();
+        if (! $u) {
+            return ['state' => 'new', 'message' => 'No PartyRent account uses this email yet. We will email them a code so they can create one and set their own password.'];
+        }
+        if (ShopStaff::where('supplier_id', $s->id)->where('user_id', $u->id)->where('status', '!=', 'active')->exists()) {
+            return ['state' => 'blocked', 'message' => $u->name.' was on your team before. Reactivate them from the team list instead.'];
+        }
+        if ($why = self::blocker($u, $s)) {
+            return ['state' => 'blocked', 'message' => $why];
+        }
+
+        return ['state' => 'existing', 'message' => self::maskName($u->name).' has a PartyRent account. They will be asked to accept your invitation.'];
+    }
+
+    /** Invite an email to the team. Nobody joins until the person confirms from that inbox. */
+    public static function invite(Supplier $s, User $by, array $data): array
     {
         if (! $by->orgCan('team.manage') || $by->shop()?->id !== $s->id) {
             return ['ok' => false, 'error' => 'Only the Organization Admin can add employees.'];
@@ -43,52 +107,126 @@ class ShopStaffs
             return ['ok' => false, 'error' => 'Choose Cashier, Inventory Staff or Staff. Organization Admin rights stay with the account owner.'];
         }
         $email = Str::lower(trim((string) ($data['email'] ?? '')));
-        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['ok' => false, 'error' => 'Enter a valid email address.'];
+        $chk = self::check($s, $email);
+        if (! in_array($chk['state'], ['existing', 'new'], true)) {
+            return ['ok' => false, 'error' => $chk['message']];
         }
-        $existing = User::where('email', $email)->first();
-        if ($existing) {
-            $m = ShopStaff::where('user_id', $existing->id)->first();
-            if ($m && $m->supplier_id === $s->id) {
-                return ['ok' => false, 'error' => $existing->name.' is already on your team.'.($m->status !== 'active' ? ' Reactivate them from the list.' : '')];
-            }
-            if ($existing->isStaff()) {
-                return ['ok' => false, 'error' => 'That email belongs to a PartyRent staff account and cannot join a shop.'];
-            }
-            if ($existing->supplier || $m) {
-                return ['ok' => false, 'error' => 'That account already '.($existing->supplier ? 'has its own supplier profile' : 'works for another shop').'. One account can only work for one shop.'];
-            }
-            if (! $existing->isActive()) {
-                return ['ok' => false, 'error' => 'That account is '.$existing->status.' and cannot be added.'];
-            }
-        } else {
-            if (mb_strlen(trim((string) ($data['name'] ?? ''))) < 3) {
-                return ['ok' => false, 'error' => 'No PartyRent account uses that email yet. Enter the employee\'s full name to create one.'];
-            }
-            if (strlen((string) ($data['password'] ?? '')) < 8) {
-                return ['ok' => false, 'error' => 'The temporary password needs at least 8 characters.'];
-            }
+        $inv = new StaffInvite(['supplier_id' => $s->id, 'email' => $email, 'role' => $role, 'invited_by' => $by->id]);
+        $sent = self::send($inv);
+        Notifier::audit('Invited employee', $s->name.' · '.$email.' ('.ShopStaff::ORG_ROLES[$role].')', $by);
+
+        return ['ok' => true, 'invite' => $inv, 'existing' => $chk['state'] === 'existing', 'sent' => $sent];
+    }
+
+    /** (Re)issue the link and code and email them; an existing account also gets an in-app notification. */
+    public static function send(StaffInvite $inv): bool
+    {
+        [$token, $code] = $inv->issue();
+        $u = User::where('email', $inv->email)->first();
+        if ($u) {
+            Notifier::notify($u, 'customer', 'Invitation to join '.$inv->supplier->name, ($inv->inviter?->name ?? $inv->supplier->name).' invited you to work as '.$inv->roleLabel().'. Open it to accept or decline.', route('invite.show', $token, false));
         }
-        $u = DB::transaction(function () use ($s, $by, $data, $email, $role, $existing) {
-            $u = $existing;
-            if (! $u) {
-                $u = User::create([
-                    'name' => trim($data['name']), 'email' => $email, 'phone' => trim((string) ($data['phone'] ?? '')),
-                    'address' => $s->address, 'password' => Hash::make($data['password']),
-                    'roles' => ['customer'], 'status' => 'active',
-                ]);
-                $u->forceFill(['email_verified_at' => now()])->save(); // the owner vouches for the address
-            }
-            ShopStaff::create(['supplier_id' => $s->id, 'user_id' => $u->id, 'role' => $role, 'status' => 'active', 'added_by' => $by->id]);
+        try {
+            Notification::route('mail', $inv->email)->notify(new StaffInviteMail($inv, route('invite.show', $token), $u ? null : $code));
+
+            return true;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
+    }
+
+    public static function resend(Supplier $s, User $by, StaffInvite $inv): array
+    {
+        if (! $by->orgCan('team.manage') || $inv->supplier_id !== $s->id) {
+            return ['ok' => false, 'error' => 'You can only manage your own invitations.'];
+        }
+        if (($w = $inv->secondsUntilResend()) > 0) {
+            return ['ok' => false, 'error' => 'Please wait '.$w.' seconds before sending again.'];
+        }
+
+        return ['ok' => true, 'sent' => self::send($inv)];
+    }
+
+    public static function cancel(Supplier $s, User $by, StaffInvite $inv): array
+    {
+        if (! $by->orgCan('team.manage') || $inv->supplier_id !== $s->id) {
+            return ['ok' => false, 'error' => 'You can only manage your own invitations.'];
+        }
+        $inv->delete();
+        Notifier::audit('Cancelled invitation', $s->name.' · '.$inv->email, $by);
+
+        return ['ok' => true];
+    }
+
+    /** The invited person (signed in with the invited email) joins the team. The rules are checked again here. */
+    public static function accept(StaffInvite $inv, User $u): array
+    {
+        if (Str::lower($u->email) !== $inv->email) {
+            return ['ok' => false, 'error' => 'This invitation is for '.$inv->email.'.'];
+        }
+        if ($inv->isExpired()) {
+            return ['ok' => false, 'error' => 'This invitation has expired. Ask the shop to send it again.'];
+        }
+        $s = $inv->supplier;
+        if ($why = self::blocker($u, $s)) {
+            return ['ok' => false, 'error' => str_replace('That account', 'Your account', $why)];
+        }
+        DB::transaction(function () use ($inv, $u, $s) {
+            ShopStaff::updateOrCreate(['supplier_id' => $s->id, 'user_id' => $u->id], ['role' => $inv->role, 'status' => 'active', 'added_by' => $inv->invited_by]);
+            StaffInvite::where('email', $inv->email)->delete(); // other shops' invitations no longer apply
+        });
+        Notifier::notify($s->owner, 'supplier', $u->name.' joined your team', $u->name.' accepted your invitation and is now '.$inv->roleLabel().'.', route('supplier.team', [], false));
+        Notifier::audit('Joined team', $s->name.' · '.$u->name.' ('.$inv->roleLabel().')', $u);
+
+        return ['ok' => true, 'supplier' => $s, 'role' => $inv->roleLabel()];
+    }
+
+    public static function decline(StaffInvite $inv, User $u): array
+    {
+        if (Str::lower($u->email) !== $inv->email) {
+            return ['ok' => false, 'error' => 'This invitation is for '.$inv->email.'.'];
+        }
+        $s = $inv->supplier;
+        $inv->delete();
+        Notifier::notify($s->owner, 'supplier', $u->name.' declined your invitation', $u->name.' will not join '.$s->name.'.', route('supplier.team', [], false));
+
+        return ['ok' => true, 'supplier' => $s];
+    }
+
+    /** A new email: checks the code, creates the account with the person's own password, then joins. */
+    public static function joinNew(StaffInvite $inv, array $data): array
+    {
+        if ($inv->isExpired()) {
+            return ['ok' => false, 'error' => 'This invitation has expired. Ask the shop to send it again.'];
+        }
+        if ($inv->attempts >= StaffInvite::MAX_ATTEMPTS) {
+            return ['ok' => false, 'field' => 'code', 'error' => 'Too many wrong codes. Ask the shop to send the invitation again.'];
+        }
+        if (! $inv->matches((string) ($data['code'] ?? ''))) {
+            $inv->increment('attempts');
+            $left = StaffInvite::MAX_ATTEMPTS - $inv->attempts;
+
+            return ['ok' => false, 'field' => 'code', 'error' => $left > 0 ? 'That code is not right. '.$left.' '.($left === 1 ? 'try' : 'tries').' left.' : 'Too many wrong codes. Ask the shop to send the invitation again.'];
+        }
+        if (User::where('email', $inv->email)->exists()) {
+            return ['ok' => false, 'error' => 'This email now has a PartyRent account. Log in to accept the invitation.'];
+        }
+        $s = $inv->supplier;
+        $u = DB::transaction(function () use ($inv, $data, $s) {
+            $u = User::create([
+                'name' => trim($data['name']), 'email' => $inv->email, 'phone' => trim((string) $data['phone']),
+                'address' => $s->address, 'password' => Hash::make($data['password']),
+                'roles' => ['customer'], 'status' => 'active',
+            ]);
+            $u->forceFill(['email_verified_at' => now()])->save(); // the code proves they own the inbox
 
             return $u;
         });
-        if ($existing) {
-            Notifier::notify($u, 'customer', 'You joined '.$s->name, $by->name.' added you as '.ShopStaff::ORG_ROLES[$role].'. Open your account menu and choose "Switch to Business Mode" to work for the shop.', route('home'));
-        }
-        Notifier::audit('Added employee', $s->name.' · '.$u->name.' ('.ShopStaff::ORG_ROLES[$role].')', $by);
+        Notifier::notify($u, 'customer', 'Welcome to PartyRent! 🎉', 'You can rent party supplies too. To work for '.$s->name.', choose "Switch to Business Mode".', route('home', [], false));
 
-        return ['ok' => true, 'user' => $u->fresh(), 'created' => ! $existing];
+        return self::accept($inv, $u) + ['user' => $u];
     }
 
     /** patch: role | status (active|deactivated). Deactivating ends their access to the shop, not their own account. */
@@ -112,6 +250,10 @@ class ShopStaffs
         if (! empty($patch['status'])) {
             if (! in_array($patch['status'], ['active', 'deactivated'], true)) {
                 return ['ok' => false, 'error' => 'Invalid status.'];
+            }
+            // they may have joined another business (or opened their own shop) since being deactivated here
+            if ($patch['status'] === 'active' && $m->status !== 'active' && ($why = self::blocker($u, $s))) {
+                return ['ok' => false, 'error' => 'Cannot reactivate '.$u->name.': '.lcfirst(str_replace('That account', 'their account', $why))];
             }
             $m->status = $patch['status'];
             $changes[] = 'status: '.$patch['status'];

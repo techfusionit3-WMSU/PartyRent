@@ -154,7 +154,8 @@ class AuthController extends Controller
         $request->session()->regenerate();
         session(['mode' => 'customer']);
 
-        return redirect()->route('profile', ['welcome' => 1])->with('success', 'Email confirmed. Welcome to PartyRent, '.$u->firstName().'! 🎉');
+        // Flashed once: the Browse page shows the welcome modal only right after the account is created.
+        return redirect()->route('home')->with('welcome_new', $u->firstName());
     }
 
     public function registerResend(Request $request)

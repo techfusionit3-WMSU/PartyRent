@@ -113,4 +113,15 @@
   </tbody></table></div>
 </div></div></div>
 @endif
+
+@if(session('welcome_new'))
+<div class="modal-backdrop" id="welcomeModal"><div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+  <div class="modal-head"><h3 id="welcomeTitle">Welcome to {{ setting('platformName') }}! 🎉</h3><button class="icon-btn" type="button" data-close aria-label="Close">{{ icon('x') }}</button></div>
+  <div class="modal-body">
+    <p class="mb-1">Hi {{ session('welcome_new') }}, your account is ready.</p>
+    <p class="muted mb-0">Browse chairs, tents and party supplies from local suppliers, pick your rental dates, and add what you need to your Rental List. Not sure where to start? Let our AI planner suggest everything for your event.</p>
+  </div>
+  <div class="modal-foot"><a class="btn" href="{{ route('ai') }}">{{ icon('sparkle') }}Plan with AI</a><button class="btn btn-primary" type="button" data-close>Start browsing</button></div>
+</div></div>
+@endif
 @endsection

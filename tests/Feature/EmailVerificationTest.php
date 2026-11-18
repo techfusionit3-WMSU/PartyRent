@@ -53,11 +53,14 @@ class EmailVerificationTest extends TestCase
         $this->post('/register/verify', ['code' => $wrong])->assertSessionHasErrors('code');
         $this->assertDatabaseMissing('users', ['email' => 'new.user@gmail.com']);
 
-        $this->post('/register/verify', ['code' => $code])->assertRedirect(route('profile', ['welcome' => 1]));
+        $this->post('/register/verify', ['code' => $code])->assertRedirect(route('home'));
         $u = User::where('email', 'new.user@gmail.com')->firstOrFail();
         $this->assertTrue($u->hasVerifiedEmail());
         $this->assertAuthenticatedAs($u);
         $this->assertSame(0, PendingRegistration::count());
+        // the welcome modal shows on Browse right after sign-up, and only that once
+        $this->get(route('home'))->assertOk()->assertSee('id="welcomeModal"', false);
+        $this->get(route('home'))->assertOk()->assertDontSee('id="welcomeModal"', false);
         $this->get('/cart')->assertOk();
 
         // the password typed at sign-up works
@@ -82,7 +85,7 @@ class EmailVerificationTest extends TestCase
         $this->travel(61)->seconds();
         $this->post('/register/resend')->assertSessionHas('success');
         Notification::assertSentOnDemandTimes(RegistrationCode::class, 2);
-        $this->post('/register/verify', ['code' => $this->latestCode()])->assertRedirect(route('profile', ['welcome' => 1]));
+        $this->post('/register/verify', ['code' => $this->latestCode()])->assertRedirect(route('home'));
         $this->assertDatabaseHas('users', ['email' => 'new.user@gmail.com']);
     }
 

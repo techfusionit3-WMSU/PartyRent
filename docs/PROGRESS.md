@@ -4,6 +4,25 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
+**Feedback batch 2026-11-18** (user pasted list + screenshots). Order / status:
+- [ ] B1 Header: plain search (no AI) + separate square AI button; nav links wrap to a 2nd row on small screens
+      (never hidden); remove category navbar; "Switch to your shop"/"Switch to customer mode" moved under the
+      user profile (tinted background) on both sides
+- [ ] B2 Browse: date + filter bar sits above "Shop by category", below "Your upcoming rentals", sticky without the
+      gap under the header; fewer repeated category blocks
+- [ ] B3 Rental dates (browse bar, product, package): one date by default + "Multiple days" toggle (start/end)
+- [ ] B4 Product + package page: shop card under the photo, same width; nicer availability calendar; delivery &
+      policies moved into the rent box; "different qty per day" only shown for multi-day, uses the chosen dates
+      (no manual add), hides the single qty field when on
+- [ ] B5 Checkout: single (listing) vs rental-list checkout picks the right items; map pin for address; multiple
+      locations = toggle + explainer popup; event date follows multi-day; items + rental time above delivery;
+      split lines grouped per item in one card
+- [ ] B6 Cases: compensation (request / offer, rush fees) for both sides; steps can't be skipped before their
+      requirements; confirm dialog on every irreversible step (supplier request steps too)
+- [ ] B7 Discounts: clear type (percent of item / ₱ per piece / % of whole order); item picker in a popup with
+      search, picked items on top as removable chips; fix stray "@include('partials.badges'..." text on request page
+
+## Previous task
 **v4 port of the reference prototype** (user 2026-11-16; prompt = `PartyRent_port_prompt.md` + "replicate /reference
 exactly"). Reference unzipped (read-only) in `reference/partyrent/`. Step 1 audit done: `docs/PORT_AUDIT.md`,
 `PORTING_CHECKLIST.md`. APPROVED 2026-11-16. User: "always follow the zip UI/UX and do all the prompts".

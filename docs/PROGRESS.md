@@ -8,8 +8,8 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 direct "Request Rental" = cart_lines.direct (checkout?line=); Rentals::stepBlockers gates request steps; case
 proposals carry optional `comp` {amount, payer supplier|customer, reason} + type 'compensation'; discount kinds
 percent | amount | order_percent | order_amount (+ min_amount), Discounts::bestOrder vs item discounts in quoteOrder.
-Not done / open questions: customer-paid case charges are only in pricing totals (no separate line in the charges
-breakdown yet). Order / status:
+Case credits + customer-paid rush costs show as their own lines in partials/rental-charges. Calendar draws only
+its latest response (seq). Order / status:
 - [x] B1 Header: plain search (no AI) + separate square AI button; nav links wrap to a 2nd row on small screens
       (never hidden); remove category navbar; "Switch to your shop"/"Switch to customer mode" moved under the
       user profile (tinted background) on both sides

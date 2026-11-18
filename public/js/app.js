@@ -219,9 +219,11 @@
   /* ---------- availability calendar ---------- */
   function Calendar(el, opts) {
     opts = opts || {};
-    let month = el.dataset.month, need = +(el.dataset.need || 1), selected = [];
+    let month = el.dataset.month, need = +(el.dataset.need || 1), selected = [], seq = 0;
     async function draw() {
-      let r; try { r = await api(window.PR.routes.calendar + '?' + new URLSearchParams({ kind: el.dataset.kind, id: el.dataset.id, month, need })); } catch (err) { el.innerHTML = '<p class="small muted">Calendar unavailable.</p>'; return; }
+      const my = ++seq; // only the latest request may draw (responses can come back out of order)
+      let r; try { r = await api(window.PR.routes.calendar + '?' + new URLSearchParams({ kind: el.dataset.kind, id: el.dataset.id, month, need })); } catch (err) { if (my === seq) el.innerHTML = '<p class="small muted">Calendar unavailable.</p>'; return; }
+      if (my !== seq) return;
       let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => '<div class="dow">' + d + '</div>').join('');
       for (let i = 0; i < r.startPad; i++) cells += '<div class="d blank"></div>';
       const s0 = selected[0], s1 = selected[selected.length - 1];

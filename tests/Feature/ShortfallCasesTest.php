@@ -231,5 +231,6 @@ class ShortfallCasesTest extends TestCase
         $b->refresh();
         $this->assertEqualsWithDelta($total + 120, $b->pricing['total'], 0.001);
         $this->assertEqualsWithDelta(120, $b->fin()['balance'], 0.001); // paid in full before, now owes the rush costs
+        $this->asCustomer($carlo)->get(route('rentals.show', $b))->assertOk()->assertSee('Rush costs')->assertSee('Rush delivery');
     }
 }

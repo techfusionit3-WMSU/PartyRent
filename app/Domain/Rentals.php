@@ -82,7 +82,7 @@ class Rentals
     public static function cartGroups(User $u): array
     {
         $groups = [];
-        foreach (CartLine::where('user_id', $u->id)->orderBy('id')->get() as $c) {
+        foreach (CartLine::where('user_id', $u->id)->where('direct', false)->orderBy('id')->get() as $c) {
             $groups[$c->supplier_id][] = $c->toLine();
         }
 
@@ -91,12 +91,13 @@ class Rentals
 
     public static function cartCount(User $u): int
     {
-        return CartLine::where('user_id', $u->id)->count();
+        return CartLine::where('user_id', $u->id)->where('direct', false)->count();
     }
 
-    public static function cartLinesFor(User $u, int $supplierId): array
+    /** The Rental List lines for one shop; $withDirect also returns "Request Rental" lines (checkout of one listing). */
+    public static function cartLinesFor(User $u, int $supplierId, bool $withDirect = false): array
     {
-        return CartLine::where('user_id', $u->id)->where('supplier_id', $supplierId)->orderBy('id')->get()->map->toLine()->all();
+        return CartLine::where('user_id', $u->id)->where('supplier_id', $supplierId)->when(! $withDirect, fn ($q) => $q->where('direct', false))->orderBy('id')->get()->map->toLine()->all();
     }
 
     /** Days of notice a line needs: a sale item's lead time, or the longest among a package's sale items. */
@@ -183,7 +184,7 @@ class Rentals
      * line; a different time slot is a separate line. Time, duration and stock are validated together with
      * the rest of this supplier's list, inside a transaction that locks the products involved.
      */
-    public static function addToCart(User $u, string $type, int $refId, array $days, ?array $sel = null, ?array $time = null): array
+    public static function addToCart(User $u, string $type, int $refId, array $days, ?array $sel = null, ?array $time = null, bool $direct = false): array
     {
         $item = $type === 'package' ? Package::find($refId) : Product::find($refId);
         if (! self::listed($item)) {
@@ -205,10 +206,14 @@ class Rentals
         $sel = $type === 'package' ? Packages::cleanSel(Packages::def($item), $sel) : null;
         $time = Slots::time(['time' => $time]);
 
-        return DB::transaction(function () use ($u, $type, $refId, $days, $sel, $time, $item) {
+        return DB::transaction(function () use ($u, $type, $refId, $days, $sel, $time, $item, $direct) {
             self::lockProducts([['type' => $type, 'ref_id' => $refId, 'days' => $days, 'sel' => $sel]]);
             inv()->flush();
-            $existing = CartLine::where('user_id', $u->id)->where('type', $type)->where('ref_id', $refId)->get()
+            if ($direct) {
+                // "Request Rental": exactly what is on the listing page, on its own (an earlier unfinished one is dropped)
+                CartLine::where('user_id', $u->id)->where('direct', true)->delete();
+            }
+            $existing = $direct ? null : CartLine::where('user_id', $u->id)->where('direct', false)->where('type', $type)->where('ref_id', $refId)->get()
                 ->first(fn ($c) => self::timeKey(Slots::time($c->toLine())) === self::timeKey($time) && ($type !== 'package' || Packages::cleanSel(Packages::def($item), $c->sel) == $sel));
             $merged = $existing ? $existing->days : [];
             foreach ($days as $d => $q) {
@@ -222,7 +227,7 @@ class Rentals
             if ($e = self::leadTimeError($cand)) {
                 return self::fail($e);
             }
-            $others = array_values(array_filter(self::cartLinesFor($u, $item->supplier_id), fn ($l) => $l['id'] !== $existing?->id));
+            $others = $direct ? [] : array_values(array_filter(self::cartLinesFor($u, $item->supplier_id), fn ($l) => $l['id'] !== $existing?->id));
             if ($issues = self::durationIssues(array_merge($others, [$cand]))) {
                 return self::fail($issues[0]['message'].(($existing || $others) ? ' (This includes dates already in your Rental List for this supplier — submit that request first, then book the other dates separately.)' : ''), ['issues' => $issues]);
             }
@@ -232,11 +237,12 @@ class Rentals
             }
             if ($existing) {
                 $existing->update(['days' => $merged, 'selected' => true]);
+                $line = $existing;
             } else {
-                CartLine::create(['user_id' => $u->id, 'supplier_id' => $item->supplier_id, 'type' => $type, 'ref_id' => $refId, 'days' => $days, 'sel' => $sel, 'time' => $time, 'selected' => true]);
+                $line = CartLine::create(['user_id' => $u->id, 'supplier_id' => $item->supplier_id, 'type' => $type, 'ref_id' => $refId, 'days' => $days, 'sel' => $sel, 'time' => $time, 'selected' => true, 'direct' => $direct]);
             }
 
-            return self::ok(['name' => $item->name, 'supplier_id' => $item->supplier_id]);
+            return self::ok(['name' => $item->name, 'supplier_id' => $item->supplier_id, 'line_id' => $line->id]);
         });
     }
 
@@ -447,7 +453,7 @@ class Rentals
         if ($s->owner_id === $u->id) {
             return self::fail('You cannot rent from your own shop.');
         }
-        $src = array_values(array_filter(self::cartLinesFor($u, $s->id), fn ($l) => in_array($l['id'], array_map('intval', $o['cart_line_ids'] ?? []), true)));
+        $src = array_values(array_filter(self::cartLinesFor($u, $s->id, true), fn ($l) => in_array($l['id'], array_map('intval', $o['cart_line_ids'] ?? []), true)));
         if (! $src) {
             return self::fail('There are no selected items for '.$s->name.' in your rental list.');
         }
@@ -519,7 +525,8 @@ class Rentals
                     'id' => (string) (($d['id'] ?? '') ?: 'd'.($i + 1)), 'label' => trim((string) (($d['label'] ?? '') ?: 'Location '.($i + 1))),
                     'address' => trim((string) ($d['address'] ?? '')), 'zoneId' => in_array($d['zoneId'] ?? '', $zoneIds, true) ? $d['zoneId'] : '',
                     'deliveryTime' => (string) ($d['deliveryTime'] ?? ''), 'contactName' => trim((string) ($d['contactName'] ?? '')), 'contactPhone' => trim((string) ($d['contactPhone'] ?? '')),
-                ];
+                ] + (isset($d['lat'], $d['lng']) && is_numeric($d['lat']) && is_numeric($d['lng']) && abs((float) $d['lat']) <= 90 && abs((float) $d['lng']) <= 180
+                    ? ['lat' => round((float) $d['lat'], 7), 'lng' => round((float) $d['lng'], 7)] : []);
             }
             if (! $destinations) {
                 return self::fail('Add a delivery address.');
@@ -612,7 +619,7 @@ class Rentals
         }
         $result = DB::transaction(function () use ($u, $orders) {
             foreach ($orders as $o) {
-                self::lockProducts(self::cartLinesFor($u, (int) ($o['supplier_id'] ?? 0)));
+                self::lockProducts(self::cartLinesFor($u, (int) ($o['supplier_id'] ?? 0), true));
             }
             inv()->flush();
             $prepared = [];

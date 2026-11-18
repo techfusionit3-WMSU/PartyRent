@@ -71,7 +71,8 @@ class CartController extends Controller
             'then' => 'nullable|in:list,checkout', 'start' => $t, 'end' => $t, 'from' => $t, 'to' => $t]);
         $sel = json_decode((string) ($data['sel'] ?? ''), true);
         $time = ($data['start'] ?? $data['from'] ?? null) ? ['start' => $data['start'] ?? $data['from'], 'end' => $data['end'] ?? $data['to'] ?? ''] : null;
-        $res = Rentals::addToCart($request->user(), $data['type'], (int) $data['ref_id'], (array) json_decode($data['days'], true), is_array($sel) ? $sel : null, $time);
+        $direct = ($data['then'] ?? 'list') === 'checkout' && ! $request->expectsJson();
+        $res = Rentals::addToCart($request->user(), $data['type'], (int) $data['ref_id'], (array) json_decode($data['days'], true), is_array($sel) ? $sel : null, $time, $direct);
         if ($request->expectsJson()) {
             return response()->json($res, $res['ok'] ? 200 : 422);
         }
@@ -79,7 +80,7 @@ class CartController extends Controller
             return back()->with('error', $res['error']);
         }
         if (($data['then'] ?? 'list') === 'checkout') {
-            return redirect()->route('checkout', ['supplier' => $res['supplier_id']]);
+            return redirect()->route('checkout', ['line' => $res['line_id']]);
         }
 
         return back()->with('success', $res['name'].' added to your Rental List.');
@@ -127,8 +128,19 @@ class CartController extends Controller
     {
         $u = $request->user();
         $only = (int) $request->query('supplier');
+        // ?line= : "Request Rental" from a listing = only that item; otherwise the ticked Rental List items (of one shop with ?supplier=)
+        $direct = (int) $request->query('line');
+        if ($direct) {
+            $dl = \App\Models\CartLine::where('user_id', $u->id)->where('direct', true)->find($direct);
+            if (! $dl) {
+                return redirect()->route('cart')->with('warn', 'That checkout has expired. Please request the item again from its page.');
+            }
+            $groups = [$dl->supplier_id => [$dl->toLine()]];
+        } else {
+            $groups = Rentals::cartGroups($u);
+        }
         $orders = [];
-        foreach (Rentals::cartGroups($u) as $sid => $lines) {
+        foreach ($groups as $sid => $lines) {
             $chosen = array_values(array_filter($lines, fn ($l) => $l['selected'] && (! $only || $sid === $only)));
             if (! $chosen || ! ($s = Supplier::find($sid))) {
                 continue;
@@ -158,11 +170,7 @@ class CartController extends Controller
                 ],
             ];
         }
-        if (! $orders) {
-            return view('customer.checkout', ['orders' => [], 'u' => $u, ]);
-        }
-
-        return view('customer.checkout', ['orders' => $orders, 'u' => $u]);
+        return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'direct' => (bool) $direct]);
     }
 
     /** Validate + price the checkout state (no save): per shop the review HTML, plus the order summary. */

@@ -574,3 +574,8 @@
 .cal .d.sel-a, .cal .d.sel-b { background: var(--brand); color: #fff; border-color: var(--brand); }
 .cal .d .a { font-weight: 600; opacity: .9; }
 .cal-hint { display: flex; align-items: center; gap: 6px; }
+/* checkout: one card per item, split parts inside it */
+.item-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.item-card .item-part { margin-top: 10px; }
+.item-card .item-part + .item-part { padding-top: 10px; border-top: 1px dashed var(--line); }
+.item-card .part-lbl { color: var(--purple); margin-bottom: 6px; }

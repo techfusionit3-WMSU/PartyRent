@@ -14,7 +14,7 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [x] B4 Product + package page: shop card under the photo, same width; nicer availability calendar; delivery &
       policies moved into the rent box; "different qty per day" only shown for multi-day, uses the chosen dates
       (no manual add), hides the single qty field when on
-- [ ] B5 Checkout: single (listing) vs rental-list checkout picks the right items; map pin for address; multiple
+- [x] B5 Checkout: single (listing) vs rental-list checkout picks the right items; map pin for address; multiple
       locations = toggle + explainer popup; event date follows multi-day; items + rental time above delivery;
       split lines grouped per item in one card
 - [ ] B6 Cases: compensation (request / offer, rush fees) for both sides; steps can't be skipped before their

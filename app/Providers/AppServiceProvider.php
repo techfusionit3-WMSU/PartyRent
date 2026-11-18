@@ -45,23 +45,27 @@ class AppServiceProvider extends ServiceProvider
             if ($role === 'supplier' && ($shop = $u->shop())) {
                 $badges['cases'] = $openCases()->where('supplier_id', $shop->id)->count();
                 $badges['requests'] = RentalRequest::where('supplier_id', $shop->id)->where('status', 'pending')->count();
-                $badges['payments'] = Payment::where('status', 'pending')->whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $shop->id))->count();
+                $badges['payments'] = Payment::where('status', 'pending')->whereIn('method', ['cash', 'cod'])->whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $shop->id))->count();
             } elseif ($role === 'cashier') {
                 $shop = $u->shop();
-                $badges['verification'] = Payment::where('status', 'pending')->when($shop, fn ($q) => $q->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $shop->id)))->count();
+                // a shop's cashier confirms cash only; PartyRent's cashier checks transfers for every shop
+                $badges['verification'] = $shop
+                    ? Payment::where('status', 'pending')->whereIn('method', ['cash', 'cod'])->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $shop->id))->count()
+                    : Payment::where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->count();
             } elseif ($role === 'superadmin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
                 $badges['cases'] = \App\Models\ShortfallCase::where('status', 'escalated')->count();
-                $badges['verification'] = Payment::where('status', 'pending')->count();
+                $badges['verification'] = Payment::where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
-                $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();
+                $badges['payouts'] = \App\Models\PayoutBatch::where('status', 'pending')->count();
             } elseif ($role === 'admin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
                 $badges['cases'] = \App\Models\ShortfallCase::where('status', 'escalated')->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
-                $badges['payouts'] = \App\Models\Payout::where('status', 'pending')->count();
+                $badges['verification'] = Payment::where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->count();
+                $badges['payouts'] = \App\Models\PayoutBatch::where('status', 'pending')->count();
             }
             $view->with([
                 'shellUser' => $u,

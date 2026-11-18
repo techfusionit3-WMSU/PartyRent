@@ -85,8 +85,10 @@ class RentalLifecycleTest extends TestCase
         $this->assertSame($before, Payment::count());
 
         // 5. the shop's cashier verifies → receipt issued, fully paid
+        // the transfer went to PartyRent's account: the shop's cashier cannot verify it, PartyRent's cashier does
         $cashier = $this->shopCashier($r->code);
-        $this->actingAs($cashier)->withSession(['mode' => 'cashier'])->post("/cashier/payments/{$pay->code}/verify")->assertSessionHas('success');
+        $this->actingAs($cashier)->withSession(['mode' => 'supplier'])->post("/cashier/payments/{$pay->code}/verify")->assertSessionHas('error');
+        $this->actingAs($this->platformCashier())->withSession(['mode' => 'cashier'])->post("/cashier/payments/{$pay->code}/verify")->assertSessionHas('success');
         $pay->refresh();
         $this->assertSame('verified', $pay->status);
         $this->assertNotNull($pay->receipt_no);
@@ -136,10 +138,12 @@ class RentalLifecycleTest extends TestCase
         $this->post("/supplier/requests/{$r->code}/complete")->assertSessionHas('success');
         $this->assertSame('completed', $r->fresh()->status);
 
-        // escrow released: 1,800 income − 5% commission + 500 damages taken from the deposit (the rest of the deposit went back to Maria)
+        // earnings added to the next payout: 1,800 income − 5% commission + 500 damages taken from the deposit.
+        // The deposit was paid in cash to the shop, so the shop already holds those 500: they come off what PartyRent sends.
         $po = \App\Models\Payout::where('rental_request_id', $r->id)->firstOrFail();
         $this->assertSame('pending', $po->status);
-        $this->assertEquals([1800.0, 90.0, 500.0, 2210.0], [$po->income, $po->commission, $po->compensation, $po->net]);
+        $this->assertNull($po->payout_batch_id);
+        $this->assertEquals([1800.0, 90.0, 500.0, 2210.0, 500.0, 1710.0], [$po->income, $po->commission, $po->compensation, $po->earned, $po->cash_kept, $po->net]);
 
         // 8. customer reviews
         $key = array_key_first(\App\Domain\Reviews::reviewables($r->fresh()));

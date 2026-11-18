@@ -46,6 +46,15 @@ abstract class TestCase extends BaseTestCase
         ]);
     }
 
+    /** PartyRent's own cashier (no shop): checks bank / debit transfers for every shop. */
+    protected function platformCashier(): User
+    {
+        $u = User::firstOrCreate(['email' => 'cashier@partyrent.test'], ['name' => 'PartyRent Cashier', 'phone' => '0917 000 0001', 'address' => 'Makati City', 'roles' => ['cashier'], 'status' => 'active', 'password' => 'password']);
+        $u->forceFill(['email_verified_at' => now()])->save();
+
+        return $u;
+    }
+
     /** v4: each shop has its own cashier. Give the request's shop one (the seed only has Grace at Elegant Occasion). */
     protected function shopCashier(string $code): User
     {
@@ -54,7 +63,7 @@ abstract class TestCase extends BaseTestCase
         if ($existing) {
             return User::find($existing);
         }
-        $u = User::create(['name' => 'Shop Cashier', 'email' => 'cashier'.$r->supplier_id.'@shop.test', 'phone' => '0917 000 0000', 'address' => 'Quezon City', 'roles' => ['cashier'], 'status' => 'active', 'password' => 'password']);
+        $u = User::create(['name' => 'Shop Cashier', 'email' => 'cashier'.$r->supplier_id.'@shop.test', 'phone' => '0917 000 0000', 'address' => 'Quezon City', 'roles' => ['customer'], 'status' => 'active', 'password' => 'password']);
         $u->email_verified_at = now();
         $u->save();
         ShopStaff::create(['supplier_id' => $r->supplier_id, 'user_id' => $u->id, 'role' => 'cashier']);

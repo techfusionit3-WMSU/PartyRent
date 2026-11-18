@@ -7,5 +7,9 @@
   @if($b['delivery'] > 0)<div class="row between"><span>Delivery fee <span class="small muted">no commission</span></span><span class="num">+ {{ money($b['delivery']) }}</span></div>@endif
   @if($b['voucher'] > 0)<div class="row between"><span>Free Shipping voucher <span class="small muted">paid by PartyRent</span></span><span class="num">+ {{ money($b['voucher']) }}</span></div>@endif
   @if($b['compensation'] > 0)<div class="row between"><span>Damage charges <span class="small muted">no commission</span></span><span class="num">+ {{ money($b['compensation']) }}</span></div>@endif
-  <div class="row between strong" style="border-top:1px solid var(--line);padding-top:6px;margin-top:4px"><span>{{ $netLabel ?? 'You receive' }}</span><span class="num">{{ money($b['net']) }}</span></div>
+  @if(abs($b['cashKept'] ?? 0) >= 0.005)
+    <div class="row between strong" style="border-top:1px solid var(--line);padding-top:6px;margin-top:4px"><span>You earned</span><span class="num">{{ money($b['earned']) }}</span></div>
+    <div class="row between"><span>Cash you already collected <span class="small muted">yours already</span></span><span class="num">− {{ money($b['cashKept']) }}</span></div>
+  @endif
+  <div class="row between strong" style="border-top:1px solid var(--line);padding-top:6px;margin-top:4px"><span>{{ $netLabel ?? 'You receive' }}</span><span class="num">{{ $b['net'] < 0 ? '− '.money(-$b['net']) : money($b['net']) }}</span></div>
 </div>

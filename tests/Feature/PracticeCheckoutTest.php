@@ -64,7 +64,7 @@ class PracticeCheckoutTest extends TestCase
         $this->assertStringContainsString('Maya', $p->notes);
         $this->assertNotNull($p->receipt_no);
         $this->assertTrue($r->fresh()->fin()['reservationConfirmed']);
-        $this->assertTrue(AppNotification::where('user_id', $r->supplier->owner_id)->where('title', 'Payment verified')->exists());
+        $this->assertTrue(AppNotification::where('user_id', $r->supplier->owner_id)->where('title', 'Payment confirmed')->exists());
 
         // the finished checkout page just sends the customer back
         $this->as('jose@demo.ph', 'customer')->get('/practice-checkout/'.$p->gateway_ref)->assertRedirect('/rentals/PR-0003');

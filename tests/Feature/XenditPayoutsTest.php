@@ -6,6 +6,7 @@ use App\Domain\Payouts;
 use App\Domain\Settings;
 use App\Domain\XenditPayouts;
 use App\Models\Payout;
+use App\Models\PayoutBatch;
 use App\Models\RentalRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,9 +48,12 @@ class XenditPayoutsTest extends TestCase
         return $this->actingAs(User::where('email', 'admin@partyrent.ph')->firstOrFail())->withSession(['mode' => 'admin']);
     }
 
-    private function pending(string $method = 'gcash', ?string $bank = null): Payout
+    /** A payout ready to send (a shop's 15-day period just ended with ₱1,500 to pay). */
+    private function pending(string $method = 'gcash', ?string $bank = null): PayoutBatch
     {
-        $p = Payout::where('status', 'pending')->with('supplier')->firstOrFail();
+        $s = \App\Models\Supplier::where('status', 'approved')->firstOrFail();
+        $p = PayoutBatch::create(['code' => Payouts::nextCode(), 'supplier_id' => $s->id, 'schedule' => 'half_month', 'period_start' => add_days(today_iso(), -15), 'period_end' => add_days(today_iso(), -1),
+            'earned' => 1500, 'commission' => 75, 'net' => 1500, 'status' => 'pending']);
         $p->supplier->update(['payout_method' => $method, 'payout_bank' => $bank, 'payout_account_name' => 'Juan Dela Cruz', 'payout_account_no' => '0917 555 0101']);
 
         return $p->fresh('supplier');
@@ -118,18 +122,24 @@ class XenditPayoutsTest extends TestCase
         $this->assertSame(0, $this->posts);
     }
 
-    public function test_automatic_payout_when_a_rental_is_released(): void
+    public function test_automatic_payout_when_the_period_ends(): void
     {
         Settings::set('payoutAuto', true);
         $this->status = 'SUCCEEDED';
-        $p = Payout::with('rentalRequest', 'supplier')->firstOrFail();
-        $r = $p->rentalRequest;
-        $p->supplier->update(['payout_method' => 'gcash', 'payout_bank' => null, 'payout_account_name' => 'Juan', 'payout_account_no' => '09175550101']);
-        $p->delete(); // release it again, as if the rental was just completed
-
-        $res = Payouts::release(RentalRequest::findOrFail($r->id));
-        $this->assertTrue($res['ok']);
-        $this->assertSame('paid', $res['payout']->fresh()->status);
-        $this->assertSame(1, $this->posts);
+        foreach (\App\Models\Supplier::all() as $s) {
+            $s->update(['payout_method' => 'gcash', 'payout_bank' => null, 'payout_account_name' => 'Owner', 'payout_account_no' => '09175550101']);
+        }
+        // a completed rental earned ₱2,000 for a shop that owes nothing
+        $r = RentalRequest::whereNotIn('id', Payout::select('rental_request_id'))->whereNotIn('supplier_id', PayoutBatch::select('supplier_id'))->firstOrFail();
+        Payout::create(['code' => 'EA-T1', 'supplier_id' => $r->supplier_id, 'rental_request_id' => $r->id, 'income' => 2105.26, 'commission_pct' => 5, 'commission' => 105.26,
+            'compensation' => 0, 'earned' => 2000, 'cash_kept' => 0, 'net' => 2000, 'status' => 'pending', 'created_at' => now()->subDays(20)]);
+        $made = Payouts::closeDue(add_days(today_iso(), 40));
+        $this->assertGreaterThan(0, $made);
+        $this->assertSame(2000.0, PayoutBatch::where('supplier_id', $r->supplier_id)->value('net'));
+        $sent = PayoutBatch::where('status', 'paid')->where('gateway', 'xendit')->get();
+        $this->assertSame($sent->count(), $this->posts);
+        $this->assertGreaterThan(0, $sent->count());
+        // the earnings inside are paid too
+        $this->assertSame(0, Payout::whereIn('payout_batch_id', $sent->pluck('id'))->where('status', '!=', 'paid')->count());
     }
 }

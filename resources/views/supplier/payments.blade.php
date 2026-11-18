@@ -2,15 +2,15 @@
 
 {{-- Reference SP.payments + Shared.reviewPayment --}}
 @section('content')
-<div class="page-head"><div><h1>Payment Monitoring</h1><p>Your shop verifies its own payments{!! $cashiers->isNotEmpty() ? ' (Cashier: '.e($cashiers->pluck('name')->implode(', ')).')' : ' — as an individual supplier you can verify and record them yourself, or add a Cashier under Team &amp; Roles' !!}. Only verified payments count toward balances.</p></div></div>
+<div class="page-head"><div><h1>Payment Monitoring</h1><p>Online payments are confirmed automatically, and PartyRent checks bank and debit transfers (the money goes to PartyRent's account). Your shop only records and confirms <b>cash</b> you receive{!! $cashiers->isNotEmpty() ? ' (Cashier: '.e($cashiers->pluck('name')->implode(', ')).')' : '' !!}. Only confirmed payments count toward balances. Your money comes in your <a href="{{ route('supplier.payouts') }}">payouts</a>.</p></div></div>
 <div class="stats mb-3">
   @include('partials.stat', ['label' => 'Collected (verified)', 'value' => money_short($collected), 'sub' => 'rental payments', 'icon' => 'check', 'color' => 'teal'])
-  @include('partials.stat', ['label' => 'Awaiting verification', 'value' => money_short($pend->sum('amount')), 'sub' => $pend->count().' submissions', 'icon' => 'clock', 'color' => 'gold'])
+  @include('partials.stat', ['label' => 'Waiting for confirmation', 'value' => money_short($pend->sum('amount')), 'sub' => $pend->count().' submissions', 'icon' => 'clock', 'color' => 'gold'])
   @include('partials.stat', ['label' => 'Outstanding balances', 'value' => money_short($outstanding), 'icon' => 'cash', 'color' => 'pink'])
   @include('partials.stat', ['label' => 'Overdue', 'value' => money_short($overdue->sum(fn ($x) => $x['f']['overdueAmount'])), 'sub' => $overdue->count().' rentals', 'icon' => 'alert', 'color' => 'red'])
   @include('partials.stat', ['label' => 'Deposits held', 'value' => money_short($depositsHeld), 'sub' => 'refundable — not income', 'icon' => 'shield', 'color' => 'purple'])
 </div>
-<div class="tabs">@foreach([['verify', 'Verification queue', $pend->count()], ['balances', 'Balances by order', null], ['overdue', 'Overdue', $overdue->count()], ['history', 'Payment records', $pays->count()]] as [$k, $l, $c])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.payments', ['tab' => $k]) }}">{{ $l }}@if($c !== null)<span class="count">{{ $c }}</span>@endif</a>@endforeach</div>
+<div class="tabs">@foreach([['verify', 'Waiting for confirmation', $pend->count()], ['balances', 'Balances by order', null], ['overdue', 'Overdue', $overdue->count()], ['history', 'Payment records', $pays->count()]] as [$k, $l, $c])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.payments', ['tab' => $k]) }}">{{ $l }}@if($c !== null)<span class="count">{{ $c }}</span>@endif</a>@endforeach</div>
 <div class="card pad-0">
   @if(in_array($tab, ['verify', 'history'], true))
     @php($rows = $tab === 'verify' ? $pend : $pays)
@@ -26,8 +26,9 @@
           <td data-label="Type">{{ $p->typeLabel() }}</td>
           <td data-label="Method"><div>{{ $p->methodLabel() }}<div class="small muted">{{ $p->reference }}</div></div></td>
           <td data-label="Amount" class="num"><b>{{ money($p->amount) }}</b></td>
-          <td data-label="Status">@include('partials.badges', ['ver' => $p->status])</td>
-          <td>@if($p->status === 'pending')<button class="btn btn-xs {{ $canVerify ? 'btn-primary' : '' }}" data-modal="pay{{ $p->id }}">{{ $canVerify ? 'Review' : 'View' }}</button>@elseif($p->receipt_no)<a class="btn btn-xs" href="{{ route('payments.receipt', $p) }}" target="_blank">{{ $p->receipt_no }}</a>@endif</td>
+          @php($cv = \App\Domain\Rentals::canVerify($p, auth()->user()))
+          <td data-label="Status">@include('partials.badges', ['ver' => $p->status])@if($p->status === 'pending' && ! $cv)<div class="small muted">PartyRent is checking</div>@endif</td>
+          <td>@if($p->status === 'pending')<button class="btn btn-xs {{ $cv ? 'btn-primary' : '' }}" data-modal="pay{{ $p->id }}">{{ $cv ? 'Review' : 'View' }}</button>@elseif($p->receipt_no)<a class="btn btn-xs" href="{{ route('payments.receipt', $p) }}" target="_blank">{{ $p->receipt_no }}</a>@endif</td>
         </tr>
       @endforeach
     </tbody></table></div>
@@ -73,12 +74,14 @@
       </div>
       @if($dupRef)<div class="alert alert-warn mt-1">{{ icon('alert') }}<div>This reference number was already used on another payment. Check for duplicates.</div></div>@endif
       @if($rental && $p->amount > $f['balance'] + 0.001)<div class="alert alert-danger mt-1">{{ icon('alert') }}<div>Amount exceeds the outstanding balance. Reject it or ask the customer to correct it.</div></div>@endif
-      @if($canVerify)
+      @php($cv = \App\Domain\Rentals::canVerify($p, auth()->user()))
+      @unless($cv)<div class="alert alert-info mt-2">{{ icon('clock') }}<div>This {{ strtolower($p->methodLabel()) }} went to PartyRent's account, so PartyRent checks it. You are notified as soon as it is confirmed.</div></div>@endunless
+      @if($cv)
         <form method="POST" action="{{ route('supplier.payments.reject', $p) }}" class="mt-2" id="rej{{ $p->id }}" hidden>@csrf<div class="field"><label>Reason (sent to the customer)</label><textarea class="input" name="reason" required placeholder="e.g. Reference number not found / proof unreadable"></textarea></div><button class="btn btn-danger">Reject payment</button></form>
       @endif
     </div>
     <div class="modal-foot"><button type="button" class="btn" data-close>Close</button>
-      @if($canVerify)
+      @if($cv)
         <button type="button" class="btn btn-danger" onclick="var f=document.getElementById('rej{{ $p->id }}');f.hidden=false;f.querySelector('textarea').focus()">{{ icon('x') }}Reject</button>
         <form method="POST" action="{{ route('supplier.payments.verify', $p) }}" data-confirm-title="Verify payment?" data-confirm="Confirm that {{ money($p->amount) }} (ref {{ $p->reference ?: '—' }}) was received. A receipt will be issued and the balance updated for the customer." data-confirm-ok="Verify">@csrf<button class="btn btn-success">{{ icon('check') }}Verify &amp; issue receipt</button></form>
       @endif

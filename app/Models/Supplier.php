@@ -42,6 +42,15 @@ class Supplier extends Model
     public function products(): HasMany { return $this->hasMany(Product::class); }
     public function locations(): HasMany { return $this->hasMany(InventoryLocation::class)->orderBy('id'); }
     public function payouts(): HasMany { return $this->hasMany(Payout::class); }
+    public function payoutBatches(): HasMany { return $this->hasMany(PayoutBatch::class); }
+
+    /** Payment methods customers can choose now: cash is paused while the shop owes PartyRent too long. */
+    public function acceptedMethods(): array
+    {
+        $m = $this->methods ?? [];
+
+        return in_array('cash', $m, true) && \App\Domain\Payouts::cashPaused($this) ? array_values(array_diff($m, ['cash'])) : $m;
+    }
 
     public function hasPayoutAccount(): bool { return (bool) $this->payout_method && $this->payout_account_name && $this->payout_account_no; }
 

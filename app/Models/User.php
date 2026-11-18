@@ -28,6 +28,8 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         'categories.manage' => 'Manage categories',
         'transactions.view' => 'View transactions & reservations',
         'payouts.manage' => 'Release & send supplier payouts',
+        'payments.verify' => 'Verify customer bank / debit transfers',
+        'payments.record' => 'Record payments & refunds PartyRent sends',
         'complaints.manage' => 'Handle complaints',
         'reports.view' => 'View reports',
     ];

@@ -1,7 +1,8 @@
 @extends('layouts.dash', ['title' => 'Payment Verification', 'nav' => 'verification'])
 
 @section('content')
-<div class="page-head"><div><h1>Payment verification</h1><p>Check each submission against the bank statement or cash count. A payment only reduces the balance once you verify it.</p></div></div>
+@php($shopCashier = auth()->user()->isShopCashier())
+<div class="page-head"><div><h1>{{ $shopCashier ? 'Payments to confirm' : 'Payment verification' }}</h1><p>@if($shopCashier)Confirm <b>cash</b> once you have it in hand. Bank and debit transfers go to PartyRent's account, so PartyRent checks them; they are listed here so you know what is coming.@else Check each bank or debit transfer against PartyRent's account statement. Online payments are confirmed automatically. A payment only reduces the balance once it is verified.@endif</p></div></div>
 @if($list->isEmpty())
   <div class="card">@include('partials.empty', ['emoji' => '✅', 'title' => 'All caught up', 'text' => 'No payments are waiting for verification.'])</div>
 @else
@@ -26,10 +27,14 @@
         @if($dupVerified)<div class="alert alert-danger mt-1">{{ icon('alert') }}<div><b>Reference already used.</b> {{ $p->reference }} was verified on {{ $dupVerified->code }} ({{ $dupVerified->rentalRequest->code }}). This is probably a reused receipt. Reject it unless the bank shows two separate transfers.</div></div>
         @elseif($dups->isNotEmpty())<div class="alert alert-warn mt-1">{{ icon('alert') }}<div><b>Same reference on another submission:</b> {{ $dups->map(fn ($d) => $d->code.' ('.$d->rentalRequest->code.')')->implode(', ') }}. Only one of them can be real.</div></div>@endif
         @if($over)<div class="alert alert-danger mt-1">{{ icon('alert') }}<div>This payment exceeds the remaining balance of {{ money($f['balance']) }}. Reject it or ask the customer to correct the amount.</div></div>@endif
+        @if(! \App\Domain\Rentals::canVerify($p, auth()->user()))
+          <div class="alert alert-info mt-2">{{ icon('clock') }}<div>PartyRent is checking this transfer. You and the customer are notified as soon as it is confirmed.</div></div>
+        @else
         <div class="row wrap mt-2" style="justify-content:flex-end;gap:8px">
           <form method="POST" action="{{ route('cashier.reject', $p) }}" class="row" style="gap:6px">@csrf<input class="input input-sm" name="reason" required placeholder="Reason for rejection" style="width:260px" maxlength="500"><button class="btn btn-danger btn-sm">{{ icon('x') }}Reject</button></form>
           <form method="POST" action="{{ route('cashier.verify', $p) }}" data-confirm="Verify {{ $p->code }} for {{ money($p->amount) }}? A receipt will be issued and the balance updated." data-confirm-title="Verify payment?" data-confirm-ok="Verify & issue receipt">@csrf<button class="btn btn-success btn-sm" @disabled($over || $dupVerified)>{{ icon('check') }}Verify</button></form>
         </div>
+        @endif
       </div>
     @endforeach
   </div>

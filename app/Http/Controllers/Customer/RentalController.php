@@ -150,7 +150,7 @@ class RentalController extends Controller
             // Cash goes straight to the shop (on delivery, at pickup or at the shop); the shop records it and the receipt appears here.
             return back()->with('warn', 'Cash is paid to '.$r->supplier->name.' in person. They record it on their side and your receipt shows up here — nothing to submit.');
         }
-        if (! in_array($data['method'], $r->supplier->methods, true)) {
+        if (! in_array($data['method'], $r->supplier->acceptedMethods(), true)) {
             return back()->with('error', 'This supplier does not accept that payment method.');
         }
         $bank = in_array($data['method'], ['bank', 'debit'], true);
@@ -239,5 +239,15 @@ class RentalController extends Controller
         $reqs = RentalRequest::where('customer_id', $u->id)->get();
 
         return view('customer.profile', ['u' => $u, 'sup' => $u->supplier, 'reqs' => $reqs, 'welcome' => $request->boolean('welcome')]);
+    }
+
+    /** "Not right?" on a cash payment the shop recorded: goes to PartyRent support. */
+    public function disputeCash(Request $request, RentalRequest $rentalRequest, \App\Models\Payment $payment)
+    {
+        abort_unless($rentalRequest->customer_id === $request->user()->id && $payment->rental_request_id === $rentalRequest->id, 404);
+        $data = $request->validate(['why' => 'required|string|min:5|max:1000']);
+        $res = \App\Domain\Rentals::disputeCash($payment, $request->user(), $data['why']);
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Thanks for telling us. PartyRent support ('.$res['complaint']->code.') will look into it and get back to you.' : $res['error']);
     }
 }

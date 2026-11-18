@@ -11,7 +11,16 @@
         <td data-label="Amount" class="num"><b>{{ $p->isOutflow() ? '− ' : '' }}{{ money($p->amount) }}</b></td>
         <td data-label="Status">@include('partials.badges', ['ver' => $p->status])@if($p->reject_reason)<div class="small" style="color:var(--red)">{{ $p->reject_reason }}</div>@endif</td>
         <td data-label="">@if($p->receipt_no)<a class="btn btn-xs" href="{{ route('payments.receipt', $p) }}" target="_blank">{{ $p->receipt_no }}</a>@endif @if($p->proof_path)<a class="btn btn-xs btn-ghost" href="{{ route('payments.proof', $p) }}" target="_blank">Proof</a>@endif
-          @if(! empty($inlineVerify) && $p->status === 'pending' && ! $p->isOutflow())
+          @if(! empty($inlineVerify) && $p->status === 'pending' && ! $p->isOutflow() && ! \App\Domain\Rentals::canVerify($p, auth()->user()))
+            <div class="small muted mt-1">PartyRent is checking this transfer.</div>
+          @endif
+          @if($p->disputed_at)<div class="small mt-1" style="color:var(--red)">{{ icon('flag', 'width:12px') }} Reported by the customer · PartyRent support is reviewing</div>@endif
+          @if(auth()->id() === $r->customer_id && \App\Domain\Payouts::isCash($p->method) && $p->status === 'verified' && $p->type !== 'refund' && ! $p->disputed_at)
+            <details class="inline-reject mt-1"><summary class="btn btn-xs btn-ghost">Not right?</summary>
+              <form method="POST" action="{{ route('rentals.dispute', [$r, $p]) }}" class="mt-1">@csrf<p class="small muted mb-1">The shop recorded this cash payment. If you did not pay it, or paid a different amount, tell PartyRent support.</p><textarea class="input" name="why" rows="2" required minlength="5" maxlength="1000" placeholder="e.g. I paid ₱2,000, not ₱5,000"></textarea><button class="btn btn-xs btn-danger mt-1">Report to PartyRent</button></form>
+            </details>
+          @endif
+          @if(! empty($inlineVerify) && $p->status === 'pending' && ! $p->isOutflow() && \App\Domain\Rentals::canVerify($p, auth()->user()))
             <div class="inline-verify">
               <form method="POST" action="{{ route('supplier.payments.verify', $p) }}" data-confirm-title="Verify {{ $p->code }}?" data-confirm="Confirm that {{ money($p->amount) }} ({{ $p->methodLabel() }}{{ $p->reference ? ', ref '.$p->reference : '' }}) was received. A receipt is issued and the customer's balance updated." data-confirm-ok="Verify">@csrf<button class="btn btn-xs btn-success">{{ icon('check') }}Verify</button></form>
               <details class="inline-reject"><summary class="btn btn-xs btn-ghost">Reject</summary>

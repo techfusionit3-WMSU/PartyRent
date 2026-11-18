@@ -49,6 +49,13 @@ class Notifier
         }
     }
 
+    /** Money PartyRent itself must handle (refunds of money it holds, transfers to check): its cashiers and admins. */
+    public static function platformFinance(string $title, string $body, string $link = ''): void
+    {
+        self::notify('cashier', 'cashier', $title, $body, $link);
+        self::notify('admin', 'admin', $title, $body, $link);
+    }
+
     /** Notifications visible to a user in their current mode (superadmin also sees admin alerts). */
     public static function for(User $u, ?string $mode): Collection
     {
@@ -56,8 +63,11 @@ class Notifier
 
         return AppNotification::query()
             ->where(function ($q) use ($u, $role) {
-                $q->where(fn ($d) => $d->where('user_id', $u->id)->where('scope', $role))
-                    ->orWhere('role', $role);
+                $q->where(fn ($d) => $d->where('user_id', $u->id)->where('scope', $role));
+                // Role-wide alerts are for PartyRent's staff; a shop's own cashier only gets their shop's.
+                if (! ($role === 'cashier' && $u->isShopCashier())) {
+                    $q->orWhere('role', $role);
+                }
                 // Business staff see the shop's notifications (sent to the owner).
                 if ($role === 'supplier' && ($shop = $u->shop()) && $shop->owner_id !== $u->id) {
                     $q->orWhere(fn ($d) => $d->where('user_id', $shop->owner_id)->where('scope', 'supplier'));

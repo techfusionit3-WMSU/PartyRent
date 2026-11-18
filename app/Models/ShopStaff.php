@@ -67,7 +67,7 @@ class ShopStaff extends Model
         'locations' => 'locations.manage', 'locations.*' => 'locations.manage',
         'damages' => 'returns.inspect', 'damages.*' => 'returns.inspect',
         'payments' => 'payments.view', 'payments.*' => 'payments.verify',
-        'payouts' => 'payments.view', 'payouts.account' => 'shop.manage',
+        'payouts' => 'payments.view', 'payouts.account' => 'shop.manage', 'payouts.schedule' => 'shop.manage',
         'reports' => 'reports.view', 'reports.*' => 'reports.view',
         'shop' => 'shop.manage', 'shop.*' => 'shop.manage', 'business' => 'shop.manage',
         'team' => 'team.manage', 'team.*' => 'team.manage', 'staff' => 'team.manage', 'staff.*' => 'team.manage',

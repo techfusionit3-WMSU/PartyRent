@@ -2,7 +2,8 @@
 
 @section('content')
 <div data-leave-warn="dirty" data-leave-msg="This payment has not been recorded yet. Leave anyway?" hidden></div>
-<div class="page-head"><div><h1>Record payment or refund</h1><p>For authorized over-the-counter payments and refunds. Recorded entries are verified immediately and a receipt is issued.</p></div></div>
+@php($shopSide = ! \App\Domain\Rentals::platformCan(auth()->user(), 'payments.record'))
+<div class="page-head"><div><h1>{{ $shopSide ? 'Record cash' : 'Record payment or refund' }}</h1><p>@if($shopSide)Cash the customer handed to your shop, or cash you gave back. It counts at once and the customer gets a receipt. The cash is yours: it is taken off your next payout from PartyRent.@else For authorized payments and refunds PartyRent handled by hand. Recorded entries are verified immediately and a receipt is issued.@endif</p></div></div>
 <form method="GET" class="card row wrap mb-2" style="gap:8px">
   <label for="rq" class="strong">Rental request</label>
   <input class="input" id="rq" name="request" list="openReqs" value="{{ $code }}" placeholder="e.g. PR-0001" style="max-width:220px" required>
@@ -18,11 +19,12 @@
       <h3>{{ $r->code }} · {{ $r->event_name }}</h3><p class="small muted">{{ $r->customer->name }} · @include('partials.badges', ['status' => $r->status])</p>
       <div class="form-grid">
         <div class="field"><label>Type</label><select class="input" name="type">@foreach(\App\Models\Payment::TYPE_LABEL as $k => $l)@continue($k === 'deposit_refund')<option value="{{ $k }}" @selected(old('type') === $k)>{{ $l }}</option>@endforeach</select><div class="hint">Deposit refunds are created when the rental's deposit is settled after the return inspection.</div></div>
-        <div class="field"><label>Method</label><select class="input" name="method"><option value="cash">Cash (over the counter)</option><option value="bank">Online bank transfer</option><option value="debit">Debit card</option></select></div>
-        @if($accounts->isNotEmpty())<div class="field"><label>Received into (bank / GCash)</label><select class="input" name="pay_account"><option value="">— not a transfer —</option>@foreach($accounts as $a)<option value="{{ $a->id }}" @selected((string) old('pay_account') === (string) $a->id)>{{ $a->display() }}{{ $a->active ? '' : ' (off)' }}</option>@endforeach</select></div>@endif
+        @if($shopSide)<input type="hidden" name="method" value="cash"><div class="field"><label>Method</label><div class="input" style="background:var(--soft, #f7f5fa)">Cash</div><div class="hint">Bank and debit transfers go to PartyRent, which records them.</div></div>
+        @else<div class="field"><label>Method</label><select class="input" name="method"><option value="cash">Cash (over the counter)</option><option value="bank">Online bank transfer</option><option value="debit">Debit card</option></select></div>@endif
+        @if($accounts->isNotEmpty() && ! $shopSide)<div class="field"><label>Received into (bank / GCash)</label><select class="input" name="pay_account"><option value="">— not a transfer —</option>@foreach($accounts as $a)<option value="{{ $a->id }}" @selected((string) old('pay_account') === (string) $a->id)>{{ $a->display() }}{{ $a->active ? '' : ' (off)' }}</option>@endforeach</select></div>@endif
         <div class="field"><label>Amount (₱)</label><input class="input" type="number" min="1" step="0.01" name="amount" required value="{{ old('amount', $f['balance'] ?: '') }}"></div>
         <div class="field"><label>Date</label><input class="input" type="date" name="date" value="{{ old('date', today_iso()) }}" max="{{ today_iso() }}" required></div>
-        <div class="field full"><label>Official reference / OR number</label><input class="input" name="reference" required maxlength="80" value="{{ old('reference') }}"></div>
+        <div class="field full"><label>Official reference / OR number @if($shopSide)<span class="muted small">(optional for cash)</span>@endif</label><input class="input" name="reference" @unless($shopSide) required @endunless maxlength="80" value="{{ old('reference') }}"></div>
         <div class="field full"><label>Notes</label><input class="input" name="notes" maxlength="255" value="{{ old('notes') }}"></div>
       </div>
       <button class="btn btn-primary" data-busy="Recording…">{{ icon('check') }}Record & issue receipt</button>

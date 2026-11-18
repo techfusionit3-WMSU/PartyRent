@@ -41,9 +41,9 @@ class PaymentReminderTest extends TestCase
     {
         $r = $this->accepted(RentalRequest::where('status', 'pending')->firstOrFail()->code);
         $owner = User::find($r->supplier->owner_id);
-        $p = Payment::create(['code' => 'PAY-INL1', 'rental_request_id' => $r->id, 'type' => 'down', 'method' => 'bank', 'amount' => 100,
+        $p = Payment::create(['code' => 'PAY-INL1', 'rental_request_id' => $r->id, 'type' => 'down', 'method' => 'cash', 'amount' => 100,
             'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'INL-REF-1', 'status' => 'pending']);
-        // a shop without its own cashier verifies its payments itself
+        // a shop without its own cashier confirms its cash itself
         \App\Models\ShopStaff::where('supplier_id', $r->supplier_id)->where('role', 'cashier')->delete();
 
         $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get('/supplier/requests/'.$r->code)

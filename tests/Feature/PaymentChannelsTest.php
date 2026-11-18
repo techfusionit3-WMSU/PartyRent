@@ -131,11 +131,11 @@ class PaymentChannelsTest extends TestCase
             ->assertSessionHas('success');
 
         // the cashier sees where to look
-        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertSee('Paid to')->assertSee('GCash 0917 555 0142');
+        $this->actingAs($this->platformCashier())->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertSee('Paid to')->assertSee('GCash 0917 555 0142');
         $this->super()->get('/superadmin/pay-accounts')->assertSee(money(50).' left');
 
         // a rejected payment frees the room again
-        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->post("/cashier/payments/{$p->code}/reject", ['reason' => 'not found']);
+        $this->actingAs($this->platformCashier())->withSession(['mode' => 'cashier'])->post("/cashier/payments/{$p->code}/reject", ['reason' => 'not found']);
         $this->assertEquals($amt + 50, $gcash->room());
     }
 
@@ -156,7 +156,7 @@ class PaymentChannelsTest extends TestCase
         $this->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => 1, 'method' => 'bank', 'pay_account' => $bdo, 'reference' => 'UB22O1A9', 'proof' => $this->proof()])->assertSessionHas('error');
 
         // the cashier's own bank records are checked too, and can say which account received it
-        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])
+        $this->actingAs($this->platformCashier())->withSession(['mode' => 'cashier'])
             ->post('/cashier/record', ['request' => 'PR-0001', 'type' => 'installment', 'method' => 'bank', 'amount' => 10, 'date' => today_iso(), 'reference' => 'BDO-884377'])
             ->assertSessionHas('error', fn ($e) => str_contains($e, 'already used'));
         $this->get('/cashier/record?request=PR-0001')->assertSee('Received into');
@@ -173,7 +173,7 @@ class PaymentChannelsTest extends TestCase
             'date' => today_iso(), 'reference' => 'bdo884377', 'status' => 'pending', 'recorded_by' => 'customer', 'submitted_at' => now()]);
         $this->assertSame('BDO884377', $p->reference_key);
 
-        $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertOk()->assertSee('Reference already used')->assertSee('TXN-10002');
+        $this->actingAs($this->platformCashier())->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertOk()->assertSee('Reference already used')->assertSee('TXN-10002');
         $this->post('/cashier/payments/TXN-99001/verify')->assertSessionHas('error', fn ($e) => str_contains($e, 'already verified'));
         $this->assertSame('pending', $p->fresh()->status);
     }

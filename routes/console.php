@@ -20,6 +20,13 @@ Artisan::command('partyrent:escalate-cases', function () {
 
 Schedule::command('partyrent:escalate-cases')->everyFifteenMinutes();
 
+/* Scheduled supplier payouts: when a shop's period (15 days or a month) ends, its earnings become one payout. */
+Artisan::command('partyrent:payouts', function () {
+    $this->info(\App\Domain\Payouts::closeDue().' payout(s) prepared.');
+})->purpose('Prepare the supplier payouts whose period ended');
+
+Schedule::command('partyrent:payouts')->dailyAt('00:30');
+
 /* Check the mail setup: php artisan partyrent:mail-test you@gmail.com */
 Artisan::command('partyrent:mail-test {to?}', function (?string $to = null) {
     $to = $to ?: config('mail.from.address');

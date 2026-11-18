@@ -480,7 +480,7 @@ class Ai
             if ($sup) {
                 $plans = implode('<br>', array_map(fn ($k) => '<b>'.e(\App\Domain\Finance::PLAN_LABEL[$k]).'</b>: '.e(\App\Domain\Finance::planSummary($sup, $k)), \App\Domain\Finance::plansOf($sup)));
 
-                return $reply('<b>'.e($sup->name).'</b> accepts '.e(implode(', ', array_map(fn ($m) => Payment::METHOD_LABEL[$m] ?? $m, $sup->methods))).'.<br>'.$plans);
+                return $reply('<b>'.e($sup->name).'</b> accepts '.e(implode(', ', array_map(fn ($m) => Payment::METHOD_LABEL[$m] ?? $m, $sup->acceptedMethods()))).'.<br>'.$plans);
             }
 
             return $reply('Each supplier sets its own payment plans: <b>Full Payment</b>, <b>Down Payment</b> + final balance (e.g. 30% down), or <b>Installments</b>. There is no separate reservation fee — once your down payment (or full payment) is verified, your booking is reserved and marked Partially Paid. The down payment is credited to your total, never charged twice. Ask me about a specific shop, e.g. "Happy Moments payment policy".', ['Happy Moments payment policy', 'Elegant Occasion payment policy']);

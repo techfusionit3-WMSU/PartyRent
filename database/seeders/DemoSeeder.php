@@ -122,7 +122,7 @@ class DemoSeeder extends Seeder
         foreach (Settings::DEFAULTS as $k => $v) {
             Setting::create(['key' => $k, 'value' => $v]);
         }
-        Setting::create(['key' => 'permissions.admin', 'value' => ['customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'applications.review', 'listings.view', 'listings.manage', 'categories.manage', 'transactions.view', 'payouts.manage', 'complaints.manage', 'reports.view']]);
+        Setting::create(['key' => 'permissions.admin', 'value' => ['customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'applications.review', 'listings.view', 'listings.manage', 'categories.manage', 'transactions.view', 'payouts.manage', 'payments.verify', 'payments.record', 'complaints.manage', 'reports.view']]);
         Setting::create(['key' => 'permissions.cashier', 'value' => array_keys(User::CASHIER_PERMS)]);
         foreach (['seq.request' => 13, 'seq.payment' => 25, 'seq.receipt' => 10025, 'seq.complaint' => 3] as $k => $v) {
             Setting::create(['key' => $k, 'value' => $v]);
@@ -524,19 +524,37 @@ class DemoSeeder extends Seeder
         foreach ($accounts as $k => [$m, $bank, $name, $no]) {
             Supplier::whereKey($this->S[$k])->update(['payout_method' => $m, 'payout_bank' => $bank, 'payout_account_name' => $name, 'payout_account_no' => $no]);
         }
+        // Earnings per completed rental; the older ones were already paid out in a 15-day payout.
+        $sent = [];
         foreach (RentalRequest::where('status', 'completed')->with(['payments', 'supplier'])->get() as $r) {
             $b = \App\Domain\Payouts::breakdown($r);
-            if ($b['net'] <= 0) {
+            if (abs($b['earned']) < 0.005 && abs($b['cashKept']) < 0.005) {
                 continue;
             }
-            $done = Carbon::parse($r->completed_at);
-            $sent = $done->lt(Carbon::parse($this->D(-20)));
-            \App\Models\Payout::create([
-                'code' => \App\Domain\Payouts::nextCode(), 'supplier_id' => $r->supplier_id, 'rental_request_id' => $r->id,
-                'income' => $b['income'], 'commission_pct' => $b['pct'], 'commission' => $b['commission'], 'compensation' => $b['compensation'], 'net' => $b['net'],
-                'delivery' => $b['delivery'], 'voucher' => $b['voucher'],
-                'status' => $sent ? 'paid' : 'pending', 'created_at' => $done->copy()->setTime(18, 0), 'updated_at' => $done->copy()->setTime(18, 0),
-            ] + ($sent ? ['method' => $r->supplier->payout_method ?: 'bank', 'reference' => 'GC'.str_pad((string) ($r->id * 7919), 8, '0', STR_PAD_LEFT), 'paid_at' => $done->copy()->addDays(2)->setTime(10, 0), 'paid_by' => $this->U['u12']] : []));
+            $done = Carbon::parse($r->completed_at)->setTime(18, 0);
+            $line = \App\Models\Payout::create([
+                'code' => 'EA-'.(10000 + \App\Domain\Settings::nextSeq('earning')), 'supplier_id' => $r->supplier_id, 'rental_request_id' => $r->id,
+                'income' => $b['income'], 'commission_pct' => $b['pct'], 'commission' => $b['commission'], 'compensation' => $b['compensation'],
+                'delivery' => $b['delivery'], 'voucher' => $b['voucher'], 'earned' => $b['earned'], 'cash_kept' => $b['cashKept'], 'net' => $b['net'],
+                'status' => 'pending', 'created_at' => $done, 'updated_at' => $done,
+            ]);
+            if ($done->lt(Carbon::parse($this->D(-20)))) {
+                [$ps, $pe] = \App\Domain\Payouts::period($done->toDateString(), 'half_month');
+                $sent[$r->supplier_id.'|'.$ps.'|'.$pe][] = $line;
+            }
+        }
+        foreach ($sent as $key => $lines) {
+            [$sid, $ps, $pe] = explode('|', $key);
+            $sup = Supplier::find($sid);
+            $net = r2(collect($lines)->sum('net'));
+            $paidAt = Carbon::parse($pe)->addDays(2)->setTime(10, 0);
+            $batch = \App\Models\PayoutBatch::create([
+                'code' => \App\Domain\Payouts::nextCode(), 'supplier_id' => $sid, 'schedule' => 'half_month', 'period_start' => $ps, 'period_end' => $pe,
+                'earned' => r2(collect($lines)->sum('earned')), 'commission' => r2(collect($lines)->sum('commission')), 'cash_kept' => r2(collect($lines)->sum('cash_kept')),
+                'net' => $net, 'status' => $net > 0 ? 'paid' : 'carried',
+                'created_at' => Carbon::parse($pe)->addDay()->setTime(0, 30), 'updated_at' => $paidAt,
+            ] + ($net > 0 ? ['method' => $sup->payout_method ?: 'bank', 'reference' => 'GC'.str_pad((string) ($batch_n = count($sent) * 7919 + (int) $sid), 8, '0', STR_PAD_LEFT), 'paid_at' => $paidAt, 'paid_by' => $this->U['u12']] : []));
+            \App\Models\Payout::whereIn('id', collect($lines)->pluck('id'))->update(['payout_batch_id' => $batch->id, 'status' => $net > 0 ? 'paid' : 'scheduled']);
         }
     }
 

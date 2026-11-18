@@ -566,8 +566,8 @@ class Rentals
             return self::fail($s->name.' does not offer the selected payment plan. Choose one of: '.implode(', ', array_map(fn ($k) => Finance::PLAN_LABEL[$k], $plans)).'.');
         }
         $method = $o['method'] ?? 'online';
-        if ($method !== 'online' && ! in_array($method, $s->methods ?? [], true)) {
-            return self::fail($s->name.' does not accept that payment method.');
+        if ($method !== 'online' && ! in_array($method, $s->acceptedMethods(), true)) {
+            return self::fail($s->name.' does not accept that payment method'.($method === 'cash' && in_array('cash', $s->methods ?? [], true) ? ' right now. Please pay online or by bank transfer.' : '.'));
         }
         $eventDate = ($o['eventDate'] ?? null) ?: $allDates[0];
         if ($eventDate < $allDates[0] || $eventDate > end($allDates)) {
@@ -793,7 +793,7 @@ class Rentals
         $fin = $r->fin();
         Notifier::notify($r->supplier->owner_id, 'supplier', 'Customer cancellation', $r->customer->name.' cancelled '.$r->code.'. '.($fin['paidRental'] > 0 ? 'Verified payments of '.money($fin['paidRental']).' need refund review.' : 'No payments were made.'), self::link('supplier.requests.show', $r));
         if ($fin['paidRental'] > 0) {
-            Notifier::finance($r->supplier, 'Refund review', $r->code.' was cancelled by the customer with '.money($fin['paidRental']).' paid. Record any refund due.', self::link('cashier.record', ['request' => $r->code]));
+            Notifier::platformFinance('Refund review', $r->code.' ('.$r->supplier->name.') was cancelled by the customer with '.money($fin['paidRental']).' paid. Record any refund due (cash paid to the shop is refunded by the shop).', self::link('cashier.record', ['request' => $r->code]));
         }
         Notifier::audit('Cancelled rental request', $r->code.' — '.($pol['free'] ? 'within free period' : 'after free period').($reason ? ' · '.$reason : ''));
 
@@ -872,7 +872,7 @@ class Rentals
         $paid = $r->fin()['paidRental'];
         Notifier::notify($r->customer_id, 'customer', 'Request declined', $r->supplier->name.' declined '.$r->code.($reason ? ': '.$reason : '.').($paid > 0 ? ' Your '.money($paid).' will be refunded in full.' : ''), self::link('rentals.show', $r));
         if ($paid > 0) {
-            Notifier::finance($r->supplier, 'Refund due', $r->code.' was declined. Refund the customer\'s '.money($paid).' in full.', self::link('cashier.record', ['request' => $r->code]));
+            Notifier::platformFinance('Refund due', $r->code.' ('.$r->supplier->name.') was declined. Refund the customer\'s '.money($paid).' in full.', self::link('cashier.record', ['request' => $r->code]));
         }
         Notifier::audit('Declined rental request', $r->code.($reason ? ' — '.$reason : ''));
 
@@ -1261,7 +1261,14 @@ class Rentals
         }
         self::changed($r);
         $cust = $r->customer;
-        Notifier::finance($r->supplier, 'New payment submission', $cust->name.' · '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.' — pending verification.', self::link('supplier.payments', ['tab' => 'verify']));
+        if (Payouts::isCash($p->method)) {
+            Notifier::finance($r->supplier, 'Cash payment to confirm', $cust->name.' · '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.'. Confirm it once you have the cash.', self::link('supplier.payments', ['tab' => 'verify']));
+        } else {
+            // the money went to PartyRent's account, so PartyRent checks it (not the shop)
+            Notifier::notify('cashier', 'cashier', 'Payment to verify', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
+            Notifier::notify('admin', 'admin', 'Payment to verify', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
+            Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment submitted', $cust->name.' sent '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.'. PartyRent is checking it; you will be told once it is confirmed.', self::link('supplier.requests.show', $r));
+        }
         if ($source === 'supplier') {
             Notifier::notify($r->customer_id, 'customer', 'Payment recorded', 'The supplier recorded your '.money($p->amount).' payment for '.$r->code.'. It will count once verified.', self::link('rentals.show', $r));
         }
@@ -1269,16 +1276,36 @@ class Rentals
         return self::ok(['payment' => $p]);
     }
 
-    /** May this user act on a shop's money (Auth.canFinance)? The shop's cashier / owner, or the superadmin. */
+    /** May this user act on a shop's money (Auth.canFinance)? The shop's cashier / owner, or PartyRent's own finance staff. */
     public static function canFinance(int $supplierId, string $perm, User $u): bool
     {
-        return $u->hasRole('superadmin') || ($u->isActive() && $u->shop()?->id === $supplierId && $u->orgCan($perm));
+        return self::platformCan($u, $perm) || ($u->isActive() && $u->shop()?->id === $supplierId && $u->orgCan($perm));
+    }
+
+    /** PartyRent's own finance staff: the superadmin, or an admin / platform cashier holding the permission. */
+    public static function platformCan(User $u, string $perm): bool
+    {
+        // a shop's own cashier is never PartyRent staff, whatever their account roles say
+        return $u->isActive() && ($u->hasRole('superadmin') || (($u->hasRole('admin') || ($u->hasRole('cashier') && ! $u->staffOf)) && $u->hasPerm($perm)));
+    }
+
+    /**
+     * Who confirms a payment: transfers (bank, debit) land in PartyRent's account, so only PartyRent can check
+     * them; online payments are confirmed by the gateway; cash is handed to the shop, so the shop confirms it.
+     */
+    public static function canVerify(Payment $p, User $u): bool
+    {
+        if (self::platformCan($u, 'payments.verify')) {
+            return true;
+        }
+
+        return Payouts::isCash($p->method) && self::canFinance($p->rentalRequest->supplier_id, 'payments.verify', $u);
     }
 
     public static function verifyPayment(Payment $p, User $by): array
     {
-        if (! self::canFinance($p->rentalRequest->supplier_id, 'payments.verify', $by)) {
-            return self::fail('You do not have permission to verify payments.');
+        if (! self::canVerify($p, $by)) {
+            return self::fail(Payouts::isCash($p->method) ? 'You do not have permission to verify payments.' : 'PartyRent checks bank and debit transfers, because the money goes to PartyRent\'s account. You will be notified once it is confirmed.');
         }
         if ($dup = $p->duplicates()->firstWhere('status', 'verified')) {
             return self::fail('Reference '.$p->reference.' was already verified on '.$dup->code.' ('.$dup->rentalRequest->code.'). Reject this one unless the bank shows two separate transfers.');
@@ -1312,7 +1339,7 @@ class Rentals
             self::changed($r);
             $after = $r->fin();
             Notifier::notify($r->customer_id, 'customer', 'Payment verified ✅', money($p->amount).' for '.$r->code.' was verified. Receipt '.$p->receipt_no.'. Payment status: '.$after['status'].($after['balance'] > 0 ? ', balance '.money($after['balance']) : '').'.', self::link('rentals.show', $r));
-            Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment verified', money($p->amount).' for '.$r->code.' verified by '.($by ? 'cashier' : 'PartyRent (paid online)').'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
+            Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment confirmed', money($p->amount).' for '.$r->code.' was confirmed by '.($by === null ? 'PartyRent (paid online)' : (Payouts::isCash($p->method) ? 'your shop (cash)' : 'PartyRent')).'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
             Notifier::audit($by ? 'Verified payment' : 'Online payment confirmed by '.OnlinePay::name($p->gateway), $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
 
             return self::ok(['payment' => $p]);
@@ -1321,8 +1348,8 @@ class Rentals
 
     public static function rejectPayment(Payment $p, string $reason, User $by): array
     {
-        if (! self::canFinance($p->rentalRequest->supplier_id, 'payments.verify', $by)) {
-            return self::fail('You do not have permission to reject payments.');
+        if (! self::canVerify($p, $by)) {
+            return self::fail(Payouts::isCash($p->method) ? 'You do not have permission to reject payments.' : 'PartyRent checks bank and debit transfers, because the money goes to PartyRent\'s account.');
         }
         if ($p->status !== 'pending') {
             return self::fail('Only pending payments can be rejected.');
@@ -1334,7 +1361,7 @@ class Rentals
         $r = $p->rentalRequest;
         self::changed($r);
         Notifier::notify($r->customer_id, 'customer', 'Payment rejected', money($p->amount).' for '.$r->code.' was rejected: '.$reason, self::link('rentals.show', $r));
-        Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment rejected', 'A '.money($p->amount).' submission for '.$r->code.' was rejected by the cashier.', self::link('supplier.requests.show', $r));
+        Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment rejected', 'A '.money($p->amount).' submission for '.$r->code.' was rejected by '.(Payouts::isCash($p->method) ? 'your shop' : 'PartyRent').'.', self::link('supplier.requests.show', $r));
         Notifier::audit('Rejected payment', $p->code.' · '.money($p->amount).' · '.$reason, $by);
 
         return self::ok();
@@ -1416,8 +1443,11 @@ class Rentals
         if (in_array($r->status, ['declined', 'cancelled'], true) && $data['type'] !== 'refund') {
             return self::fail($r->code.' is '.$r->status.': only refunds can be recorded.');
         }
+        if (! Payouts::isCash($data['method'] ?? 'cash') && ! self::platformCan($by, 'payments.record')) {
+            return self::fail('Your shop records cash only. Bank and debit transfers go to PartyRent\'s account, so PartyRent records and checks them.');
+        }
         if ($r->payout()->exists()) {
-            return self::fail('The money for '.$r->code.' was already released to the supplier ('.$r->payout->code.'). Ask an admin to handle any correction.');
+            return self::fail('The earnings for '.$r->code.' were already added to a payout. Ask PartyRent to handle any correction.');
         }
         if ($data['type'] === 'refund' && (float) $data['amount'] > $f['paidRental'] - $f['refunded'] + 0.001) {
             return self::fail('Refund cannot exceed verified rental payments ('.money($f['paidRental'] - $f['refunded']).').');
@@ -1444,10 +1474,41 @@ class Rentals
         $after = $r->fin();
         $isRefund = $data['type'] === 'refund';
         Notifier::notify($r->customer_id, 'customer', $isRefund ? 'Refund update' : 'Payment verified ✅', money($p->amount).' '.($isRefund ? 'refunded' : 'received').' for '.$r->code.'. Receipt '.$p->receipt_no.'.', self::link('rentals.show', $r));
-        Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment verified', 'Cashier recorded '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
+        Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment recorded', $by->name.' recorded '.money($p->amount).' ('.$p->typeLabel().', '.$p->methodLabel().') for '.$r->code.'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
         Notifier::audit('Recorded offline '.($isRefund ? 'refund' : 'payment'), $p->code.' · '.money($p->amount).' · '.$r->code, $by);
 
         return self::ok(['payment' => $p]);
+    }
+
+    /**
+     * The customer says they never handed over this cash (the shop records cash itself): open a complaint for
+     * PartyRent support. The payment stays as it is until support decides.
+     */
+    public static function disputeCash(Payment $p, User $by, string $why): array
+    {
+        $r = $p->rentalRequest;
+        if ($r->customer_id !== $by->id || ! Payouts::isCash($p->method) || $p->status !== 'verified' || $p->type === 'refund') {
+            return self::fail('Only cash payments recorded by the shop can be reported here.');
+        }
+        if ($p->disputed_at) {
+            return self::fail('You already reported '.$p->code.'. PartyRent support is looking into it.');
+        }
+        $why = trim($why);
+        if (mb_strlen($why) < 5) {
+            return self::fail('Tell us briefly what happened, e.g. "I paid ₱2,000, not ₱5,000".');
+        }
+        $next = (int) \App\Models\Complaint::selectRaw('max(cast(substr(code, 5) as unsigned)) as n')->value('n') + 1;
+        $c = \App\Models\Complaint::create([
+            'code' => 'CMP-'.str_pad((string) $next, 3, '0', STR_PAD_LEFT), 'reporter_id' => $by->id, 'against_supplier_id' => $r->supplier_id,
+            'rental_request_id' => $r->id, 'subject' => 'Cash payment '.$p->code.' disputed ('.money($p->amount).')',
+            'body' => mb_substr($why, 0, 2000), 'priority' => 'high', 'status' => 'open', 'updates' => [],
+        ]);
+        $p->update(['disputed_at' => now()]);
+        Notifier::notify('admin', 'admin', 'Cash payment disputed', $by->name.' says they did not pay '.money($p->amount).' ('.$p->code.') to '.$r->supplier->name.' for '.$r->code.'. '.$c->code.'.', self::link('admin.complaints'));
+        Notifier::notify($r->supplier->owner_id, 'supplier', 'Cash payment questioned', $by->name.' questioned the '.money($p->amount).' cash payment '.$p->code.' for '.$r->code.'. PartyRent support will contact you.', self::link('supplier.requests.show', $r));
+        Notifier::audit('Cash payment disputed', $p->code.' · '.$r->code.' · '.$c->code, $by);
+
+        return self::ok(['complaint' => $c]);
     }
 
     /** Flag newly overdue schedule items and notify everyone involved (runs on a schedule and on dashboard loads). */

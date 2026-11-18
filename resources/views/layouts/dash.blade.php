@@ -12,15 +12,16 @@
             ['Shop'], ['shop', 'supplier.shop', 'store', 'Shop Profile & Settings', 0, 'shop.manage'], ['team', 'supplier.team', 'users', 'Team & Roles', 0, 'team.manage'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products', 'products.manage'], ['requests', 'supplier.requests', 'list', 'Requests', 'orders.view'], ['payments', 'supplier.payments', 'card', 'Payments', 'payments.view']]],
         'cashier' => ['tag' => 'Cashier', 'items' => [
-            ['Payments'], ['dashboard', 'cashier.dashboard', 'grid', 'Dashboard'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0], ['record', 'cashier.record', 'cash', 'Record Payment'], ['balances', 'cashier.balances', 'clock', 'Installments & Overdue'],
-            ['Records'], ['history', 'cashier.history', 'list', 'Payment History'], ['receipts', 'cashier.receipts', 'receipt', 'Receipts'], ['reports', 'cashier.reports', 'bars', 'Financial Reports'], ['notifications', 'notifications', 'bell', 'Notifications'],
+            ['Payments'], ['dashboard', 'cashier.dashboard', 'grid', 'Dashboard'], ['verification', 'cashier.verification', 'check', $shellUser->isShopCashier() ? 'Payments to Confirm' : 'Payment Verification', $b['verification'] ?? 0], ['record', 'cashier.record', 'cash', $shellUser->isShopCashier() ? 'Record Cash' : 'Record Payment'], ['balances', 'cashier.balances', 'clock', 'Installments & Overdue'],
+            ['Records'], ['history', 'cashier.history', 'list', 'Payment History'], ...($shellUser->isShopCashier() ? [['payouts', 'cashier.payouts', 'cash', 'Earnings & Payouts']] : []), ['receipts', 'cashier.receipts', 'receipt', 'Receipts'], ['reports', 'cashier.reports', 'bars', 'Financial Reports'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'cashier.dashboard', 'grid', 'Home'], ['verification', 'cashier.verification', 'check', 'Verify'], ['record', 'cashier.record', 'cash', 'Record'], ['history', 'cashier.history', 'list', 'History']]],
         'admin' => ['tag' => 'Admin', 'items' => [
             ['Operations'], ['dashboard', 'admin.dashboard', 'grid', 'Dashboard'], ['users', 'admin.users', 'users', 'Customers & Suppliers'], ['applications', 'admin.applications', 'file', 'Supplier Applications', $b['applications'] ?? 0], ['listings', 'admin.listings', 'box', 'Listings & Packages'], ['categories', 'admin.categories', 'tag', 'Categories'],
+            ['Money'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0, 'payments.verify'], ['payouts', 'admin.payouts', 'cash', 'Supplier Payouts', $b['payouts'] ?? 0, 'payouts.manage'],
             ['Monitoring'], ['transactions', 'admin.transactions', 'activity', 'Transactions & Reservations'], ['complaints', 'admin.complaints', 'flag', 'Complaints & Issues', $b['complaints'] ?? 0], ['cases', 'admin.cases', 'alert', 'Shortfall Cases', $b['cases'] ?? 0], ['activity', 'admin.activity', 'clock', 'Activity Log'], ['reports', 'admin.reports', 'bars', 'Reports'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'admin.dashboard', 'grid', 'Home'], ['users', 'admin.users', 'users', 'Users'], ['applications', 'admin.applications', 'file', 'Apps'], ['transactions', 'admin.transactions', 'activity', 'Rentals']]],
         'superadmin' => ['tag' => 'Superadmin', 'items' => [
-            ['Platform'], ['dashboard', 'super.dashboard', 'grid', 'Dashboard'], ['monitoring', 'super.monitoring', 'activity', 'Platform Monitoring'], ['users', 'super.users', 'users', 'Platform Users'], ['reports', 'super.reports', 'bars', 'Platform Reports'],
+            ['Platform'], ['dashboard', 'super.dashboard', 'grid', 'Dashboard'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0], ['payouts', 'admin.payouts', 'cash', 'Supplier Payouts', $b['payouts'] ?? 0], ['monitoring', 'super.monitoring', 'activity', 'Platform Monitoring'], ['users', 'super.users', 'users', 'Platform Users'], ['reports', 'super.reports', 'bars', 'Platform Reports'],
             ['Access control'], ['admins', 'super.admins', 'shield', 'Administrators'], ['roles', 'super.roles', 'lock', 'Roles & Permissions'],
             ['System'], ['audit', 'super.audit', 'file', 'Audit Logs'], ['settings', 'super.settings', 'settings', 'System Settings'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'super.dashboard', 'grid', 'Home'], ['monitoring', 'super.monitoring', 'activity', 'Monitor'], ['admins', 'super.admins', 'shield', 'Admins'], ['audit', 'super.audit', 'file', 'Audit']]],
@@ -29,7 +30,7 @@
     $sup = in_array($role, ['supplier', 'cashier'], true) ? $shellUser->shop() : null;
     $emp = $shellUser->isEmployee();
     // Supplier employees only see the sections their organization role allows; a group label shows only before a visible item.
-    $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && ($role !== 'supplier' || empty($it[5]) || $shellUser->orgCan($it[5]));
+    $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && (empty($it[5]) || ($role === 'supplier' ? $shellUser->orgCan($it[5]) : ($role !== 'admin' || $shellUser->hasPerm($it[5]))));
     $items = [];
     $label = null;
     foreach ($cfg['items'] as $it) {

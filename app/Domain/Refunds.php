@@ -6,7 +6,8 @@ use App\Models\Payment;
 
 /**
  * Refunds to customers (change list C13). A refund is a Payment of type "refund":
- * - pending  → owed, waiting to be sent (by the gateway or by hand by the shop's cashier)
+ * - pending  → owed, waiting to be sent (by the gateway, or by hand by PartyRent's cashier / admin, who hold the money;
+ *              a shop refunds only cash it collected itself)
  * - awaiting → asked from Xendit, waiting for it to finish
  * - verified → sent; the booking's paid amount and the supplier payout go down by it (Payouts::breakdown uses
  *              paidRental − refunded).
@@ -47,7 +48,7 @@ class Refunds
         if (! $res['ok'] || $res['status'] === 'FAILED') {
             $why = $res['error'] ?? 'refund failed';
             $refund->update(['notes' => trim($refund->notes.' · Xendit refund not possible: '.$why.'. Send it by hand and verify it.')]);
-            Notifier::finance($refund->rentalRequest->supplier, 'Refund needs a manual transfer', $refund->code.' ('.money($refund->amount).'): Xendit could not refund it — '.$why.'.', route('supplier.requests.show', $refund->rentalRequest, false));
+            Notifier::platformFinance('Refund needs a manual transfer', $refund->code.' ('.money($refund->amount).') for '.$refund->rentalRequest->code.': Xendit could not refund it — '.$why.'.', route('cashier.record', ['request' => $refund->rentalRequest->code], false));
 
             return 'manual';
         }
@@ -92,7 +93,7 @@ class Refunds
         }
         if ($status === 'FAILED') {
             $refund->update(['status' => 'pending', 'notes' => trim($refund->notes.' · Xendit refund failed. Send it by hand and verify it.')]);
-            Notifier::finance($refund->rentalRequest->supplier, 'Refund needs a manual transfer', $refund->code.' ('.money($refund->amount).'): the Xendit refund failed.', route('supplier.requests.show', $refund->rentalRequest, false));
+            Notifier::platformFinance('Refund needs a manual transfer', $refund->code.' ('.money($refund->amount).') for '.$refund->rentalRequest->code.': the Xendit refund failed.', route('cashier.record', ['request' => $refund->rentalRequest->code], false));
 
             return 'manual';
         }

@@ -7,7 +7,10 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/** v4 Payment Monitoring: an individual shop verifies its own payments; other shops cannot. */
+/**
+ * Payment Monitoring: transfers go to PartyRent's account, so PartyRent (not the shop) verifies them;
+ * a shop confirms only cash it received. Other shops cannot touch either.
+ */
 class SupplierPaymentsTest extends TestCase
 {
     use RefreshDatabase;
@@ -16,23 +19,71 @@ class SupplierPaymentsTest extends TestCase
 
     protected string $seeder = \Database\Seeders\DemoSeeder::class;
 
-    public function test_shop_owner_verifies_and_rejects_own_payments(): void
+    public function test_shop_sees_transfers_but_partyrent_verifies_them(): void
     {
         $juan = User::where('email', 'juan@demo.ph')->firstOrFail();
-        $pending = Payment::whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $juan->supplier->id))->where('status', 'pending')->firstOrFail();
+        $pending = Payment::whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $juan->supplier->id))->where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->firstOrFail();
 
         // another shop's owner cannot touch it
         $ana = User::where('email', 'ana@demo.ph')->firstOrFail();
         $this->actingAs($ana)->withSession(['mode' => 'supplier'])->post(route('supplier.payments.verify', $pending))->assertNotFound();
 
+        // the owner sees it waiting, but cannot verify a transfer into PartyRent's account
         $this->actingAs($juan)->withSession(['mode' => 'supplier']);
-        $this->get(route('supplier.payments'))->assertOk()->assertSee('Verification queue')->assertSee($pending->code)->assertSee('Balance check');
+        $this->get(route('supplier.payments'))->assertOk()->assertSee('Waiting for confirmation')->assertSee($pending->code)->assertSee('PartyRent is checking');
         $this->get(route('supplier.payments', ['tab' => 'balances']))->assertOk()->assertSee('Next deadline');
-        $this->post(route('supplier.payments.reject', $pending), ['reason' => ''])->assertSessionHasErrors('reason');
-        $this->post(route('supplier.payments.verify', $pending))->assertSessionHas('success');
+        $this->post(route('supplier.payments.verify', $pending))->assertSessionHas('error', fn ($e) => str_contains($e, 'PartyRent checks'));
+        $this->assertSame('pending', $pending->fresh()->status);
+
+        // PartyRent's admin verifies it from the verification page
+        $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();
+        $this->actingAs($admin)->withSession(['mode' => 'admin'])->get('/cashier/verification')->assertOk()->assertSee($pending->code);
+        $this->post("/cashier/payments/{$pending->code}/verify")->assertSessionHas('success');
         $pending->refresh();
         $this->assertSame('verified', $pending->status);
         $this->assertNotNull($pending->receipt_no);
-        $this->assertSame($juan->id, $pending->verified_by);
+        $this->assertSame($admin->id, $pending->verified_by);
+        // other cashier pages stay closed to admins
+        $this->get('/cashier/balances')->assertForbidden();
+    }
+
+    public function test_shop_owner_confirms_cash_it_received(): void
+    {
+        $juan = User::where('email', 'juan@demo.ph')->firstOrFail();
+        $r = $juan->supplier->rentalRequests()->whereIn('status', \App\Domain\Finance::ACTIVE)->with('payments')->get()->first(fn ($x) => $x->fin()['balance'] >= 100);
+        $cash = Payment::create(['code' => 'PAY-CASH1', 'rental_request_id' => $r->id, 'type' => 'balance', 'method' => 'cash', 'amount' => 100,
+            'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'IN-PERSON', 'status' => 'pending']);
+
+        $this->actingAs($juan)->withSession(['mode' => 'supplier']);
+        $this->post(route('supplier.payments.reject', $cash), ['reason' => ''])->assertSessionHasErrors('reason');
+        $this->post(route('supplier.payments.verify', $cash))->assertSessionHas('success');
+        $this->assertSame('verified', $cash->fresh()->status);
+        $this->assertSame($juan->id, $cash->fresh()->verified_by);
+    }
+
+    public function test_shop_records_cash_only_and_customer_can_dispute_it(): void
+    {
+        $juan = User::where('email', 'juan@demo.ph')->firstOrFail();
+        $r = $juan->supplier->rentalRequests()->whereIn('status', \App\Domain\Finance::ACTIVE)->with('payments')->get()->first(fn ($x) => $x->fin()['balance'] >= 100);
+        $cashier = $this->shopCashier($r->code);
+        $this->actingAs($cashier)->withSession(['mode' => 'supplier']);
+        $this->get('/cashier/record?request='.$r->code)->assertOk()->assertSee('Record cash');
+        // a bank transfer is PartyRent's to record
+        $this->post('/cashier/record', ['request' => $r->code, 'type' => 'balance', 'method' => 'bank', 'amount' => 50, 'date' => today_iso(), 'reference' => 'BDO-9'])
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'cash only'));
+        $this->post('/cashier/record', ['request' => $r->code, 'type' => 'balance', 'method' => 'cash', 'amount' => 50, 'date' => today_iso()])->assertSessionHas('success');
+        $p = Payment::where('rental_request_id', $r->id)->where('method', 'cash')->latest('id')->firstOrFail();
+
+        // the customer says they never paid it → a complaint for PartyRent support
+        $customer = $r->customer;
+        $this->actingAs($customer)->withSession(['mode' => 'customer']);
+        $this->get('/rentals/'.$r->code)->assertOk()->assertSee('Not right?');
+        $this->post(route('rentals.dispute', [$r, $p]), ['why' => 'no'])->assertSessionHasErrors('why');
+        $this->post(route('rentals.dispute', [$r, $p]), ['why' => 'I did not pay any cash.'])->assertSessionHas('success');
+        $this->assertNotNull($p->fresh()->disputed_at);
+        $this->assertDatabaseHas('complaints', ['rental_request_id' => $r->id, 'reporter_id' => $customer->id, 'priority' => 'high']);
+        $this->post(route('rentals.dispute', [$r, $p]), ['why' => 'Again please.'])->assertSessionHas('error');
+        // nobody else can dispute it
+        $this->actingAs($juan)->post(route('rentals.dispute', [$r, $p]), ['why' => 'Not mine at all'])->assertNotFound();
     }
 }

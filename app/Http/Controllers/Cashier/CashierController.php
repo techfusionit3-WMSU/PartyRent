@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  * only that shop's payments, receipts, balances and overdue accounts. A cashier without a shop (PartyRent's own,
  * or the superadmin) sees every shop.
  */
-class CashierController extends Controller
+class CashierController extends Controller implements \Illuminate\Routing\Controllers\HasMiddleware
 {
     /** The shop this cashier works for, or null for a platform-wide cashier. */
     private function shopId(Request $request): ?int
@@ -33,6 +33,19 @@ class CashierController extends Controller
     private function payments(Request $request)
     {
         return Payment::query()->when($this->shopId($request), fn ($q, $sid) => $q->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $sid)));
+    }
+
+    /** Admins come here only to check transfers and record refunds (payments.verify); the rest is for cashiers. */
+    public static function middleware(): array
+    {
+        return [function ($request, $next) {
+            $u = $request->user();
+            if ($u && $u->activeRole(session('mode')) === 'admin') {
+                abort_unless($u->hasPerm('payments.verify') && $request->routeIs('cashier.verification', 'cashier.verify', 'cashier.reject', 'cashier.record', 'cashier.record.store'), 403, 'You do not have permission for this page.');
+            }
+
+            return $next($request);
+        }];
     }
 
     private function ownPayment(Request $request, Payment $p): void

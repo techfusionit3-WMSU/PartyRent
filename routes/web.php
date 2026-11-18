@@ -116,6 +116,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::post('/rentals/{rentalRequest}/installments', [RentalController::class, 'proposeInstallments'])->name('rentals.installments');
     Route::post('/rentals/{rentalRequest}/payments', [RentalController::class, 'pay'])->name('rentals.pay');
     Route::get('/rentals/{rentalRequest}/payments/{payment}/online', [RentalController::class, 'onlineReturn'])->name('rentals.online.return');
+    Route::post('/rentals/{rentalRequest}/payments/{payment}/dispute', [RentalController::class, 'disputeCash'])->middleware('throttle:5,1')->name('rentals.dispute');
     // practice checkout (PAYMONGO_FAKE=true, never in production)
     Route::get('/practice-checkout/{ref}', [\App\Http\Controllers\Customer\PracticeCheckoutController::class, 'show'])->name('paymongo.practice');
     Route::post('/practice-checkout/{ref}', [\App\Http\Controllers\Customer\PracticeCheckoutController::class, 'act'])->name('paymongo.practice.act');
@@ -137,6 +138,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/payments/{payment}/reject', [SupplierController::class, 'rejectPayment'])->name('payments.reject');
     Route::get('/payouts', [\App\Http\Controllers\Supplier\PayoutController::class, 'index'])->name('payouts');
     Route::put('/payouts/account', [\App\Http\Controllers\Supplier\PayoutController::class, 'updateAccount'])->name('payouts.account');
+    Route::put('/payouts/schedule', [\App\Http\Controllers\Supplier\PayoutController::class, 'updateSchedule'])->name('payouts.schedule');
     Route::get('/reviews', [ReviewController::class, 'supplierIndex'])->name('reviews');
     Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])->name('reviews.reply');
     Route::get('/shop', [SupplierController::class, 'shop'])->name('shop');
@@ -210,7 +212,9 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
 });
 
 /* ---------- cashier ---------- */
-Route::prefix('cashier')->name('cashier.')->middleware(['auth', 'role:cashier,superadmin'])->group(function () {
+// PartyRent's cashier and admins (with payments.verify) check transfers; a shop's cashier works on their shop only.
+Route::prefix('cashier')->name('cashier.')->middleware(['auth', 'role:cashier,admin,superadmin'])->group(function () {
+    Route::get('/payouts', [\App\Http\Controllers\Supplier\PayoutController::class, 'index'])->name('payouts');
     Route::get('/', [CashierController::class, 'dashboard'])->name('dashboard');
     Route::get('/verification', [CashierController::class, 'verification'])->name('verification');
     Route::post('/payments/{payment}/verify', [CashierController::class, 'verify'])->name('verify');
@@ -239,6 +243,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::post('/payouts/{payout}/pay', [\App\Http\Controllers\Admin\PayoutController::class, 'pay'])->name('payouts.pay');
     Route::post('/payouts/{payout}/send', [\App\Http\Controllers\Admin\PayoutController::class, 'send'])->name('payouts.send');
     Route::post('/payouts/{payout}/check', [\App\Http\Controllers\Admin\PayoutController::class, 'check'])->name('payouts.check');
+    Route::post('/payouts/{payout}/settle', [\App\Http\Controllers\Admin\PayoutController::class, 'settle'])->name('payouts.settle');
     Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
     Route::get('/activity', [AdminController::class, 'audit'])->name('activity');
 

@@ -3,6 +3,7 @@
 namespace App\Domain;
 
 use App\Models\Payout;
+use App\Models\PayoutBatch;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * Send supplier payouts through Xendit (Money-out, /v2/payouts) instead of a manual transfer.
  *
- * Flow: a payout is released (automatically when the rental is completed) → an admin clicks "Send via
+ * Flow: a payout is prepared when the shop's payout period ends (Payouts::closeDue) → an admin clicks "Send via
  * Xendit", or it is sent automatically when the superadmin turned on payoutAuto → status "sending" →
  * Xendit transfers PartyRent's balance to the supplier's GCash / bank → the payout webhook or "Check
  * status" sees SUCCEEDED → "paid", supplier notified. A failed transfer goes back to "pending" with the
@@ -59,7 +60,7 @@ class XenditPayouts
     }
 
     /** Send a pending payout through Xendit. $by is the admin, or null when sent automatically. */
-    public static function send(Payout $p, ?User $by): array
+    public static function send(PayoutBatch $p, ?User $by): array
     {
         if (! self::enabled()) {
             return ['ok' => false, 'error' => 'Xendit is not set up (XENDIT_SECRET_KEY).'];
@@ -73,7 +74,7 @@ class XenditPayouts
         }
         // claim it: only one send per payout, even with double clicks
         $claimed = DB::transaction(function () use ($p, $by) {
-            $row = Payout::lockForUpdate()->find($p->id);
+            $row = PayoutBatch::lockForUpdate()->find($p->id);
             if (! $row || $row->status !== 'pending') {
                 return false;
             }
@@ -85,7 +86,6 @@ class XenditPayouts
             return ['ok' => false, 'error' => $p->code.' is already being sent or was paid.'];
         }
         $p->refresh();
-        $r = $p->rentalRequest;
         try {
             $res = self::http()->withHeaders(['Idempotency-key' => $p->code.'-'.now()->format('YmdHis')])->post('/v2/payouts', [
                 'reference_id' => $p->code,
@@ -93,8 +93,8 @@ class XenditPayouts
                 'channel_properties' => ['account_holder_name' => $s->payout_account_name, 'account_number' => preg_replace('/\D/', '', $s->payout_account_no)],
                 'amount' => round($p->net, 2),
                 'currency' => 'PHP',
-                'description' => Settings::get('platformName').' payout '.$p->code.' for '.$r->code,
-                'metadata' => ['payout' => $p->code, 'request' => $r->code],
+                'description' => Settings::get('platformName').' payout '.$p->code.' for '.$p->periodLabel(),
+                'metadata' => ['payout' => $p->code, 'period' => $p->period_start->toDateString().'/'.$p->period_end->toDateString()],
             ]);
         } catch (\Throwable $e) {
             Log::warning('Xendit payout failed: '.$e->getMessage());
@@ -116,7 +116,7 @@ class XenditPayouts
     }
 
     /** Ask Xendit how a "sending" payout is doing. Returns paid | sending | failed | done | error. */
-    public static function sync(Payout $p): string
+    public static function sync(PayoutBatch $p): string
     {
         if ($p->status !== 'sending' || ! $p->gateway_ref) {
             return 'done';
@@ -131,7 +131,7 @@ class XenditPayouts
     }
 
     /** Apply a Xendit payout object (from the API or the webhook). */
-    public static function apply(Payout $p, array $x): string
+    public static function apply(PayoutBatch $p, array $x): string
     {
         $status = strtoupper((string) ($x['status'] ?? ''));
         if ($status === 'SUCCEEDED') {
@@ -146,22 +146,23 @@ class XenditPayouts
         return 'sending';
     }
 
-    private static function finish(Payout $p): string
+    private static function finish(PayoutBatch $p): string
     {
         return DB::transaction(function () use ($p) {
-            $p = Payout::lockForUpdate()->find($p->id);
+            $p = PayoutBatch::lockForUpdate()->find($p->id);
             if (! $p || $p->status !== 'sending') {
                 return 'done';
             }
             $p->update(['status' => 'paid', 'paid_at' => now(), 'failure' => null]);
-            Notifier::notify($p->supplier->owner_id, 'supplier', 'Payout sent 💸', money($p->net).' was sent to your '.$p->methodLabel().' account through Xendit. Reference '.$p->reference.' ('.$p->code.').', route('supplier.payouts', [], false));
+            Payouts::markLinesPaid($p);
+            Notifier::notify($p->supplier->owner_id, 'supplier', 'Payout sent 💸', money($p->net).' for '.$p->periodLabel().' was sent to your '.$p->methodLabel().' account through Xendit. Reference '.$p->reference.' ('.$p->code.').', route('supplier.payouts', [], false));
             Notifier::audit('Payout received by supplier', $p->code.' · '.money($p->net).' · Xendit '.$p->reference);
 
             return 'paid';
         });
     }
 
-    private static function fail(Payout $p, string $why, bool $tellAdmin): void
+    private static function fail(PayoutBatch $p, string $why, bool $tellAdmin): void
     {
         $p->update(['status' => 'pending', 'gateway' => null, 'gateway_ref' => null, 'reference' => null, 'method' => null, 'paid_by' => null, 'failure' => mb_substr($why, 0, 250)]);
         if ($tellAdmin) {
@@ -173,13 +174,13 @@ class XenditPayouts
     public static function handleCallback(array $body): string
     {
         $x = (array) ($body['data'] ?? $body);
-        $p = empty($x['id']) ? null : Payout::where('gateway', 'xendit')->where('gateway_ref', $x['id'])->first();
+        $p = empty($x['id']) ? null : PayoutBatch::where('gateway', 'xendit')->where('gateway_ref', $x['id'])->first();
 
         return $p ? self::apply($p, $x) : 'unknown';
     }
 
-    /** Called after a payout is released: send it right away when automatic payouts are on. */
-    public static function autoSend(Payout $p): void
+    /** Called after a payout is prepared: send it right away when automatic payouts are on. */
+    public static function autoSend(PayoutBatch $p): void
     {
         if (Settings::get('payoutAuto', false) && self::enabled() && self::channel($p->supplier)) {
             self::send($p, null);

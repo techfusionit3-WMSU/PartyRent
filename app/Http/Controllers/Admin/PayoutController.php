@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Domain\Payouts;
 use App\Domain\XenditPayouts;
 use App\Http\Controllers\Controller;
-use App\Models\Payout;
+use App\Models\PayoutBatch;
 use App\Models\RentalRequest;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 
-/** Owner/admin side of the escrow: release held money and send payouts to suppliers. */
+/** Admin side of the escrow: send the shops' scheduled payouts, settle balances shops owe, release cancelled bookings. */
 class PayoutController extends Controller
 {
     private function need(Request $r): void
@@ -22,20 +22,23 @@ class PayoutController extends Controller
     {
         $this->need($request);
         // payouts Xendit is still processing: ask for news (localhost gets no webhooks)
+        Payouts::closeDue(); // payouts whose period ended (also runs daily)
+        // payouts Xendit is still processing: ask for news (localhost gets no webhooks)
         if (XenditPayouts::enabled()) {
-            Payout::where('status', 'sending')->take(10)->get()->each(fn ($p) => XenditPayouts::sync($p));
+            PayoutBatch::where('status', 'sending')->take(10)->get()->each(fn ($p) => XenditPayouts::sync($p));
         }
-        $tab = in_array($request->query('tab'), ['pending', 'release', 'paid', 'suppliers'], true) ? $request->query('tab') : 'pending';
+        $tab = in_array($request->query('tab'), ['pending', 'owed', 'release', 'paid', 'suppliers'], true) ? $request->query('tab') : 'pending';
         $sum = Payouts::summary();
         $suppliers = Supplier::whereIn('id', array_keys($sum))->orderBy('name')->get();
 
         return view('admin.payouts', [
             'tab' => $tab,
-            'pending' => Payout::whereIn('status', ['pending', 'sending'])->with(['supplier', 'rentalRequest'])->orderBy('created_at')->get(),
-            'paid' => Payout::where('status', 'paid')->with(['supplier', 'rentalRequest', 'payer'])->orderByDesc('paid_at')->take(100)->get(),
+            'pending' => PayoutBatch::whereIn('status', ['pending', 'sending'])->with(['supplier', 'lines.rentalRequest'])->orderBy('period_end')->get(),
+            'owed' => PayoutBatch::where('status', 'carried')->whereNull('carried_to_id')->where('net', '<', 0)->with('supplier')->orderBy('period_end')->get(),
+            'paid' => PayoutBatch::whereIn('status', ['paid', 'settled'])->with(['supplier', 'lines.rentalRequest', 'payer'])->orderByDesc('paid_at')->take(100)->get(),
             'awaiting' => Payouts::awaitingRelease(),
             'sum' => $sum, 'suppliers' => $suppliers,
-            'totals' => collect(['escrow', 'awaiting', 'pending', 'paid', 'commission'])->mapWithKeys(fn ($k) => [$k => r2(collect($sum)->sum($k))])->all(),
+            'totals' => collect(['escrow', 'awaiting', 'next', 'pending', 'paid', 'commission', 'owed'])->mapWithKeys(fn ($k) => [$k => r2(collect($sum)->sum($k))])->all(),
             'pct' => Payouts::pct(), 'xendit' => XenditPayouts::enabled(),
         ]);
     }
@@ -45,11 +48,11 @@ class PayoutController extends Controller
         $this->need($request);
         $res = Payouts::release($rentalRequest);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $res['payout']->code.' released: '.money($res['payout']->net).' to '.$rentalRequest->supplier->name.'.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $rentalRequest->code.': '.money($res['payout']->net).' added to '.$rentalRequest->supplier->name."'s next payout." : $res['error']);
     }
 
     /** Send a payout through Xendit (Money-out). */
-    public function send(Request $request, Payout $payout)
+    public function send(Request $request, PayoutBatch $payout)
     {
         $this->need($request);
         $res = XenditPayouts::send($payout, $request->user());
@@ -64,7 +67,7 @@ class PayoutController extends Controller
         });
     }
 
-    public function check(Request $request, Payout $payout)
+    public function check(Request $request, PayoutBatch $payout)
     {
         $this->need($request);
         $state = XenditPayouts::sync($payout);
@@ -77,12 +80,22 @@ class PayoutController extends Controller
         });
     }
 
-    public function pay(Request $request, Payout $payout)
+    public function pay(Request $request, PayoutBatch $payout)
     {
         $this->need($request);
         $data = $request->validate(['method' => 'required|in:gcash,bank', 'reference' => 'required|string|max:80', 'notes' => 'nullable|string|max:255']);
         $res = Payouts::markPaid($payout, $data, $request->user());
 
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $payout->code.' marked as paid. The supplier was notified.' : $res['error']);
+    }
+
+    /** The shop paid what it owed directly. */
+    public function settle(Request $request, PayoutBatch $payout)
+    {
+        $this->need($request);
+        $data = $request->validate(['reference' => 'required|string|max:80', 'notes' => 'nullable|string|max:255']);
+        $res = Payouts::settle($payout, $data, $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $payout->supplier->name."'s balance is settled." : $res['error']);
     }
 }

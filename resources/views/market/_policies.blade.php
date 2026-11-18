@@ -14,7 +14,7 @@
 @php($sst = \App\Domain\Slots::settings($sup))
 <dt>Rental hours</dt><dd>{{ \App\Domain\Slots::fmt12($sst['open']) }} – {{ \App\Domain\Slots::fmt12($sst['close']) }} · {{ +$sst['prepHours'] }}h preparation / {{ +$sst['recoveryHours'] }}h recovery between bookings</dd>
 @if($frame = \App\Domain\Slots::frameLabel($p))<dt>Item time frame</dt><dd>{{ $frame }}</dd>@endif
-<dt>Payment methods</dt><dd>{{ collect($sup->methods)->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }}</dd>
+<dt>Payment methods</dt><dd>{{ collect($sup->acceptedMethods())->map(fn ($m) => \App\Models\Payment::METHOD_LABEL[$m] ?? $m)->implode(', ') }}</dd>
 <dt>Security deposit</dt><dd>{{ $sup->depositLabel() }} (refundable)</dd>
 @if(! $p->isSale())<dt>Rental duration</dt><dd>{{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '').' per booking' : 'No Rental Duration Limit' }}</dd>@endif
 <dt>Cancellation</dt><dd>{{ $sup->pol('cancellation') }}</dd>

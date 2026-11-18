@@ -12,7 +12,7 @@
   <div class="logo-tile" style="width:84px;height:84px;font-size:2.6rem;background:#fff;box-shadow:var(--shadow)">@if($s->logo_path)<img src="{{ asset('storage/'.$s->logo_path) }}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:14px">@else{{ $s->logo }}@endif</div>
   <div class="grow"><h1 class="mb-0">{{ $s->name }}</h1><div class="muted">{{ $s->city }} · <span class="stars">{{ stars($s->rating) }}</span> {{ $s->rating ? rating_text($s) : 'New' }} ({{ $reviews->count() }} reviews)</div>
     <p class="mt-1 mb-1">{{ $s->description }}</p>
-    <div class="row wrap gap-sm"><span class="badge b-teal">{{ icon('truck', 'width:12px') }} {{ $s->fulfillmentLabel() }}{{ $s->fulfillment !== 'pickup' ? ' · '.money_short($s->delivery_fee).' delivery' : '' }}</span>@foreach($s->methods ?? [] as $m)<span class="badge b-gray plain">{{ \App\Domain\Finance::METHOD_LABEL[$m] ?? $m }}</span>@endforeach</div>
+    <div class="row wrap gap-sm"><span class="badge b-teal">{{ icon('truck', 'width:12px') }} {{ $s->fulfillmentLabel() }}{{ $s->fulfillment !== 'pickup' ? ' · '.money_short($s->delivery_fee).' delivery' : '' }}</span>@foreach($s->acceptedMethods() as $m)<span class="badge b-gray plain">{{ \App\Domain\Finance::METHOD_LABEL[$m] ?? $m }}</span>@endforeach</div>
   </div>
   <dl class="kv" style="min-width:260px;max-width:340px"><dt>Address</dt><dd>{{ $own ? $s->address : $s->publicAddress() }}</dd><dt>Contact</dt><dd>{{ $s->phone }}<br>{{ $s->email }}</dd><dt>Hours</dt><dd>{{ $s->hours }}</dd></dl>
 </div></div>

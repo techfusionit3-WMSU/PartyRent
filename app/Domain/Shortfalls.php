@@ -590,7 +590,7 @@ class Shortfalls
                 // C13: paid online -> back through the gateway (Xendit / practice); otherwise the shop's cashier sends it
                 $how = Refunds::issue($refundPay);
                 if ($how === 'manual') {
-                    Notifier::finance($c->supplier, 'Refund due: '.$r->code, money($refund).' goes back to '.$c->customer->name.' (shortfall '.$c->code.'). Send it and mark it verified.', route('supplier.requests.show', $r, false));
+                    Notifier::platformFinance('Refund due: '.$r->code, money($refund).' goes back to '.$c->customer->name.' (shortfall '.$c->code.', '.$c->supplier->name.'). Send it and record it.', route('cashier.record', ['request' => $r->code], false));
                 }
                 $changes[] = ($how === 'sent' ? 'Refunded ' : ($how === 'awaiting' ? 'Refund in progress ' : 'Refund due ')).money($refund);
             }
@@ -602,7 +602,7 @@ class Shortfalls
                     'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'SCC-'.$c->id.'-'.substr((string) now()->getTimestampMs(), -5),
                     'status' => 'pending', 'notes' => 'Compensation from the shop · case '.$c->code.' · '.$d['comp']['reason'], 'recorded_by' => 'system',
                 ]);
-                Notifier::finance($c->supplier, 'Compensation due: '.$r->code, money($compOut).' goes to '.$c->customer->name.' (case '.$c->code.': '.$d['comp']['reason'].'). Send it and mark it verified.', route('supplier.requests.show', $r, false));
+                Notifier::platformFinance('Compensation due: '.$r->code, money($compOut).' goes to '.$c->customer->name.' (case '.$c->code.', '.$c->supplier->name.': '.$d['comp']['reason'].'). Send it and record it; it comes off the shop\'s payout.', route('cashier.record', ['request' => $r->code], false));
                 $changes[] = 'Shop pays the customer '.money($compOut).' compensation ('.$d['comp']['reason'].')';
             }
             $res = ['type' => $d['type'], 'credit' => (float) ($d['credit'] ?? 0), 'refund' => $refund, 'comp' => $d['comp'] ?? null, 'by' => $role, 'proposal' => $e->id, 'changes' => $changes,

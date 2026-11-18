@@ -3,6 +3,7 @@
 {{-- Port of C.checkout (reference js/pages/customer-rent.js). State lives in public/js/checkout.js;
      prices and validation always come from the server (POST checkout.quote → Rentals::prepareOrder). --}}
 @section('content')
+<div data-leave-warn="always" data-leave-msg="Your rental request has not been sent yet. If you leave now, nothing is requested (your Rental List items stay saved)." hidden></div>
 @php($direct = $direct ?? false)
 @if(! $orders)
   @include('partials.empty', ['emoji' => '🧾', 'title' => 'Nothing to check out', 'text' => 'Select items in your Rental List first.', 'action' => '<a class="btn btn-primary" href="'.route('cart').'">Go to Rental List</a>'])

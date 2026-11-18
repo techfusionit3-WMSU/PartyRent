@@ -1,6 +1,7 @@
 @extends('layouts.dash', ['title' => 'Record Payment', 'nav' => 'record'])
 
 @section('content')
+<div data-leave-warn="dirty" data-leave-msg="This payment has not been recorded yet. Leave anyway?" hidden></div>
 <div class="page-head"><div><h1>Record payment or refund</h1><p>For authorized over-the-counter payments and refunds. Recorded entries are verified immediately and a receipt is issued.</p></div></div>
 <form method="GET" class="card row wrap mb-2" style="gap:8px">
   <label for="rq" class="strong">Rental request</label>

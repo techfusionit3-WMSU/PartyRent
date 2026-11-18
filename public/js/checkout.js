@@ -238,7 +238,7 @@
     try {
       const res = await fetch(form.dataset.submit, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify(Object.assign(payload(), { agree: 1 })) });
       const data = await res.json();
-      if (res.ok && data.ok) { location.href = data.redirect; return; }
+      if (res.ok && data.ok) { window.PR.leaveOk = true; location.href = data.redirect; return; }
       toast(data.error || data.message || 'Please check the form.', 'error'); requote();
     } catch (e) { toast('Could not submit. Check your connection.', 'error'); }
     btn.disabled = false; btn.textContent = label;

@@ -1,6 +1,7 @@
 @extends('layouts.market', ['title' => $r->event_name, 'nav' => 'rentals'])
 
 @section('content')
+<div data-leave-warn="dirty" data-leave-msg="You started filling in a form on this rental (for example a payment) that was not sent. Leave anyway?" hidden></div>
 <div class="crumbs"><a href="{{ route('rentals.index') }}">My Rentals</a> / {{ $r->code }}</div>
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }}@if($r->event_type && $r->event_type !== 'Other') · {{ $r->event_type }}@endif · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@include('partials.badges', ['pay' => $f['status']])</div></div>
 @include('partials.case-alert', ['r' => $r])

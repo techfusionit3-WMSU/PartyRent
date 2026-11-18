@@ -22,6 +22,7 @@
     $proposals = $c->events->whereIn('kind', ['proposal', 'counter']);
 @endphp
 @section('content')
+<div data-leave-warn="dirty" data-leave-msg="Your message or proposal on this case has not been sent. Leave anyway?" hidden></div>
 <div class="page-head"><div>
   <h1>Case {{ $c->code }} <span class="badge {{ $st[1] }}" style="vertical-align:middle">{{ $st[0] }}</span></h1>
   <p>{{ $c->supplier->name }} cannot provide <b>{{ $c->units() }} × {{ $c->product->name }}</b> for booking @if($bookingUrl)<a href="{{ $bookingUrl }}">{{ $r->code }}</a>@else<b>{{ $r->code }}</b>@endif ({{ $r->event_name }}).</p>

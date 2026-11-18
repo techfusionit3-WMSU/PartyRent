@@ -126,6 +126,33 @@
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.modal-backdrop:not(.hidden)').forEach(m => m.id && closeModal(m)); });
 
+  /* ---------- leaving important pages ----------
+     <div data-leave-warn="always|dirty" data-leave-msg="…" hidden></div> on a page:
+     always = checkout (warn until the request is sent; the page sets PR.leaveOk = true on success);
+     dirty  = transaction pages (warn only when something was typed into a form that was not sent). */
+  const leaveBox = document.querySelector('[data-leave-warn]');
+  if (leaveBox) {
+    let dirty = leaveBox.dataset.leaveWarn === 'always', sending = false;
+    window.PR.leaveOk = false;
+    const mark = e => { const f = e.target.closest && e.target.closest('form'); if (f && (f.method || '').toLowerCase() === 'post' && e.target.type !== 'hidden' && !f.hasAttribute('data-no-leave-warn')) dirty = true; };
+    document.addEventListener('input', mark); document.addEventListener('change', mark);
+    // registered last (after the confirm-dialog handler below), so a submit held for confirmation and then cancelled is still "not sent"
+    setTimeout(() => document.addEventListener('submit', e => { if (!e.defaultPrevented) sending = true; }), 0);
+    const nativeSubmit = HTMLFormElement.prototype.submit; // form.submit() (auto-submit selects) fires no submit event
+    HTMLFormElement.prototype.submit = function () { sending = true; return nativeSubmit.call(this); };
+    const active = () => dirty && !sending && !window.PR.leaveOk;
+    window.addEventListener('beforeunload', e => { if (active()) { e.preventDefault(); e.returnValue = ''; } });
+    document.addEventListener('click', async e => {
+      const a = e.target.closest('a[href]');
+      if (!a || !active() || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('data-modal') || a.hasAttribute('data-dropdown') || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+      const href = a.getAttribute('href') || '';
+      if (!href || href.startsWith('#') || href.startsWith('javascript:') || a.href.split('#')[0] === location.href.split('#')[0]) return;
+      e.preventDefault(); e.stopPropagation();
+      const ok = await confirmDialog({ title: 'Leave this page?', message: leaveBox.dataset.leaveMsg || 'What you entered on this page has not been sent yet. If you leave now it will be lost.', ok: 'Leave page', danger: true });
+      if (ok) { window.PR.leaveOk = true; location.href = a.href; }
+    }, true);
+  }
+
   // forms needing confirmation: <form data-confirm="..." data-confirm-title="..." data-danger>
   document.addEventListener('submit', async e => {
     const f = e.target;

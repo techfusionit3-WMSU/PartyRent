@@ -584,3 +584,31 @@
 .comp-box legend { font-weight: 700; font-size: .88rem; padding: 0 6px; }
 .comp-line { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--gold-50); }
 .comp-line.to-cust { background: var(--green-50); }
+/* discounts form: type cards, affix input, item picker */
+.disc-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.disc-kind { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 12px; cursor: pointer; }
+.disc-kind input { accent-color: var(--brand); margin-top: 3px; flex: none; }
+.disc-kind b { display: block; font-size: .88rem; }
+.disc-kind small { display: block; color: var(--muted); font-size: .76rem; line-height: 1.35; margin-top: 2px; }
+.disc-kind.on { border-color: var(--brand); background: var(--brand-50); }
+.input-affix { display: flex; align-items: center; border: 1.5px solid var(--line-2); border-radius: 10px; background: var(--surface); padding: 0 12px; }
+.input-affix:focus-within { border-color: var(--brand); }
+.input-affix .input { border: 0; box-shadow: none; padding-left: 6px; padding-right: 6px; background: transparent; }
+.input-affix > span { font-weight: 800; color: var(--ink-2); }
+.disc-example { color: var(--purple); font-weight: 600; }
+.pick-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 999px; background: var(--brand-50); color: var(--brand); font-size: .82rem; font-weight: 700; }
+.pick-chip button { border: 0; background: rgba(225, 29, 116, .12); color: var(--brand); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; font-size: .9rem; line-height: 1; }
+.pick-chip button:hover { background: var(--brand); color: #fff; }
+.picker { position: fixed; inset: 0; z-index: 1200; background: rgba(30, 20, 51, .45); display: grid; place-items: center; padding: 16px; }
+.picker-box { background: var(--surface); border-radius: 18px; width: min(520px, 100%); max-height: min(640px, calc(100vh - 32px)); display: flex; flex-direction: column; box-shadow: var(--shadow-lg); }
+.picker-body { padding: 0 20px; overflow: auto; flex: 1; }
+.picker-search { max-width: none; }
+.picker-body > .pick-chips { margin-bottom: 10px; }
+.pick-list { border-top: 1px solid var(--line); }
+.pick-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.pick-row:hover { background: var(--surface-2); }
+.pick-row input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pick-row .pick-add { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line-2); color: var(--brand); }
+.pick-row .pick-add svg { width: 14px; height: 14px; }
+@media (max-width: 520px) { .disc-kinds { grid-template-columns: minmax(0, 1fr); } }

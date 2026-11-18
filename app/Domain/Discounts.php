@@ -36,7 +36,7 @@ class Discounts
     {
         $best = null;
         foreach (self::running($p->supplier_id, $at ?? today_iso()) as $d) {
-            if (! $d->covers($p)) {
+            if ($d->isOrderLevel() || ! $d->covers($p)) {
                 continue;
             }
             $off = 0.0;
@@ -50,6 +50,39 @@ class Discounts
             $off = r2($off);
             if ($off > 0 && (! $best || $off > $best['amount'])) {
                 $best = ['id' => $d->id, 'name' => $d->name, 'label' => $d->label(), 'amount' => $off];
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Best whole-order discount for one shop order. $lines = quoted lines (Pricing::quoteLine) of rental / sale items.
+     * The base is the covered items' total before item discounts. Returns null or ['id','name','label','amount','base'].
+     */
+    public static function bestOrder(int $supplierId, array $lines, ?string $at = null): ?array
+    {
+        $best = null;
+        foreach (self::running($supplierId, $at ?? today_iso()) as $d) {
+            if (! $d->isOrderLevel()) {
+                continue;
+            }
+            $base = 0.0;
+            $pieces = 0;
+            foreach ($lines as $l) {
+                if (! in_array($l['kind'] ?? '', ['rent', 'sale'], true) || ! ($p = inv()->product($l['refId'] ?? 0)) || ! $d->covers($p)) {
+                    continue;
+                }
+                $base += (float) ($l['gross'] ?? $l['total'] ?? 0);
+                $pieces += $l['kind'] === 'sale' ? (int) array_sum(array_column($l['once'] ?? [], 'qty')) : (int) max(array_column($l['days'] ?? [], 'qty') ?: [0]);
+            }
+            $base = r2($base);
+            if ($base <= 0 || ($d->min_amount && $base < $d->min_amount) || ($d->min_qty && $pieces < $d->min_qty)) {
+                continue;
+            }
+            $off = r2($d->kind === 'order_percent' ? $base * min(100, $d->value) / 100 : min($d->value, $base));
+            if ($off > 0 && (! $best || $off > $best['amount'])) {
+                $best = ['id' => $d->id, 'name' => $d->name, 'label' => $d->label(), 'amount' => $off, 'base' => $base];
             }
         }
 

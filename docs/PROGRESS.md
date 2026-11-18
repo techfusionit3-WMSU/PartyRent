@@ -4,7 +4,12 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Feedback batch 2026-11-18** (user pasted list + screenshots). Order / status:
+**Feedback batch 2026-11-18** (user pasted list + screenshots) — ALL DONE (126 tests green). Notes for later:
+direct "Request Rental" = cart_lines.direct (checkout?line=); Rentals::stepBlockers gates request steps; case
+proposals carry optional `comp` {amount, payer supplier|customer, reason} + type 'compensation'; discount kinds
+percent | amount | order_percent | order_amount (+ min_amount), Discounts::bestOrder vs item discounts in quoteOrder.
+Not done / open questions: customer-paid case charges are only in pricing totals (no separate line in the charges
+breakdown yet). Order / status:
 - [x] B1 Header: plain search (no AI) + separate square AI button; nav links wrap to a 2nd row on small screens
       (never hidden); remove category navbar; "Switch to your shop"/"Switch to customer mode" moved under the
       user profile (tinted background) on both sides
@@ -19,7 +24,7 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
       split lines grouped per item in one card
 - [x] B6 Cases: compensation (request / offer, rush fees) for both sides; steps can't be skipped before their
       requirements; confirm dialog on every irreversible step (supplier request steps too)
-- [ ] B7 Discounts: clear type (percent of item / ₱ per piece / % of whole order); item picker in a popup with
+- [x] B7 Discounts: clear type (percent of item / ₱ per piece / % of whole order); item picker in a popup with
       search, picked items on top as removable chips; fix stray "@include('partials.badges'..." text on request page
 
 ## Previous task

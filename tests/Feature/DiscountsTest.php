@@ -113,4 +113,30 @@ class DiscountsTest extends TestCase
         $this->put(route('supplier.discounts.bulk', $p), ['base_price' => 18])->assertSessionHas('success');
         $this->assertEquals([['min' => 1, 'max' => null, 'price' => 18]], $p->fresh()->tiers);
     }
+
+    public function test_whole_order_discounts(): void
+    {
+        $s = $this->juan();
+        $p = Product::where('supplier_id', $s->id)->where('listing_type', 'rent')->orderBy('id')->first();
+        $gross = (float) $this->quote($p, 10)['total'];
+        // ₱ off the whole order, only from a minimum order amount
+        $d = Discount::create(['supplier_id' => $s->id, 'name' => 'Big order', 'kind' => 'order_amount', 'value' => 100, 'applies_to' => 'all', 'min_amount' => $gross + 1, 'active' => true]);
+        $this->assertEqualsWithDelta($gross, $this->quote($p, 10)['total'], 0.001); // below the minimum
+        $d->update(['min_amount' => $gross]);
+        $q = $this->quote($p, 10);
+        $this->assertEqualsWithDelta($gross - 100, $q['total'], 0.001);
+        $this->assertSame('Whole order', $q['discounts'][0]['item']);
+        $this->assertEqualsWithDelta($q['rentalFee'], array_sum(array_column($q['lines'], 'total')), 0.001); // lines still add up
+        // % off the whole order beats a smaller item discount (only one shop discount applies)
+        $d->update(['active' => false]);
+        Discount::create(['supplier_id' => $s->id, 'name' => 'Item 5%', 'kind' => 'percent', 'value' => 5, 'applies_to' => 'all', 'active' => true]);
+        Discount::create(['supplier_id' => $s->id, 'name' => 'Order 20%', 'kind' => 'order_percent', 'value' => 20, 'applies_to' => 'all', 'active' => true]);
+        $q = $this->quote($p, 10);
+        $this->assertEqualsWithDelta($gross * 0.8, $q['total'], 0.01);
+        $this->assertCount(1, $q['discounts']);
+        $this->assertSame('20% off the whole order', Discount::where('name', 'Order 20%')->first()->label());
+        // the form accepts the new kinds
+        $this->post(route('supplier.discounts.store'), ['name' => 'Promo', 'kind' => 'order_amount', 'value' => 200, 'applies_to' => 'all', 'min_amount' => 2000])->assertSessionHas('success');
+        $this->assertSame(2000.0, Discount::where('name', 'Promo')->first()->min_amount);
+    }
 }

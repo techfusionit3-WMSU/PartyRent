@@ -12,15 +12,35 @@ class Discount extends Model
 
     protected function casts(): array
     {
-        return ['value' => 'float', 'product_ids' => 'array', 'min_qty' => 'integer', 'active' => 'boolean', 'starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d'];
+        return ['value' => 'float', 'min_amount' => 'float', 'product_ids' => 'array', 'min_qty' => 'integer', 'active' => 'boolean', 'starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d'];
     }
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
 
-    /** "10% off" / "₱20 off per piece" */
+    /** What the discount takes off, how it is shown in the form. */
+    public const KINDS = [
+        'percent' => ['% off each item', 'Each covered item\'s price goes down by this percent.'],
+        'amount' => ['₱ off per piece', 'This many pesos come off every piece (per day for rentals).'],
+        'order_percent' => ['% off the whole order', 'The covered items\' total in one order goes down by this percent.'],
+        'order_amount' => ['₱ off the whole order', 'This many pesos come off the order once (not per piece).'],
+    ];
+
+    public function isOrderLevel(): bool
+    {
+        return str_starts_with((string) $this->kind, 'order_');
+    }
+
+    /** "10% off each item" / "₱20 off per piece" / "10% off the whole order" / "₱500 off the order" */
     public function label(): string
     {
-        return $this->kind === 'percent' ? rtrim(rtrim(number_format($this->value, 2), '0'), '.').'% off' : money_short($this->value).' off per piece';
+        $pct = rtrim(rtrim(number_format($this->value, 2), '0'), '.').'%';
+
+        return match ($this->kind) {
+            'percent' => $pct.' off',
+            'order_percent' => $pct.' off the whole order',
+            'order_amount' => money_short($this->value).' off the order',
+            default => money_short($this->value).' off per piece',
+        }.($this->isOrderLevel() && $this->min_amount ? ' of '.money_short($this->min_amount).'+' : '');
     }
 
     /** Scheduled / Running / Ended / Off on a date. */

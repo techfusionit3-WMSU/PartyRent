@@ -46,14 +46,15 @@ class DiscountController extends Controller
         $s = $this->sup($request);
         $v = $request->validate([
             'name' => 'required|string|min:2|max:80',
-            'kind' => 'required|in:percent,amount',
+            'kind' => 'required|in:percent,amount,order_percent,order_amount',
+            'min_amount' => 'nullable|numeric|min:1|max:10000000',
             'value' => 'required|numeric|min:0.01|max:1000000',
             'applies_to' => 'required|in:all,products',
             'product_ids' => 'nullable|array', 'product_ids.*' => 'integer',
             'min_qty' => 'nullable|integer|min:2|max:100000',
             'starts_on' => 'nullable|date', 'ends_on' => 'nullable|date',
         ], ['value.required' => 'Enter how much the discount takes off.']);
-        if ($v['kind'] === 'percent' && $v['value'] > 90) {
+        if (in_array($v['kind'], ['percent', 'order_percent'], true) && $v['value'] > 90) {
             throw ValidationException::withMessages(['value' => 'A percent discount can be at most 90%.']);
         }
         if (! empty($v['starts_on']) && ! empty($v['ends_on']) && $v['ends_on'] < $v['starts_on']) {
@@ -70,6 +71,7 @@ class DiscountController extends Controller
         return [
             'name' => trim($v['name']), 'kind' => $v['kind'], 'value' => round((float) $v['value'], 2), 'applies_to' => $v['applies_to'],
             'product_ids' => $v['applies_to'] === 'products' ? $ids : null, 'min_qty' => $v['min_qty'] ?? null,
+            'min_amount' => str_starts_with($v['kind'], 'order_') ? ($v['min_amount'] ?? null) : null,
             'starts_on' => $v['starts_on'] ?? null, 'ends_on' => $v['ends_on'] ?? null,
         ];
     }

@@ -322,6 +322,31 @@ class Pricing
         $lq = array_map(fn ($l) => self::quoteLine($l, $combined, $at), $lines);
         $discounts = array_values(array_filter(array_map(fn ($l) => ! empty($l['discount']) ? $l['discount'] + ['item' => $l['name']] : null, $lq)));
         $discount = r2(array_sum(array_column($discounts, 'amount')));
+        // A whole-order discount replaces the item discounts when it saves the customer more (one shop discount at a time).
+        $orderDisc = $s ? Discounts::bestOrder($s->id, $lq, $at) : null;
+        if ($orderDisc && $orderDisc['amount'] > $discount) {
+            foreach ($lq as &$ql) {
+                if (! empty($ql['discount'])) {
+                    $k = $ql['kind'] === 'sale' ? 'sale' : 'rent';
+                    $ql[$k] = $ql['total'] = r2((float) $ql['gross']);
+                    $ql['discount'] = null;
+                }
+            }
+            unset($ql);
+            // spread the order discount over the covered lines (by their share) so line totals still add up
+            $left = $orderDisc['amount'];
+            $covered = array_keys(array_filter($lq, fn ($l) => in_array($l['kind'] ?? '', ['rent', 'sale'], true) && ($p = inv()->product($l['refId'] ?? 0)) && \App\Models\Discount::find($orderDisc['id'])?->covers($p)));
+            foreach ($covered as $n => $i) {
+                $k = $lq[$i]['kind'] === 'sale' ? 'sale' : 'rent';
+                $share = $n === count($covered) - 1 ? $left : r2($orderDisc['amount'] * (float) $lq[$i]['gross'] / max(0.01, $orderDisc['base']));
+                $share = min($share, (float) $lq[$i]['total']);
+                $lq[$i][$k] = $lq[$i]['total'] = r2((float) $lq[$i]['total'] - $share);
+                $lq[$i]['orderShare'] = $share;
+                $left = r2($left - $share);
+            }
+            $discounts = [$orderDisc + ['item' => 'Whole order']];
+            $discount = (float) $orderDisc['amount'];
+        }
         $rentalSubtotal = r2(array_sum(array_column($lq, 'rent')));
         $salesSubtotal = r2(array_sum(array_column($lq, 'sale')));
         $packageServices = r2(array_sum(array_column($lq, 'service')));

@@ -41,7 +41,7 @@ class Chat
         $r->forceFill([$side === 'customer' ? 'chat_customer_seen_at' : 'chat_supplier_seen_at' => now()])->saveQuietly();
     }
 
-    public static function post(RentalRequest $r, User $by, string $side, string $body): array
+    public static function post(RentalRequest $r, User $by, string $side, string $body, bool $notify = true): array
     {
         $body = trim(preg_replace("/\r\n?/", "\n", $body));
         if (! in_array($side, self::SIDES, true)) {
@@ -56,6 +56,9 @@ class Chat
         $m = RequestMessage::create(['rental_request_id' => $r->id, 'user_id' => $by->id, 'side' => $side, 'body' => $body, 'created_at' => now()]);
         self::markSeen($r, $side);
 
+        if (! $notify) {
+            return ['ok' => true, 'message' => $m];
+        }
         $snippet = mb_strimwidth(str_replace("\n", ' ', $body), 0, 120, '…');
         if ($side === 'customer') {
             $title = 'New message on '.$r->code;

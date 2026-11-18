@@ -58,6 +58,8 @@ class RequestController extends Controller
             'next' => Rentals::nextSteps($r), 'review' => $r->status === 'pending' ? Rentals::acceptReview($r) : null,
             'checklist' => $r->status === 'inspection' ? Rentals::completionChecklist($r) : [],
             'custHist' => RentalRequest::where('customer_id', $r->customer_id)->get(['status']),
+            'due' => Rentals::paymentDue($r), 'reminderText' => Rentals::paymentReminderText($r),
+            'canRemind' => in_array($r->status, Finance::ACTIVE, true) && $u->canShop('supplier.requests.remind'),
             'peak' => $r->status === 'return_pending' ? Rentals::peakUnits($r) : [], 'sug' => Finance::suggestedNext($r),
         ]);
     }
@@ -166,6 +168,16 @@ class RequestController extends Controller
         $r->update(['supplier_notes' => mb_substr((string) $request->input('notes', ''), 0, 2000)]);
 
         return back()->with('success', 'Notes saved.');
+    }
+
+    /** Remind the customer about what they still owe (notification + chat message). */
+    public function remind(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $data = $request->validate(['message' => 'nullable|string|max:'.\App\Domain\Chat::MAX]);
+        $res = Rentals::remindPayment($r, $request->user(), (string) ($data['message'] ?? ''));
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payment reminder sent to '.$r->customer->name.'. It is also in your messages with them.' : $res['error']);
     }
 
     /** Record a payment received by the shop (reference recordCash): verified at once, receipt issued. */

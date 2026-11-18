@@ -643,3 +643,13 @@
 .rq-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 10px; }
 .rq-form textarea { flex: 1; min-width: 0; resize: vertical; }
 @media (max-width: 480px) { .rq-form .btn span { display: none; } }
+
+/* Supplier request page: what is due + inline payment verification */
+.due-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.due-strip > div { flex: 1 1 160px; display: flex; flex-direction: column; gap: 1px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.due-strip b { font-size: 1.02rem; }
+.text-red { color: var(--red); font-weight: 600; }
+.inline-verify { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; margin-top: 6px; }
+.inline-reject summary { list-style: none; cursor: pointer; }
+.inline-reject summary::-webkit-details-marker { display: none; }
+.inline-reject[open] { flex: 1 1 100%; }

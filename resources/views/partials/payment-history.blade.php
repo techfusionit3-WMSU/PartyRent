@@ -11,6 +11,14 @@
         <td data-label="Amount" class="num"><b>{{ $p->isOutflow() ? '− ' : '' }}{{ money($p->amount) }}</b></td>
         <td data-label="Status">@include('partials.badges', ['ver' => $p->status])@if($p->reject_reason)<div class="small" style="color:var(--red)">{{ $p->reject_reason }}</div>@endif</td>
         <td data-label="">@if($p->receipt_no)<a class="btn btn-xs" href="{{ route('payments.receipt', $p) }}" target="_blank">{{ $p->receipt_no }}</a>@endif @if($p->proof_path)<a class="btn btn-xs btn-ghost" href="{{ route('payments.proof', $p) }}" target="_blank">Proof</a>@endif
+          @if(! empty($inlineVerify) && $p->status === 'pending' && ! $p->isOutflow())
+            <div class="inline-verify">
+              <form method="POST" action="{{ route('supplier.payments.verify', $p) }}" data-confirm-title="Verify {{ $p->code }}?" data-confirm="Confirm that {{ money($p->amount) }} ({{ $p->methodLabel() }}{{ $p->reference ? ', ref '.$p->reference : '' }}) was received. A receipt is issued and the customer's balance updated." data-confirm-ok="Verify">@csrf<button class="btn btn-xs btn-success">{{ icon('check') }}Verify</button></form>
+              <details class="inline-reject"><summary class="btn btn-xs btn-ghost">Reject</summary>
+                <form method="POST" action="{{ route('supplier.payments.reject', $p) }}" class="mt-1">@csrf<textarea class="input" name="reason" rows="2" required maxlength="500" placeholder="Reason sent to the customer, e.g. reference not found"></textarea><button class="btn btn-xs btn-danger mt-1">Reject payment</button></form>
+              </details>
+            </div>
+          @endif
           @if($p->status === 'awaiting' && $p->gateway_url && auth()->id() === $r->customer_id)<a class="btn btn-xs btn-primary" href="{{ $p->gateway_url }}">Continue payment</a> <a class="btn btn-xs" href="{{ route('rentals.online.return', [$r, $p]) }}">Check status</a>@endif</td>
       </tr>
     @endforeach

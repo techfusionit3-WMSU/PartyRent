@@ -111,9 +111,12 @@
     @endif
     <div class="card"><h3>Requested items, times & daily quantities</h3>@include('partials.lines-table', ['pricing' => $r->pricing, 'r' => $r, 'showSource' => true])</div>
     @php($pendPays = $r->payments->where('status', 'pending'))
-    <div class="card"><div class="card-head"><h3>Payments</h3>@if($canRecord)<button class="btn btn-sm" data-modal="cashModal">{{ icon('cash') }}Record payment</button>@endif</div>
-      @if($pendPays->count())<div class="alert alert-warn mb-1">{{ icon('clock') }}<div class="grow">{{ $pendPays->count() }} payment(s) awaiting verification. @if($finOK)<a class="btn btn-xs btn-primary" href="{{ route('supplier.payments', ['tab' => 'verify']) }}">Review in Payments</a>@else Your Cashier or Organization Admin verifies them.@endif</div></div>@endif
-      @include('partials.payment-history')<p class="small muted mt-1 mb-0">Only verified payments reduce the balance. Duplicate reference numbers and amounts above the outstanding balance are blocked.</p></div>
+    <div class="card" id="payments"><div class="card-head"><h3>Payments</h3><div class="row wrap" style="gap:6px">@if($canRemind && $due)<button class="btn btn-sm" data-modal="remindModal">{{ icon('bell') }}Notify customer</button>@endif @if($canRecord)<button class="btn btn-sm btn-primary" data-modal="cashModal">{{ icon('cash') }}Record payment</button>@endif</div></div>
+      @if($due && in_array($r->status, \App\Domain\Finance::ACTIVE, true))
+        <div class="due-strip mb-1">@foreach($due as $d)<div><span class="small muted">{{ $d['label'] }}</span><b>{{ money($d['amount']) }}</b>@if($d['due'])<span class="small {{ $d['due'] < today_iso() ? 'text-red' : 'muted' }}">due {{ fmt_date($d['due']) }}</span>@endif</div>@endforeach</div>
+      @endif
+      @if($pendPays->count())<div class="alert alert-warn mb-1">{{ icon('clock') }}<div class="grow">{{ $pendPays->count() }} payment(s) awaiting verification. @if($finOK)Check each one below and verify or reject it here. <a href="{{ route('supplier.payments', ['tab' => 'verify']) }}" class="small">Open the Payments page</a>@else Your Cashier or Organization Admin verifies them.@endif</div></div>@endif
+      @include('partials.payment-history', ['inlineVerify' => $finOK])<p class="small muted mt-1 mb-0">Only verified payments reduce the balance. Duplicate reference numbers and amounts above the outstanding balance are blocked.</p></div>
     @include('partials.inspection-report')
     @include('partials.request-chat', ['chatSide' => 'supplier'])
     <div class="card"><h3>Activity</h3>@include('partials.timeline')</div>
@@ -211,6 +214,15 @@
     @endif
     <p class="small muted mt-2 mb-0">A deposit refund record is created and the customer is notified. This is logged in the audit trail.</p>
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Confirm settlement</button></div></form>
+</div></div>
+@endif
+
+@if($canRemind && $due)
+<div class="modal-backdrop hidden" id="remindModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Notify {{ $c->firstName() }} about payment · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+  <form method="POST" action="{{ route('supplier.requests.remind', $r) }}">@csrf<div class="modal-body">
+    <div class="due-strip mb-2">@foreach($due as $d)<div><span class="small muted">{{ $d['label'] }}</span><b>{{ money($d['amount']) }}</b>@if($d['due'])<span class="small muted">due {{ fmt_date($d['due']) }}</span>@endif</div>@endforeach</div>
+    <div class="field"><label for="remind-msg">Message to {{ $c->name }}</label><textarea class="input" id="remind-msg" name="message" rows="5" maxlength="{{ \App\Domain\Chat::MAX }}">{{ $reminderText }}</textarea><div class="hint">Sent as a notification and added to your messages with the customer. One reminder every 6 hours.</div></div>
+  </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">{{ icon('send') }}Send reminder</button></div></form>
 </div></div>
 @endif
 

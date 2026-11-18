@@ -56,7 +56,7 @@ class ShopStaff extends Model
         'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage',
         'requests.advance' => 'fulfillment.update', 'requests.complete' => 'fulfillment.update',
         'requests.inspection' => 'returns.inspect', 'requests.settle' => 'returns.inspect',
-        'requests.cash' => 'payments.record',
+        'requests.cash' => 'payments.record', 'requests.remind' => 'payments.view',
         'requests' => 'orders.view', 'requests.*' => 'orders.view', 'schedule' => 'orders.view', 'calendar' => 'orders.view',
         'reviews' => 'orders.view', 'reviews.*' => 'orders.manage',
         'products' => 'products.manage', 'products.*' => 'products.manage',

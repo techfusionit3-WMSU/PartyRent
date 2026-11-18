@@ -150,6 +150,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/requests/{rentalRequest}/settle', [SupplierRequestController::class, 'settle'])->name('requests.settle');
     Route::post('/requests/{rentalRequest}/complete', [SupplierRequestController::class, 'complete'])->name('requests.complete');
     Route::post('/requests/{rentalRequest}/notes', [SupplierRequestController::class, 'notes'])->name('requests.notes');
+    Route::post('/requests/{rentalRequest}/remind', [SupplierRequestController::class, 'remind'])->middleware('throttle:10,1')->name('requests.remind');
     Route::post('/requests/{rentalRequest}/cash', [SupplierRequestController::class, 'recordCash'])->name('requests.cash');
     Route::post('/requests/{rentalRequest}/source', [SupplierRequestController::class, 'source'])->name('requests.source');
     Route::post('/requests/{rentalRequest}/schedule/{decision}', [SupplierRequestController::class, 'schedule'])->whereIn('decision', ['approve', 'reject'])->name('requests.schedule');

@@ -1341,6 +1341,66 @@ class Rentals
     }
 
     /** Cashier records an authorized offline payment or refund — verified at once, receipt issued. */
+    /** What the customer still owes, line by line, for a payment reminder ([] when nothing is due). */
+    public static function paymentDue(RentalRequest $r): array
+    {
+        $f = $r->fin();
+        $sug = Finance::suggestedNext($r);
+        $out = [];
+        if ($sug['amount'] > 0.009) {
+            $out[] = ['label' => $sug['label'], 'amount' => $sug['amount'], 'due' => $sug['due'] ?? null];
+        }
+        if ($f['depositPaid'] < $f['depositRequired'] - 0.009) {
+            $out[] = ['label' => 'Security deposit (refundable)', 'amount' => r2($f['depositRequired'] - $f['depositPaid']), 'due' => $r->start_date];
+        }
+        if ($f['compensationDue'] > 0.009) {
+            $out[] = ['label' => 'Damage compensation', 'amount' => $f['compensationDue'], 'due' => null];
+        }
+
+        return $out;
+    }
+
+    /** Default text of a payment reminder (the shop can edit it before sending). */
+    public static function paymentReminderText(RentalRequest $r): string
+    {
+        $parts = array_map(fn ($d) => $d['label'].': '.money($d['amount']).($d['due'] ? ' (due '.fmt_date($d['due']).')' : ''), self::paymentDue($r));
+        $f = $r->fin();
+
+        return 'Hi '.$r->customer->firstName().'! A friendly reminder about your payment for '.$r->code.'. '
+            .($parts ? implode('; ', $parts).'. ' : '')
+            .'Remaining balance: '.money(max(0, $f['balance'])).'. '
+            .'You can pay online on the rental page, or pay us in cash and we will record it. Thank you!';
+    }
+
+    /**
+     * Shop reminds the customer about a payment: a "Payment reminder" notification plus the same text in the
+     * request chat (both sides keep a record). At most one every 6 hours per request.
+     */
+    public static function remindPayment(RentalRequest $r, User $by, string $text): array
+    {
+        if (! in_array($r->status, Finance::ACTIVE, true)) {
+            return self::fail('Payment reminders are for accepted, active rentals.');
+        }
+        if (! self::paymentDue($r)) {
+            return self::fail($r->customer->name.' has nothing left to pay on '.$r->code.'.');
+        }
+        $text = trim($text) ?: self::paymentReminderText($r);
+        if (mb_strlen($text) > Chat::MAX) {
+            return self::fail('Keep the reminder under '.Chat::MAX.' characters.');
+        }
+        $link = self::link('rentals.show', $r);
+        $last = \App\Models\AppNotification::where('user_id', $r->customer_id)->where('scope', 'customer')->where('title', 'like', 'Payment reminder%')
+            ->where('link', $link)->where('created_at', '>', now()->subHours(6))->latest('id')->first();
+        if ($last) {
+            return self::fail('You already reminded '.$r->customer->firstName().' at '.$last->created_at->format('g:i A').'. You can send another reminder after '.$last->created_at->addHours(6)->format('M j, g:i A').'.');
+        }
+        Chat::post($r, $by, 'supplier', '🔔 Payment reminder: '.$text, false);
+        Notifier::notify($r->customer_id, 'customer', 'Payment reminder · '.$r->code, $r->supplier->name.': '.mb_strimwidth($text, 0, 220, '…'), $link);
+        Notifier::audit('Payment reminder sent', $r->code.' → '.$r->customer->email, $by);
+
+        return self::ok();
+    }
+
     public static function cashierRecord(RentalRequest $r, array $data, User $by): array
     {
         if (! self::canFinance($r->supplier_id, 'payments.record', $by)) {

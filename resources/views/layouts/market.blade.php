@@ -11,11 +11,6 @@
       <button type="submit" class="search-go">{{ icon('search') }}<span>Search</span></button>
     </form>
     <button type="submit" form="mkSearch" formaction="{{ route('ai') }}" class="ai-square" title="AI Search: describe your event and let AI build the search" aria-label="AI Search">{{ icon('sparkle') }}<span>AI</span></button>
-    <nav class="mk-nav" aria-label="Main">
-      @foreach([['home', 'home', 'Browse'], ['packages', 'packages.index', 'Packages'], ['suppliers', 'suppliers.index', 'Suppliers'], ['rentals', 'rentals.index', 'My Rentals']] as [$k, $r, $l])
-        <a href="{{ route($r) }}" class="{{ $nav === $k ? 'active' : '' }}">{{ $l }}</a>
-      @endforeach
-    </nav>
     <div class="mk-actions">
       @auth
         @include('partials.notif-dropdown')
@@ -27,6 +22,14 @@
       @endauth
     </div>
   </div>
+  {{-- Main sections: their own centered row, four equal tabs (same look on every screen size) --}}
+  <nav class="mk-nav" aria-label="Main">
+    <div class="container mk-nav-in">
+      @foreach([['home', 'home', 'Browse', 'grid'], ['packages', 'packages.index', 'Packages', 'package'], ['suppliers', 'suppliers.index', 'Suppliers', 'store'], ['rentals', 'rentals.index', 'My Rentals', 'list']] as [$k, $r, $l, $i])
+        <a href="{{ route($r) }}" class="{{ $nav === $k || ($k === 'home' && $nav === 'browse') ? 'active' : '' }}" @if($nav === $k) aria-current="page" @endif>{{ icon($i) }}<span>{{ $l }}</span>@if($k === 'rentals')@auth @if($shellPendingRentals)<span class="nav-count">{{ $shellPendingRentals }}</span>@endif @endauth @endif</a>
+      @endforeach
+    </div>
+  </nav>
   @yield('subheader')
 </header>
 

@@ -21,9 +21,15 @@
 .mk-search .ai-toggle { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 8px 14px; background: var(--grad); color: #fff; font: 700 .82rem var(--font); cursor: pointer; white-space: nowrap; }
 .mk-search .ai-toggle svg { color: #fff; width: 16px; height: 16px; }
 .mk-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.mk-nav { display: flex; gap: 2px; }
-.mk-nav a { padding: 8px 12px; border-radius: 999px; color: var(--ink-2); font-weight: 600; font-size: .9rem; text-decoration: none; white-space: nowrap; }
-.mk-nav a:hover, .mk-nav a.active { background: var(--brand-50); color: var(--brand); }
+.mk-nav { border-top: 1px solid var(--line); }
+.mk-nav-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 760px; margin: 0 auto; }
+.mk-nav a { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 6px; color: var(--ink-2); font-weight: 600; font-size: .9rem; text-decoration: none; white-space: nowrap; transition: color .15s, background .15s; }
+.mk-nav a svg { width: 18px; height: 18px; flex: none; }
+.mk-nav a::after { content: ''; position: absolute; left: 22%; right: 22%; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: transparent; transition: background .15s; }
+.mk-nav a:hover { color: var(--brand); background: var(--brand-50); }
+.mk-nav a.active { color: var(--brand); }
+.mk-nav a.active::after { background: var(--brand); }
+.mk-nav .nav-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand); color: #fff; font-size: .7rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
 .user-btn { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font: 600 .86rem var(--font); color: var(--ink); }
 .user-btn .avatar { width: 32px; height: 32px; font-size: .75rem; }
 .user-btn:hover { border-color: var(--brand); }
@@ -303,7 +309,7 @@
   .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); }
   .form-grid { grid-template-columns: minmax(0, 1fr); }
   .cat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .mk-header .bar { gap: 8px; flex-wrap: wrap; height: auto; padding: 8px 0; }
+  .mk-header .bar { gap: 8px; flex-wrap: wrap; height: auto; padding-block: 8px; }
   .mk-search { order: 3; flex: 1 1 100%; max-width: none; min-width: 0; }
   .mk-search input { width: 0; }
   .mk-actions { margin-left: auto; }
@@ -503,10 +509,11 @@
 .ai-square svg { width: 18px; height: 18px; color: #fff; }
 .ai-square:hover { filter: brightness(1.07); }
 @media (max-width: 1180px) {
-  .mk-header .bar { flex-wrap: wrap; height: auto; padding: 10px 0 0; row-gap: 6px; }
-  .mk-nav { order: 10; flex: 1 1 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--line); padding: 4px 0; }
-  .mk-nav::-webkit-scrollbar { display: none; }
-  .mk-nav a { padding: 7px 12px; font-size: .86rem; }
+  .mk-header .bar { flex-wrap: wrap; height: auto; padding-block: 10px; row-gap: 6px; }
+}
+@media (max-width: 440px) {
+  .mk-nav a { flex-direction: column; gap: 2px; padding: 7px 2px 8px; font-size: .74rem; }
+  .mk-nav .nav-count { position: absolute; top: 3px; left: calc(50% + 6px); }
 }
 @media (max-width: 768px) {
   .mk-header .bar { padding-top: 8px; }
@@ -514,7 +521,8 @@
   .ai-square { order: 4; height: 42px; padding: 0 11px; }
   .mk-search .search-go span { display: none; }
   .mk-search .search-go { padding: 8px 10px; }
-  .mk-nav { justify-content: space-between; }
+  .mk-nav a { padding: 9px 2px; gap: 6px; font-size: .82rem; }
+  .mk-nav a svg { width: 16px; height: 16px; }
 }
 .menu .menu-switch-top { display: flex; align-items: center; gap: 10px; width: calc(100% - 12px); margin: 2px 6px 6px; padding: 10px 12px; border-radius: 11px; border: 1px solid var(--purple-50); background: var(--purple-50); color: var(--purple); font: 700 .86rem var(--font); cursor: pointer; text-align: left; text-decoration: none; }
 .menu .menu-switch-top svg { color: var(--purple); width: 18px; height: 18px; flex: none; }

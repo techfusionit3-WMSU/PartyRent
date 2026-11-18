@@ -142,6 +142,7 @@
     opts = opts || {};
     const st = { type: el.dataset.type, ref: +el.dataset.ref, days: JSON.parse(el.dataset.days || '{}'), siblings: JSON.parse(el.dataset.siblings || '[]'), sel: JSON.parse(el.dataset.sel || 'null') };
     let timer = null, last = null;
+    const fixed = el.hasAttribute('data-fixed');
     const sync = () => { const t = el.dataset.sync && $(el.dataset.sync); if (t) t.value = JSON.stringify(st.days); };
     const save = () => { if (!el.dataset.save) return; clearTimeout(timer); timer = setTimeout(async () => { try { await api(el.dataset.save, { method: 'PATCH', body: JSON.stringify({ days: st.days }) }); el.dispatchEvent(new CustomEvent('pr:saved', { bubbles: true })); } catch (err) { toast('Could not save: ' + err.message, 'error'); } }, 450); };
     async function refresh() {
@@ -155,10 +156,10 @@
         '<div data-l="Available">' + (x.ok || x.past ? '<span class="avail-pill ' + (x.available - x.qty < 5 && st.type === 'item' ? 'low' : 'ok') + '">' + x.available + ' ' + (st.type === 'package' ? 'pkg' : 'avail.') + '</span>' : '<span class="avail-pill none">Only ' + x.available + '</span>') + '</div>' +
         '<div data-l="Daily rate">' + esc(x.unitText) + '<div class="small muted">/' + esc(r.unitWord) + (x.tier ? ' · tier ' + esc(x.tier) : '') + '</div></div>' +
         '<div data-l="Subtotal" class="strong">' + esc(x.subtotalText) + '</div>' +
-        '<div class="rm"><button type="button" class="icon-btn" data-remove aria-label="Remove date" style="width:34px;height:34px">' + svg('trash', 'width:17px') + '</button></div></div>').join('');
+        '<div class="rm">' + (fixed ? '' : '<button type="button" class="icon-btn" data-remove aria-label="Remove date" style="width:34px;height:34px">' + svg('trash', 'width:17px') + '</button>') + '</div></div>').join('');
       const first = Object.keys(st.days).sort()[0];
-      el.innerHTML = '<div class="day-editor"><div class="day-row head"><div>Date</div><div>Requested qty</div><div>Available</div><div>Daily rate</div><div>Daily subtotal</div><div></div></div>' + (rows || '<div class="empty small" style="padding:18px">No dates yet — add a rental date below.</div>') + '</div>' +
-        '<div class="row wrap mt-1" style="gap:8px"><input type="date" class="input input-sm" style="width:auto" data-newdate min="' + r.today + '" aria-label="Add a rental date"><button type="button" class="btn btn-sm" data-adddate>' + svg('plus') + 'Add date</button><span class="grow"></span><div class="row" style="gap:6px"><span class="small muted">Same qty for all:</span><input type="number" min="1" class="input input-sm" style="width:80px" data-allqty value="' + (first ? st.days[first] : 1) + '" aria-label="Quantity for all dates"><button type="button" class="btn btn-sm btn-outline" data-applyall>Apply</button></div></div>' +
+      el.innerHTML = '<div class="day-editor"><div class="day-row head"><div>Date</div><div>Requested qty</div><div>Available</div><div>Daily rate</div><div>Daily subtotal</div><div></div></div>' + (rows || '<div class="empty small" style="padding:18px">' + (fixed ? 'Pick your rental dates first.' : 'No dates yet — add a rental date below.') + '</div>') + '</div>' +
+        '<div class="row wrap mt-1" style="gap:8px">' + (fixed ? '' : '<input type="date" class="input input-sm" style="width:auto" data-newdate min="' + r.today + '" aria-label="Add a rental date"><button type="button" class="btn btn-sm" data-adddate>' + svg('plus') + 'Add date</button>') + '<span class="grow"></span><div class="row" style="gap:6px"><span class="small muted">Same qty for all:</span><input type="number" min="1" class="input input-sm" style="width:80px" data-allqty value="' + (first ? st.days[first] : 1) + '" aria-label="Quantity for all dates"><button type="button" class="btn btn-sm btn-outline" data-applyall>Apply</button></div></div>' +
         '<div class="row between mt-1"><div class="small">' + (r.ok ? '<span style="color:var(--green)">' + svg('check', 'width:15px;vertical-align:-3px') + ' All dates available</span>' : '<span style="color:var(--red)">' + svg('alert', 'width:15px;vertical-align:-3px') + ' ' + esc(r.lead || 'Fix the highlighted dates before requesting') + '</span>') + '</div><div class="strong">Line total: <span class="price">' + esc(r.totalText) + '</span>' + (r.once > 0 ? '<div class="small muted" style="font-weight:400">incl. ' + esc(r.onceText) + ' once for consumables &amp; services</div>' : '') + '</div></div>';
       el.dispatchEvent(new CustomEvent('pr:schedule', { bubbles: true, detail: r }));
       if (opts.onChange) opts.onChange(r, st);
@@ -223,35 +224,66 @@
       let r; try { r = await api(window.PR.routes.calendar + '?' + new URLSearchParams({ kind: el.dataset.kind, id: el.dataset.id, month, need })); } catch (err) { el.innerHTML = '<p class="small muted">Calendar unavailable.</p>'; return; }
       let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => '<div class="dow">' + d + '</div>').join('');
       for (let i = 0; i < r.startPad; i++) cells += '<div class="d blank"></div>';
-      r.days.forEach(d => { cells += '<div class="d ' + d.cls + (selected.includes(d.date) ? ' sel' : '') + (d.date === r.today ? ' today' : '') + '" title="' + d.date + ': ' + d.available + ' available"' + (d.cls !== 'past' ? ' data-pick="' + d.date + '" style="cursor:pointer"' : '') + '><span class="n">' + d.n + '</span><span class="a">' + (d.cls === 'past' ? '' : d.available) + '</span></div>'; });
+      const s0 = selected[0], s1 = selected[selected.length - 1];
+      r.days.forEach(d => { const on = selected.includes(d.date); cells += '<div class="d ' + d.cls + (on ? ' sel' : '') + (on && d.date === s0 ? ' sel-a' : '') + (on && d.date === s1 ? ' sel-b' : '') + (d.date === r.today ? ' today' : '') + '" title="' + d.date + ': ' + d.available + ' available"' + (d.cls !== 'past' ? ' data-pick="' + d.date + '" role="button" tabindex="0" aria-label="' + d.date + ', ' + d.available + ' available' + (on ? ', selected' : '') + '"' : '') + '><span class="n">' + d.n + '</span><span class="a">' + (d.cls === 'past' ? '' : d.available + ' free') + '</span></div>'; });
       el.innerHTML = '<div class="row between mb-1"><button type="button" class="btn btn-sm btn-ghost btn-icon" data-m="' + r.prev + '" aria-label="Previous month"' + (r.canPrev ? '' : ' disabled') + '>' + svg('left') + '</button><b>' + esc(r.title) + '</b><button type="button" class="btn btn-sm btn-ghost btn-icon" data-m="' + r.next + '" aria-label="Next month">' + svg('right') + '</button></div><div class="cal">' + cells + '</div>' +
-        '<div class="legend mt-1"><span><i style="background:var(--green-50);border:1px solid #BCE6CB"></i>Enough for ' + need + '</span><span><i style="background:var(--gold-50);border:1px solid #FBDDA4"></i>Fewer than ' + need + '</span><span><i style="background:var(--red-50);border:1px solid #F8C4C4"></i>Fully booked</span></div>';
+        '<div class="legend mt-1"><span><i style="background:var(--brand);"></i>Your dates</span><span><i style="background:var(--green-50);border:1px solid #BCE6CB"></i>Enough for ' + need + '</span><span><i style="background:var(--gold-50);border:1px solid #FBDDA4"></i>Fewer than ' + need + '</span><span><i style="background:var(--red-50);border:1px solid #F8C4C4"></i>Fully booked</span></div>';
     }
     el.addEventListener('click', e => { const m = e.target.closest('[data-m]'); if (m) { month = m.dataset.m; draw(); } const p = e.target.closest('[data-pick]'); if (p && opts.onPick) opts.onPick(p.dataset.pick); });
+    el.addEventListener('keydown', e => { const p = e.target.closest('[data-pick]'); if (p && opts.onPick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); opts.onPick(p.dataset.pick); } });
     draw();
     return { update(o) { if (o.month) month = o.month; if (o.need) need = o.need; if (o.selected) selected = o.selected; draw(); } };
   }
 
   /* ---------- product / package rental box ----------
-     <div data-rentbox data-type data-ref data-start data-end data-qty data-max-days> with #ps #pe #pq, scheduler, calendar, form */
+     <div data-rentbox data-type data-max-days> around partials/rent-box: #ps #pe (+ #mdToggle "Multiple days"),
+     #pq quantity (#qtyRow), #perDayToggle "Different quantity per day" (#perDayWrap, only for several days) with
+     the fixed-date scheduler in #perDay, the availability calendar and the form. */
   function RentBox(box) {
     const type = box.dataset.type;
-    const ps = $('#ps', box), pe = $('#pe', box), pq = $('#pq', box);
-    let start = ps.value, end = pe.value, qty = pq ? Math.max(1, +pq.value || 1) : 1;
+    const ps = $('#ps', box), pe = $('#pe', box), pq = $('#pq', box), md = $('#mdToggle', box);
+    const pdT = $('#perDayToggle', box), pdWrap = $('#perDayWrap', box), pdBox = $('#perDay', box), qRow = $('#qtyRow', box);
+    let start = ps.value, end = pe.value || ps.value, qty = pq ? Math.max(1, +pq.value || 1) : 1, picking = 'start';
     const maxDays = +box.dataset.maxDays || 30;
-    const daysFor = () => { const o = {}; range(start, end).forEach(d => { o[d] = qty; }); return o; };
-    const cal = $('[data-calendar]', document) ? Calendar($('[data-calendar]'), { onPick: d => { if (d < start || d > end || start !== end) { start = d; end = d; } else { end = d; } ps.value = start; pe.value = end; sch.setDays(daysFor()); } }) : null;
+    const multi = () => !!(md && md.checked);
+    const perDay = () => !!(pdT && pdT.checked && start !== end);
+    // per-day quantities survive date changes while "Different quantity per day" is on
+    const daysFor = () => { const o = {}, old = sch ? sch.state.days : {}; if (!start) return o; range(start, end).forEach(d => { o[d] = perDay() && old[d] != null ? old[d] : qty; }); return o; };
+    const ui = () => {
+      box.classList.toggle('md-on', start !== end);
+      if (pdWrap) pdWrap.classList.toggle('hidden', start === end);
+      if (pdBox) pdBox.classList.toggle('hidden', !perDay());
+      if (qRow) qRow.classList.toggle('hidden', perDay());
+      if (calHint) calHint.textContent = multi() ? (picking === 'end' ? 'Now tap your last rental day.' : 'Tap your first rental day, then your last.') : 'Tap a date to rent for that day.';
+    };
+    const calEl = $('[data-calendar]', document);
+    let calHint = null;
+    if (calEl) { calHint = document.createElement('p'); calHint.className = 'small muted mb-1 cal-hint'; calEl.parentNode.insertBefore(calHint, calEl); }
+    const setRange = (a, b) => {
+      const t = sch && sch.last() ? sch.last().today : iso(new Date());
+      const min = ps.min || t;
+      if (a < min) { toast(a < t ? 'You cannot rent for a past date.' : 'The earliest date you can pick is ' + min + '.', 'error'); return false; }
+      if (b < a) b = a;
+      if (range(a, b).length > maxDays) { toast('Maximum rental period is ' + maxDays + ' days.', 'warn'); b = addDays(a, maxDays - 1); }
+      start = a; end = b; ps.value = a; pe.value = b;
+      if (md && start !== end && !md.checked) { md.checked = true; md.dispatchEvent(new Event('change')); }
+      return true;
+    };
+    const cal = calEl ? Calendar(calEl, { onPick: d => {
+      if (!multi()) { if (!setRange(d, d)) return; picking = 'start'; }
+      else if (picking === 'end' && d >= start) { if (!setRange(start, d)) return; picking = 'start'; }
+      else { if (!setRange(d, d)) return; picking = 'end'; }
+      ui(); sch.setDays(daysFor()); box.dispatchEvent(new CustomEvent('multiday', { bubbles: true }));
+    } }) : null;
     const sch = Scheduler($('[data-scheduler]', box), {
       onChange: (r, st) => {
         const dates = Object.keys(st.days).sort();
         const vals = Object.values(st.days).map(Number);
-        const custom = new Set(vals).size > 1;
         const at = $('#availTxt', box);
-        if (at) at.innerHTML = !dates.length ? '<span class="badge b-gray">Pick dates</span>' : r.ok ? '<span class="badge b-green">Available for your dates</span>' + (r.minAvailable != null ? '<div class="small muted">Min. ' + r.minAvailable + ' free per day</div>' : '') : '<span class="badge b-red">Not enough stock</span><div class="small" style="color:var(--red)">' + r.bad.map(b => esc(b.date) + ': only ' + b.available).join(', ') + '</div>';
+        if (at) at.innerHTML = !dates.length ? '<span class="badge b-gray">Pick a date</span>' : r.ok ? '<span class="badge b-green">Available for your ' + (dates.length > 1 ? 'dates' : 'date') + '</span>' + (r.minAvailable != null ? '<div class="small muted">' + (dates.length > 1 ? 'Min. ' + r.minAvailable + ' free per day' : r.minAvailable + ' free') + '</div>' : '') : '<span class="badge b-red">Not enough stock</span><div class="small" style="color:var(--red)">' + r.bad.map(b => esc(b.date) + ': only ' + b.available).join(', ') + '</div>';
         const qb = $('#qbox', box); if (qb) qb.classList.toggle('bad', !r.ok);
         const est = $('#est', box); if (est) est.textContent = r.totalText + (dates.length > 1 ? ' · ' + dates.length + ' days' : '');
         $$('[data-tier]', box).forEach(t => { const min = +t.dataset.min, max = t.dataset.max ? +t.dataset.max : null; t.classList.toggle('on', vals.some(q => q >= min && (max == null || q <= max))); });
-        if (custom && $('#perDay', box)) $('#perDay', box).open = true;
         $$('[data-rent-submit]', box).forEach(b => { b.disabled = !r.ok; });
         if (cal) cal.update({ month: (dates[0] || r.today).slice(0, 7), need: Math.max(1, ...vals, 1), selected: dates });
         const alt = $('#altBox', box);
@@ -263,19 +295,24 @@
     });
     const onDates = () => {
       if (!ps.value) return;
-      const t = sch.last() ? sch.last().today : iso(new Date());
-      if (ps.value < t) { toast('Start date cannot be in the past.', 'error'); ps.value = start; return; }
-      start = ps.value; end = pe.value && pe.value >= start ? pe.value : start;
-      if (range(start, end).length > maxDays) { toast('Maximum rental period is ' + maxDays + ' days.', 'warn'); end = addDays(start, maxDays - 1); }
-      pe.value = end; sch.setDays(daysFor());
+      const a = ps.value, b = multi() && pe.value ? pe.value : ps.value;
+      if (a === start && b === end && Object.keys(sch.state.days).length) return;
+      if (!setRange(a, b)) { ps.value = start; pe.value = end; return; }
+      picking = 'start'; ui(); sch.setDays(daysFor());
     };
     ps.addEventListener('change', onDates); pe.addEventListener('change', onDates);
+    box.addEventListener('multiday', onDates);
+    if (pdT) pdT.addEventListener('change', () => {
+      if (!pdT.checked) { const q = Math.max(1, ...Object.values(sch.state.days).map(Number), 1); qty = q; if (pq) pq.value = q; }
+      ui(); sch.setDays(daysFor());
+    });
     if (pq) {
       const setQ = v => { qty = Math.max(1, Math.floor(v) || 1); pq.value = qty; Object.keys(sch.state.days).forEach(d => { sch.state.days[d] = qty; }); sch.refresh(); };
       pq.addEventListener('change', () => setQ(+pq.value));
       $('#qbox [data-d]', box).addEventListener('click', () => setQ(qty - 1));
       $('#qbox [data-i]', box).addEventListener('click', () => setQ(qty + 1));
     }
+    ui();
   }
 
   /* ---------- cascading address selects ----------

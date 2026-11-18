@@ -5,6 +5,11 @@
 <div class="pd">
   <div>
     <div class="pd-gallery"><div class="main">@include('partials.img', ['item' => $k])</div></div>
+    <a class="card pdx-shop" style="margin-top:12px" href="{{ route('suppliers.show', $sup) }}">
+      <div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div>
+      <div class="grow" style="min-width:0"><div class="strong ellipsis">{{ $sup->name }}</div><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }} · {{ $sup->fulfillmentLabel() }}</div></div>
+      <span class="btn btn-sm">View Supplier Profile</span>
+    </a>
     <div class="card mt-2"><h3>Package availability</h3><p class="small muted">Based on the stock of every included item.</p><div data-calendar data-kind="package" data-id="{{ $k->id }}" data-month="{{ substr($start, 0, 7) }}" data-need="1"></div></div>
   </div>
   <div data-rentbox data-type="package" data-max-days="{{ setting('maxRentalDays', 30) }}">
@@ -25,8 +30,7 @@
     <form class="card soft mt-2" method="POST" action="{{ route('cart.add') }}">
       @csrf
       <input type="hidden" name="type" value="package"><input type="hidden" name="ref_id" value="{{ $k->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}"><input type="hidden" name="sel" id="selInput" value="{{ json_encode($pp['sel']) }}">
-      <div class="form-grid"><div class="field"><label for="ps">Start date</label><input type="date" class="input" id="ps" min="{{ add_days(today_iso(), $lead) }}" value="{{ $start }}"></div><div class="field"><label for="pe">End date</label><input type="date" class="input" id="pe" min="{{ add_days(today_iso(), $lead) }}" value="{{ $end }}"></div>@include('partials.rent-times', ['sup' => $k->supplier, 'item' => $k, 'part' => 'selects'])</div>
-      @include('partials.rent-times', ['sup' => $k->supplier, 'item' => $k, 'part' => 'line'])
+      @include('partials.rent-box', ['type' => 'package', 'ref' => $k->id, 'days' => $days, 'siblings' => $siblings, 'start' => $start, 'end' => $end, 'qty' => 1, 'minDate' => add_days(today_iso(), $lead), 'sup' => $k->supplier, 'item' => $k, 'sel' => $pp['sel'], 'stockText' => null, 'timed' => true])
       @if($def['stages'])
         <div class="mb-2" id="stageBox"><div class="label mb-1">Your event schedule</div>
           @foreach($def['stages'] as $i => $st)
@@ -35,14 +39,13 @@
           <div class="hint">You can leave these blank and agree on them with the supplier later.</div>
         </div>
       @endif
-      <div data-scheduler data-type="package" data-ref="{{ $k->id }}" data-sel='@json($pp['sel'])' data-days='@json((object) $days)' data-siblings='@json($siblings)' data-sync="#daysInput"></div>
+      <div class="sum-line total mt-2"><span>Estimated rental</span><span class="price" id="est"></span></div>
       @if($own)
         <div class="alert alert-info mt-2">{{ icon('info') }}<div>This is your own package.</div></div>
       @else
         <div class="row wrap mt-2"><button class="btn btn-outline btn-lg grow" name="then" value="list" data-rent-submit>{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout" data-rent-submit>Request Rental</button></div>
       @endif
     </form>
-    <div class="card mt-2"><div class="row"><div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div><div class="grow"><a class="strong" href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->city }} · {{ $sup->fulfillmentLabel() }}</div></div></div></div>
   </div>
 </div>
 <div class="section">@include('partials.reviews-block', ['reviews' => $reviews, 'showItem' => false, 'title' => 'Customer reviews', 'emptyText' => 'No one has reviewed this package yet.'])</div>

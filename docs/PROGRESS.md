@@ -5,13 +5,13 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
 **Feedback batch 2026-11-18** (user pasted list + screenshots). Order / status:
-- [ ] B1 Header: plain search (no AI) + separate square AI button; nav links wrap to a 2nd row on small screens
+- [x] B1 Header: plain search (no AI) + separate square AI button; nav links wrap to a 2nd row on small screens
       (never hidden); remove category navbar; "Switch to your shop"/"Switch to customer mode" moved under the
       user profile (tinted background) on both sides
-- [ ] B2 Browse: date + filter bar sits above "Shop by category", below "Your upcoming rentals", sticky without the
+- [x] B2 Browse: date + filter bar sits above "Shop by category", below "Your upcoming rentals", sticky without the
       gap under the header; fewer repeated category blocks
-- [ ] B3 Rental dates (browse bar, product, package): one date by default + "Multiple days" toggle (start/end)
-- [ ] B4 Product + package page: shop card under the photo, same width; nicer availability calendar; delivery &
+- [x] B3 Rental dates (browse bar, product, package): one date by default + "Multiple days" toggle (start/end)
+- [x] B4 Product + package page: shop card under the photo, same width; nicer availability calendar; delivery &
       policies moved into the rent box; "different qty per day" only shown for multi-day, uses the chosen dates
       (no manual add), hides the single qty field when on
 - [ ] B5 Checkout: single (listing) vs rental-list checkout picks the right items; map pin for address; multiple

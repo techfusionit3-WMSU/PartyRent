@@ -550,3 +550,27 @@
   .browse-bar .bb-tools select { flex: 1 1 0; min-width: 0; }
 }
 #results { scroll-margin-top: calc(var(--mk-head, 64px) + 80px); }
+/* product page (feedback 2026-11-18): shop card under the photo, policies inside the rent box, rent box dates */
+.pdx-stagecol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pdx-stagecol .pdx-shop { margin-top: 12px; }
+.pdx-pol { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.pdx-pol > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; font-weight: 700; font-size: .9rem; list-style: none; }
+.pdx-pol > summary::-webkit-details-marker { display: none; }
+.pdx-pol > summary::after { content: "▾"; color: var(--muted); transition: transform .15s; }
+.pdx-pol[open] > summary::after { transform: rotate(180deg); }
+.pdx-pol > summary svg { color: var(--brand); flex: none; }
+.pdx-pol > .kv { padding: 0 12px 12px; margin: 0; font-size: .86rem; }
+.rb-dates:not(.md-on) .rb-dgrid { grid-template-columns: minmax(0, 1fr); }
+.rb-dates .md-on-txt, #qtyRow .md-on-txt { display: none; }
+.rb-dates.md-on .md-on-txt { display: inline; }
+.rb-dates.md-on .md-off-txt { display: none; }
+[data-rentbox].md-on #qtyRow .md-on-txt { display: inline; }
+@media (max-width: 768px) { .pdx-stagecol .pdx-shop { margin: 12px 14px 0; } }
+/* availability calendar: picked range filled, ends rounded, hover on pickable days */
+.cal .d[data-pick] { cursor: pointer; transition: transform .08s, box-shadow .12s; }
+.cal .d[data-pick]:hover { box-shadow: 0 0 0 2px var(--brand) inset; }
+.cal .d[data-pick]:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.cal .d.sel { background: var(--brand-50); border-color: var(--brand); color: var(--brand); }
+.cal .d.sel-a, .cal .d.sel-b { background: var(--brand); color: #fff; border-color: var(--brand); }
+.cal .d .a { font-weight: 600; opacity: .9; }
+.cal-hint { display: flex; align-items: center; gap: 6px; }

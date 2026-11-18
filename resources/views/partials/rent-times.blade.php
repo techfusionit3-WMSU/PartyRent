@@ -20,7 +20,7 @@
     var m = function (t) { var x = /^(\d{1,2}):(\d{2})$/.exec(t || ''); return x ? +x[1] * 60 + +x[2] : null; };
     function draw() {
       var out = g('durTxt'); if (!out || !g('ps')) return;
-      var a = g('ps').value, b = (g('pe') && g('pe').value) || a;
+      var md = g('mdToggle'), a = g('ps').value, b = (md && !md.checked) ? a : ((g('pe') && g('pe').value) || a);
       if (!a) { out.textContent = 'Select dates'; return; }
       var days = Math.round((new Date(b) - new Date(a)) / 864e5), mins = days * 1440 + m(g('pet').value) - m(g('pst').value);
       if (mins <= 0) { out.textContent = 'End must be after start'; return; }
@@ -28,6 +28,7 @@
       out.textContent = [d ? d + ' Day' + (d > 1 ? 's' : '') : '', h ? h + ' Hour' + (h > 1 ? 's' : '') : '', mm ? mm + ' Min' : ''].filter(Boolean).join(' ');
     }
     ['ps', 'pe', 'pst', 'pet'].forEach(function (id) { var e = g(id); if (e) { e.addEventListener('input', draw); e.addEventListener('change', draw); } });
+    document.addEventListener('multiday', function () { setTimeout(draw, 0); });
     draw();
   })();
   </script>

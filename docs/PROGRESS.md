@@ -4,7 +4,25 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Feedback batch 2026-11-18** (user pasted list + screenshots) — ALL DONE (126 tests green). Notes for later:
+**Feedback batch 2 (2026-11-18 late)** — user pasted list. Order / status:
+- [x] F1 Speed: OPcache enabled in C:\xampp\php\php.ini (backup php.ini.bak-before-opcache; 3-6x per request);
+      Inventory interval index + demandOn memo (home controller 145 -> 35 ms)
+- [x] F2 Accounts: EnsureSameAccount (pages stamp `_auth` / X-Auth-Id via app.js; writes from a page of another
+      account are refused, 409 for JSON; 419 handler never replays a form as the new account; other tabs show an
+      "Account changed" bar). Shop cashier: receipts/proofs only of their shop; suspended shop never = all shops.
+      Supplier request page: "Requested by (account)" vs "Contact on the day".
+- [ ] F3 Market nav (Browse / Packages / Suppliers / My Rentals) centered + evenly spaced
+- [ ] F4 Leave warning on checkout + transaction pages (unsaved forms)
+- [ ] F5 Transaction code on customer transaction pages
+- [ ] F6 Chat between supplier and client without a problem case
+- [ ] F7 Payment: "COD" -> "Cash" for down payment; supplier records cash paid in person (no customer login)
+- [ ] F8 Supplier request page: "Notify customer about payment" (reminder) action
+- [ ] F9 Supplier request page: transaction actions inline (link to other page optional)
+- [ ] F10 Cases: supplier's fault -> customer pays nothing, only supplier compensates
+- [ ] F11 Customer can report a problem with items -> case with supplier
+- [ ] F12 Checkout: qty field per item with stock check + clear errors; simpler split-quantity UI
+
+(previous) **Feedback batch 2026-11-18** (user pasted list + screenshots) — ALL DONE (126 tests green). Notes for later:
 direct "Request Rental" = cart_lines.direct (checkout?line=); Rentals::stepBlockers gates request steps; case
 proposals carry optional `comp` {amount, payer supplier|customer, reason} + type 'compensation'; discount kinds
 percent | amount | order_percent | order_amount (+ min_amount), Discounts::bestOrder vs item discounts in quoteOrder.

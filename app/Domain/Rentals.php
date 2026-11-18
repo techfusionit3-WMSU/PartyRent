@@ -507,7 +507,7 @@ class Rentals
         }
         $chk = inv()->check($lines);
         if (! $chk['ok']) {
-            return self::fail($s->name.': some quantities exceed the available stock for the selected dates and times. Please adjust them.', ['check' => $chk]);
+            return self::fail($s->name.': '.\App\Http\Controllers\Customer\CartController::stockMessage($chk), ['check' => $chk]);
         }
         // fulfillment & delivery locations
         $fulfillment = ($o['fulfillment'] ?? 'delivery') === 'pickup' ? 'pickup' : 'delivery';

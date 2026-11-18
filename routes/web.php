@@ -97,6 +97,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout');
     Route::post('/checkout', [CartController::class, 'submit'])->name('checkout.submit');
     Route::post('/checkout/quote', [CartController::class, 'quote'])->name('checkout.quote');
+    Route::post('/checkout/qty', [CartController::class, 'qty'])->middleware('throttle:120,1')->name('checkout.qty');
     Route::get('/rentals/submitted', [CartController::class, 'submitted'])->name('rentals.submitted');
 
     Route::get('/rentals', [RentalController::class, 'index'])->name('rentals.index');

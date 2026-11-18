@@ -19,7 +19,7 @@
 @php($state = ['orders' => $orders, 'shared' => ['contactName' => $u->name, 'contactPhone' => $u->phone, 'instructions' => '']])
 <form id="cf" novalidate class="grid grid-side"
   data-checkout='@json($state)'
-  data-quote="{{ route('checkout.quote') }}" data-submit="{{ route('checkout.submit') }}" data-today="{{ today_iso() }}">
+  data-quote="{{ route('checkout.quote') }}" data-qty="{{ route('checkout.qty') }}" data-submit="{{ route('checkout.submit') }}" data-today="{{ today_iso() }}">
   <div class="stack">
     <div class="card"><h3>Contact details</h3><div class="form-grid">
       <div class="field"><label for="ev-cn">Contact person</label><input class="input" id="ev-cn" data-s="contactName" required value="{{ $u->name }}"></div>

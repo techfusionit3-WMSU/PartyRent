@@ -43,21 +43,114 @@
     return '<div class="field"><label>Main event day</label><select class="input" data-k="eventDate">' + rentalDays(o).map(d => '<option value="' + d + '"' + (d === o.eventDate ? ' selected' : '') + '>' + esc(fmtDay(d)) + '</option>').join('') + '</select><div class="hint">Your rental runs ' + esc(o.range) + '. Pick the day of the event itself; all payments are due on or before it.</div></div>';
   }
 
-  /** Items & rental times, one card per item; the parts of a split item (per location) sit inside the same card. */
-  function itemsBlock(o) {
+  /* ---------- items: quantity (checked against stock) + where each part goes ----------
+     A "group" is one selected item (cart line). Its total per date is what the customer rents; with several
+     delivery locations the group has one part per location. The FIRST part always takes "the rest", so the
+     parts can never add up to more or less than the total. */
+  const qtyErr = {}, qtyTimer = {}, qtyBusy = {};
+  const shortDay = iso => { const d = new Date(iso + 'T00:00:00'); return MON[d.getMonth()] + ' ' + d.getDate(); };
+  function groupsOf(o) {
+    const gs = [];
+    o.lines.forEach((l, i) => { let g = gs.find(x => x.cart_id === l.cart_id); if (!g) { g = { cart_id: l.cart_id, name: l.name, parts: [], idx: [] }; gs.push(g); } g.parts.push(l); g.idx.push(i); });
+    gs.forEach(g => {
+      g.total = {}; g.parts.forEach(l => Object.entries(l.days).forEach(([d, q]) => { g.total[d] = (g.total[d] || 0) + Number(q); }));
+      g.dates = Object.keys(g.total).sort();
+      g.uniform = new Set(g.dates.map(d => g.total[d])).size <= 1;
+    });
+    return gs;
+  }
+  const stepper = (v, attrs, label) => '<div class="qty-step"><button type="button" data-step="-1" aria-label="One less">−</button><input type="number" min="1" step="1" inputmode="numeric" value="' + v + '" ' + attrs + ' aria-label="' + esc(label) + '"><button type="button" data-step="1" aria-label="One more">+</button></div>';
+
+  function qtyBlock(o, g) {
+    const av = ((lastQuote[o.supplier_id] || {}).avail || {})[g.cart_id] || {};
+    const perDay = g.dates.length > 1 && (!g.uniform || (o.perDay || {})[g.cart_id]);
+    const tag = d => { const a = av[d]; if (!a) return ''; return '<span class="qa ' + (a.ok ? 'ok' : 'bad') + '">' + (a.ok ? a.available + ' available' : 'only ' + a.available + ' available') + '</span>'; };
+    let h = '<div class="qty-row">';
+    if (!perDay) {
+      const bad = g.dates.filter(d => av[d] && !av[d].ok), min = g.dates.reduce((m, d) => Math.min(m, av[d] ? av[d].available : Infinity), Infinity);
+      h += '<label class="qty-field"><span>' + (g.dates.length > 1 ? 'Quantity (each of the ' + g.dates.length + ' days)' : 'Quantity') + '</span>' + stepper(g.total[g.dates[0]], 'data-qall', 'Quantity of ' + g.name) + '</label>';
+      h += '<div class="qty-info">' + (bad.length ? '<span class="qa bad">only ' + av[bad[0]].available + ' available on ' + esc(shortDay(bad[0])) + '</span>' : (isFinite(min) ? '<span class="qa ok">up to ' + min + ' available</span>' : '')) +
+        (g.dates.length > 1 ? '<button type="button" class="link-btn" data-perday>Different quantity per day</button>' : '') + '</div>';
+    } else {
+      h += '<div class="qty-days">' + g.dates.map(d => '<label class="qty-field"><span>' + esc(shortDay(d)) + '</span>' + stepper(g.total[d], 'data-qday="' + d + '"', 'Quantity of ' + g.name + ' on ' + shortDay(d)) + tag(d) + '</label>').join('') + '</div>';
+      if (g.uniform) h += '<button type="button" class="link-btn" data-sameall>Same quantity every day</button>';
+    }
+    h += '</div>';
+    const e = qtyErr[g.cart_id];
+    if (e) h += '<div class="qty-err" role="alert">' + svg('alert') + '<span>' + esc(e.msg) + '</span>' + (e.fix ? '<button type="button" class="btn btn-xs" data-usefix>Use ' + esc(e.fixLabel) + '</button>' : '') + '</div>';
+    return h;
+  }
+
+  function allocBlock(o, g) {
     const multi = multiLoc(o);
-    const groups = [];
-    o.lines.forEach((l, i) => { let g = groups.find(x => x.cart_id === l.cart_id); if (!g) { g = { cart_id: l.cart_id, name: l.name, parts: [] }; groups.push(g); } g.parts.push({ l, i }); });
-    return groups.map(g => {
-      const split = g.parts.length > 1;
-      const total = {}; g.parts.forEach(({ l }) => Object.entries(l.days).forEach(([d, q]) => { total[d] = (total[d] || 0) + Number(q); }));
-      return '<div class="item-card"><div class="row between wrap" style="gap:6px"><b>' + esc(g.name) + '</b><span class="small muted">' + esc(qtyTxt({ days: total })) + (split ? ' · split in ' + g.parts.length : '') + '</span></div>' +
-        g.parts.map(({ l, i }, k) => '<div class="item-part" data-li="' + i + '">' +
-          (split ? '<div class="small strong part-lbl">Part ' + (k + 1) + ' · ' + esc(qtyTxt(l)) + '</div>' : '') +
-          '<div class="row wrap" style="gap:8px;align-items:center"><div class="time-pair" style="max-width:340px;flex:1 1 240px">' + sel(o, l.time.start, 'data-lt="start" aria-label="Start time"') + sel(o, l.time.end, 'data-lt="end" aria-label="End time"') + '</div>' +
-          (multi ? '<select class="input input-sm" style="width:auto;flex:1 1 180px" data-ldest aria-label="Delivery location">' + o.destinations.map((d, n) => '<option value="' + d.id + '"' + (d.id === l.destId ? ' selected' : '') + '>To location ' + (n + 1) + ': ' + esc(d.label) + '</option>').join('') + '</select>' + (Math.max(...Object.values(l.days).map(Number)) > 1 ? '<button type="button" class="btn btn-xs" data-split="' + i + '">Split quantity</button>' : '') : '') +
-          '</div></div>').join('') + '</div>';
+    const free = o.destinations.filter(d => !g.parts.some(l => l.destId === d.id));
+    const rows = g.parts.map((l, k) => {
+      const i = g.idx[k];
+      const dest = multi ? '<select class="input input-sm" data-pdest aria-label="Location">' + o.destinations.map((d, n) => '<option value="' + d.id + '"' + (d.id === l.destId ? ' selected' : '') + '>' + (n + 1) + '. ' + esc(d.label) + '</option>').join('') + '</select>' : '';
+      let q = '';
+      if (multi && g.parts.length > 1) {
+        q = g.uniform
+          ? (k === 0 ? '<div class="alloc-rest"><b>' + (Number(l.days[g.dates[0]]) || 0) + '</b><small>the rest</small></div>' : '<label class="alloc-day"><small>how many</small><input class="input input-sm alloc-in" type="number" min="0" step="1" inputmode="numeric" data-pq value="' + (Number(l.days[g.dates[0]]) || 0) + '" aria-label="How many go to this location"></label>')
+          : '<div class="alloc-days">' + g.dates.map(d => k === 0 ? '<div class="alloc-rest"><small>' + esc(shortDay(d)) + '</small><b>' + (Number(l.days[d]) || 0) + '</b></div>' : '<label class="alloc-day"><small>' + esc(shortDay(d)) + '</small><input class="input input-sm" type="number" min="0" step="1" data-pq="' + d + '" value="' + (Number(l.days[d]) || 0) + '"></label>').join('') + '</div>';
+      }
+      return '<div class="alloc-row" data-li="' + i + '">' + dest + q + '<div class="time-pair">' + sel(o, l.time.start, 'data-lt="start" aria-label="Start time"') + sel(o, l.time.end, 'data-lt="end" aria-label="End time"') + '</div>' +
+        (multi && k > 0 ? '<button type="button" class="icon-btn" data-prm title="Send these back to the first location" aria-label="Remove this location">' + svg('x') + '</button>' : '') + '</div>';
     }).join('');
+    const head = multi ? '<div class="alloc-head small"><span>' + (g.parts.length > 1 ? 'Where they go' : 'Location') + '</span><span>Rental time</span></div>' : '<div class="alloc-head small"><span>Rental time</span></div>';
+    const foot = multi ? '<div class="row between wrap mt-1" style="gap:6px">' + (g.parts.length > 1 ? '<span class="small qa ok">' + svg('check') + ' All ' + esc(qtyTxt({ days: g.total })) + ' assigned</span>' : '<span></span>') +
+      (free.length && Math.max(...g.dates.map(d => g.total[d])) > 1 ? '<button type="button" class="btn btn-xs" data-padd>' + svg('plus') + 'Send some to another location</button>' : '') + '</div>' : '';
+    return '<div class="alloc">' + head + rows + foot + '</div>';
+  }
+
+  /** Items & rental times, one card per item: quantity (stock-checked) and, with several locations, how many go where. */
+  function itemsBlock(o) {
+    return groupsOf(o).map(g => '<div class="item-card" data-item="' + g.cart_id + '"><div class="row between wrap" style="gap:6px"><b>' + esc(g.name) + '</b><span class="small muted">' + esc(qtyTxt({ days: g.total })) + '</span></div>' + qtyBlock(o, g) + allocBlock(o, g) + '</div>').join('');
+  }
+
+  /** New total per date for an item: checked against the stock on the server (and saved), then spread over the parts. */
+  async function setTotal(o, cartId, want) {
+    const g = groupsOf(o).find(x => x.cart_id === cartId); if (!g) { delete qtyBusy[cartId]; return; }
+    for (const d of g.dates) {
+      if (!Number.isInteger(want[d]) || want[d] < 1) { delete qtyBusy[cartId]; qtyErr[cartId] = { msg: 'Enter a whole number of at least 1. To drop this item, remove it from your Rental List.' }; draw(); return; }
+    }
+    if (g.dates.every(d => want[d] === g.total[d])) { delete qtyBusy[cartId]; if (qtyErr[cartId]) { delete qtyErr[cartId]; draw(); } return; }
+    qtyBusy[cartId] = true;
+    let data = {}, res = null;
+    try {
+      res = await fetch(form.dataset.qty, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify({ cart_id: cartId, days: want }) });
+      data = await res.json().catch(() => ({}));
+    } catch (e) { data = { error: 'Could not check the stock. Check your connection and try again.' }; }
+    delete qtyBusy[cartId];
+    if (!res || !res.ok || !data.ok) {
+      const avail = data.available || {};
+      const fixDays = {}; let fix = false;
+      g.dates.forEach(d => { const a = avail[d]; fixDays[d] = a !== undefined && a < want[d] ? a : want[d]; if (fixDays[d] !== want[d]) fix = true; });
+      const usable = fix && g.dates.every(d => fixDays[d] >= 1);
+      const vals = [...new Set(g.dates.map(d => fixDays[d]))];
+      const firstErr = data.errors ? Object.values(data.errors)[0][0] : null;
+      qtyErr[cartId] = { msg: data.error || firstErr || data.message || 'Could not change the quantity.', fix: usable ? fixDays : null, fixLabel: vals.length === 1 ? String(vals[0]) : 'what is available' };
+      draw(); return;
+    }
+    delete qtyErr[cartId];
+    g.dates.forEach(d => {
+      const parts = g.parts; parts[0].days[d] = (Number(parts[0].days[d]) || 0) + (want[d] - g.total[d]);
+      for (let k = parts.length - 1; parts[0].days[d] < 0 && k > 0; k--) { const take = Math.min(Number(parts[k].days[d]) || 0, -parts[0].days[d]); parts[k].days[d] = (Number(parts[k].days[d]) || 0) - take; parts[0].days[d] += take; }
+    });
+    draw(); requote();
+  }
+  function queueTotal(o, cartId, want) { clearTimeout(qtyTimer[cartId]); qtyBusy[cartId] = true; qtyTimer[cartId] = setTimeout(() => setTotal(o, cartId, want), 450); }
+
+  /** How many of an item go to an extra location (part k > 0); the first location keeps the rest. */
+  function setPart(o, g, k, date, v) {
+    const dates = date ? [date] : g.dates; let capped = null;
+    dates.forEach(d => {
+      const others = g.parts.reduce((s, l, j) => s + (j === 0 || j === k ? 0 : Number(l.days[d]) || 0), 0);
+      const max = g.total[d] - others, vv = Math.max(0, Math.min(Number.isFinite(v) ? v : 0, max));
+      if (v > max) capped = max;
+      g.parts[k].days[d] = vv; g.parts[0].days[d] = max - vv;
+    });
+    if (capped !== null) toast('Only ' + capped + ' left to send there (the total is ' + qtyTxt({ days: g.total }) + '). Change the quantity above to rent more.', 'warn');
+    draw(); requote();
   }
 
   function destCard(o, d, i) {
@@ -84,7 +177,7 @@
       (o.fulfillment === 'delivery'
         ? '<label class="switch mb-1"><input type="checkbox" data-multiloc' + (multi ? ' checked' : '') + '><span class="sw"></span>Deliver to more than one location</label>' +
           '<div class="stack-sm">' + o.destinations.map((d, i) => destCard(o, d, i)).join('') + '</div>' +
-          (multi ? '<button type="button" class="btn btn-sm mt-1" data-adddest>' + svg('plus') + 'Add another location</button><p class="small muted mt-1 mb-0">Choose the location for each item above, or split an item\'s quantity between locations. Each location has its own delivery fee.</p>' : '')
+          (multi ? '<button type="button" class="btn btn-sm mt-1" data-adddest>' + svg('plus') + 'Add another location</button><p class="small muted mt-1 mb-0">For each item above, choose its location — or use <b>Send some to another location</b> and type how many go there (the first location keeps the rest). Each location has its own delivery fee.</p>' : '')
         : '<div class="alert alert-info">' + svg('map') + '<div>Pickup at <b>' + esc(sh.address) + '</b> · ' + esc(sh.hours) + '</div></div>') +
       (sh.services.length ? '<div class="label mt-2 mb-1">Services</div>' + sh.services.map(x => '<label class="check"><input type="checkbox" data-svc="' + esc(x.id) + '"' + (x.required || o.services.includes(x.id) ? ' checked' : '') + (x.required ? ' disabled' : '') + '> <b>' + esc(x.name) + '</b> — ' + money(x.amount) + (x.per === 'location' ? ' per visit' : '') + (x.required ? ' <span class="badge b-gray plain">included</span>' : '') + '<div class="small muted">' + esc(x.description || '') + '</div></label>').join('') + '<p class="small muted mb-0">Per-visit services are charged once for consecutive days at the same location, and again for each location change or separate date block.</p>' : '') +
       '<div class="label mt-2 mb-1">Payment plan</div><div class="stack-sm">' + sh.plans.map(p => { const dis = p.key === 'installment' && q.installmentOk === false; return '<label class="card card-flat row" style="padding:12px 14px;cursor:pointer;' + (dis ? 'opacity:.55' : '') + '"><input type="radio" name="plan_' + sid + '" value="' + p.key + '" data-plan' + (p.key === o.plan ? ' checked' : '') + (dis ? ' disabled' : '') + ' style="accent-color:var(--brand);width:18px;height:18px"><div class="grow"><b>' + esc(p.label) + '</b><div class="small muted">' + esc(p.summary) + '</div>' + (dis ? '<div class="small" style="color:var(--red)">' + esc(q.installmentMsg) + '</div>' : '') + '</div></label>'; }).join('') + '</div>' +
@@ -137,9 +230,21 @@
     return true;
   }
 
+  let drawing = false, drawAgain = false;
   function draw() {
+    // replacing the cards blurs a focused box, whose change handler may ask for another draw: do that one afterwards
+    if (drawing) { drawAgain = true; return; }
+    drawing = true;
+    try { render(); } finally { drawing = false; }
+    if (drawAgain) { drawAgain = false; draw(); }
+  }
+  function render() {
+    // keep the cursor in a quantity box when the cards are redrawn
+    const a = document.activeElement, card = a && a.closest && a.closest('[data-item]');
+    const key = card && (a.matches('[data-qall]') ? '[data-qall]' : a.matches('[data-qday]') ? '[data-qday="' + a.dataset.qday + '"]' : null);
     $('#shops').innerHTML = orders.map(shopCard).join('');
     bind();
+    if (key) { const el = $('[data-item="' + card.dataset.item + '"] ' + key); if (el) { el.focus(); const n = el.value.length; try { el.type = 'text'; el.setSelectionRange(n, n); el.type = 'number'; } catch (e) { /* number inputs can't place the caret everywhere */ } } }
   }
 
   function payload() {
@@ -191,11 +296,28 @@
       $$('[data-pin]', box).forEach(b => b.onclick = () => { const d = o.destinations.find(x => x.id === b.dataset.pin); pinDialog(d, pos => { d.lat = +pos[0].toFixed(7); d.lng = +pos[1].toFixed(7); draw(); requote(); }); });
       const add = $('[data-adddest]', box); if (add) add.onclick = () => { let n = o.destinations.length + 1; while (o.destinations.some(d => d.id === 'd' + n)) n++; o.destinations.push({ id: 'd' + n, label: 'Location ' + (o.destinations.length + 1), address: '', zoneId: '', deliveryTime: o.shop.times[0], contactName: '', contactPhone: '' }); draw(); requote(); };
       $$('[data-rmdest]', box).forEach(b => b.onclick = () => { const id = b.dataset.rmdest; const keep = o.destinations.find(d => d.id !== id); o.lines.forEach(l => { if (l.destId === id) l.destId = keep.id; }); o.destinations = o.destinations.filter(d => d.id !== id); if (o.destinations.length < 2) o.multiLoc = false; mergeSame(o); draw(); requote(); });
+      $$('[data-item]', box).forEach(card => {
+        const cid = +card.dataset.item, grp = () => groupsOf(o).find(x => x.cart_id === cid);
+        $$('[data-step]', card).forEach(b => b.onclick = () => { const inp = b.parentNode.querySelector('input'); inp.value = Math.max(1, (parseInt(inp.value, 10) || 0) + +b.dataset.step); inp.dispatchEvent(new Event('input', { bubbles: true })); });
+        const qa = $('[data-qall]', card);
+        if (qa) qa.oninput = () => { const v = parseInt(qa.value, 10), want = {}; grp().dates.forEach(d => { want[d] = v; }); queueTotal(o, cid, want); };
+        $$('[data-qday]', card).forEach(inp => inp.oninput = () => { const want = Object.assign({}, grp().total); want[inp.dataset.qday] = parseInt(inp.value, 10); queueTotal(o, cid, want); });
+        const pd = $('[data-perday]', card); if (pd) pd.onclick = () => { o.perDay = Object.assign(o.perDay || {}, { [cid]: true }); draw(); };
+        const sa = $('[data-sameall]', card); if (sa) sa.onclick = () => { delete (o.perDay || {})[cid]; draw(); };
+        const fx = $('[data-usefix]', card); if (fx) fx.onclick = () => setTotal(o, cid, Object.assign({}, qtyErr[cid].fix));
+        const ad = $('[data-padd]', card); if (ad) ad.onclick = () => {
+          const g = grp(), d = o.destinations.find(x => !g.parts.some(l => l.destId === x.id)); if (!d) return;
+          const zero = {}; g.dates.forEach(x => { zero[x] = 0; });
+          o.lines.splice(g.idx[g.idx.length - 1] + 1, 0, { cart_id: cid, name: g.name, type: g.parts[0].type, group: g.parts[0].group, days: zero, time: Object.assign({}, g.parts[0].time), destId: d.id });
+          draw();
+        };
+      });
       $$('[data-li]', box).forEach(row => {
-        const l = o.lines[+row.dataset.li];
+        const i = +row.dataset.li, l = o.lines[i], g = groupsOf(o).find(x => x.cart_id === l.cart_id), k = g.idx.indexOf(i);
         $$('[data-lt]', row).forEach(s => s.onchange = () => { l.time[s.dataset.lt] = s.value; requote(); });
-        const ds = $('[data-ldest]', row); if (ds) ds.onchange = () => { l.destId = ds.value; mergeSame(o); draw(); requote(); };
-        const sp = $('[data-split]', row); if (sp) sp.onclick = () => splitLine(o, +sp.dataset.split);
+        const ds = $('[data-pdest]', row); if (ds) ds.onchange = () => { l.destId = ds.value; mergeSame(o); draw(); requote(); };
+        $$('[data-pq]', row).forEach(inp => inp.onchange = () => setPart(o, g, k, inp.dataset.pq || null, parseInt(inp.value, 10)));
+        const rm = $('[data-prm]', row); if (rm) rm.onclick = () => { g.dates.forEach(d => { g.parts[0].days[d] = (Number(g.parts[0].days[d]) || 0) + (Number(l.days[d]) || 0); }); o.lines.splice(i, 1); draw(); requote(); };
       });
       $$('[data-svc]', box).forEach(c => c.onchange = () => { o.services = $$('[data-svc]:checked:not([disabled])', box).map(x => x.dataset.svc); o.inst.auto = true; requote(); });
       $$('[data-plan]', box).forEach(r => r.onchange = () => { o.plan = r.value; o.inst.auto = true; o.inst.items = []; requote(true); });
@@ -206,29 +328,13 @@
     });
   }
 
-  function splitLine(o, i) {
-    const l = o.lines[i]; const max = Math.max(...Object.values(l.days).map(Number));
-    if (max < 2) return toast('There is only 1 per day — nothing to split.', 'warn');
-    const bd = document.createElement('div'); bd.className = 'modal-backdrop';
-    bd.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Split ' + esc(l.name) + '</h3><button class="icon-btn" data-x aria-label="Close">' + svg('x') + '</button></div><div class="modal-body"><p class="small muted">Move part of the quantity to another delivery location (for example 20 sets to the church and 20 to the reception). The total stays the same — nothing is charged twice.</p><div class="form-grid"><div class="field"><label>Quantity to move (per day)</label><input class="input" type="number" min="1" max="' + (max - 1) + '" id="spq" value="' + Math.max(1, Math.floor(max / 2)) + '"></div><div class="field"><label>Move to</label><select class="input" id="spd">' + o.destinations.filter(d => d.id !== l.destId).map(d => '<option value="' + d.id + '">' + esc(d.label) + '</option>').join('') + '</select></div><div class="field"><label>Start time there</label>' + sel(o, l.time.start, 'id="sps"') + '</div><div class="field"><label>End time there</label>' + sel(o, l.time.end, 'id="spe"') + '</div></div></div><div class="modal-foot"><button class="btn" data-x>Cancel</button><button class="btn btn-primary" id="spok">Split</button></div></div>';
-    document.body.appendChild(bd);
-    const close = () => bd.remove();
-    bd.addEventListener('click', e => { if (e.target === bd || e.target.closest('[data-x]')) close(); });
-    $('#spok', bd).onclick = () => {
-      const n = Math.floor(+$('#spq', bd).value || 0);
-      if (!(n >= 1 && n < max)) return toast('Enter a quantity between 1 and ' + (max - 1) + '.', 'error');
-      const moved = {}; Object.keys(l.days).forEach(d => { const q = Math.min(Number(l.days[d]), n); if (q) { moved[d] = q; l.days[d] = Number(l.days[d]) - q; if (!l.days[d]) delete l.days[d]; } });
-      o.lines.splice(i + 1, 0, { cart_id: l.cart_id, name: l.name, type: l.type, group: l.group, days: moved, time: { start: $('#sps', bd).value, end: $('#spe', bd).value }, destId: $('#spd', bd).value });
-      if (!Object.keys(l.days).length) o.lines.splice(i, 1);
-      close(); mergeSame(o); draw(); requote();
-    };
-  }
-
   $$('[data-s]', form).forEach(el => el.oninput = el.onchange = () => { shared[el.dataset.s] = el.value; el.closest('.field').classList.remove('invalid'); requote(); });
   $('#submitBtn').onclick = async () => {
     let bad = false;
     $$('[data-s][required]', form).forEach(el => { const ok = el.value.trim().length >= (+el.getAttribute('minlength') || 1); el.closest('.field').classList.toggle('invalid', !ok); if (!ok) bad = true; });
     if (bad) return toast('Please complete the event details.', 'error');
+    if (Object.keys(qtyBusy).length) return toast('Checking the new quantity… try again in a moment.', 'info');
+    const qe = Object.keys(qtyErr)[0]; if (qe) { const c = $('[data-item="' + qe + '"]'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast('Fix the quantity first: ' + qtyErr[qe].msg, 'error'); }
     if (!$('#agree').checked) return toast('Please accept the shops\' policies.', 'warn');
     const notOk = orders.find(o => lastQuote[o.supplier_id] && !lastQuote[o.supplier_id].ok);
     if (notOk) { $('[data-shop="' + notOk.supplier_id + '"]').scrollIntoView({ behavior: 'smooth' }); return toast(notOk.shop.name + ': ' + lastQuote[notOk.supplier_id].error, 'error'); }

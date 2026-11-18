@@ -173,6 +173,78 @@ class CartController extends Controller
         return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'direct' => (bool) $direct]);
     }
 
+    /**
+     * Checkout quantity field: change how many of a selected item (per rental date) and check the stock at once.
+     * Saves the new quantities on the cart line (the Rental List or a direct "Request Rental" line), so the order
+     * that is submitted always matches. 422 + a clear message + what IS available when the stock is short.
+     */
+    public function qty(Request $request)
+    {
+        $data = $request->validate(
+            ['cart_id' => 'required|integer', 'days' => 'required|array|min:1', 'days.*' => 'required|integer|min:1|max:1000000'],
+            ['days.*.min' => 'The quantity must be at least 1. To drop an item, remove it from your Rental List.', 'days.*.max' => 'That quantity is too large.',
+                'days.*.integer' => 'Enter a whole number.', 'days.*.required' => 'Enter a quantity.']
+        );
+        $line = CartLine::where('user_id', $request->user()->id)->find($data['cart_id']);
+        if (! $line) {
+            return response()->json(['ok' => false, 'error' => 'This item is no longer in your Rental List. Reload the page.'], 404);
+        }
+        $cur = $line->toLine();
+        $days = array_map('intval', $data['days']);
+        ksort($days);
+        if (array_keys($days) !== array_keys(Rentals::cleanDays($cur['days']))) {
+            return response()->json(['ok' => false, 'error' => 'The rental dates can only be changed in your Rental List or on the item page.'], 422);
+        }
+        inv()->flush();
+        $chk = inv()->check([array_merge($cur, ['id' => 'x', 'days' => $days])]);
+        $avail = array_map(fn ($x) => $x['available'], $chk['byLine']['x'] ?? []);
+        if (! $chk['ok']) {
+            return response()->json(['ok' => false, 'error' => self::stockMessage($chk), 'available' => $avail], 422);
+        }
+        $res = Rentals::updateCartLine($request->user(), $line, $days);
+        if (! $res['ok']) {
+            return response()->json(['ok' => false, 'error' => $res['error'], 'available' => $avail], 422);
+        }
+
+        return response()->json(['ok' => true, 'days' => $days, 'available' => $avail]);
+    }
+
+    /** "Only 12 Gold Chairs are available on Jan 26 (you asked for 20)." — up to three problems. */
+    public static function stockMessage(array $chk): string
+    {
+        // one sentence per item + numbers, listing every date it applies to
+        $parts = collect($chk['bad'] ?? [])->unique(fn ($b) => ($b['product_id'] ?? 0).'|'.$b['date'])
+            ->groupBy(fn ($b) => ($b['product_id'] ?? 0).'|'.$b['name'].'|'.$b['available'].'|'.$b['requested'].'|'.(! empty($b['service']) ? 's' : ''))
+            ->take(3)->map(function ($g) {
+                $b = $g->first();
+                $on = ! empty($b['sale']) ? '' : ' on '.$g->pluck('date')->sort()->map(fn ($d) => fmt_date($d))->join(', ', ' and ');
+
+                return ! empty($b['service'])
+                    ? $b['name'].' is fully booked'.$on.' ('.$b['available'].' team'.($b['available'] === 1 ? '' : 's').' free)'
+                    : ($b['available'] > 0 ? 'Only '.$b['available'].' × '.$b['name'].' '.($b['available'] === 1 ? 'is' : 'are').' available' : $b['name'].' is not available').$on.' (you asked for '.$b['requested'].')';
+            });
+
+        return $parts->isEmpty() ? 'Some quantities exceed the available stock. Please lower them.' : $parts->implode('. ').'. Lower the quantity or pick other dates.';
+    }
+
+    /** Availability per selected item and date for the checkout hints: [cart_id => [date => [available, requested, ok]]]. */
+    private static function availability(int $userId, array $o): array
+    {
+        $byCart = [];
+        foreach ((array) ($o['lines'] ?? []) as $l) {
+            $id = (int) ($l['cart_id'] ?? 0);
+            foreach (Rentals::cleanDays((array) ($l['days'] ?? [])) as $d => $q) {
+                $byCart[$id][$d] = ($byCart[$id][$d] ?? 0) + $q;
+            }
+        }
+        $lines = [];
+        foreach (CartLine::where('user_id', $userId)->whereIn('id', array_keys($byCart))->get() as $cl) {
+            $lines[] = array_merge($cl->toLine(), ['id' => (string) $cl->id, 'days' => $byCart[$cl->id]]);
+        }
+
+        return $lines ? inv()->check($lines)['byLine'] : [];
+    }
+
     /** Validate + price the checkout state (no save): per shop the review HTML, plus the order summary. */
     public function quote(Request $request)
     {
@@ -195,6 +267,7 @@ class CartController extends Controller
             $elig = Finance::installmentEligibility($s, $o['eventDate'] ?? null);
             $out[] = [
                 'supplier_id' => $s->id, 'ok' => $prep['ok'], 'error' => $prep['error'] ?? null, 'total' => $q['total'], 'finalBalance' => $q['finalBalance'],
+                'avail' => self::availability($u->id, $o),
                 'suggest' => $suggest, 'installmentOk' => $elig['ok'], 'installmentMsg' => $elig['message'] ?? '',
                 'html' => view('customer._checkout-review', ['q' => $q, 'o' => $o, 'prep' => $prep])->render(),
                 'summary' => ['name' => $s->name, 'plan' => Finance::PLAN_LABEL[$q['plan']], 'where' => ($o['fulfillment'] ?? '') === 'delivery' ? count($o['destinations'] ?? []).' location'.(count($o['destinations'] ?? []) > 1 ? 's' : '') : 'pickup', 'q' => $q],

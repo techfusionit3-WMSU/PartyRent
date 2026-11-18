@@ -4,7 +4,7 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Feedback batch 2 (2026-11-18 late)** — user pasted list. Order / status:
+**Feedback batch 2 (2026-11-18 late)** — user pasted list. ALL DONE (140 tests green). Order / status:
 - [x] F1 Speed: OPcache enabled in C:\xampp\php\php.ini (backup php.ini.bak-before-opcache; 3-6x per request);
       Inventory interval index + demandOn memo (home controller 145 -> 35 ms)
 - [x] F2 Accounts: EnsureSameAccount (pages stamp `_auth` / X-Auth-Id via app.js; writes from a page of another
@@ -20,7 +20,8 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [x] F9 Supplier request page: transaction actions inline (link to other page optional)
 - [x] F10 Cases: customer never pays (COMP_PAYERS = supplier only; pricier substitute = shop-covered credit)
 - [x] F11 Customer reports a problem (shortfall_cases.kind=problem, problem; Shortfalls::reportByCustomer, rentals.problem)
-- [ ] F12 Checkout: qty field per item with stock check + clear errors; simpler split-quantity UI
+- [x] F12 Checkout: qty stepper per item (POST checkout.qty: stock check + saves cart line; 422 'Only N … available' + 'Use N'),
+      quote returns `avail` per cart line; split dialog replaced by per-location rows (first location = the rest)
 
 (previous) **Feedback batch 2026-11-18** (user pasted list + screenshots) — ALL DONE (126 tests green). Notes for later:
 direct "Request Rental" = cart_lines.direct (checkout?line=); Rentals::stepBlockers gates request steps; case

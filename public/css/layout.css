@@ -655,3 +655,37 @@
 .inline-reject[open] { flex: 1 1 100%; }
 .problem-cta { border-left: 4px solid var(--gold); }
 .chip-check { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: .84rem; }
+
+/* Checkout: quantity per item (stock-checked) and where each part goes */
+.qty-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; margin-top: 10px; }
+.qty-field { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-size: .78rem; font-weight: 600; color: var(--ink-2); }
+.qty-days { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.qty-step { display: inline-flex; align-items: stretch; border: 1.5px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; height: 38px; }
+.qty-step:focus-within { border-color: var(--brand); }
+.qty-step button { width: 34px; border: 0; background: var(--surface-2); color: var(--ink); font: 700 1.05rem var(--font); cursor: pointer; }
+.qty-step button:hover { background: var(--brand-50); color: var(--brand); }
+.qty-step input { width: 62px; border: 0; text-align: center; font: 700 .95rem var(--font); color: var(--ink); -moz-appearance: textfield; outline: none; }
+.qty-step input::-webkit-outer-spin-button, .qty-step input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-info { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-bottom: 8px; }
+.qa { font-size: .78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.qa svg { width: 14px; height: 14px; }
+.qa.ok { color: var(--green); }
+.qa.bad { color: var(--red); }
+.link-btn { border: 0; background: none; padding: 0; color: var(--brand); font: 600 .8rem var(--font); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.qty-err { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: #FEF2F2; color: #991B1B; font-size: .84rem; }
+.qty-err svg { width: 16px; height: 16px; flex: none; }
+.qty-err span { flex: 1 1 200px; }
+.alloc { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.alloc-head { display: flex; gap: 10px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.alloc-head span:last-child { margin-left: auto; }
+.alloc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; }
+.alloc-row + .alloc-row { border-top: 1px solid var(--line); }
+.alloc-row > select { flex: 1 1 170px; width: auto; }
+.alloc-row .time-pair { flex: 1 1 240px; max-width: 340px; margin-left: auto; }
+.alloc-in { width: 80px; text-align: center; }
+.alloc-rest { display: inline-flex; flex-direction: column; align-items: center; min-width: 80px; padding: 2px 8px; border-radius: 8px; background: var(--surface-2); line-height: 1.2; }
+.alloc-rest small, .alloc-day small { color: var(--muted); font-size: .7rem; font-weight: 600; }
+.alloc-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.alloc-day { display: inline-flex; flex-direction: column; align-items: center; }
+.alloc-day input { width: 64px; text-align: center; }
+@media (max-width: 560px) { .alloc-row .time-pair { max-width: none; margin-left: 0; flex-basis: 100%; } }

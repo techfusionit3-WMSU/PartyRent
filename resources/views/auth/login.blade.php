@@ -18,14 +18,11 @@
 @unless(app()->isProduction())
 @php
   $demoGroups = [
-    'Customers' => [['Maria Santos', 'maria@demo.ph'], ['Jose Garcia', 'jose@demo.ph'], ['Miguel Torres (suspended)', 'miguel@demo.ph']],
-    'Suppliers (shop owners)' => [['Juan · Happy Moments', 'juan@demo.ph'], ['Ana · Celebration Hub', 'ana@demo.ph'], ['Carlo · Dream Events', 'carlo@demo.ph'], ['Liza · Elegant Occasion (org)', 'liza@demo.ph'], ['Ramon · Party Essentials', 'ramon@demo.ph'], ['Bea · pending application', 'bea@demo.ph'], ['Kristine · Aquino Events (pending)', 'kristine@demo.ph']],
-    'Shop staff (Elegant Occasion)' => [['Grace · Cashier', 'cashier@elegantoccasion.ph'], ['Rico · Inventory', 'inventory@elegantoccasion.ph'], ['Joy · Staff', 'staff@elegantoccasion.ph']],
     'Platform' => [['Mark · Admin', 'admin@partyrent.ph'], ['Paolo · Admin (limited)', 'paolo.admin@partyrent.ph'], ['Patricia · Super admin', 'super@partyrent.ph']],
   ];
 @endphp
 <div class="card card-flat mt-2" style="padding:14px">
-  <div class="strong mb-1">Demo accounts <span class="muted small">— password <code>demo123</code></span></div>
+  <div class="strong mb-1">Admin accounts <span class="muted small">— password <code>demo123</code></span></div>
   <p class="muted small" style="margin:0 0 8px">Click one to fill the form, then press Log in.</p>
   @foreach($demoGroups as $group => $accounts)
     <div class="small muted" style="margin:8px 0 4px">{{ $group }}</div>

@@ -153,6 +153,15 @@
     }, true);
   }
 
+  // copy a transaction code: <button data-copy-code="PR-0001">
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-copy-code]'); if (!b) return;
+    const code = b.dataset.copyCode;
+    const done = () => toast('Transaction code ' + code + ' copied.', 'success');
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(code).then(done, () => toast(code, 'info'));
+    else { const t = document.createElement('textarea'); t.value = code; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); done(); } catch (er) { toast(code, 'info'); } t.remove(); }
+  });
+
   // forms needing confirmation: <form data-confirm="..." data-confirm-title="..." data-danger>
   document.addEventListener('submit', async e => {
     const f = e.target;

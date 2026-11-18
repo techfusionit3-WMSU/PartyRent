@@ -16,7 +16,7 @@
     @foreach($list as $r)
       @php($f = $r->fin())
       <a class="card row wrap between" style="color:inherit;text-decoration:none" href="{{ route('rentals.show', $r) }}">
-        <div class="row" style="min-width:0"><div class="logo-tile" style="background:{{ $r->supplier->color }}1a">{{ $r->supplier->logo }}</div><div style="min-width:0"><div class="strong">{{ $r->event_name }}</div><div class="small muted">{{ $r->code }} · {{ $r->supplier->name }}</div><div class="small">{{ icon('calendar', 'width:13px;vertical-align:-2px') }} {{ fmt_range($r->start_date, $r->end_date) }} · {{ $r->fulfillment === 'delivery' ? 'Delivery' : 'Pickup' }}</div></div></div>
+        <div class="row" style="min-width:0"><div class="logo-tile" style="background:{{ $r->supplier->color }}1a">{{ $r->supplier->logo }}</div><div style="min-width:0"><div class="strong">{{ $r->event_name }}</div><div class="small muted"><span class="txn-mini">{{ $r->code }}</span> {{ $r->supplier->name }}</div><div class="small">{{ icon('calendar', 'width:13px;vertical-align:-2px') }} {{ fmt_range($r->start_date, $r->end_date) }} · {{ $r->fulfillment === 'delivery' ? 'Delivery' : 'Pickup' }}</div></div></div>
         <div class="row wrap"><div class="right"><div class="small muted">Total</div><b>{{ money($f['payable']) }}</b>@if($f['balance'] > 0 && $r->isActive())<div class="small" style="color:var(--brand)">Balance {{ money($f['balance']) }}</div>@endif</div><div class="stack-sm" style="align-items:flex-end">@include('partials.badges', ['status' => $r->status])@include('partials.badges', ['pay' => $f['status']])</div></div>
       </a>
     @endforeach

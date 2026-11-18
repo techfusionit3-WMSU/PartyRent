@@ -9,7 +9,7 @@
 @section('content')
 <div data-leave-warn="dirty" data-leave-msg="You started filling in a form on this request (payment, notes or a status step) that was not saved. Leave anyway?" hidden></div>
 <div class="crumbs"><a href="{{ route('supplier.requests') }}">Rental Requests</a> / {{ $r->code }}</div>
-<div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }}@if($r->event_type && $r->event_type !== 'Other') · {{ $r->event_type }}@endif · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status]) @if($r->status !== 'pending') @include('partials.badges', ['pay' => $f['status']])@endif @include('partials.badges', ['planBadge' => $r->plan])</div></div>
+<div class="page-head"><div><h1>{{ $r->event_name }}</h1><div class="mb-1">@include('partials.txn-code', ['code' => $r->code, 'side' => 'supplier'])</div><p>@if($r->event_type && $r->event_type !== 'Other'){{ $r->event_type }} · @endif event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status]) @if($r->status !== 'pending') @include('partials.badges', ['pay' => $f['status']])@endif @include('partials.badges', ['planBadge' => $r->plan])</div></div>
 @include('partials.case-alert', ['r' => $r])
 <div class="card mb-2">@include('partials.progress')</div>
 

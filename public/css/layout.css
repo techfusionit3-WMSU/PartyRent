@@ -620,3 +620,12 @@
 .pick-row .pick-add { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line-2); color: var(--brand); }
 .pick-row .pick-add svg { width: 14px; height: 14px; }
 @media (max-width: 520px) { .disc-kinds { grid-template-columns: minmax(0, 1fr); } }
+
+/* Transaction code chip (customer + supplier request pages) */
+.txn-code { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px dashed var(--brand); border-radius: 999px; background: var(--brand-50); font-size: .86rem; }
+.txn-code .lbl { color: var(--muted); font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
+.txn-code b { color: var(--brand); font-size: .98rem; letter-spacing: .03em; font-variant-numeric: tabular-nums; }
+.txn-copy { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 999px; background: #fff; color: var(--brand); cursor: pointer; }
+.txn-copy svg { width: 15px; height: 15px; }
+.txn-copy:hover { background: var(--brand); color: #fff; }
+.txn-mini { display: inline-block; padding: 0 7px; margin-right: 4px; border-radius: 6px; background: var(--brand-50); color: var(--brand); font-weight: 700; font-variant-numeric: tabular-nums; }

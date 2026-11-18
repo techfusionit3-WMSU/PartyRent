@@ -103,6 +103,8 @@ class RentalLifecycleTest extends TestCase
         foreach (['in_progress', 'ready_pickup'] as $to) {
             $this->post("/supplier/requests/{$r->code}/advance", ['to' => $to])->assertSessionHas('success');
         }
+        $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'ongoing', 'receivedBy' => 'Maria'])->assertSessionHas('error'); // too early: release opens the day before the rental
+        $this->travelTo(\Illuminate\Support\Carbon::parse($d1)->setTime(8, 0));
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'ongoing'])->assertSessionHas('error'); // needs receiver
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'ongoing', 'receivedBy' => 'Maria', 'releaseDate' => today_iso(), 'releaseQty' => '4 tables'])->assertSessionHas('success');
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'return_pending'])->assertSessionHas('success');

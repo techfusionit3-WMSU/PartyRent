@@ -17,7 +17,7 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [x] B5 Checkout: single (listing) vs rental-list checkout picks the right items; map pin for address; multiple
       locations = toggle + explainer popup; event date follows multi-day; items + rental time above delivery;
       split lines grouped per item in one card
-- [ ] B6 Cases: compensation (request / offer, rush fees) for both sides; steps can't be skipped before their
+- [x] B6 Cases: compensation (request / offer, rush fees) for both sides; steps can't be skipped before their
       requirements; confirm dialog on every irreversible step (supplier request steps too)
 - [ ] B7 Discounts: clear type (percent of item / ₱ per piece / % of whole order); item picker in a popup with
       search, picked items on top as removable chips; fix stray "@include('partials.badges'..." text on request page

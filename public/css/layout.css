@@ -579,3 +579,8 @@
 .item-card .item-part { margin-top: 10px; }
 .item-card .item-part + .item-part { padding-top: 10px; border-top: 1px dashed var(--line); }
 .item-card .part-lbl { color: var(--purple); margin-bottom: 6px; }
+/* case compensation */
+.comp-box { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px 12px; margin: 0 0 14px; }
+.comp-box legend { font-weight: 700; font-size: .88rem; padding: 0 6px; }
+.comp-line { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--gold-50); }
+.comp-line.to-cust { background: var(--green-50); }

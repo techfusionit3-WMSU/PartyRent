@@ -51,6 +51,7 @@
           <dt>Agreed</dt><dd>{{ ($c->resolution['type'] ?? '') === 'none' ? 'Closed without changes' : \App\Domain\Shortfalls::TYPES[$c->resolution['type']] ?? $c->resolution['type'] }}{{ ($c->resolution['by'] ?? '') === 'admin' ? ' (settled by PartyRent support)' : '' }}</dd>
           @if(! empty($c->resolution['changes']))<dt>Changes</dt><dd>@foreach($c->resolution['changes'] as $x)<div>{{ $x }}</div>@endforeach</dd>@endif
           @if(isset($c->resolution['totalAfter']))<dt>Booking total</dt><dd>{{ money($c->resolution['totalBefore']) }} → <b>{{ money($c->resolution['totalAfter']) }}</b></dd>@endif
+          @if(! empty($c->resolution['comp']))<dt>Compensation</dt><dd>{{ money($c->resolution['comp']['amount']) }} paid by {{ $c->resolution['comp']['payer'] === 'supplier' ? 'the shop to the customer' : 'the customer to the shop' }} · {{ $c->resolution['comp']['reason'] }}</dd>@endif
           @if(($c->resolution['refund'] ?? 0) > 0)<dt>Refund</dt><dd>{{ money($c->resolution['refund']) }} {{ $role === 'customer' ? 'is on its way back to you.' : 'due to the customer (in Payments).' }}</dd>@endif
           <dt>Resolved</dt><dd>{{ $c->resolved_at?->format('M j, Y g:i A') }}</dd>
         </dl>
@@ -64,11 +65,12 @@
         @if($od['type'] === 'substitute')<div>Substitute: <b>{{ $od['substitute'] }}</b> for the missing units</div>@endif
         @if(($od['credit'] ?? 0) > 0)<div>Price reduction: <b>{{ money($od['credit']) }}</b> off the booking</div>@endif
         @if($od['type'] === 'cancel')<div>Everything paid for the rental is refunded.</div>@endif
+        @if(! empty($od['comp']))<div class="comp-line {{ $od['comp']['payer'] === 'supplier' ? 'to-cust' : 'to-shop' }}">{{ icon('cash', 'width:15px;vertical-align:-3px') }} Compensation: <b>{{ money($od['comp']['amount']) }}</b> paid by {{ $od['comp']['payer'] === 'supplier' ? $c->supplier->name.' to '.$c->customer->name : $c->customer->name.' to '.$c->supplier->name }} · {{ $od['comp']['reason'] }}</div>@endif
         @if($open->body)<p class="mt-1" style="white-space:pre-line">"{{ $open->body }}"</p>@endif
         <div class="small muted mt-1">{{ icon('clock', 'width:13px;vertical-align:-2px') }} Answer before <b>{{ $c->deadline_at?->format('M j, g:i A') }}</b> ({{ $c->deadline_at?->diffForHumans() }}). Without an answer PartyRent support steps in.</div>
         @if(! $mine && in_array($role, ['customer', 'supplier'], true))
           <div class="row wrap mt-2">
-            <form method="POST" action="{{ route('cases.respond', $c) }}" data-confirm-title="Accept this proposal?" data-confirm="The booking, the price and any refund are updated right away." data-confirm-ok="Accept">@csrf<input type="hidden" name="answer" value="accept"><button class="btn btn-primary">{{ icon('check') }}Accept</button></form>
+            <form method="POST" action="{{ route('cases.respond', $c) }}" data-confirm-title="Accept this proposal?" data-confirm="The booking, the price, any refund and any compensation are updated right away. This can't be undone: the case closes and can't be reopened." data-confirm-ok="Yes, accept">@csrf<input type="hidden" name="answer" value="accept"><button class="btn btn-primary">{{ icon('check') }}Accept</button></form>
             <button class="btn" data-modal="declineM">Decline</button>
             @if($role === 'customer')<button class="btn btn-outline" data-modal="proposeM">Counter-offer</button>@endif
           </div>
@@ -80,12 +82,12 @@
 
     @if($c->status !== 'resolved' && $role === 'supplier')
       <div class="card"><div class="row between"><h3 class="mb-0">{{ $open ? 'Replace your proposal' : 'Propose a solution' }}</h3><button class="btn btn-primary btn-sm" data-modal="proposeM">{{ icon('plus') }}New proposal</button></div>
-        <p class="small muted mb-0 mt-1">Offer fewer units at a lower price, a substitute item, a later or split delivery, a refund, or cancelling the booking. The customer can accept, counter or decline.</p></div>
+        <p class="small muted mb-0 mt-1">Offer fewer units at a lower price, a substitute item, a later or split delivery, a refund, or cancelling the booking — with compensation for rush costs either way if needed. The customer can accept, counter or decline.</p></div>
     @endif
 
     @if($c->status !== 'resolved' && $role === 'admin')
       <div class="card"><h3>Settle as PartyRent support</h3>
-        <form method="POST" action="{{ route('cases.settle', $c) }}" data-confirm-title="Settle {{ $c->code }}?" data-confirm="The chosen proposal is applied to the booking now (lines, inventory, price, refund)." data-confirm-ok="Settle">@csrf
+        <form method="POST" action="{{ route('cases.settle', $c) }}" data-confirm-title="Settle {{ $c->code }}?" data-confirm="The chosen proposal is applied to the booking now (lines, inventory, price, refund, compensation). This can't be undone." data-confirm-ok="Settle">@csrf
           <div class="field"><label for="setP">Apply</label><select class="input" id="setP" name="proposal"><option value="">Close without changes</option>@foreach($proposals as $p)<option value="{{ $p->id }}">{{ $WHO[$p->role] ?? $p->role }}: {{ \App\Domain\Shortfalls::describe($p->data) }}</option>@endforeach</select></div>
           <div class="field"><label for="setN">Note to both sides</label><textarea class="input" id="setN" name="note" rows="2"></textarea></div>
           <button class="btn btn-primary">Settle case</button></form></div>
@@ -132,16 +134,29 @@
 {{-- propose / counter --}}
 @if($c->status !== 'resolved' && in_array($role, ['customer', 'supplier'], true))
 <div class="modal-backdrop hidden" id="proposeM"><div class="modal" role="dialog" aria-modal="true" aria-label="Proposal"><div class="modal-head"><h3>{{ $role === 'customer' ? 'Counter-offer' : 'Propose a solution' }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('cases.propose', $c) }}">@csrf<div class="modal-body">
+  <form method="POST" action="{{ route('cases.propose', $c) }}" data-confirm-title="Send this {{ $role === 'customer' ? 'counter-offer' : 'proposal' }}?" data-confirm="{{ $role === 'customer' ? 'The shop' : 'The customer' }} can accept it right away, which updates the booking. {{ $open && $mine ? 'It replaces your open proposal.' : '' }}" data-confirm-ok="Send">@csrf<div class="modal-body">
     <div class="field"><label for="pType">What do you propose?</label><select class="input" id="pType" name="type" required>@foreach(\App\Domain\Shortfalls::TYPES as $k => $l)@continue($role === 'customer' && $k === 'substitute')<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></div>
     @if($role === 'supplier')<div class="field" data-for="substitute" hidden><label for="pSub">Substitute item</label><select class="input" id="pSub" name="substitute_id"><option value="">Choose…</option>@foreach($subs as $s)<option value="{{ $s->id }}">{{ $s->name }} · {{ money($s->basePrice()) }}/day</option>@endforeach</select><div class="hint">Added to the booking for the missing units on the same dates.</div></div>@endif
-    <div class="field" data-hide-for="cancel"><label for="pCredit">Price reduction (₱ off the booking)</label><input class="input" type="number" id="pCredit" name="credit" min="0" step="0.01" max="{{ $r->pricing['total'] ?? 0 }}" value="0"><div class="hint">For "fewer units" the missing units come off automatically ({{ money($shortValue) }}); add extra here if you want. For a refund, enter the amount.</div></div>
+    <div class="field" data-hide-for="cancel compensation"><label for="pCredit">Price reduction (₱ off the booking)</label><input class="input" type="number" id="pCredit" name="credit" min="0" step="0.01" max="{{ $r->pricing['total'] ?? 0 }}" value="0"><div class="hint">For "fewer units" the missing units come off automatically ({{ money($shortValue) }}); add extra here if you want. For a refund, enter the amount.</div></div>
+    <fieldset class="comp-box" data-comp>
+      <legend>Compensation for rush costs <span class="muted" style="font-weight:500" data-comp-opt>(optional)</span></legend>
+      <p class="small muted mt-0">Finding a replacement at short notice can cost extra (rush or delivery fees). Either side can ask for it or offer it.</p>
+      <div class="row wrap gap-sm mb-1">
+        <label class="chip"><input type="radio" name="comp_payer" value="supplier" hidden>{{ $role === 'customer' ? 'The shop pays me' : 'We pay the customer' }}</label>
+        <label class="chip"><input type="radio" name="comp_payer" value="customer" hidden>{{ $role === 'customer' ? 'I cover the shop\'s rush costs' : 'The customer pays our rush costs' }}</label>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label for="pComp">Amount (₱)</label><input class="input" type="number" id="pComp" name="comp_amount" min="0" step="0.01" value="0"></div>
+        <div class="field"><label for="pCompR">What it's for</label><input class="input" id="pCompR" name="comp_reason" maxlength="200" placeholder="{{ $role === 'customer' ? 'e.g. Rush fee to rent 20 chairs elsewhere' : 'e.g. Rush delivery of the substitute' }}"></div>
+      </div>
+      <div class="hint">{{ $role === 'customer' ? 'Paid by the shop: sent to you like a refund. Paid by you: added to your booking total.' : 'Paid by your shop: sent to the customer and taken from your payout. Paid by the customer: added to the booking total.' }}</div>
+    </fieldset>
     <div class="field"><label for="pNote">Message</label><textarea class="input" id="pNote" name="note" rows="3" maxlength="2000" placeholder="{{ $role === 'customer' ? 'e.g. We can accept 80 chairs if the delivery fee is waived.' : 'e.g. We can deliver 80 chairs on time and the other 20 by 10 AM.' }}"></textarea></div>
     <div class="field"><label for="pDl">Answer needed within</label><select class="input" id="pDl" name="deadline_hours">@foreach([12 => '12 hours', 24 => '24 hours', 48 => '2 days', 72 => '3 days'] as $h => $l)<option value="{{ $h }}" @selected($h === \App\Domain\Shortfalls::DEFAULT_DEADLINE_HOURS)>{{ $l }}</option>@endforeach</select></div>
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Send</button></div></form>
 </div></div>
 <div class="modal-backdrop hidden" id="declineM"><div class="modal sm" role="dialog" aria-modal="true" aria-label="Decline"><div class="modal-head"><h3>Decline the proposal</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('cases.respond', $c) }}">@csrf<input type="hidden" name="answer" value="decline"><div class="modal-body">
+  <form method="POST" action="{{ route('cases.respond', $c) }}" data-confirm-title="Decline this proposal?" data-confirm="The proposal can't be accepted later. {{ $role === 'customer' ? 'The shop' : 'The customer' }} has {{ \App\Domain\Shortfalls::DEFAULT_DEADLINE_HOURS }} hours to send a new one before PartyRent support steps in." data-confirm-ok="Decline" data-danger>@csrf<input type="hidden" name="answer" value="decline"><div class="modal-body">
     <div class="field"><label for="dNote">Why? <span class="muted">(optional)</span></label><textarea class="input" id="dNote" name="note" rows="3" maxlength="2000"></textarea></div>
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-danger">Decline</button></div></form>
 </div></div>
@@ -151,7 +166,11 @@
   var t = document.getElementById('pType'); if (!t) return;
   function sync() {
     document.querySelectorAll('[data-for]').forEach(function (el) { el.hidden = el.getAttribute('data-for') !== t.value; });
-    document.querySelectorAll('[data-hide-for]').forEach(function (el) { el.hidden = el.getAttribute('data-hide-for') === t.value; });
+    document.querySelectorAll('[data-hide-for]').forEach(function (el) { el.hidden = el.getAttribute('data-hide-for').split(' ').indexOf(t.value) >= 0; });
+    var only = t.value === 'compensation', opt = document.querySelector('[data-comp-opt]'), amt = document.getElementById('pComp');
+    if (opt) opt.textContent = only ? '(required)' : '(optional)';
+    if (amt) amt.required = only;
+    document.querySelectorAll('[data-comp] input[name=comp_payer]').forEach(function (r) { r.required = only; if (r.value === 'customer') { r.disabled = t.value === 'cancel'; r.closest('label').style.opacity = t.value === 'cancel' ? .45 : ''; if (r.disabled && r.checked) { r.checked = false; r.closest('label').classList.remove('active'); } } });
   }
   t.addEventListener('change', sync); sync();
 })();

@@ -113,9 +113,15 @@ class SaleItemsTest extends TestCase
         // stock on hand cannot drop below what accepted orders need
         $this->put("/supplier/products/{$p->id}", $this->saleForm(['total_stock' => 5]))->assertSessionHas('error');
 
+        // steps can't be skipped: nothing paid yet → can't start preparing
+        $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'in_progress'])->assertSessionHas('error');
+        $this->actingAs($this->shopCashier($r->code))->withSession(['mode' => 'cashier'])
+            ->post('/cashier/record', ['request' => $r->code, 'type' => 'full', 'method' => 'cash', 'amount' => $r->fresh()->fin()['total'], 'date' => today_iso(), 'reference' => 'OR-SALE'])->assertSessionHas('success');
+        $this->as('juan@demo.ph', 'supplier');
         foreach (['in_progress', 'ready_pickup'] as $to) {
             $this->post("/supplier/requests/{$r->code}/advance", ['to' => $to])->assertSessionHas('success');
         }
+        $this->travelTo(\Illuminate\Support\Carbon::parse($d));
         $this->post("/supplier/requests/{$r->code}/advance", ['to' => 'ongoing', 'receivedBy' => 'Maria', 'releaseDate' => today_iso()])->assertSessionHas('success');
         $p->refresh();
         $this->assertSame(3, $p->stockOnHand());

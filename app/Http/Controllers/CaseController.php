@@ -115,6 +115,7 @@ class CaseController extends Controller
         $v = $request->validate([
             'type' => 'required|string', 'credit' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:2000',
             'substitute_id' => 'nullable|integer', 'deadline_hours' => 'nullable|integer|min:1|max:168',
+            'comp_amount' => 'nullable|numeric|min:0', 'comp_payer' => 'nullable|in:supplier,customer', 'comp_reason' => 'nullable|string|max:200',
         ]);
 
         return $this->back(Shortfalls::propose($case, $request->user(), $role, $v), $role === 'customer' ? 'Counter-offer sent.' : 'Proposal sent to the customer.');

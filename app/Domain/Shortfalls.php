@@ -37,7 +37,12 @@ class Shortfalls
         'delay' => 'Delayed or partial delivery',
         'refund' => 'Partial or full refund',
         'cancel' => 'Cancel the booking (full refund)',
+        'compensation' => 'Compensation only (no change to the items)',
     ];
+
+    /** Who pays a compensation: the shop pays the customer (e.g. rush fees for a replacement found elsewhere) or the
+     * customer covers the shop's rush costs (e.g. a substitute sourced at short notice). */
+    public const COMP_PAYERS = ['supplier', 'customer'];
 
     public const DEFAULT_DEADLINE_HOURS = 48;
 
@@ -174,6 +179,10 @@ class Shortfalls
         if ($role === 'customer' && $type === 'substitute') {
             return self::fail('Ask for a substitute in the message instead.');
         }
+        // steps can't be skipped: the shop makes the first proposal; the customer then answers or counters it
+        if ($role === 'customer' && ! CaseEvent::where('shortfall_case_id', $c->id)->where('kind', 'proposal')->exists()) {
+            return self::fail('Wait for the shop\'s first proposal, then accept, decline or counter it.');
+        }
         $r = $c->rentalRequest;
         $credit = r2(max(0, (float) ($p['credit'] ?? 0)));
         $total = (float) ($r->pricing['total'] ?? 0);
@@ -184,6 +193,30 @@ class Shortfalls
             return self::fail('The amount cannot be more than the booking total ('.money($total).').');
         }
         $data = ['type' => $type, 'credit' => $credit, 'by' => $role, 'status' => 'open'];
+        // compensation for rush costs, either way
+        $comp = r2(max(0, (float) ($p['comp_amount'] ?? 0)));
+        if ($comp > 0) {
+            $payer = in_array($p['comp_payer'] ?? '', self::COMP_PAYERS, true) ? $p['comp_payer'] : null;
+            if (! $payer) {
+                return self::fail('Choose who pays the compensation.');
+            }
+            if ($comp > max($total, 1000) * 2) {
+                return self::fail('That compensation is far above the booking total. Explain it in the message or ask PartyRent support.');
+            }
+            if ($payer === 'customer' && $type === 'cancel') {
+                return self::fail('A cancelled booking cannot charge the customer rush costs.');
+            }
+            $reason = trim((string) ($p['comp_reason'] ?? ''));
+            if (mb_strlen($reason) < 3) {
+                return self::fail('Say what the compensation is for (e.g. rush fee for a replacement).');
+            }
+            $data['comp'] = ['amount' => $comp, 'payer' => $payer, 'reason' => mb_substr($reason, 0, 200)];
+        } elseif ($type === 'compensation') {
+            return self::fail('Enter the compensation amount.');
+        }
+        if ($type === 'compensation') {
+            $data['credit'] = 0.0;
+        }
         if ($type === 'substitute') {
             $sub = Product::where('supplier_id', $c->supplier_id)->where('status', 'active')->find($p['substitute_id'] ?? 0);
             if (! $sub || $sub->isSale() || $sub->id === $c->product_id) {
@@ -227,10 +260,13 @@ class Shortfalls
             'delay' => 'delayed / partial delivery',
             'refund' => 'refund',
             'cancel' => 'cancel the booking with a full refund',
+            'compensation' => 'compensation',
             default => $d['type'],
         };
+        $comp = $d['comp'] ?? null;
 
-        return $t.(($d['credit'] ?? 0) > 0 ? ' · '.money($d['credit']).' off' : '');
+        return $t.(($d['credit'] ?? 0) > 0 ? ' · '.money($d['credit']).' off' : '')
+            .($comp ? ' · '.($comp['payer'] === 'supplier' ? 'shop pays the customer ' : 'customer pays the shop ').money($comp['amount']).' ('.$comp['reason'].')' : '');
     }
 
     /** The other side answers the open proposal: accept | decline. (A counter is a propose() by the customer.) */
@@ -417,6 +453,16 @@ class Shortfalls
                         $q[$k] = r2(max(0, (float) $q[$k] - $credit));
                     }
                 }
+                if (($d['comp']['payer'] ?? '') === 'customer') {
+                    $amt = (float) $d['comp']['amount'];
+                    $q['charges'] = array_merge($q['charges'] ?? [], [['label' => 'Rush costs · case '.$c->code.' · '.$d['comp']['reason'], 'amount' => $amt]]);
+                    foreach (['rentalFee', 'total', 'payable'] as $k) {
+                        if (isset($q[$k])) {
+                            $q[$k] = r2((float) $q[$k] + $amt);
+                        }
+                    }
+                    $changes[] = 'Customer pays '.money($amt).' rush costs ('.$d['comp']['reason'].')';
+                }
                 $q['finalBalance'] = r2(max(0, $q['total'] - ($q['reservationFee'] ?? 0) - ($q['downPayment'] ?? 0)));
                 $r->update(['pricing' => $q]);
                 $r->refresh();
@@ -441,7 +487,18 @@ class Shortfalls
                 }
                 $changes[] = ($how === 'sent' ? 'Refunded ' : ($how === 'awaiting' ? 'Refund in progress ' : 'Refund due ')).money($refund);
             }
-            $res = ['type' => $d['type'], 'credit' => (float) ($d['credit'] ?? 0), 'refund' => $refund, 'by' => $role, 'proposal' => $e->id, 'changes' => $changes,
+            $compOut = ($d['comp']['payer'] ?? '') === 'supplier' ? (float) $d['comp']['amount'] : 0.0;
+            if ($compOut > 0) {
+                // the shop compensates the customer: paid out like a refund (comes off the shop's payout)
+                $compPay = Payment::create([
+                    'code' => Rentals::nextPaymentCode(), 'rental_request_id' => $r->id, 'type' => 'refund', 'method' => 'bank', 'amount' => $compOut,
+                    'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'SCC-'.$c->id.'-'.substr((string) now()->getTimestampMs(), -5),
+                    'status' => 'pending', 'notes' => 'Compensation from the shop · case '.$c->code.' · '.$d['comp']['reason'], 'recorded_by' => 'system',
+                ]);
+                Notifier::finance($c->supplier, 'Compensation due: '.$r->code, money($compOut).' goes to '.$c->customer->name.' (case '.$c->code.': '.$d['comp']['reason'].'). Send it and mark it verified.', route('supplier.requests.show', $r, false));
+                $changes[] = 'Shop pays the customer '.money($compOut).' compensation ('.$d['comp']['reason'].')';
+            }
+            $res = ['type' => $d['type'], 'credit' => (float) ($d['credit'] ?? 0), 'refund' => $refund, 'comp' => $d['comp'] ?? null, 'by' => $role, 'proposal' => $e->id, 'changes' => $changes,
                 'totalBefore' => $before['total'], 'totalAfter' => (float) ($r->fresh()->pricing['total'] ?? 0)];
             self::event($c, $role === 'admin' ? 'admin' : 'system', 'apply', implode(' · ', $changes) ?: 'Agreed — no change to the booking.', $res, $by);
             $c->update(['status' => 'resolved', 'resolved_at' => now(), 'resolution' => $res, 'proposal_id' => null, 'deadline_at' => null]);

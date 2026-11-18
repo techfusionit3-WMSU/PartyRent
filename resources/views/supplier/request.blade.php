@@ -8,7 +8,7 @@
 
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.requests') }}">Rental Requests</a> / {{ $r->code }}</div>
-<div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }}@if($r->event_type && $r->event_type !== 'Other') · {{ $r->event_type }}@endif · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status])@if($r->status !== 'pending')@include('partials.badges', ['pay' => $f['status']])@endif@include('partials.badges', ['planBadge' => $r->plan])</div></div>
+<div class="page-head"><div><h1>{{ $r->event_name }}</h1><p>{{ $r->code }}@if($r->event_type && $r->event_type !== 'Other') · {{ $r->event_type }}@endif · event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status]) @if($r->status !== 'pending') @include('partials.badges', ['pay' => $f['status']])@endif @include('partials.badges', ['planBadge' => $r->plan])</div></div>
 @include('partials.case-alert', ['r' => $r])
 <div class="card mb-2">@include('partials.progress')</div>
 
@@ -27,18 +27,23 @@
         @if(auth()->user()->orgCan('orders.manage'))<button class="btn btn-success" data-modal="acceptModal" @if($conflicts) title="Not enough stock" @endif>{{ icon('check') }}Accept request</button>@else<span class="small muted">Only the Organization Admin can accept or decline.</span>@endif
       @elseif($r->status === 'inspection')
         <button class="btn" data-modal="settleModal" @disabled($settleDisabled)>{{ icon('shield') }}Settle deposit</button>
-        <form method="POST" action="{{ route('supplier.requests.complete', $r) }}">@csrf<button class="btn btn-primary">Complete rental</button></form>
+        <form method="POST" action="{{ route('supplier.requests.complete', $r) }}" data-confirm="Close {{ $r->code }} as completed? Make sure the inspection and deposit are settled. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Complete rental?" data-confirm-ok="Complete rental">@csrf<button class="btn btn-primary">Complete rental</button></form>
       @else
         @foreach($next as $st)
-          @if($st === 'ongoing')<button class="btn btn-primary" data-modal="releaseModal">{{ \App\Domain\Rentals::ACTION_LABEL[$st] }}</button>
+          @php($why = \App\Domain\Rentals::stepBlockers($r, $st))
+          @if($st === 'ongoing')<button class="btn btn-primary" data-modal="releaseModal" @disabled($why)>{{ \App\Domain\Rentals::ACTION_LABEL[$st] }}</button>
           @elseif($st === 'inspection')<button class="btn btn-primary" data-modal="inspectModal">{{ \App\Domain\Rentals::ACTION_LABEL[$st] }}</button>
           @else
-            <form method="POST" action="{{ route('supplier.requests.advance', $r) }}" data-confirm="Update {{ $r->code }} to {{ \App\Models\RentalRequest::statusLabel($st) }}? The customer will be notified.{{ $st === 'in_progress' && $f['paidRental'] <= 0 ? ' Note: no verified payment yet ('.$f['status'].').' : '' }}" data-confirm-title="{{ \App\Domain\Rentals::ACTION_LABEL[$st] }}?" data-confirm-ok="Update status">@csrf<input type="hidden" name="to" value="{{ $st }}"><button class="btn btn-primary">{{ \App\Domain\Rentals::ACTION_LABEL[$st] }}</button></form>
+            <form method="POST" action="{{ route('supplier.requests.advance', $r) }}" data-confirm="Move {{ $r->code }} to “{{ \App\Models\RentalRequest::statusLabel($st) }}”? The customer will be notified. This can't be undone: the request can't go back to an earlier step." data-confirm-title="{{ \App\Domain\Rentals::ACTION_LABEL[$st] }}?" data-confirm-ok="Yes, move on">@csrf<input type="hidden" name="to" value="{{ $st }}"><button class="btn btn-primary" @disabled($why)>{{ \App\Domain\Rentals::ACTION_LABEL[$st] }}</button></form>
           @endif
         @endforeach
       @endif
     </div>
   </div>
+  @php($blockers = collect($next)->flatMap(fn ($st) => \App\Domain\Rentals::stepBlockers($r, $st))->unique()->values())
+  @if(! in_array($r->status, ['pending', 'inspection'], true) && $blockers->isNotEmpty())
+    <div class="alert alert-warn mt-2 mb-0">{{ icon('lock') }}<div><b>Before the next step:</b><ul class="small" style="margin:4px 0 0;padding-left:18px">@foreach($blockers as $b)<li>{{ $b }}</li>@endforeach</ul></div></div>
+  @endif
   @if($checklist)<div class="row wrap mt-2 gap-sm">@foreach($checklist as $x)<span class="badge {{ $x['ok'] ? 'b-green' : 'b-gray' }}">{{ $x['ok'] ? '✓' : '○' }} {{ $x['label'] }}{{ $x['detail'] ? ' · '.$x['detail'] : '' }}</span>@endforeach</div>@endif
 </div>
 @if($f['isOverdue'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div><b>Overdue payment:</b> {{ money($f['overdueAmount']) }} outstanding. Review with the customer and apply your cancellation policy if needed — the rental is never cancelled automatically.</div></div>@endif
@@ -130,7 +135,7 @@
 {{-- ===== modals ===== --}}
 @if($review)
 <div class="modal-backdrop hidden" id="acceptModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Accept {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.accept', $r) }}">@csrf<div class="modal-body"><div class="stack-sm">
+  <form method="POST" action="{{ route('supplier.requests.accept', $r) }}" data-confirm="Accepting reserves the stock for these dates and starts the customer's payment deadlines. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Accept {{ $r->code }}?" data-confirm-ok="Accept">@csrf<div class="modal-body"><div class="stack-sm">
     <div class="row">{{ $review['check']['ok'] ? '✅' : '❌' }}<b>1. Inventory re-checked for {{ count(date_range($r->start_date, $r->end_date)) }} date(s)</b></div>
     @if($review['check']['ok'])<div class="small muted" style="padding-left:28px">All quantities fit within available stock.</div>
     @else<div class="alert alert-danger">{{ icon('alert') }}<div>{!! collect($review['check']['bad'])->map(fn ($b) => e(fmt_date($b['date']).': '.$b['name'].' needs '.$b['requested'].', only '.$b['available'].' available'))->implode('<br>') !!}<br><b>Acceptance is blocked to prevent double-booking.</b> Decline, or ask the customer to change quantities.</div></div>@endif
@@ -143,14 +148,14 @@
   <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-success" @disabled(! $review['canAccept'])>{{ icon('check') }}Accept & reserve stock</button></div></form>
 </div></div>
 <div class="modal-backdrop hidden" id="declineModal"><div class="modal sm" role="dialog" aria-modal="true"><div class="modal-head"><h3>Decline {{ $r->code }}?</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.decline', $r) }}">@csrf<div class="modal-body"><p>The customer will be notified. The request record is kept.</p><div class="field"><label>Reason (shown to the customer)</label><textarea class="input" name="reason" required maxlength="500"></textarea></div></div>
+  <form method="POST" action="{{ route('supplier.requests.decline', $r) }}" data-confirm="The customer is told the request was declined. A declined request can't be reopened." data-confirm-title="Decline {{ $r->code }}?" data-confirm-ok="Decline" data-danger>@csrf<div class="modal-body"><p>The customer will be notified. The request record is kept.</p><div class="field"><label>Reason (shown to the customer)</label><textarea class="input" name="reason" required maxlength="500"></textarea></div></div>
   <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-danger">Decline request</button></div></form>
 </div></div>
 @endif
 
 @if(in_array('ongoing', $next, true))
 <div class="modal-backdrop hidden" id="releaseModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Record release to customer</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.advance', $r) }}">@csrf<input type="hidden" name="to" value="ongoing"><div class="modal-body">
+  <form method="POST" action="{{ route('supplier.requests.advance', $r) }}" data-confirm="Record that the items were handed to the customer. Consumables are deducted from stock. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Confirm release?" data-confirm-ok="Yes, released">@csrf<input type="hidden" name="to" value="ongoing"><div class="modal-body">
     <div class="form-grid"><div class="field"><label>Release date</label><input class="input" type="date" name="releaseDate" value="{{ today_iso() }}" required></div><div class="field"><label>Person receiving the items</label><input class="input" name="receivedBy" required value="{{ $r->contact_name ?: $c->name }}"></div></div>
     @php($firstDay = collect($r->lines)->map(function ($l) { $d = array_key_first($l['days']); return $l['days'][$d].'× '.inv()->itemName($l); })->implode(', '))
     <div class="field"><label>Released quantity</label><textarea class="input" name="releaseQty" required>{{ $firstDay }}</textarea><div class="hint">First-day quantities shown. For multi-day rentals with changing quantities, note any later drop-offs.</div></div>

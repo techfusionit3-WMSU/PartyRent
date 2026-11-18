@@ -885,10 +885,51 @@ class Rentals
         return array_values(array_filter(self::FLOW[$r->status] ?? [], fn ($st) => ! ($st === 'ready_pickup' && $r->fulfillment !== 'pickup') && ! ($st === 'out_delivery' && $r->fulfillment !== 'delivery')));
     }
 
+    /**
+     * What still has to happen before a request can move to $to (empty = allowed). A step can never be skipped:
+     * preparing needs the reservation / down payment, sending out needs the approved allocation, release needs the
+     * full rental amount paid and no open problem case, and a return can only be marked once the rental has started.
+     *
+     * @return string[]
+     */
+    public static function stepBlockers(RentalRequest $r, string $to): array
+    {
+        $f = $r->fin();
+        $out = [];
+        $secured = $f['reservationConfirmed'] || ! $f['schedule'] || $f['balance'] <= 0;
+        $openCase = \App\Models\ShortfallCase::where('rental_request_id', $r->id)->where('status', '!=', 'resolved')->exists();
+        if (in_array($to, ['in_progress', 'ready_pickup', 'out_delivery', 'ongoing'], true) && ! $secured) {
+            $first = $f['schedule'][0] ?? null;
+            $out[] = "The customer's ".strtolower($first['label'] ?? 'first payment').($first ? ' ('.money($first['amount']).')' : '').' is not verified yet.';
+        }
+        if (in_array($to, ['ready_pickup', 'out_delivery', 'ongoing'], true) && ($r->allocation['status'] ?? 'approved') !== 'approved') {
+            $out[] = 'Approve the inventory allocation first.';
+        }
+        if (in_array($to, ['ready_pickup', 'out_delivery', 'ongoing'], true) && $openCase) {
+            $out[] = 'Resolve the open problem case first.';
+        }
+        if ($to === 'ongoing') {
+            if ($f['balance'] > 0) {
+                $out[] = 'The rental is not fully paid yet ('.money($f['balance']).' balance).';
+            }
+            if (today_iso() < add_days($r->start_date, -1)) {
+                $out[] = 'Items can be released from '.fmt_date(add_days($r->start_date, -1)).' (the day before the rental starts).';
+            }
+        }
+        if ($to === 'return_pending' && today_iso() < $r->start_date) {
+            $out[] = 'The rental starts on '.fmt_date($r->start_date).'; a return can only be marked after that.';
+        }
+
+        return array_values(array_unique($out));
+    }
+
     public static function advance(RentalRequest $r, string $to, array $data = []): array
     {
         if (! in_array($to, self::FLOW[$r->status] ?? [], true)) {
             return self::fail('This step is not allowed from "'.RentalRequest::statusLabel($r->status).'".');
+        }
+        if ($why = self::stepBlockers($r, $to)) {
+            return self::fail($why[0], ['blockers' => $why]);
         }
         if ($to === 'ready_pickup' && $r->fulfillment !== 'pickup') {
             return self::fail('This rental is for delivery.');

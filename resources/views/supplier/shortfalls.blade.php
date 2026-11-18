@@ -10,11 +10,11 @@
   @if($cases->isEmpty())
     @include('partials.empty', ['emoji' => '🛟', 'title' => 'No cases', 'text' => 'When you report a shortfall that affects bookings, the cases appear here.'])
   @else
-    <div class="table-wrap"><table class="table cards"><thead><tr><th>Case</th><th>Booking</th><th>Customer</th><th>Item</th><th class="num">Units short</th><th>Status</th><th>Deadline</th><th></th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table cards"><thead><tr><th>Case</th><th>Booking</th><th>Customer</th><th>Item</th><th class="num">Units</th><th>Status</th><th>Deadline</th><th></th></tr></thead><tbody>
       @foreach($cases as $c)
         @php($st = \App\Models\ShortfallCase::STATUS[$c->status] ?? [$c->status, 'b-gray'])
         <tr><td data-label="Case"><b>{{ $c->code }}</b></td><td data-label="Booking"><a href="{{ route('supplier.requests.show', $c->rentalRequest) }}">{{ $c->rentalRequest->code }}</a></td>
-          <td data-label="Customer">{{ $c->customer->name }}</td><td data-label="Item">{{ $c->product->name }}</td><td data-label="Units short" class="num">{{ $c->units() }}</td>
+          <td data-label="Customer">{{ $c->customer->name }}</td><td data-label="Item">{{ $c->product->name }}<div class="small muted">{{ $c->byCustomer() ? 'Customer: '.(\App\Domain\Shortfalls::PROBLEMS[$c->problem] ?? 'problem') : 'Shortfall you reported' }}</div></td><td data-label="Units" class="num">{{ $c->units() }}</td>
           <td data-label="Status"><span class="badge {{ $st[1] }}">{{ $st[0] }}</span></td>
           <td data-label="Deadline">{{ $c->deadline_at ? $c->deadline_at->format('M j, g:i A') : '—' }}</td>
           <td class="right"><a class="btn btn-xs {{ in_array($c->status, ['reported', 'countered'], true) ? 'btn-primary' : '' }}" href="{{ route('cases.show', $c) }}">{{ in_array($c->status, ['reported', 'countered'], true) ? 'Respond' : 'Open' }}</a></td></tr>

@@ -40,9 +40,24 @@ class Shortfalls
         'compensation' => 'Compensation only (no change to the items)',
     ];
 
-    /** Who pays a compensation: the shop pays the customer (e.g. rush fees for a replacement found elsewhere) or the
-     * customer covers the shop's rush costs (e.g. a substitute sourced at short notice). */
-    public const COMP_PAYERS = ['supplier', 'customer'];
+    /**
+     * Who pays a compensation. A case is always about the shop's side (units it can't provide, or items the customer
+     * reports missing, damaged, wrong or late), so the customer never pays anything extra: only the shop compensates.
+     * (Damage the customer causes is charged through the return inspection, not through a case.)
+     */
+    public const COMP_PAYERS = ['supplier'];
+
+    /** Problems a customer can report about the items of their booking. */
+    public const PROBLEMS = [
+        'missing' => 'Missing items / fewer units than booked',
+        'damaged' => 'Damaged or not working on arrival',
+        'wrong' => 'Wrong item delivered',
+        'late' => 'Late or no delivery',
+        'other' => 'Other problem with the items',
+    ];
+
+    /** Booking stages in which the customer can report a problem with the items. */
+    public const REPORTABLE = ['accepted', 'in_progress', 'ready_pickup', 'out_delivery', 'ongoing', 'return_pending'];
 
     public const DEFAULT_DEADLINE_HOURS = 48;
 
@@ -146,6 +161,90 @@ class Shortfalls
         });
     }
 
+    /** Rental units of every product in a booking per date (packages expanded): [pid => [date => units]]. */
+    public static function bookedUnits(RentalRequest $r): array
+    {
+        $out = [];
+        foreach (inv()->demandMap($r->lines ?? []) as $date => $units) {
+            foreach ($units as $pid => $q) {
+                if ($q > 0) {
+                    $out[$pid][$date] = $q;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The customer reports a problem with items of their booking (missing, damaged, wrong, late…). Opens a case
+     * like a shortfall: the shop must propose a solution within the default deadline, otherwise PartyRent support
+     * steps in. Nothing is charged to the customer through a case.
+     * $data: product_id, problem, qty, dates[], details, photo
+     */
+    public static function reportByCustomer(User $by, RentalRequest $r, array $data): array
+    {
+        if ($r->customer_id !== $by->id) {
+            return self::fail('You can only report problems on your own bookings.');
+        }
+        if (! in_array($r->status, self::REPORTABLE, true)) {
+            return self::fail($r->status === 'pending'
+                ? 'The shop has not accepted '.$r->code.' yet. Message them instead, or cancel the request.'
+                : 'Problems can be reported from acceptance until the items are returned. For anything else, message the shop or contact PartyRent support.');
+        }
+        $booked = self::bookedUnits($r);
+        $pid = (int) ($data['product_id'] ?? 0);
+        $p = isset($booked[$pid]) ? Product::find($pid) : null;
+        if (! $p) {
+            return self::fail('Choose the item that has a problem.');
+        }
+        if (! isset(self::PROBLEMS[$data['problem'] ?? ''])) {
+            return self::fail('Choose what went wrong.');
+        }
+        $qty = (int) ($data['qty'] ?? 0);
+        $max = max($booked[$pid]);
+        if ($qty < 1 || $qty > $max) {
+            return self::fail('Enter how many '.$p->name.' are affected (1 to '.$max.').');
+        }
+        $dates = array_values(array_intersect(array_keys($booked[$pid]), (array) ($data['dates'] ?? [])));
+        if (! $dates) {
+            $dates = array_keys($booked[$pid]);
+        }
+        sort($dates);
+        $details = trim((string) ($data['details'] ?? ''));
+        if (mb_strlen($details) < 5) {
+            return self::fail('Describe the problem in a few words so the shop can fix it.');
+        }
+        $dup = ShortfallCase::where('rental_request_id', $r->id)->where('product_id', $p->id)->where('status', '!=', 'resolved')->first();
+        if ($dup) {
+            return self::fail('There is already an open case ('.$dup->code.') for '.$p->name.' on this booking. Add to it there.');
+        }
+        $short = [];
+        foreach ($dates as $d) {
+            $short[$d] = min($qty, (int) $booked[$pid][$d]);
+        }
+
+        return DB::transaction(function () use ($by, $r, $p, $short, $details, $data) {
+            $label = self::PROBLEMS[$data['problem']];
+            $c = ShortfallCase::create([
+                'code' => 'SC-'.str_pad((string) (ShortfallCase::max('id') + 1), 4, '0', STR_PAD_LEFT),
+                'report' => 'CR-'.str_pad((string) (ShortfallCase::where('kind', 'problem')->count() + 1), 4, '0', STR_PAD_LEFT),
+                'kind' => 'problem', 'problem' => $data['problem'],
+                'supplier_id' => $r->supplier_id, 'rental_request_id' => $r->id, 'customer_id' => $r->customer_id, 'product_id' => $p->id,
+                'short' => $short, 'reason' => $label.': '.$details, 'photo' => $data['photo'] ?? null, 'status' => 'reported',
+                'deadline_at' => now()->addHours(self::DEFAULT_DEADLINE_HOURS), // the shop answers first; if not, support steps in
+            ]);
+            $units = array_sum($short);
+            self::event($c, 'customer', 'report', $details, ['product' => $p->name, 'short' => $short, 'photo' => $c->photo, 'problem' => $data['problem']], $by);
+            RequestEvent::create(['rental_request_id' => $r->id, 'status' => 'shortfall', 'user_id' => $by->id, 'note' => $c->code.': customer reported '.mb_strtolower($label).' — '.$units.' × '.$p->name, 'created_at' => now()]);
+            Notifier::notify($r->supplier->owner_id, 'supplier', 'Problem reported on '.$r->code,
+                $by->name.' reported: '.$label.' — '.$units.' × '.$p->name.'. "'.mb_strimwidth($details, 0, 160, '…').'" Propose a solution within '.self::DEFAULT_DEADLINE_HOURS.' hours or PartyRent support steps in.', self::link($c));
+            Notifier::audit('Customer reported a problem', $c->code.' · '.$r->code.' · '.$label.' · '.$units.' × '.$p->name, $by);
+
+            return self::ok(['case' => $c]);
+        });
+    }
+
     /** Price of the missing units at the booking's quoted rates (default credit for a partial / substitute). */
     public static function shortValue(ShortfallCase $c): float
     {
@@ -196,10 +295,10 @@ class Shortfalls
         // compensation for rush costs, either way
         $comp = r2(max(0, (float) ($p['comp_amount'] ?? 0)));
         if ($comp > 0) {
-            $payer = in_array($p['comp_payer'] ?? '', self::COMP_PAYERS, true) ? $p['comp_payer'] : null;
-            if (! $payer) {
-                return self::fail('Choose who pays the compensation.');
+            if (($p['comp_payer'] ?? 'supplier') === 'customer') {
+                return self::fail('This is the shop\'s side of the booking, so the customer doesn\'t pay anything extra. Only the shop can compensate.');
             }
+            $payer = 'supplier';
             if ($comp > max($total, 1000) * 2) {
                 return self::fail('That compensation is far above the booking total. Explain it in the message or ask PartyRent support.');
             }
@@ -433,10 +532,18 @@ class Shortfalls
                         $q['lines'][$li]['rent'] = $q['lines'][$li]['total'];
                     }
                     // … and a substitute is added at its current price
+                    $covered = 0.0;
                     if ($d['type'] === 'substitute') {
                         $sq = Pricing::quoteLine(end($lines), null, $r->created_at?->format('Y-m-d'));
                         $q['lines'][] = $sq;
                         $delta += (float) $sq['total'];
+                        // the shop's shortfall never costs the customer more: a pricier substitute is on the shop
+                        if ($delta > 0.009) {
+                            $covered = r2($delta);
+                            $q['credits'] = array_merge($q['credits'] ?? [], [['label' => 'Substitute price difference covered by '.$c->supplier->name.' · '.$c->code, 'amount' => $covered]]);
+                            $changes[] = 'Shop covers the substitute\'s higher price ('.money($covered).')';
+                            $delta = 0.0;
+                        }
                     }
                     $q['lines'] = array_values(array_filter($q['lines'], fn ($x) => ! empty($x['days']) || ! empty($x['once'])));
                     foreach (['rentalFee', 'itemsSubtotal', 'rentalSubtotal', 'total', 'payable'] as $k) {

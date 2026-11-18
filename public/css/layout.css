@@ -653,3 +653,5 @@
 .inline-reject summary { list-style: none; cursor: pointer; }
 .inline-reject summary::-webkit-details-marker { display: none; }
 .inline-reject[open] { flex: 1 1 100%; }
+.problem-cta { border-left: 4px solid var(--gold); }
+.chip-check { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: .84rem; }

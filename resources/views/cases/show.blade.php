@@ -25,7 +25,7 @@
 <div data-leave-warn="dirty" data-leave-msg="Your message or proposal on this case has not been sent. Leave anyway?" hidden></div>
 <div class="page-head"><div>
   <h1>Case {{ $c->code }} <span class="badge {{ $st[1] }}" style="vertical-align:middle">{{ $st[0] }}</span></h1>
-  <p>{{ $c->supplier->name }} cannot provide <b>{{ $c->units() }} × {{ $c->product->name }}</b> for booking @if($bookingUrl)<a href="{{ $bookingUrl }}">{{ $r->code }}</a>@else<b>{{ $r->code }}</b>@endif ({{ $r->event_name }}).</p>
+  <p>@if($c->byCustomer()){{ $c->customer->name }} reported a problem: <b>{{ \App\Domain\Shortfalls::PROBLEMS[$c->problem] ?? 'Problem with the items' }}</b> — <b>{{ $c->units() }} × {{ $c->product->name }}</b> on booking @else{{ $c->supplier->name }} cannot provide <b>{{ $c->units() }} × {{ $c->product->name }}</b> for booking @endif @if($bookingUrl)<a href="{{ $bookingUrl }}">{{ $r->code }}</a>@else<b>{{ $r->code }}</b>@endif ({{ $r->event_name }}).</p>
 </div></div>
 
 <div class="card mb-2">
@@ -101,7 +101,7 @@
           <li class="ev-{{ $e->kind }} by-{{ $e->role }} {{ $e->role === $role ? 'me' : '' }}">
             <div class="small"><b>{{ $e->role === 'system' ? 'PartyRent' : ($e->user?->name ?? $WHO[$e->role] ?? '') }}</b> <span class="muted">· {{ ['customer' => 'Customer', 'supplier' => 'Shop', 'admin' => 'Support', 'system' => 'System'][$e->role] ?? '' }} · {{ $e->created_at?->format('M j, g:i A') }}</span></div>
             @switch($e->kind)
-              @case('report')<div><span class="badge b-gold plain">Reported</span> {{ array_sum($ed['short'] ?? []) }} × {{ $ed['product'] ?? '' }} short</div>@break
+              @case('report')<div><span class="badge b-gold plain">Reported</span> @if(! empty($ed['problem'])){{ \App\Domain\Shortfalls::PROBLEMS[$ed['problem']] ?? 'Problem' }} — {{ array_sum($ed['short'] ?? []) }} × {{ $ed['product'] ?? '' }}@else{{ array_sum($ed['short'] ?? []) }} × {{ $ed['product'] ?? '' }} short @endif</div>@break
               @case('proposal')@case('counter')<div><span class="badge {{ $e->kind === 'counter' ? 'b-purple' : 'b-sky' }} plain">{{ $e->kind === 'counter' ? 'Counter-offer' : 'Proposal' }}</span> {{ \App\Domain\Shortfalls::describe($ed) }} <span class="small muted">· {{ ['open' => 'open', 'accepted' => 'accepted', 'declined' => 'declined', 'replaced' => 'replaced', 'expired' => 'expired'][$ed['status'] ?? ''] ?? '' }}</span></div>@break
               @case('accept')<div><span class="badge b-green plain">Accepted</span></div>@break
               @case('decline')<div><span class="badge b-red plain">Declined</span></div>@break
@@ -140,17 +140,14 @@
     @if($role === 'supplier')<div class="field" data-for="substitute" hidden><label for="pSub">Substitute item</label><select class="input" id="pSub" name="substitute_id"><option value="">Choose…</option>@foreach($subs as $s)<option value="{{ $s->id }}">{{ $s->name }} · {{ money($s->basePrice()) }}/day</option>@endforeach</select><div class="hint">Added to the booking for the missing units on the same dates.</div></div>@endif
     <div class="field" data-hide-for="cancel compensation"><label for="pCredit">Price reduction (₱ off the booking)</label><input class="input" type="number" id="pCredit" name="credit" min="0" step="0.01" max="{{ $r->pricing['total'] ?? 0 }}" value="0"><div class="hint">For "fewer units" the missing units come off automatically ({{ money($shortValue) }}); add extra here if you want. For a refund, enter the amount.</div></div>
     <fieldset class="comp-box" data-comp>
-      <legend>Compensation for rush costs <span class="muted" style="font-weight:500" data-comp-opt>(optional)</span></legend>
-      <p class="small muted mt-0">Finding a replacement at short notice can cost extra (rush or delivery fees). Either side can ask for it or offer it.</p>
-      <div class="row wrap gap-sm mb-1">
-        <label class="chip"><input type="radio" name="comp_payer" value="supplier" hidden>{{ $role === 'customer' ? 'The shop pays me' : 'We pay the customer' }}</label>
-        <label class="chip"><input type="radio" name="comp_payer" value="customer" hidden>{{ $role === 'customer' ? 'I cover the shop\'s rush costs' : 'The customer pays our rush costs' }}</label>
-      </div>
+      <legend>{{ $role === 'customer' ? 'Compensation from the shop' : 'Compensation to the customer' }} <span class="muted" style="font-weight:500" data-comp-opt>(optional)</span></legend>
+      <p class="small muted mt-0">This problem is on the shop's side, so <b>the customer never pays anything extra</b> — only the shop compensates (for example rush fees to rent replacements elsewhere). {{ $role === 'customer' ? 'Ask for it here.' : 'Offer it here.' }}</p>
+      <input type="hidden" name="comp_payer" value="supplier">
       <div class="form-grid">
         <div class="field"><label for="pComp">Amount (₱)</label><input class="input" type="number" id="pComp" name="comp_amount" min="0" step="0.01" value="0"></div>
-        <div class="field"><label for="pCompR">What it's for</label><input class="input" id="pCompR" name="comp_reason" maxlength="200" placeholder="{{ $role === 'customer' ? 'e.g. Rush fee to rent 20 chairs elsewhere' : 'e.g. Rush delivery of the substitute' }}"></div>
+        <div class="field"><label for="pCompR">What it's for</label><input class="input" id="pCompR" name="comp_reason" maxlength="200" placeholder="{{ $role === 'customer' ? 'e.g. Rush fee to rent 20 chairs elsewhere' : 'e.g. Covers renting the missing chairs elsewhere' }}"></div>
       </div>
-      <div class="hint">{{ $role === 'customer' ? 'Paid by the shop: sent to you like a refund. Paid by you: added to your booking total.' : 'Paid by your shop: sent to the customer and taken from your payout. Paid by the customer: added to the booking total.' }}</div>
+      <div class="hint">{{ $role === 'customer' ? 'Sent to you by the shop like a refund.' : 'Sent to the customer and taken from your payout.' }}</div>
     </fieldset>
     <div class="field"><label for="pNote">Message</label><textarea class="input" id="pNote" name="note" rows="3" maxlength="2000" placeholder="{{ $role === 'customer' ? 'e.g. We can accept 80 chairs if the delivery fee is waived.' : 'e.g. We can deliver 80 chairs on time and the other 20 by 10 AM.' }}"></textarea></div>
     <div class="field"><label for="pDl">Answer needed within</label><select class="input" id="pDl" name="deadline_hours">@foreach([12 => '12 hours', 24 => '24 hours', 48 => '2 days', 72 => '3 days'] as $h => $l)<option value="{{ $h }}" @selected($h === \App\Domain\Shortfalls::DEFAULT_DEADLINE_HOURS)>{{ $l }}</option>@endforeach</select></div>
@@ -171,7 +168,6 @@
     var only = t.value === 'compensation', opt = document.querySelector('[data-comp-opt]'), amt = document.getElementById('pComp');
     if (opt) opt.textContent = only ? '(required)' : '(optional)';
     if (amt) amt.required = only;
-    document.querySelectorAll('[data-comp] input[name=comp_payer]').forEach(function (r) { r.required = only; if (r.value === 'customer') { r.disabled = t.value === 'cancel'; r.closest('label').style.opacity = t.value === 'cancel' ? .45 : ''; if (r.disabled && r.checked) { r.checked = false; r.closest('label').classList.remove('active'); } } });
   }
   t.addEventListener('change', sync); sync();
 })();

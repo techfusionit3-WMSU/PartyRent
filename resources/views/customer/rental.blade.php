@@ -14,6 +14,9 @@
     <div class="card"><div class="card-head"><h3>Items & daily quantities</h3><span class="small muted">{{ fmt_range($r->start_date, $r->end_date) }}</span></div>@include('partials.lines-table', ['pricing' => $r->pricing])</div>
     @if($r->fulfillment === 'delivery' && $r->destinations)<div class="card"><h3>{{ count($r->destinations) > 1 ? 'Delivery & event locations' : 'Delivery location' }}</h3>@include('partials.destinations')</div>@endif
     @if($r->plan === 'installment')@include('partials.installment-card')@endif
+    @if($problemItems)
+      <div class="card problem-cta"><div class="row between wrap" style="gap:10px"><div><b>Something wrong with the items?</b><div class="small muted">Missing, damaged, wrong or late items — report it and {{ $sup->name }} must propose a fix. You never pay extra for the shop's mistake.</div></div><button class="btn btn-sm" data-modal="problemModal">{{ icon('alert') }}Report a problem</button></div></div>
+    @endif
     @include('partials.request-chat', ['chatSide' => 'customer'])
     <div class="card"><div class="card-head"><h3>Payment history</h3>@if($payTypes)<button class="btn btn-primary btn-sm" data-modal="payModal">{{ icon('card') }}Make a payment</button>@endif</div>@include('partials.payment-history')</div>
     @include('partials.inspection-report')
@@ -104,6 +107,34 @@
       @include('partials.media-lightbox')
     @endif
   </section>
+@endif
+
+@if($problemItems)
+<div class="modal-backdrop hidden" id="problemModal"><div class="modal" role="dialog" aria-modal="true" aria-label="Report a problem"><div class="modal-head"><h3>Report a problem · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+  <form method="POST" action="{{ route('rentals.problem', $r) }}" enctype="multipart/form-data" data-confirm-title="Send this report to {{ $sup->name }}?" data-confirm="A case is opened. The shop must propose a solution within {{ \App\Domain\Shortfalls::DEFAULT_DEADLINE_HOURS }} hours; if not, PartyRent support steps in." data-confirm-ok="Send report">@csrf<div class="modal-body">
+    <div class="form-grid">
+      <div class="field"><label for="prItem">Which item?</label><select class="input" id="prItem" name="product_id" required>@foreach($problemItems as $it)<option value="{{ $it['id'] }}" data-days='@json($it['days'])' @selected((int) old('product_id') === $it['id'])>{{ $it['name'] }}</option>@endforeach</select></div>
+      <div class="field"><label for="prType">What went wrong?</label><select class="input" id="prType" name="problem" required>@foreach(\App\Domain\Shortfalls::PROBLEMS as $k => $l)<option value="{{ $k }}" @selected(old('problem') === $k)>{{ $l }}</option>@endforeach</select></div>
+      <div class="field"><label for="prQty">How many are affected?</label><input class="input" type="number" id="prQty" name="qty" min="1" required value="{{ old('qty', 1) }}"><div class="hint" id="prQtyHint"></div></div>
+    </div>
+    <div class="field"><label>On which rental dates?</label><div class="row wrap gap-sm" id="prDates"></div><div class="hint">Leave all ticked if it affects the whole rental.</div></div>
+    <div class="field"><label for="prDetails">Describe the problem</label><textarea class="input" id="prDetails" name="details" rows="3" required minlength="5" maxlength="2000" placeholder="e.g. 5 of the 40 chairs arrived with broken legs.">{{ old('details') }}</textarea></div>
+    <div class="field"><label for="prPhoto">Photo <span class="muted">(optional, helps the shop and support)</span></label><input class="input" type="file" id="prPhoto" name="photo" accept="image/*"></div>
+  </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">{{ icon('send') }}Send report</button></div></form>
+</div></div>
+@push('scripts')
+<script>
+(function () {
+  var sel = document.getElementById('prItem'), box = document.getElementById('prDates'), qty = document.getElementById('prQty'), hint = document.getElementById('prQtyHint');
+  function draw() {
+    var days = JSON.parse(sel.selectedOptions[0].dataset.days || '[]'), max = Math.max.apply(null, days.map(function (d) { return d.qty; }).concat([1]));
+    box.innerHTML = days.map(function (d) { return '<label class="check chip-check"><input type="checkbox" name="dates[]" value="' + d.date + '" checked> ' + d.label + ' <span class="muted">(' + d.qty + ' booked)</span></label>'; }).join('');
+    qty.max = max; if (+qty.value > max) qty.value = max; hint.textContent = 'You booked up to ' + max + '.';
+  }
+  sel.addEventListener('change', draw); draw();
+})();
+</script>
+@endpush
 @endif
 
 @if($payTypes)

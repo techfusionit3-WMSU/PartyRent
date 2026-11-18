@@ -16,10 +16,10 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [x] F5 Transaction code on customer transaction pages
 - [x] F6 Chat between supplier and client without a problem case (request_messages, App\Domain\Chat, partials/request-chat, rq-* CSS)
 - [x] F7 Payment: "COD" -> "Cash" (migration cod->cash); customer cash = nothing to submit; supplier records it (ref optional)
-- [ ] F8 Supplier request page: "Notify customer about payment" (reminder) action
-- [ ] F9 Supplier request page: transaction actions inline (link to other page optional)
-- [ ] F10 Cases: supplier's fault -> customer pays nothing, only supplier compensates
-- [ ] F11 Customer can report a problem with items -> case with supplier
+- [x] F8 Supplier request page: "Notify customer about payment" (reminder) action
+- [x] F9 Supplier request page: transaction actions inline (link to other page optional)
+- [x] F10 Cases: customer never pays (COMP_PAYERS = supplier only; pricier substitute = shop-covered credit)
+- [x] F11 Customer reports a problem (shortfall_cases.kind=problem, problem; Shortfalls::reportByCustomer, rentals.problem)
 - [ ] F12 Checkout: qty field per item with stock check + clear errors; simpler split-quantity UI
 
 (previous) **Feedback batch 2026-11-18** (user pasted list + screenshots) — ALL DONE (126 tests green). Notes for later:

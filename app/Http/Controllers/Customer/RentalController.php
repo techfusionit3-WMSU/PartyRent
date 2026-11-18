@@ -61,8 +61,17 @@ class RentalController extends Controller
         $chat = ['rows' => \App\Domain\Chat::rows($r, 'customer'), 'unread' => \App\Domain\Chat::unread($r, 'customer')];
         \App\Domain\Chat::markSeen($r, 'customer');
 
+        $problemItems = [];
+        if (in_array($r->status, \App\Domain\Shortfalls::REPORTABLE, true)) {
+            foreach (\App\Domain\Shortfalls::bookedUnits($r) as $pid => $days) {
+                if ($p = inv()->product($pid)) {
+                    $problemItems[] = ['id' => $pid, 'name' => $p->name, 'days' => array_map(fn ($d, $q) => ['date' => $d, 'label' => fmt_date($d), 'qty' => $q], array_keys($days), $days)];
+                }
+            }
+        }
+
         return view('customer.rental', [
-            'r' => $r, 'chat' => $chat, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
+            'r' => $r, 'chat' => $chat, 'problemItems' => $problemItems, 'f' => $f, 'sup' => $r->supplier, 'payTypes' => $types,
             'online' => OnlinePay::enabled(), 'accounts' => PayAccount::available(),
             'policy' => Rentals::cancelPolicy($r), 'reviewables' => $r->status === 'completed' ? Reviews::reviewables($r) : [],
         ]);

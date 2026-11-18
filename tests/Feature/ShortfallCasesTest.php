@@ -193,7 +193,7 @@ class ShortfallCasesTest extends TestCase
         $this->asSupplier()->post(route('supplier.shortfalls.store'), ['product_id' => $p->id, 'qty' => 1, 'start_date' => add_days(today_iso(), -1), 'reason' => 'Past.'])->assertSessionHasErrors('start_date');
     }
 
-    public function test_compensation_either_way_and_the_shop_proposes_first(): void
+    public function test_only_the_shop_compensates_and_proposes_first(): void
     {
         [$p, $a, $b, $d1, , , $carlo] = $this->scenario();
         $c = ShortfallCase::first();
@@ -201,16 +201,18 @@ class ShortfallCasesTest extends TestCase
 
         // the customer can't jump ahead of the shop's first proposal
         $this->asCustomer($carlo)->post(route('cases.propose', $c), ['type' => 'compensation', 'comp_amount' => 500, 'comp_payer' => 'supplier', 'comp_reason' => 'Rush fee'])->assertSessionHas('error');
-        // compensation-only needs an amount, a payer and a reason
+        // compensation-only needs an amount and a reason
         $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'compensation'])->assertSessionHas('error');
-        $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'compensation', 'comp_amount' => 100, 'comp_payer' => 'customer'])->assertSessionHas('error');
-        $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'cancel', 'comp_amount' => 100, 'comp_payer' => 'customer', 'comp_reason' => 'Rush'])->assertSessionHas('error');
+        $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'compensation', 'comp_amount' => 100])->assertSessionHas('error');
+        // the shop's mistake never makes the customer pay: no "customer pays" compensation, whatever the type
+        foreach (['compensation', 'substitute', 'partial', 'cancel'] as $type) {
+            $this->asSupplier()->post(route('cases.propose', $c), ['type' => $type, 'comp_amount' => 80, 'comp_payer' => 'customer', 'comp_reason' => 'Rush delivery'])->assertSessionHas('error');
+        }
+        $this->assertSame(0, \App\Models\CaseEvent::where('shortfall_case_id', $c->id)->where('kind', 'proposal')->count());
 
-        // shop proposes a substitute and asks the customer to cover its rush delivery
-        $sub = $this->chairs(100, 'Spare Chair');
-        $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'substitute', 'substitute_id' => $sub->id, 'comp_amount' => 80, 'comp_payer' => 'customer', 'comp_reason' => 'Rush delivery of the substitute'])->assertSessionHas('success');
-        $this->asCustomer($carlo)->get(route('cases.show', $c))->assertOk()->assertSee('Compensation')->assertSee('Rush delivery of the substitute');
-        // the customer counters: the shop pays them ₱300 for renting elsewhere at short notice
+        // the shop proposes fewer units; the customer counters: the shop pays them ₱300 for renting elsewhere at short notice
+        $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'partial'])->assertSessionHas('success');
+        $this->asCustomer($carlo)->get(route('cases.show', $c))->assertOk()->assertSee('Compensation')->assertDontSee('I cover the shop');
         $this->asCustomer($carlo)->post(route('cases.propose', $c), ['type' => 'partial', 'comp_amount' => 300, 'comp_payer' => 'supplier', 'comp_reason' => 'Rush fee to rent 20 chairs elsewhere'])->assertSessionHas('success');
         $this->asSupplier()->post(route('cases.respond', $c), ['answer' => 'accept'])->assertSessionHas('success');
         $c->refresh();
@@ -221,16 +223,19 @@ class ShortfallCasesTest extends TestCase
         $this->assertLessThan($total, (float) $b->fresh()->pricing['total']); // 20 chairs came off
     }
 
-    public function test_customer_paid_rush_costs_are_added_to_the_total(): void
+    public function test_a_pricier_substitute_costs_the_customer_nothing_more(): void
     {
         [$p, $a, $b, $d1, , , $carlo] = $this->scenario();
         $c = ShortfallCase::first();
         $total = (float) $b->pricing['total'];
-        $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'compensation', 'comp_amount' => 120, 'comp_payer' => 'customer', 'comp_reason' => 'Rush delivery'])->assertSessionHas('success');
+        $sub = $this->chairs(100, 'Premium Chair');
+        $sub->update(['tiers' => [['min' => 1, 'max' => null, 'price' => 35]]]); // 3.5x the booked chair
+
+        $this->asSupplier()->post(route('cases.propose', $c), ['type' => 'substitute', 'substitute_id' => $sub->id])->assertSessionHas('success');
         $this->asCustomer($carlo)->post(route('cases.respond', $c), ['answer' => 'accept'])->assertSessionHas('success');
         $b->refresh();
-        $this->assertEqualsWithDelta($total + 120, $b->pricing['total'], 0.001);
-        $this->assertEqualsWithDelta(120, $b->fin()['balance'], 0.001); // paid in full before, now owes the rush costs
-        $this->asCustomer($carlo)->get(route('rentals.show', $b))->assertOk()->assertSee('Rush costs')->assertSee('Rush delivery');
+        $this->assertEqualsWithDelta($total, (float) $b->pricing['total'], 0.001);
+        $this->assertTrue(collect($b->pricing['credits'] ?? [])->contains(fn ($x) => str_contains($x['label'], 'Substitute price difference covered')));
+        $this->assertTrue(collect($b->lines)->contains(fn ($l) => (int) $l['ref_id'] === $sub->id));
     }
 }

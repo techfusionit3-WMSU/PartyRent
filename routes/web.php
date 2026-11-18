@@ -104,6 +104,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/rentals/{rentalRequest}/submitted', [RentalController::class, 'confirmation'])->name('rentals.confirmation');
     Route::get('/rentals/{rentalRequest}/messages', [RentalController::class, 'messages'])->name('rentals.messages');
     Route::post('/rentals/{rentalRequest}/messages', [RentalController::class, 'sendMessage'])->middleware('throttle:30,1')->name('rentals.messages.send');
+    Route::post('/rentals/{rentalRequest}/problem', [CaseController::class, 'customerReport'])->middleware('throttle:10,1')->name('rentals.problem');
     Route::post('/rentals/{rentalRequest}/cancel', [RentalController::class, 'cancel'])->name('rentals.cancel');
     Route::post('/rentals/{rentalRequest}/installments', [RentalController::class, 'proposeInstallments'])->name('rentals.installments');
     Route::post('/rentals/{rentalRequest}/payments', [RentalController::class, 'pay'])->name('rentals.pay');

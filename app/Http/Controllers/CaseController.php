@@ -93,6 +93,28 @@ class CaseController extends Controller
             : 'Reported. The units are out of stock on those dates, and your spare stock still covers every accepted booking.');
     }
 
+    /* ---------- customer: report a problem with the items of a booking ---------- */
+
+    public function customerReport(Request $request, \App\Models\RentalRequest $rentalRequest)
+    {
+        abort_unless($rentalRequest->customer_id === $request->user()->id, 404);
+        $v = $request->validate([
+            'product_id' => 'required|integer', 'problem' => 'required|string', 'qty' => 'required|integer|min:1',
+            'dates' => 'nullable|array', 'dates.*' => 'date', 'details' => 'required|string|min:5|max:2000', 'photo' => 'nullable|image|max:8192',
+        ], ['details.min' => 'Describe the problem in a few words so the shop can fix it.', 'photo.image' => 'The photo must be an image (JPG, PNG or WEBP).']);
+        $photo = $request->file('photo')?->store('cases', 'local');
+        $res = Shortfalls::reportByCustomer($request->user(), $rentalRequest, $v + ['photo' => $photo]);
+        if (! $res['ok']) {
+            if ($photo) {
+                Storage::disk('local')->delete($photo);
+            }
+
+            return back()->withInput()->with('error', $res['error']);
+        }
+
+        return redirect()->route('cases.show', $res['case'])->with('success', 'Problem reported ('.$res['case']->code.'). '.$rentalRequest->supplier->name.' was notified and must propose a solution within '.Shortfalls::DEFAULT_DEADLINE_HOURS.' hours — otherwise PartyRent support steps in. You never pay extra for the shop\'s mistake.');
+    }
+
     /* ---------- shared case page ---------- */
 
     public function show(Request $request, ShortfallCase $case)

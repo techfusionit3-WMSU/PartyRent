@@ -44,6 +44,12 @@ class Inventory
     /** @var array<int, array{id:int, status:string, lines:array, sale:array, svc:array}>|null */
     private ?array $demands = null;
 
+    /** @var array<int, array>|null product id => intervals of open requests (see intervalIndex) */
+    private ?array $ivIndex = null;
+
+    /** Memoized breakdown() results for this request. */
+    private array $bd = [];
+
     private array $caps = [];
 
     private array $locStock = [];
@@ -51,7 +57,8 @@ class Inventory
     public function flush(): void
     {
         $this->products = $this->packages = $this->suppliers = $this->caps = $this->locStock = [];
-        $this->holds = $this->demands = null;
+        $this->holds = $this->demands = $this->ivIndex = null;
+        $this->bd = [];
     }
 
     /* ---------------- lookups ---------------- */
@@ -243,22 +250,41 @@ class Inventory
         return $this->demands;
     }
 
+    /**
+     * Every open request's occupied intervals, indexed by product: [pid => [interval + request info]].
+     * Built once per HTTP request (each line is expanded once for all its products), so availability
+     * lookups stay fast as bookings pile up instead of re-walking every request for every product/date.
+     */
+    private function intervalIndex(): array
+    {
+        if ($this->ivIndex === null) {
+            $this->ivIndex = [];
+            foreach ($this->openDemands() as $d) {
+                foreach ($d['lines'] as $l) {
+                    $meta = ['requestId' => $d['id'], 'code' => $d['code'], 'status' => $d['status'], 'sourceId' => isset($l['sourceId']) ? (int) $l['sourceId'] : null];
+                    foreach (Slots::lineIntervals($l, $this->bufFor($l)) as $iv) {
+                        foreach ($this->unitsForLine($l, $iv['date']) as $pid => $qty) {
+                            if ($qty > 0) {
+                                $this->ivIndex[$pid][] = array_merge($iv, ['qty' => $qty]) + $meta;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $this->ivIndex;
+    }
+
     /** Intervals of existing requests in the given statuses (optionally only one source location). */
     public function existingIntervals(int $pid, array $statuses, ?int $excludeId = null, ?int $locId = null): array
     {
         $out = [];
-        foreach ($this->openDemands() as $d) {
-            if ($d['id'] === $excludeId || ! in_array($d['status'], $statuses, true)) {
+        foreach ($this->intervalIndex()[$pid] ?? [] as $iv) {
+            if ($iv['requestId'] === $excludeId || ! in_array($iv['status'], $statuses, true) || ($locId && (int) ($iv['sourceId'] ?? 0) !== $locId)) {
                 continue;
             }
-            foreach ($d['lines'] as $l) {
-                if ($locId && (int) ($l['sourceId'] ?? 0) !== $locId) {
-                    continue;
-                }
-                foreach ($this->productIntervals($l, $pid) as $iv) {
-                    $out[] = $iv + ['requestId' => $d['id'], 'code' => $d['code'], 'status' => $d['status'], 'sourceId' => isset($l['sourceId']) ? (int) $l['sourceId'] : null];
-                }
-            }
+            $out[] = $iv;
         }
 
         return $out;
@@ -266,6 +292,13 @@ class Inventory
 
     /** Peak demand of one product on a date (within a time window), plus the requests involved. */
     public function demandOn(int $pid, string $date, array $statuses, ?int $excludeId = null, ?array $win = null, ?int $locId = null): array
+    {
+        $key = $pid.'|'.$date.'|'.implode(',', $statuses).'|'.$excludeId.'|'.($win ? implode('-', $win) : '').'|'.$locId;
+
+        return $this->bd[$key] ??= $this->computeDemandOn($pid, $date, $statuses, $excludeId, $win, $locId);
+    }
+
+    private function computeDemandOn(int $pid, string $date, array $statuses, ?int $excludeId, ?array $win, ?int $locId): array
     {
         [$A, $B] = $this->absWindow($date, $win);
         $ivs = array_values(array_filter($this->existingIntervals($pid, $statuses, $excludeId, $locId), fn ($iv) => $iv['from'] < $B && $iv['to'] > $A));

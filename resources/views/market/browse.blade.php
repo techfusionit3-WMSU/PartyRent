@@ -50,8 +50,10 @@
   <section class="section"><div class="section-title"><h2>Shop by event</h2></div><div class="grid grid-3">
     @foreach($themes as [$e, $em, $bg])<a class="theme-card" style="background:{{ $bg }}" href="{{ $qs(['event' => $e]) }}#results"><span class="te">{{ $em }}</span><b>{{ $e }}</b><span>{{ $list->filter(fn ($p) => in_array($e, $p->events ?? [], true))->count() }} items · {{ $pkgs->filter(fn ($k) => in_array($e, $k->events ?? [], true))->count() }} packages</span></a>@endforeach
   </div></section>
+  @unless($forDates)
   <section class="section"><div class="section-title"><h2>{{ $u ? 'Recommended for you' : 'Most rented this season' }}</h2><a class="small strong" href="{{ $qs(['sort' => 'popular']) }}#results">See more</a></div><div class="product-grid">@foreach($home['recommended'] as $p)@include('partials.product-card', ['p' => $p])@endforeach</div></section>
   @if($pkgs->isNotEmpty())<section class="section"><div class="section-title"><h2>Popular rental packages</h2><a class="small strong" href="{{ route('packages.index') }}">See more</a></div><div class="product-grid">@foreach($pkgs->take(4) as $k)@include('partials.package-card', ['k' => $k])@endforeach</div></section>@endif
+  @endunless
   <section class="section"><div class="section-title"><h2>Featured suppliers</h2><a class="small strong" href="{{ route('suppliers.index') }}">All suppliers</a></div><div class="grid grid-3">@foreach($home['topSuppliers'] as $s)@include('partials.supplier-card', ['s' => $s])@endforeach</div></section>
 @else
   <div class="crumbs"><a href="{{ route('home') }}">Home</a> / {{ $cat ? $cat->name : ($st['q'] ? 'Search' : 'Browse') }}</div>
@@ -59,7 +61,8 @@
 
 {{-- ================= browse ================= --}}
 @unless($landing)@include('market._browse-bar')@endunless
-<div class="page-head mt-2" id="results"><div><h1>{{ $landing ? 'Browse party supplies' : $heading }}</h1><p>{{ $list->count() }} {{ $st['view'] === 'packages' ? 'packages' : 'items' }}{{ $dates ? ' · availability for '.fmt_range($dates[0], end($dates)).($st['qty'] ? ' (need '.$st['qty'].'/day)' : '') : ' · select a rental date to see available stock' }}</p></div></div>
+@if($forDates)@include('market._for-dates')@endif
+<div class="page-head mt-2" id="{{ $forDates ? 'all-results' : 'results' }}"><div><h1>{{ $landing ? 'Browse party supplies' : $heading }}</h1><p>{{ $list->count() }} {{ $st['view'] === 'packages' ? 'packages' : 'items' }}{{ $dates ? ' · availability for '.fmt_range($dates[0], end($dates)).($st['qty'] ? ' (need '.$st['qty'].'/day)' : '') : ' · select a rental date to see available stock' }}</p></div></div>
 <div class="row wrap mb-2" style="gap:6px">
   @foreach($labels as $k => $l)
     @if($st[$k] !== '')

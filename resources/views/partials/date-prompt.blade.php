@@ -4,7 +4,7 @@
   <div class="modal-head"><h3 id="dpTitle">How would you like to browse PartyRent?</h3><a class="icon-btn" href="{{ route('home', ['clear' => 1]) }}" aria-label="Close">{{ icon('x') }}</a></div>
   <div class="modal-body">
     <p class="muted small" style="margin-top:0">Pick your rental dates to see what is available for your event, or look around first.</p>
-    <form class="card card-flat soft" style="padding:16px" method="GET" action="{{ route('home') }}" id="dpForm">
+    <form class="card card-flat soft" style="padding:16px" method="GET" action="{{ route('home') }}#results" id="dpForm">
       <div class="strong mb-1">{{ icon('calendar', 'width:16px;vertical-align:-3px') }} Select rental dates</div>
       <div class="range-fields"><div class="field mb-0"><label for="dpS" class="small">Start date</label><input class="input" type="date" id="dpS" name="start" min="{{ today_iso() }}"></div><div class="field mb-0"><label for="dpE" class="small">End date</label><input class="input" type="date" id="dpE" name="end" min="{{ today_iso() }}"></div></div>
       <div class="row between mt-2" style="flex-wrap:wrap;gap:6px"><span class="small strong" id="dpRange" aria-live="polite">No dates selected</span><span class="badge b-purple plain" id="dpDays" style="display:none"></span></div>

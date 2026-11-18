@@ -122,6 +122,11 @@ class MarketController extends Controller
                 'popular' => $list->sortByDesc('rent_count'), 'recent' => $list->sortByDesc('created_at'),
                 'rating' => $list->sortBy([['rating', 'desc'], ['rent_count', 'desc']]), default => $list->sortByDesc($score),
             };
+            // With rental dates, whatever the sort, items free on those dates come first.
+            if ($dates) {
+                [$free, $busy] = $list->partition(fn ($x) => $this->freeOn($x, $dates, $need));
+                $list = $free->concat($busy);
+            }
         }
 
         $compare = collect();
@@ -143,11 +148,23 @@ class MarketController extends Controller
             ];
         }
         $pkgs = $landing ? Package::live()->with('supplier')->get() : collect();
+        // Rental dates picked (post-login prompt or the date bar): suggest what is actually free on every one of those days.
+        $forDates = null;
+        if ($dates && $landing) {
+            $evs ??= $u ? RentalRequest::where('customer_id', $u->id)->pluck('event_type')->unique()->all() : [];
+            $free = $prods->filter(fn ($x) => $this->freeOn($x, $dates, $need));
+            $forDates = [
+                'count' => $free->count(),
+                'items' => $free->sortByDesc(fn ($x) => $x->rating * 2 + log10(1 + $x->rent_count) + (array_intersect($x->events ?? [], $evs) ? 3 : 0))->take(8)->values(),
+                'packages' => $pkgs->filter(fn ($k) => collect($dates)->every(fn ($d) => inv()->packageAvailableOn($k->id, $d) >= $need))
+                    ->sortByDesc(fn ($k) => $k->supplier->rating)->take(4)->values(),
+            ];
+        }
         $active = $u && $landing ? RentalRequest::where('customer_id', $u->id)->whereIn('status', array_merge(Finance::ACTIVE, ['pending']))->with(['payments', 'supplier'])->orderBy('start_date')->take(3)->get() : collect();
         $notifs = $u && $landing ? Notifier::for($u, session('mode'))->filter(fn ($n) => ! $n->isReadBy($u->id))->take(3) : collect();
 
         return view('market.browse', [
-            'landing' => $landing, 'home' => $home, 'pkgs' => $pkgs, 'pkgCount' => Package::live()->count(), 'active' => $active, 'notifs' => $notifs, 'themes' => self::EVENT_THEMES,
+            'landing' => $landing, 'home' => $home, 'forDates' => $forDates, 'pkgs' => $pkgs, 'pkgCount' => Package::live()->count(), 'active' => $active, 'notifs' => $notifs, 'themes' => self::EVENT_THEMES,
             'prodCount' => $prods->count(), 'supCount' => $sups->count(),
             'st' => $st, 'list' => $list->values(), 'dates' => $dates, 'ai' => $ai, 'compare' => $compare,
             'cats' => Category::where('active', true)->orderBy('sort')->get(), 'sups' => $sups,
@@ -157,6 +174,16 @@ class MarketController extends Controller
             'heading' => $st['q'] ? 'Results for “'.$st['q'].'”' : ($cat ? $cat->name : ($st['event'] ? $st['event'].' supplies' : ($st['view'] === 'packages' ? 'Rental packages' : ($landing ? 'All party rentals' : 'Browse party supplies')))),
             'cat' => $cat, 'to' => $to,
         ]);
+    }
+
+    /** Can this item be rented for every one of these dates (enough stock each day, sale items past their lead time)? */
+    private function freeOn(Product $x, array $dates, int $need): bool
+    {
+        if ($x->isSale() && $dates[0] < add_days(today_iso(), (int) $x->lead_days)) {
+            return false;
+        }
+
+        return inv()->minAvailable($x->id, $dates) >= $need;
     }
 
     public function suppliers(Request $request)

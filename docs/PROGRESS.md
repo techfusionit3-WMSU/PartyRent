@@ -11,11 +11,11 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
       account are refused, 409 for JSON; 419 handler never replays a form as the new account; other tabs show an
       "Account changed" bar). Shop cashier: receipts/proofs only of their shop; suspended shop never = all shops.
       Supplier request page: "Requested by (account)" vs "Contact on the day".
-- [ ] F3 Market nav (Browse / Packages / Suppliers / My Rentals) centered + evenly spaced
-- [ ] F4 Leave warning on checkout + transaction pages (unsaved forms)
-- [ ] F5 Transaction code on customer transaction pages
-- [ ] F6 Chat between supplier and client without a problem case
-- [ ] F7 Payment: "COD" -> "Cash" for down payment; supplier records cash paid in person (no customer login)
+- [x] F3 Market nav (Browse / Packages / Suppliers / My Rentals) centered + evenly spaced
+- [x] F4 Leave warning on checkout + transaction pages (unsaved forms)
+- [x] F5 Transaction code on customer transaction pages
+- [x] F6 Chat between supplier and client without a problem case (request_messages, App\Domain\Chat, partials/request-chat, rq-* CSS)
+- [x] F7 Payment: "COD" -> "Cash" (migration cod->cash); customer cash = nothing to submit; supplier records it (ref optional)
 - [ ] F8 Supplier request page: "Notify customer about payment" (reminder) action
 - [ ] F9 Supplier request page: transaction actions inline (link to other page optional)
 - [ ] F10 Cases: supplier's fault -> customer pays nothing, only supplier compensates

@@ -256,6 +256,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/complaints', [AdminController::class, 'complaints'])->name('complaints');
     Route::get('/cases', [CaseController::class, 'adminIndex'])->name('cases');
     Route::post('/complaints', [AdminController::class, 'storeComplaint'])->name('complaints.store');
+    Route::post('/categories/{category}/review', [AdminController::class, 'resolveCategory'])->name('categories.review');
     Route::post('/complaints/{complaint}', [AdminController::class, 'updateComplaint'])->name('complaints.update');
     Route::get('/reviews', [ReviewController::class, 'adminIndex'])->name('reviews');
     Route::post('/reviews/{review}/moderate', [ReviewController::class, 'moderate'])->name('reviews.moderate');

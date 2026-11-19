@@ -7,11 +7,11 @@
     $tiers = collect($p->tiers ?: [['min' => 1, 'max' => null, 'price' => '']])->sortBy('min')->values();
     $base = old('base_price', $tiers->first()['price'] ?? '');
     $bulk = old('bulk', $tiers->slice(1)->map(fn ($t) => ['min' => $t['min'], 'price' => $t['price']])->values()->all());
-    $colors = old('colors', array_values(array_intersect($p->colors ?? [], CC::COLORS)));
-    $colorsOther = old('colors_other', implode(', ', array_diff($p->colors ?? [], CC::COLORS)));
-    $themes = old('themes', array_values(array_intersect($p->themes ?? [], CC::THEMES)));
-    $themesOther = old('themes_other', implode(', ', array_diff($p->themes ?? [], CC::THEMES)));
+    $colors = old('colors', $p->colors ?? []);
+    $themes = old('themes', $p->themes ?? []);
     $evs = old('events', $p->events ?? []);
+    $reqCat = $p->requested_category_id ? \App\Models\Category::find($p->requested_category_id) : null;
+    $catName = old('category', $reqCat?->name ?? ($p->category_id ? $cats->firstWhere('id', $p->category_id)?->name : ''));
     $mode = old('rental_mode', $p->rental_mode ?? 'day');
     $sup = auth()->user()->shop();
     $locs = $sup->locations()->get();
@@ -20,7 +20,6 @@
     $hasMax = old('has_max_days', (bool) $p->max_rental_days);
     $b = $p->exists ? inv()->breakdown($p->id, today_iso()) : null;
     $peak = $p->exists ? max(0, ...array_map(fn ($d) => inv()->demandOn($p->id, $d, \App\Domain\Inventory::RESERVING)['total'], inv()->reservedDates($p->id) ?: [today_iso()])) : 0;
-    $chip = fn ($name, $val, $on) => '<label class="chip '.($on ? 'active' : '').'"><input type="checkbox" name="'.$name.'[]" value="'.e($val).'" '.($on ? 'checked' : '').' hidden>'.($name === 'colors' ? '<span class="swatch" style="background:'.e(color_hex($val)).'"></span> ' : '').e($val).'</label>';
 @endphp
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.products') }}">Products</a> / {{ $p->exists ? $p->name : 'New product' }}</div>
@@ -37,20 +36,41 @@
       </div>@if($p->exists)<div class="hint">Items with open bookings cannot switch type until those bookings are completed.</div>@endif</div>
       <div class="field"><label>Item name</label><input class="input" name="name" required minlength="3" value="{{ old('name', $p->name) }}" placeholder="e.g. White Monoblock Chair"></div>
       <div class="form-grid">
-        <div class="field"><label>Category</label><select class="input" name="category_id" required><option value="">Select…</option>@foreach($cats as $c)<option value="{{ $c->id }}" @selected(old('category_id', $p->category_id) === $c->id)>{{ $c->name }}</option>@endforeach</select></div>
+        <div class="field @error('category') invalid @enderror"><label for="pCat">Category</label><input class="input" id="pCat" name="category" list="pCatList" required maxlength="60" autocomplete="off" value="{{ $catName }}" placeholder="Type or pick, e.g. Chairs, Photo Booths"><datalist id="pCatList">@foreach($cats as $c)<option value="{{ $c->name }}">@endforeach</datalist>
+          @error('category')<div class="error-text">{{ $message }}</div>@enderror
+          <div class="hint">@if($reqCat)<b>"{{ $reqCat->name }}"</b> is waiting for PartyRent to approve it; until then this item shows under Other Party Supplies.@else Pick a suggestion, or type a new one. A new category is reviewed by PartyRent; until then the item shows under Other Party Supplies.@endif</div></div>
         <div class="field" data-for="rent"><label>Condition</label><select class="input" name="condition">@foreach(\App\Domain\Damage::CONDITIONS as $k => $l)<option value="{{ $k }}" @selected(old('condition', $p->condition ?: 'brand_new') === $k)>{{ $l }}</option>@endforeach</select><div class="hint">Used for "Lost or Not Returned" compensation.</div></div>
       </div>
+      @if(auth()->user()->shop()?->isBusiness())
       <div class="field" data-for="rent"><label>Replacement value (₱ per unit)</label><input class="input" type="number" min="0" step="0.01" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}" style="max-width:300px"><div class="hint">The selling / replacement value — the basis for damage compensation (not the rental fee).</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+      @else
+      {{-- Individual shops: purchase record → suggested replacement value (lowered for age and condition) + minor fee --}}
+      <div class="card card-flat" data-for="rent" id="dmgBox" style="padding:14px">
+        <h4 class="mt-0">Damage & replacement</h4>
+        <p class="small muted">Customers see these amounts before they book. If something breaks, they pay the <b>repair cost</b> (never more than the replacement value); <b>lost or beyond repair</b> = the replacement value; <b>not working</b> from normal wear is free.</p>
+        <div class="form-grid">
+          <div class="field"><label for="buyPrice">Price you paid (₱ per unit) <span class="muted">(optional)</span></label><input class="input" type="number" min="0" step="0.01" id="buyPrice" name="purchase_price" value="{{ old('purchase_price', $p->purchase_price) }}">@error('purchase_price')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+          <div class="field"><label for="buyDate">When you bought it</label><input class="input" type="date" id="buyDate" name="purchased_on" max="{{ today_iso() }}" value="{{ old('purchased_on', $p->purchased_on?->format('Y-m-d')) }}">@error('purchased_on')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+        </div>
+        <div class="field"><label for="buyReceipt">Receipt <span class="muted">(optional, private)</span></label><input class="input" type="file" id="buyReceipt" name="purchase_receipt" accept="image/*,application/pdf">
+          <div class="hint">Only PartyRent admins see it, and only if a customer disputes a charge. Customers just see "Receipt on file".@if($p->purchase_receipt) <a href="{{ route('supplier.products.receipt', $p) }}" target="_blank" rel="noopener">View current receipt</a> · <label class="check" style="display:inline-flex"><input type="checkbox" name="clear_receipt" value="1"> remove</label>@endif</div>
+          @error('purchase_receipt')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+        <div class="form-grid">
+          <div class="field"><label for="repValue">Replacement value (₱ per unit)</label><input class="input" type="number" min="0" step="0.01" id="repValue" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}">
+            <div class="hint" id="sugHint">Enter the price you paid to get a suggestion.</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+          <div class="field"><label for="minorFee">Minor damage fee (₱ per unit) <span class="muted">(optional)</span></label><input class="input" type="number" min="0" step="0.01" id="minorFee" name="minor_fee" value="{{ old('minor_fee', $p->minor_fee) }}"><div class="hint">For cleaning, a stain or a small scratch.</div>@error('minor_fee')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+        </div>
+        <div class="field" id="reasonBox" hidden><label for="valReason">Why is the value above what you paid?</label><input class="input" id="valReason" name="value_reason" maxlength="255" value="{{ old('value_reason', $p->value_reason) }}" placeholder="e.g. Same chair now costs ₱1,200 at the store (link)">@error('value_reason')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+      </div>
+      @endif
       <div class="field"><label>Description</label><textarea class="input" name="description" required rows="4">{{ old('description', $p->description) }}</textarea></div>
       <div class="field"><label>Product images</label>
         @if($p->images)<div class="thumbs mb-1">@foreach($p->images as $im)<img src="{{ asset('storage/'.$im) }}" alt="Product photo">@endforeach</div><label class="check mb-1"><input type="checkbox" name="clear_images" value="1"> Remove current photos</label>@endif
         <input class="input" type="file" name="images[]" accept="image/*" multiple><div class="hint">Upload up to 5 photos (JPG/PNG, 8 MB each). Without photos, a category illustration is shown.</div></div>
       <h4 class="mt-2">Tags</h4>
-      <div class="field"><label>Colors</label><div class="row wrap gap-sm">@foreach(CC::COLORS as $c){!! $chip('colors', $c, in_array($c, $colors, true)) !!}@endforeach<label class="chip {{ $colorsOther ? 'active' : '' }}" data-other="colorsOther"><input type="checkbox" hidden @checked($colorsOther)>Others</label></div>
-        <input class="input mt-1" id="colorsOther" name="colors_other" value="{{ $colorsOther }}" placeholder="Other colors, comma-separated (e.g. Lavender, Sage)" @if(! $colorsOther) hidden @endif></div>
-      <div class="field"><label>Themes</label><div class="row wrap gap-sm">@foreach(CC::THEMES as $t){!! $chip('themes', $t, in_array($t, $themes, true)) !!}@endforeach<label class="chip {{ $themesOther ? 'active' : '' }}" data-other="themesOther"><input type="checkbox" hidden @checked($themesOther)>Others</label></div>
-        <input class="input mt-1" id="themesOther" name="themes_other" value="{{ $themesOther }}" placeholder="Other themes, comma-separated (e.g. Boho, Tropical)" @if(! $themesOther) hidden @endif></div>
-      <div class="field"><label>Suitable events</label><div class="row wrap gap-sm">@foreach($events as $e){!! $chip('events', $e, in_array($e, $evs, true)) !!}@endforeach</div></div>
+      <div class="field"><label>Colors</label>@include('partials.tag-input', ['name' => 'colors', 'values' => $colors, 'suggest' => CC::COLORS, 'swatch' => true, 'placeholder' => 'Type a color, e.g. Lavender'])</div>
+      <div class="field"><label>Themes</label>@include('partials.tag-input', ['name' => 'themes', 'values' => $themes, 'suggest' => CC::THEMES, 'placeholder' => 'Type a theme, e.g. Boho'])</div>
+      <div class="field"><label>Suitable events</label>@include('partials.tag-input', ['name' => 'events', 'values' => $evs, 'suggest' => $events, 'placeholder' => 'Type an event, e.g. Graduation'])</div>
     </div>
 
     {{-- Pricing --}}
@@ -109,6 +129,10 @@
     {{-- Listing --}}
     <div class="card"><h3>Listing</h3>
       <div class="field"><label>Status</label><select class="input" name="status">@foreach(['active' => 'Active (visible to customers)', 'inactive' => 'Inactive (hidden)'] as $k => $l)<option value="{{ $k }}" @selected(old('status', $p->status ?: 'active') === $k)>{{ $l }}</option>@endforeach</select></div>
+      @unless(auth()->user()->shop()?->isBusiness())
+        <label class="check"><input type="hidden" name="package_only" value="0"><input type="checkbox" name="package_only" value="1" @checked(old('package_only', $p->package_only))> Only available inside my packages</label>
+        <div class="hint">Not listed on its own: customers cannot find it in Browse or rent it separately, only as part of a package that includes it.</div>
+      @endunless
       <label class="check mb-2"><input type="checkbox" name="delivery" value="1" @checked(old('delivery', $p->delivery ?? true))> Available for delivery</label>
       <div data-for="rent">
         <div class="field"><label>Maximum rental duration <span class="muted">(optional)</span></label>
@@ -134,6 +158,26 @@
 </form>
 @push('scripts')
 <script>
+// Suggested replacement value = price paid × age (<1 yr 100%, 1–2 85%, 2–3 70%, older 55%) × condition (new 100%, good as new 90%, used 75%), at least 30%.
+(function () {
+  var box = document.getElementById('dmgBox'); if (!box) return;
+  var price = document.getElementById('buyPrice'), date = document.getElementById('buyDate'), val = document.getElementById('repValue'), hint = document.getElementById('sugHint'), reason = document.getElementById('reasonBox');
+  var cond = document.querySelector('[name="condition"]');
+  var peso = function (n) { return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  function suggest() {
+    var p = +price.value || 0;
+    if (p <= 0) { hint.textContent = 'Enter the price you paid to get a suggestion.'; reason.hidden = true; return null; }
+    var yrs = date.value ? (Date.now() - new Date(date.value).getTime()) / (365.25 * 864e5) : 0;
+    var age = yrs < 1 ? 1 : yrs < 2 ? 0.85 : yrs < 3 ? 0.7 : 0.55, c = { brand_new: 1, good_as_new: 0.9, used: 0.75 }[cond.value] || 0.75;
+    var s = Math.round(Math.max(p * 0.3, p * age * c) * 100) / 100;
+    hint.innerHTML = 'Suggested: <b>' + peso(s) + '</b> (price paid, lowered ' + Math.round((1 - s / p) * 100) + '% for age and condition) <button type="button" class="btn btn-xs" id="useSug">Use it</button>';
+    reason.hidden = !((+val.value || 0) > p);
+    return s;
+  }
+  box.addEventListener('input', suggest); cond.addEventListener('change', suggest);
+  box.addEventListener('click', function (e) { if (e.target.id === 'useSug') { val.value = suggest(); suggest(); } });
+  suggest();
+})();
 (function () {
   var f = document.getElementById('productForm'), $ = function (id) { return document.getElementById(id); };
   function sync() {
@@ -146,7 +190,6 @@
   f.addEventListener('change', function (e) {
     if (e.target.matches('[name=listing_type], #perishable, #rentalMode')) sync();
     if (e.target.id === 'tfOn') $('tfBox').hidden = !e.target.checked;
-    var other = e.target.closest('[data-other]'); if (other) { var inp = $(other.dataset.other); inp.hidden = !e.target.checked; if (!e.target.checked) inp.value = ''; else inp.focus(); }
   });
   f.addEventListener('input', function (e) { if (e.target.matches('[data-loc]')) { var t = 0; f.querySelectorAll('[data-loc]').forEach(function (i) { t += Math.max(0, Math.floor(+i.value || 0)); }); f.querySelector('[data-tot]').textContent = t; } });
   f.addEventListener('click', function (e) {

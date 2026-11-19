@@ -699,3 +699,62 @@
   setInterval(poll, 15000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 })();
+
+/* ---------- tag inputs (partials/tag-input): type to add, suggestions optional ---------- */
+(function () {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const titled = s => (s === s.toLowerCase() ? s.replace(/(^|\s)\S/g, c => c.toUpperCase()) : s);
+  function parts(root) {
+    return {
+      box: root.querySelector('.tag-box'), type: root.querySelector('.tag-type'), sugs: [...root.querySelectorAll('[data-tag-add]')],
+      neu: root.querySelector('[data-tag-new]'), hex: JSON.parse(root.dataset.hex || 'null'), max: +root.dataset.max || 15,
+    };
+  }
+  const selected = root => [...root.querySelectorAll('.tag[data-v]')].map(t => t.dataset.v);
+  function refresh(root) {
+    const p = parts(root), q = norm(p.type.value).toLowerCase(), have = selected(root).map(v => v.toLowerCase());
+    let exact = false;
+    p.sugs.forEach(b => {
+      const v = b.dataset.tagAdd.toLowerCase(); if (v === q) exact = true;
+      b.hidden = have.includes(v) || (q !== '' && !v.includes(q));
+    });
+    const typed = norm(p.type.value);
+    p.neu.hidden = !typed || exact || have.includes(typed.toLowerCase());
+    p.neu.textContent = typed ? '+ Add "' + titled(typed) + '"' : '';
+    root.querySelector('.tag-sugs-label').hidden = !p.sugs.some(b => !b.hidden) && p.neu.hidden;
+  }
+  function add(root, raw) {
+    const p = parts(root); let v = norm(raw); if (!v) return;
+    const sug = p.sugs.find(b => b.dataset.tagAdd.toLowerCase() === v.toLowerCase());
+    v = sug ? sug.dataset.tagAdd : titled(v);
+    const have = selected(root);
+    if (have.some(h => h.toLowerCase() === v.toLowerCase())) { p.type.value = ''; refresh(root); return; }
+    if (have.length >= p.max) { p.type.setCustomValidity('Up to ' + p.max + ' tags.'); p.type.reportValidity(); return; }
+    p.type.setCustomValidity('');
+    const chip = document.createElement('span'); chip.className = 'chip active tag'; chip.dataset.v = v;
+    if (p.hex) { const sw = document.createElement('span'); sw.className = 'swatch'; sw.style.background = p.hex[v] || '#ddd'; chip.appendChild(sw); }
+    chip.appendChild(document.createTextNode(v));
+    const h = document.createElement('input'); h.type = 'hidden'; h.name = root.dataset.name + '[]'; h.value = v; chip.appendChild(h);
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'tag-x'; x.dataset.tagRm = ''; x.setAttribute('aria-label', 'Remove ' + v); x.textContent = '×'; chip.appendChild(x);
+    p.box.insertBefore(chip, p.type);
+    p.type.value = ''; refresh(root);
+  }
+  document.addEventListener('click', e => {
+    const root = e.target.closest('[data-tags]'); if (!root) return;
+    const a = e.target.closest('[data-tag-add]'); if (a) { add(root, a.dataset.tagAdd); parts(root).type.focus(); return; }
+    if (e.target.closest('[data-tag-new]')) { add(root, parts(root).type.value); parts(root).type.focus(); return; }
+    const rm = e.target.closest('[data-tag-rm]'); if (rm) { rm.closest('.tag').remove(); refresh(root); return; }
+    if (e.target.closest('.tag-box') && !e.target.closest('.tag')) parts(root).type.focus();
+  });
+  document.addEventListener('input', e => { if (e.target.matches('.tag-type')) { e.target.setCustomValidity(''); refresh(e.target.closest('[data-tags]')); } });
+  document.addEventListener('keydown', e => {
+    if (!e.target.matches('.tag-type')) return;
+    const root = e.target.closest('[data-tags]');
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(root, e.target.value); }
+    else if (e.key === 'Backspace' && e.target.value === '') { const t = [...root.querySelectorAll('.tag')].pop(); if (t) { t.remove(); refresh(root); } }
+  });
+  // text left in the box counts as a tag (on leaving the field, and when the form is sent)
+  document.addEventListener('focusout', e => { if (e.target.matches('.tag-type') && norm(e.target.value)) add(e.target.closest('[data-tags]'), e.target.value); });
+  document.addEventListener('submit', e => { e.target.querySelectorAll && e.target.querySelectorAll('[data-tags] .tag-type').forEach(t => { if (norm(t.value)) add(t.closest('[data-tags]'), t.value); }); }, true);
+  document.querySelectorAll('[data-tags]').forEach(refresh);
+})();

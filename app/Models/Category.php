@@ -13,7 +13,7 @@ class Category extends Model
 
     protected function casts(): array
     {
-        return ['active' => 'boolean'];
+        return ['active' => 'boolean', 'pending' => 'boolean'];
     }
 
     public function products(): HasMany { return $this->hasMany(Product::class); }

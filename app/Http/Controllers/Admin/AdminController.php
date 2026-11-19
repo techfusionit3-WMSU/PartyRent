@@ -177,8 +177,48 @@ class AdminController extends Controller
     public function categories(Request $request)
     {
         $this->need($request, 'categories.manage');
+        $all = \App\Models\Category::withCount('products')->orderBy('sort')->get();
+        $pending = $all->where('pending', true)->values();
+        $waiting = \App\Models\Product::whereIn('requested_category_id', $pending->pluck('id'))->with('supplier:id,name')->get()->groupBy('requested_category_id');
 
-        return view('admin.categories', ['list' => \App\Models\Category::withCount('products')->orderBy('sort')->get(), 'icons' => array_keys((require app_path('Support/icons.php'))['art'])]);
+        return view('admin.categories', [
+            'list' => $all->where('pending', false)->values(), 'pending' => $pending, 'waiting' => $waiting,
+            'requesters' => User::whereIn('id', $pending->pluck('requested_by')->filter())->get()->keyBy('id'),
+            'icons' => array_keys((require app_path('Support/icons.php'))['art']),
+        ]);
+    }
+
+    /** A supplier-typed category: approve as its own, merge into an existing one, or reject. */
+    public function resolveCategory(Request $request, \App\Models\Category $category)
+    {
+        $this->need($request, 'categories.manage');
+        if (! $category->pending) {
+            return back()->with('error', 'That category is not waiting for review.');
+        }
+        $v = $request->validate([
+            'action' => 'required|in:approve,merge,reject',
+            'name' => 'required_if:action,approve|nullable|string|max:60', 'icon' => 'nullable|string|max:40',
+            'grad_from' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'], 'grad_to' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'into' => 'required_if:action,merge|nullable|exists:categories,id', 'reason' => 'nullable|string|max:300',
+        ]);
+        $name = $category->name;
+        if ($v['action'] === 'approve') {
+            \App\Domain\Categories::approve($category, array_filter(['name' => trim($v['name']), 'icon' => $v['icon'] ?? null, 'grad_from' => $v['grad_from'] ?? null, 'grad_to' => $v['grad_to'] ?? null]), $request->user());
+
+            return back()->with('success', '"'.$category->name.'" is now a category in Browse.');
+        }
+        if ($v['action'] === 'merge') {
+            $into = \App\Models\Category::findOrFail($v['into']);
+            if ($into->pending || $into->id === $category->id) {
+                return back()->with('error', 'Choose an existing, approved category.');
+            }
+            \App\Domain\Categories::merge($category, $into, $request->user());
+
+            return back()->with('success', '"'.$name.'" merged into '.$into->name.'.');
+        }
+        \App\Domain\Categories::reject($category, trim((string) ($v['reason'] ?? '')), $request->user());
+
+        return back()->with('success', '"'.$name.'" rejected. Its products stay under Other Party Supplies.');
     }
 
     public function storeCategory(Request $request)

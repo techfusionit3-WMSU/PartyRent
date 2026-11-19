@@ -65,7 +65,8 @@ class CatalogController extends Controller
         $time = ['nullable', 'regex:/^([01]\d|2[0-4]):[0-5]\d$/'];
         $v = $request->validate([
             'name' => 'required|string|min:3|max:120',
-            'category_id' => 'required|exists:categories,id',
+            'category_id' => 'nullable|required_without:category|exists:categories,id',
+            'category' => 'nullable|required_without:category_id|string|min:2|max:60',
             'description' => 'required|string|min:10|max:2000',
             'listing_type' => 'nullable|in:rent,sale',
             'total_stock' => 'nullable|integer|min:0|max:100000',
@@ -75,9 +76,9 @@ class CatalogController extends Controller
             'status' => 'required|in:active,inactive',
             'base_price' => 'required|numeric|min:0.01|max:10000000',
             'bulk' => 'nullable|array|max:7', 'bulk.*.min' => 'nullable|integer|min:2', 'bulk.*.price' => 'nullable|numeric|min:0.01',
-            'colors' => 'nullable|array', 'colors.*' => 'string|max:40', 'colors_other' => 'nullable|string|max:120',
-            'themes' => 'nullable|array', 'themes.*' => 'string|max:40', 'themes_other' => 'nullable|string|max:120',
-            'events' => 'nullable|array', 'events.*' => 'string|max:40',
+            'colors' => 'nullable|array|max:15', 'colors.*' => 'string|max:40', 'colors_other' => 'nullable|string|max:120',
+            'themes' => 'nullable|array|max:15', 'themes.*' => 'string|max:40', 'themes_other' => 'nullable|string|max:120',
+            'events' => 'nullable|array|max:15', 'events.*' => 'string|max:40',
             'delivery' => 'nullable|boolean',
             'replacement_value' => 'nullable|numeric|min:0|max:100000000',
             'rental_mode' => 'nullable|in:day,hour',
@@ -90,8 +91,22 @@ class CatalogController extends Controller
             'lead_days' => 'nullable|integer|min:0|max:60',
             'shelf_life_days' => 'nullable|integer|min:1|max:3650',
             'low_stock_at' => 'nullable|integer|min:0|max:100000',
-        ], ['base_price.required' => 'Enter the base price.', 'bulk.*.min.min' => 'A bulk discount starts at 2 or more pieces.']);
+            'purchase_price' => 'nullable|numeric|min:0|max:100000000', 'purchased_on' => 'nullable|date|before_or_equal:today',
+            'purchase_receipt' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:8192', 'clear_receipt' => 'nullable|boolean',
+            'value_reason' => 'nullable|string|max:255', 'minor_fee' => 'nullable|numeric|min:0|max:100000000',
+        ], ['base_price.required' => 'Enter the base price.', 'bulk.*.min.min' => 'A bulk discount starts at 2 or more pieces.', 'purchased_on.before_or_equal' => 'The purchase date cannot be in the future.']);
         $sale = ($v['listing_type'] ?? 'rent') === 'sale';
+        // Individual shops: purchase record → replacement value (suggested, lowered for age and condition).
+        $personal = ! $this->sup($request)->isBusiness() && ! $sale;
+        $buy = $personal && ($v['purchase_price'] ?? null) ? r2((float) $v['purchase_price']) : null;
+        $repValue = ($v['replacement_value'] ?? null) ? r2($v['replacement_value']) : null;
+        if ($personal && $repValue === null && $buy) {
+            $repValue = \App\Domain\Damage::suggestedValue($buy, $v['purchased_on'] ?? null, $v['condition'] ?? 'used');
+        }
+        $reason = $personal ? trim((string) ($v['value_reason'] ?? '')) : '';
+        if ($personal && $buy && $repValue > $buy && $reason === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages(['value_reason' => 'The replacement value is above the price you paid ('.money($buy).'). Say why, e.g. the current store price.']);
+        }
         $hourly = ! $sale && ($v['rental_mode'] ?? 'day') === 'hour';
         $unit = $sale
             ? (in_array($v['unit'], Product::SALE_UNITS, true) ? $v['unit'] : 'pc')
@@ -103,11 +118,26 @@ class CatalogController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(['bulk' => $tiers]);
         }
 
-        $tags = function (string $k) use ($v) {
-            $other = array_map(fn ($x) => ucwords(trim($x)), explode(',', (string) ($v[$k.'_other'] ?? '')));
+        // Typed tags: suggestions keep their spelling ("pink" → "Pink"); anything else is the supplier's own tag.
+        $known = ['colors' => self::COLORS, 'themes' => self::THEMES, 'events' => array_keys(Ai::EVENTS)];
+        $tags = function (string $k) use ($v, $known) {
+            $typed = array_merge($v[$k] ?? [], explode(',', (string) ($v[$k.'_other'] ?? '')));
+            $out = [];
+            foreach ($typed as $t) {
+                $t = trim(preg_replace('/\s+/', ' ', (string) $t));
+                if ($t === '') {
+                    continue;
+                }
+                $hit = collect($known[$k])->first(fn ($s) => mb_strtolower($s) === mb_strtolower($t));
+                $t = $hit ?? (mb_strtolower($t) === $t ? mb_convert_case($t, MB_CASE_TITLE) : $t);
+                $out[mb_strtolower($t)] = $t;
+            }
 
-            return array_values(array_unique(array_filter(array_merge(array_map('trim', $v[$k] ?? []), $other))));
+            return array_values(array_slice($out, 0, 15));
         };
+        $cat = ! empty($v['category']) && empty($v['category_id'])
+            ? \App\Domain\Categories::resolve($v['category'], $request->user())
+            : ['category_id' => $v['category_id'], 'requested_category_id' => null];
         $frame = ! $sale && $request->boolean('time_frame') && ($v['time_from'] ?? null) && ($v['time_to'] ?? null);
         if ($frame && \App\Domain\Slots::toMin($v['time_to']) <= \App\Domain\Slots::toMin($v['time_from']) && ! $request->boolean('allow_overnight')) {
             throw \Illuminate\Validation\ValidationException::withMessages(['time_to' => 'The time frame must end later than it starts (or allow overnight rental).']);
@@ -120,11 +150,16 @@ class CatalogController extends Controller
 
         return [
             'listing_type' => $sale ? 'sale' : 'rent',
-            'name' => trim($v['name']), 'category_id' => $v['category_id'], 'description' => trim($v['description']),
+            'name' => trim($v['name']), 'category_id' => $cat['category_id'], 'requested_category_id' => $cat['requested_category_id'], 'description' => trim($v['description']),
             'total_stock' => $total, 'unit' => $unit, 'condition' => $sale ? 'brand_new' : ($v['condition'] ?? 'used'), 'status' => $v['status'],
-            'tiers' => $tiers, 'colors' => $tags('colors'), 'themes' => $tags('themes'), 'events' => $v['events'] ?? [],
+            'tiers' => $tiers, 'colors' => $tags('colors'), 'themes' => $tags('themes'), 'events' => $tags('events'),
             'delivery' => $request->boolean('delivery'), 'pickup' => true,
-            'replacement_value' => $sale ? null : (($v['replacement_value'] ?? null) ? r2($v['replacement_value']) : null),
+            'replacement_value' => $sale ? null : $repValue,
+            ...($personal ? [
+                'purchase_price' => $buy, 'purchased_on' => $buy ? ($v['purchased_on'] ?? null) : null,
+                'value_reason' => $buy && $repValue > $buy ? $reason : null,
+                'minor_fee' => isset($v['minor_fee']) && $v['minor_fee'] !== '' ? r2((float) $v['minor_fee']) : null,
+            ] : []),
             'rental_mode' => $hourly ? 'hour' : 'day',
             'min_hours' => ! $sale && ($v['min_hours'] ?? null) ? (float) $v['min_hours'] : ($hourly ? 1.0 : 0.0), // 0 = no minimum
             'max_hours' => $sale || empty($v['max_hours']) ? null : (float) $v['max_hours'],
@@ -136,6 +171,7 @@ class CatalogController extends Controller
             'lead_days' => $sale ? (int) ($v['lead_days'] ?? 0) : 0,
             'shelf_life_days' => $sale && $request->boolean('perishable') ? ($v['shelf_life_days'] ?? null) : null,
             'low_stock_at' => $sale ? ($v['low_stock_at'] ?? null) : null,
+            'package_only' => ! $this->sup($request)->isBusiness() && $request->boolean('package_only'),
             '_qty' => $sale ? [] : $qty,
         ];
     }
@@ -172,12 +208,35 @@ class CatalogController extends Controller
         return array_slice($paths, -5);
     }
 
+    /** Purchase receipt (individual shops): kept on the private disk, never public. */
+    private function storeReceipt(Request $request, ?Product $p): array
+    {
+        if ($this->sup($request)->isBusiness()) {
+            return [];
+        }
+        if ($file = $request->file('purchase_receipt')) {
+            return ['purchase_receipt' => $file->store('receipts', 'local')];
+        }
+
+        return $request->boolean('clear_receipt') ? ['purchase_receipt' => null] : [];
+    }
+
+    /** The shop's own receipt. */
+    public function receipt(Request $request, Product $product)
+    {
+        $p = $this->ownProduct($request, $product);
+        abort_unless($p->purchase_receipt && \Illuminate\Support\Facades\Storage::disk('local')->exists($p->purchase_receipt), 404);
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->response($p->purchase_receipt);
+    }
+
     public function storeProduct(Request $request)
     {
         $data = $this->productData($request);
         $qty = $data['_qty'];
         unset($data['_qty']);
         $data['images'] = $this->storeImages($request, null);
+        $data += $this->storeReceipt($request, null);
         $res = Rentals::saveProduct($this->sup($request), $data);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
@@ -204,6 +263,7 @@ class CatalogController extends Controller
                     $p->refresh();
                 }
                 $data['images'] = $this->storeImages($request, $p);
+                $data += $this->storeReceipt($request, $p);
                 $res = Rentals::saveProduct($this->sup($request), $data, $p);
                 if (! $res['ok']) {
                     throw new \DomainException($res['error']);
@@ -277,12 +337,14 @@ class CatalogController extends Controller
 
     private function packageForm(Request $request, Package $k)
     {
-        $prods = Product::where('supplier_id', $this->sup($request)->id)->where('status', '!=', 'deleted')->orderBy('name')->get();
+        $sup = $this->sup($request);
+        $prods = Product::where('supplier_id', $sup->id)->where('status', '!=', 'deleted')->orderBy('name')->get();
 
         return view('supplier.package-form', [
-            'k' => $k, 'events' => array_keys(Ai::EVENTS), 'modes' => Packages::MODES,
+            'k' => $k, 'sup' => $sup, 'events' => array_keys(Ai::EVENTS), 'modes' => Packages::MODES,
+            'cats' => $sup->isBusiness() ? collect() : Category::where('active', true)->orderBy('sort')->get(),
             'def' => $k->exists ? Packages::def($k) : Packages::normalize(['pricing' => ['mode' => 'sum_discount', 'discountPct' => 10], 'components' => []]),
-            'prods' => $prods->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'type' => $p->listing_type, 'price' => $p->basePrice(), 'unit' => $p->unitWord(), 'stock' => $p->total_stock])->values(),
+            'prods' => $prods->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'type' => $p->listing_type, 'price' => $p->basePrice(), 'unit' => $p->unitWord(), 'stock' => $p->total_stock, 'packageOnly' => (bool) $p->package_only])->values(),
         ]);
     }
 
@@ -294,6 +356,39 @@ class CatalogController extends Controller
     public function editPackage(Request $request, Package $package)
     {
         return $this->packageForm($request, $this->ownPackage($request, $package));
+    }
+
+    /**
+     * "Item just for this package" (personal accounts): a package-only item created from the package form.
+     * It goes into the supplier's inventory but is never listed on its own.
+     */
+    public function packageOnlyItem(Request $request)
+    {
+        $sup = $this->sup($request);
+        abort_if($sup->isBusiness(), 403);
+        $v = $request->validate([
+            'type' => 'required|in:rent,sale', 'name' => 'required|string|min:3|max:120', 'category_id' => 'required|exists:categories,id',
+            'stock' => 'required|integer|min:1|max:100000', 'price' => 'required|numeric|min:0.01|max:10000000',
+            'replacement_value' => 'required_if:type,rent|nullable|numeric|min:0.01|max:100000000', 'minor_fee' => 'nullable|numeric|min:0|max:100000000',
+        ], ['replacement_value.required_if' => 'Enter the replacement value: what the customer pays if it is lost or beyond repair.', 'name.required' => 'Give the item a name.', 'price.required' => 'Enter the value of the item.', 'stock.min' => 'You need at least 1 of the item.']);
+        $sale = $v['type'] === 'sale';
+        $res = Rentals::saveProduct($sup, [
+            'listing_type' => $v['type'], 'name' => trim($v['name']), 'category_id' => $v['category_id'],
+            'description' => 'Included in a package.', 'unit' => $sale ? 'pc' : 'piece / day', 'condition' => $sale ? 'brand_new' : 'used',
+            'status' => 'active', 'package_only' => true, 'total_stock' => (int) $v['stock'],
+            'tiers' => [['min' => 1, 'max' => null, 'price' => (float) $v['price']]],
+            'delivery' => true, 'pickup' => true, 'colors' => [], 'themes' => [], 'events' => [],
+            'replacement_value' => $sale ? null : r2((float) $v['replacement_value']),
+            'minor_fee' => ! $sale && isset($v['minor_fee']) && $v['minor_fee'] !== '' ? r2((float) $v['minor_fee']) : null,
+        ]);
+        if (! $res['ok']) {
+            return response()->json(['message' => $res['error']], 422);
+        }
+        $p = $res['product'];
+        $this->saveLocationQty($p, []);
+        inv()->flush();
+
+        return response()->json(['product' => ['id' => $p->id, 'name' => $p->name, 'type' => $p->listing_type, 'price' => $p->basePrice(), 'unit' => $p->unitWord(), 'stock' => $p->total_stock, 'packageOnly' => true]]);
     }
 
     /** The builder posts the definition (pricing, components, guests) as one JSON field. */
@@ -465,9 +560,10 @@ class CatalogController extends Controller
     {
         $k = $this->ownPackage($request, $package);
         $name = $k->name;
-        Rentals::deletePackage($k);
+        $archived = Rentals::deletePackage($k);
 
-        return redirect()->route('supplier.packages')->with('success', $name.' deleted. Booked requests keep their copy of it.');
+        return redirect()->route('supplier.packages')->with('success', $name.' deleted. Booked requests keep their copy of it.'
+            .($archived ? ' Its package-only items are no longer listed and were moved to Archived in Products: '.implode(', ', $archived).'.' : ''));
     }
 
     /* ---------- inventory ---------- */

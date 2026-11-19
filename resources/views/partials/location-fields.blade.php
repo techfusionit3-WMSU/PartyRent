@@ -2,23 +2,32 @@
   Supplier location (inside shop-fields): location type, address and a map pin.
   Not every seller has a shop: home-based sellers keep their exact spot private until a pickup is accepted,
   and sellers with no pickup location only name their city (pin optional, used for delivery distance).
-  $d = supplier attributes.
+  $d = supplier attributes. $locFor: 'individual' (default) | 'business' | 'either' (Start Selling, where the
+  supplier type is picked on the page). A business always works from a physical workplace, so it gets no choice:
+  its location type is always "shop" (address + pin).
 --}}
 @php
-    $type = old('location_type', $d['location_type'] ?? 'shop');
+    $locFor = $locFor ?? 'individual';
+    $type = $locFor === 'business' ? 'shop' : old('location_type', $d['location_type'] ?? 'shop');
     $lat = old('lat', $d['lat'] ?? null);
     $lng = old('lng', $d['lng'] ?? null);
     $city = old('shop_addr.cityCode', $d['address_parts']['cityCode'] ?? ($d['city_code'] ?? null));
 @endphp
 @include('partials.leaflet')
 <div id="locBox">
-  <h3 class="mt-2 mb-1">Where do you operate from?</h3>
-  <div class="radio-cards loc-types mb-2">
-    @foreach(\App\Models\Supplier::LOCATION_TYPES as $k => [$label, $desc])
-      <label class="radio-card"><input type="radio" name="location_type" value="{{ $k }}" @checked($type === $k)><div><b>{{ $label }}</b><div class="small muted">{{ $desc }}</div></div></label>
-    @endforeach
+  @if($locFor !== 'business')
+  <div @if($locFor === 'either') data-for="individual" @endif>
+    <h3 class="mt-2 mb-1">Where do you operate from?</h3>
+    <div class="radio-cards loc-types mb-2">
+      @foreach(\App\Models\Supplier::LOCATION_TYPES as $k => [$label, $desc])
+        <label class="radio-card"><input type="radio" name="location_type" value="{{ $k }}" @checked($type === $k)><div><b>{{ $label }}</b><div class="small muted">{{ $desc }}</div></div></label>
+      @endforeach
+    </div>
+    @error('location_type')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
   </div>
-  @error('location_type')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+  @endif
+  @if($locFor !== 'individual')<input type="hidden" name="location_type" value="shop" @if($locFor === 'either') data-for="organization" @endif>@endif
+  @if($locFor === 'business')<h3 class="mt-2 mb-1">Your workplace</h3>@endif
 
   <h3 class="mb-1" data-loc-title>{{ ['shop' => 'Shop / pickup address', 'home' => 'Your address (kept private)', 'none' => 'Where you are based'][$type] }}</h3>
   <p class="small muted mt-0" data-loc-hint></p>
@@ -46,7 +55,9 @@
   };
   var TITLE = { shop: 'Shop / pickup address', home: 'Your address (kept private)', none: 'Where you are based' };
   function sync() {
-    var t = (form.querySelector('[name="location_type"]:checked') || {}).value || 'shop';
+    // a business has no choice: an enabled hidden location_type=shop
+    var hid = [].find.call(form.querySelectorAll('input[type=hidden][name="location_type"]'), function (i) { return !i.disabled; });
+    var t = hid ? 'shop' : ((form.querySelector('[name="location_type"]:checked:not(:disabled)') || {}).value || 'shop');
     box.querySelector('[data-loc-hint]').textContent = HINT[t];
     box.querySelector('[data-loc-title]').textContent = TITLE[t];
     // barangay / street are only required when customers may come to you
@@ -61,7 +72,7 @@
     var f = (form.querySelector('[name="fulfillment"]:checked') || {}).value;
     box.querySelector('[data-pin-optional]').textContent = t !== 'none' && f !== 'delivery' ? '(required for pickup)' : '(optional)';
   }
-  form.addEventListener('change', function (e) { if (e.target.name === 'location_type' || e.target.name === 'fulfillment') sync(); });
+  form.addEventListener('change', function (e) { if (e.target.name === 'location_type' || e.target.name === 'fulfillment' || e.target.name === 'app[type]') setTimeout(sync); });
   sync();
 })();
 </script>

@@ -50,7 +50,7 @@
         <div class="field"><label>Brand color</label><input class="input" type="color" name="color" value="{{ $o('color', '#E11D74') }}" style="height:44px;padding:4px"></div>
         <div class="field"><label>Supplier type</label><div><span class="badge b-purple">{{ \App\Domain\Applications::SUPPLIER_TYPES[$s->type] ?? 'Individual Supplier' }}</span></div></div>
       </div>
-      @include('partials.location-fields')
+      @include('partials.location-fields', ['locFor' => ($s->type === 'organization' || $s->isBusiness()) ? 'business' : 'individual'])
       @break
     @case('delivery')
       <div class="stack-sm">@foreach(['delivery' => 'Delivery only', 'pickup' => 'Pickup only', 'both' => 'Both delivery and pickup'] as $v => $l)<label class="check"><input type="radio" name="fulfillment" value="{{ $v }}" @checked($o('fulfillment') === $v)> {{ $l }}</label>@endforeach</div>

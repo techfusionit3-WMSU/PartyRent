@@ -126,7 +126,7 @@
       <div class="field"><label>Business email</label><input class="input" type="email" name="email" required value="{{ $o('email') }}">{!! $err('email') !!}</div>
       <div class="field full"><label>Operating hours</label><input class="input" name="hours" required value="{{ $o('hours') }}"></div>
     </div>
-    @include('partials.location-fields')
+    @include('partials.location-fields', ['locFor' => 'either'])
     <div class="field"><label>Business logo</label><div class="row wrap gap-sm">@foreach($logos as $l)<label class="chip {{ $o('logo', '🎈') === $l ? 'active' : '' }}" style="font-size:1.3rem"><input type="radio" name="logo" value="{{ $l }}" @checked($o('logo', '🎈') === $l) hidden>{{ $l }}</label>@endforeach</div></div>
   </section>
 

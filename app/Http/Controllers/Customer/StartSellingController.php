@@ -80,6 +80,9 @@ class StartSellingController extends Controller
     {
         $phone = ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'];
         $type = $request->input('app.type');
+        if ($type === 'organization') { // a business always works from a physical workplace
+            $request->merge(['location_type' => 'shop']);
+        }
         $rules = [
             'app.type' => 'required|in:individual,organization',
             'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',

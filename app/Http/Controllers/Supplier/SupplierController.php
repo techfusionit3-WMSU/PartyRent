@@ -161,6 +161,9 @@ class SupplierController extends Controller
         $back = fn ($ok, $msg) => redirect()->route('supplier.shop', ['tab' => $section])->with($ok ? 'success' : 'error', $msg)->withInput($ok ? [] : $request->input());
         switch ($section) {
             case 'profile':
+                if ($s->type === 'organization' || $s->isBusiness()) { // a business always works from a physical workplace
+                    $request->merge(['location_type' => 'shop']);
+                }
                 $v = $request->validate([
                     'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
                     'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'], 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',

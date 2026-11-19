@@ -10,7 +10,7 @@
     $sched = $q['schedule'] ?? [];
     $pctOf = fn ($k, $def) => old($k, collect($sched)->firstWhere('kind', $k === 'reservePct' ? 'reservation' : 'deposit')['pct'] ?? $def);
 @endphp
-<div class="crumbs"><a href="{{ route('business.bookings') }}">Inquiries & Bookings</a> / {{ $b->code }}</div>
+<div class="crumbs"><a href="{{ route('business.bookings') }}">Event Bookings</a> / {{ $b->code }}</div>
 <div class="page-head"><div><h1>{{ $b->event_type }} · {{ $b->event_date->format('D, M j, Y') }}</h1><p>{{ $b->code }} · <span class="badge {{ $b->statusBadge() }}">{{ $b->statusLabel() }}</span>@if($b->close_reason) · {{ $b->close_reason }}@endif</p></div>
   <div class="row wrap">
     @if($manage && $b->status === 'confirmed' && $b->event_date->lte(today()))<form method="POST" action="{{ route('business.bookings.complete', $b) }}">@csrf<button class="btn btn-success">{{ icon('check') }}Mark event done</button></form>@endif

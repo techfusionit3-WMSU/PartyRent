@@ -16,7 +16,7 @@ class BusinessNav
 
         return ['tag' => 'Business', 'items' => [
             ['Overview'], ['dashboard', 'business.dashboard', 'grid', 'Dashboard'],
-            ['bookings', 'business.bookings', 'list', 'Inquiries & Bookings', $inq, 'orders.view'],
+            ['bookings', 'business.bookings', 'list', 'Event Bookings', $inq, 'orders.view'],
             ['calendar', 'business.calendar', 'calendar', 'Event Calendar', 0, 'orders.view'],
             ['payments', 'business.payments', 'card', 'Event Payments', $pay, 'payments.view'],
             ['reviews', 'supplier.reviews', 'star', 'Reviews', 0, 'orders.view'],

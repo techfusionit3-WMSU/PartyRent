@@ -1,13 +1,13 @@
-@extends('layouts.dash', ['title' => 'Rental Requests', 'nav' => 'requests'])
+@extends('layouts.dash', ['title' => 'Rentals', 'nav' => 'requests'])
 
 @section('content')
-<div class="page-head"><div><h1>Rental Requests</h1><p>Review, accept or decline requests. Acceptance re-checks stock for every date.</p></div>
+<div class="page-head"><div><h1>Rentals</h1><p>Every rental from your customers, from new request to completed. Accepting re-checks stock for every date.</p></div>
   <form method="GET"><input type="hidden" name="tab" value="{{ $tab }}"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search no., customer, event" style="width:240px" aria-label="Search"></form>
 </div>
 <div class="tabs">@foreach([['pending', 'Pending'], ['upcoming', 'Accepted / Upcoming'], ['active', 'Ongoing & Returns'], ['completed', 'Completed'], ['closed', 'Declined / Cancelled'], ['all', 'All']] as [$k, $l])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.requests', array_filter(['tab' => $k, 'q' => $q])) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
 <div class="card pad-0">
   @if($list->isEmpty())
-    @include('partials.empty', ['text' => 'No requests in this tab.'])
+    @include('partials.empty', ['emoji' => '📋', 'title' => __('No requests here yet'), 'text' => __('New requests from customers show up here. More customers find you when your shop has photos, clear prices and good reviews.'), 'action' => '<a class="btn" href="'.e(route('suppliers.show', auth()->user()->shop())).'">'.icon('store').e(__('See your shop page')).'</a>'])
   @else
     <div class="table-wrap"><table class="table cards"><thead><tr><th>Request</th><th>Customer</th><th>Products</th><th>Rental dates</th><th class="num">Amount</th><th>Payment</th><th>Submitted</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $r)

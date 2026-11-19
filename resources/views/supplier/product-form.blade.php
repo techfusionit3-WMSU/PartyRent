@@ -42,7 +42,7 @@
         <div class="field" data-for="rent"><label>Condition</label><select class="input" name="condition">@foreach(\App\Domain\Damage::CONDITIONS as $k => $l)<option value="{{ $k }}" @selected(old('condition', $p->condition ?: 'brand_new') === $k)>{{ $l }}</option>@endforeach</select><div class="hint">Used for "Lost or Not Returned" compensation.</div></div>
       </div>
       @if(auth()->user()->shop()?->isBusiness())
-      <div class="field" data-for="rent"><label>Replacement value (₱ per unit)</label><input class="input" type="number" min="0" step="0.01" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}" style="max-width:300px"><div class="hint">The selling / replacement value — the basis for damage compensation (not the rental fee).</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+      <div class="field" data-for="rent"><label>Replacement value (₱ per unit){{ term('replacement_value') }}</label><input class="input" type="number" min="0" step="0.01" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}" style="max-width:300px"><div class="hint">The selling / replacement value — the basis for damage compensation (not the rental fee).</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
       @else
       {{-- Individual shops: purchase record → suggested replacement value (lowered for age and condition) + minor fee --}}
       <div class="card card-flat" data-for="rent" id="dmgBox" style="padding:14px">
@@ -56,7 +56,7 @@
           <div class="hint">Only PartyRent admins see it, and only if a customer disputes a charge. Customers just see "Receipt on file".@if($p->purchase_receipt) <a href="{{ route('supplier.products.receipt', $p) }}" target="_blank" rel="noopener">View current receipt</a> · <label class="check" style="display:inline-flex"><input type="checkbox" name="clear_receipt" value="1"> remove</label>@endif</div>
           @error('purchase_receipt')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
         <div class="form-grid">
-          <div class="field"><label for="repValue">Replacement value (₱ per unit)</label><input class="input" type="number" min="0" step="0.01" id="repValue" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}">
+          <div class="field"><label for="repValue">Replacement value (₱ per unit){{ term('replacement_value') }}</label><input class="input" type="number" min="0" step="0.01" id="repValue" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}">
             <div class="hint" id="sugHint">Enter the price you paid to get a suggestion.</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
           <div class="field"><label for="minorFee">Minor damage fee (₱ per unit) <span class="muted">(optional)</span></label><input class="input" type="number" min="0" step="0.01" id="minorFee" name="minor_fee" value="{{ old('minor_fee', $p->minor_fee) }}"><div class="hint">For cleaning, a stain or a small scratch.</div>@error('minor_fee')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
         </div>

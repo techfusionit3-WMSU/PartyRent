@@ -11,7 +11,7 @@
 <div class="card">
   <div class="tabs">@foreach([['all', 'All', $all->count()], ['pending', 'Pending', $all->where('status', 'pending')->count()], ['verified', 'Verified', null], ['rejected', 'Rejected', null]] as [$k, $l, $c])<a class="tab {{ $f === $k ? 'active' : '' }}" href="{{ route('customer.payments', ['f' => $k]) }}">{{ $l }}@if($c !== null)<span class="count">{{ $c }}</span>@endif</a>@endforeach</div>
   @if($pays->isEmpty())
-    @include('partials.empty', ['title' => 'Nothing here yet', 'text' => 'No payments yet.'])
+    @include('partials.empty', ['emoji' => '💳', 'title' => __('No payments yet'), 'text' => __('After a shop accepts your request, you pay from the rental page. Your payments and receipts are listed here.'), 'action' => '<a class="btn btn-primary" href="'.e(route('rentals.index')).'">'.icon('list').e(__('Go to My Rentals')).'</a>'])
   @else
     <div class="table-wrap"><table class="table cards"><thead><tr><th>Date</th><th>Transaction</th><th>Type</th><th>Method</th><th class="num">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>
       @foreach($pays as $p)

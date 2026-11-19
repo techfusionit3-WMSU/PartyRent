@@ -295,3 +295,16 @@ if (! function_exists('rental_period_outside')) {
         return \App\Support\RentalPeriod::outside($days);
     }
 }
+
+if (! function_exists('term')) {
+    /** A small "?" that explains a rental / payment word in place (App\Support\Glossary). */
+    function term(string $key): \Illuminate\Support\HtmlString
+    {
+        $t = \App\Support\Glossary::get($key);
+        if (! $t) {
+            return new \Illuminate\Support\HtmlString('');
+        }
+
+        return new \Illuminate\Support\HtmlString('<button type="button" class="term" data-term-title="'.e($t[0]).'" data-term="'.e($t[1]).'" aria-label="'.e(__('What is :term?', ['term' => $t[0]])).'">?</button>');
+    }
+}

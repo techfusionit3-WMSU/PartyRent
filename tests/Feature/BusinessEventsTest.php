@@ -76,7 +76,7 @@ class BusinessEventsTest extends TestCase
         $this->get('/supplier/inventory')->assertRedirect(route('business.dashboard'));
         $this->get('/supplier/team')->assertOk(); // team and profile are kept
         $this->get('/supplier/shop')->assertOk();
-        $this->get(route('business.dashboard'))->assertOk()->assertSee('Get your business ready')->assertSee('Inquiries &amp; Bookings', false)
+        $this->get(route('business.dashboard'))->assertOk()->assertSee('Get your business ready')->assertSee('Event Bookings')
             ->assertDontSee('Inventory Locations')->assertDontSee('Fulfillment &amp; Returns', false);
         $this->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('business.dashboard'));
 

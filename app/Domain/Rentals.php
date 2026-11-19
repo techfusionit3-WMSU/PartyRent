@@ -650,7 +650,7 @@ class Rentals
         $requests = [];
         foreach ($result['created'] as [$r, $s]) {
             $conflicts = array_filter(inv()->check($r->lines)['rows'], fn ($x) => ! empty($x['product_id']) && inv()->pendingOn($x['product_id'], $x['date'], $r->id) + $x['requested'] > $x['available']);
-            Notifier::notify($s->owner_id, 'supplier', 'New rental request', $u->name.' sent '.$r->code.' ('.$r->event_name.') for '.fmt_range($r->start_date, $r->end_date).' · '.Finance::PLAN_LABEL[$r->plan].(count($r->destinations ?? []) > 1 ? ' · '.count($r->destinations).' delivery locations' : '').'.'.($conflicts ? ' ⚠ Overlaps other pending requests.' : '').($r->installment_plan ? ' Installment schedule needs your review.' : ''), self::link('supplier.requests.show', $r));
+            Notifier::notify($s->owner_id, 'supplier', 'Accept or decline '.$u->firstName().'\'s request', $u->name.' sent '.$r->code.' ('.$r->event_name.') for '.fmt_range($r->start_date, $r->end_date).' · '.Finance::PLAN_LABEL[$r->plan].(count($r->destinations ?? []) > 1 ? ' · '.count($r->destinations).' delivery locations' : '').'.'.($conflicts ? ' ⚠ Overlaps other pending requests.' : '').($r->installment_plan ? ' Installment schedule needs your review.' : ''), self::link('supplier.requests.show', $r));
             Notifier::notify($u, 'customer', 'Rental request submitted', $r->code.' was sent to '.$s->name.' and is pending review. You will be notified once they respond.', self::link('rentals.show', $r));
             $requests[] = $r;
         }
@@ -724,7 +724,7 @@ class Rentals
         $history = array_merge($prev['history'] ?? [], $prev ? [['status' => $prev['status'], 'reason' => $prev['reason'] ?? '', 'at' => $prev['reviewedAt'] ?? $prev['proposedAt'] ?? null]] : []);
         $r->update(['installment_plan' => ['status' => 'proposed', 'items' => $items, 'proposedAt' => now()->toIso8601String(), 'history' => $history]]);
         self::history($r, $r->status, 'Installment schedule proposed ('.count($items).' payments)');
-        Notifier::notify($r->supplier->owner_id, 'supplier', 'Installment schedule to review', $by->name.' proposed '.count($items).' installment(s) for '.$r->code.'.', self::link('supplier.requests.show', $r));
+        Notifier::notify($r->supplier->owner_id, 'supplier', 'Review '.$by->firstName().'\'s installment schedule', $by->name.' proposed '.count($items).' installment(s) for '.$r->code.'. Approve or reject it.', self::link('supplier.requests.show', $r));
 
         return self::ok();
     }
@@ -861,7 +861,7 @@ class Rentals
         if (trim((string) $note) !== '' && $by) { // the note also lands in the conversation with the customer
             Chat::post($r, $by, 'supplier', trim((string) $note), false);
         }
-        Notifier::notify($r->customer_id, 'customer', 'Request accepted 🎉', $r->supplier->name.' accepted '.$r->code.'. '.(trim((string) $note) !== '' ? 'Message from the shop: "'.mb_strimwidth(trim((string) $note), 0, 200, '…').'" ' : '').($first
+        Notifier::notify($r->customer_id, 'customer', $first ? 'Accepted 🎉 Pay '.money($first['amount']).' to reserve' : 'Request accepted 🎉', $r->supplier->name.' accepted '.$r->code.'. '.(trim((string) $note) !== '' ? 'Message from the shop: "'.mb_strimwidth(trim((string) $note), 0, 200, '…').'" ' : '').($first
             ? 'Pay the '.mb_strtolower($first['label']).' of '.money($first['amount']).' by '.fmt_datetime($r->pay_by).' to reserve your items. They are not held for you until it is verified, and the request is cancelled if it is not paid in time.'
             : ''), self::link('rentals.show', $r));
         Notifier::audit('Accepted rental request', $r->code.' · '.money($r->pricing['total']));
@@ -906,7 +906,7 @@ class Rentals
             return;
         }
         Notifier::notify($r->customer_id, 'customer', 'Items reserved ✅', 'Your payment for '.$r->code.' is verified and your items are now reserved.', self::link('rentals.show', $r));
-        Notifier::notify($r->supplier->owner_id, 'supplier', 'Items reserved', $r->code.': the first payment is verified, so the items are now reserved. You can start preparing.', self::link('supplier.requests.show', $r));
+        Notifier::notify($r->supplier->owner_id, 'supplier', 'Start preparing '.$r->code, $r->code.': the first payment is verified, so the items are now reserved. Start preparing them for '.fmt_date($r->start_date).'.', self::link('supplier.requests.show', $r));
         foreach (RentalRequest::where('supplier_id', $r->supplier_id)->where('status', 'accepted')->whereNull('reserved_at')->where('id', '!=', $r->id)->get() as $o) {
             if (! inv()->check($o->lines, $o->id)['ok']) {
                 self::dropUnreserved($o, 'Another customer booked the same items for the same day and time first.');
@@ -1283,7 +1283,7 @@ class Rentals
             }
         }
         self::changed($r);
-        Notifier::notify($r->customer_id, 'customer', 'Rental completed', $r->code.' is complete. Thank you for renting with '.$r->supplier->name.'! You can now leave a review.', self::link('rentals.show', $r));
+        Notifier::notify($r->customer_id, 'customer', 'Rate your rental · '.$r->code, $r->code.' is complete. Thank you for renting with '.$r->supplier->name.'! Tell others how it went.', self::link('rentals.show', $r));
         Notifier::audit('Completed rental', $r->code);
         // escrow: PartyRent releases the supplier's money now (skipped if a payment is still pending —
         // the request then waits in the admin's "awaiting release" list)
@@ -1400,8 +1400,8 @@ class Rentals
             Notifier::finance($r->supplier, 'Cash payment to confirm', $cust->name.' · '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.'. Confirm it once you have the cash.', self::link('supplier.payments', ['tab' => 'verify']));
         } else {
             // the money went to PartyRent's account, so PartyRent checks it (not the shop)
-            Notifier::notify('cashier', 'cashier', 'Payment to verify', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
-            Notifier::notify('admin', 'admin', 'Payment to verify', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
+            Notifier::notify('cashier', 'cashier', 'Verify '.$cust->firstName().'\'s '.money($p->amount).' '.$p->methodLabel().' payment', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
+            Notifier::notify('admin', 'admin', 'Verify '.$cust->firstName().'\'s '.money($p->amount).' '.$p->methodLabel().' payment', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
             Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment submitted', $cust->name.' sent '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.'. PartyRent is checking it; you will be told once it is confirmed.', self::link('supplier.requests.show', $r));
         }
         if ($source === 'supplier') {
@@ -1669,7 +1669,7 @@ class Rentals
                 $flags[$s['key']] = now()->toIso8601String();
                 $count++;
                 $msg = $s['label'].' of '.money($s['amount']).' for '.$r->code.' was due '.fmt_date($s['due']).'. Outstanding: '.money($f['overdueAmount']).'.';
-                Notifier::notify($r->customer_id, 'customer', 'Payment overdue', $msg.' Please pay as soon as possible.', self::link('rentals.show', $r));
+                Notifier::notify($r->customer_id, 'customer', 'Pay now: payment overdue · '.$r->code, $msg.' Open the rental to pay.', self::link('rentals.show', $r));
                 Notifier::notify($r->supplier->owner_id, 'supplier', 'Overdue payment', $r->customer->name.': '.$msg, self::link('supplier.requests.show', $r));
                 if (\App\Models\ShopStaff::where('supplier_id', $r->supplier_id)->withRole('cashier')->where('status', 'active')->exists()) {
                     Notifier::finance($r->supplier, 'Overdue payment', $r->customer->name.': '.$msg, self::link('cashier.balances'));

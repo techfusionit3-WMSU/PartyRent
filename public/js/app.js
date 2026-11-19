@@ -758,3 +758,36 @@
   document.addEventListener('submit', e => { e.target.querySelectorAll && e.target.querySelectorAll('[data-tags] .tag-type').forEach(t => { if (norm(t.value)) add(t.closest('[data-tags]'), t.value); }); }, true);
   document.querySelectorAll('[data-tags]').forEach(refresh);
 })();
+
+/* Term tips: a small "?" next to a word opens a short explanation (click, tap or keyboard). */
+(function () {
+  let pop = null, owner = null;
+  function close() { if (pop) { pop.remove(); pop = null; } if (owner) { owner.setAttribute('aria-expanded', 'false'); owner = null; } }
+  function open(btn) {
+    close();
+    owner = btn;
+    pop = document.createElement('div');
+    pop.className = 'term-pop';
+    pop.id = 'term-pop';
+    pop.setAttribute('role', 'tooltip');
+    const b = document.createElement('b'); b.textContent = btn.dataset.termTitle || '';
+    const p = document.createElement('span'); p.textContent = btn.dataset.term || '';
+    pop.append(b, p);
+    document.body.appendChild(pop);
+    const r = btn.getBoundingClientRect(), w = pop.offsetWidth;
+    let left = window.scrollX + r.left + r.width / 2 - w / 2;
+    left = Math.max(window.scrollX + 8, Math.min(left, window.scrollX + document.documentElement.clientWidth - w - 8));
+    pop.style.left = left + 'px';
+    pop.style.top = (window.scrollY + r.bottom + 8) + 'px';
+    btn.setAttribute('aria-expanded', 'true');
+    btn.setAttribute('aria-describedby', 'term-pop');
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest('.term');
+    if (t) { e.preventDefault(); e.stopPropagation(); owner === t ? close() : open(t); return; }
+    if (pop && !e.target.closest('.term-pop')) close();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  window.addEventListener('scroll', close, { passive: true });
+  window.addEventListener('resize', close);
+})();

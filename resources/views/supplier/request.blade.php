@@ -8,7 +8,7 @@
 
 @section('content')
 <div data-leave-warn="dirty" data-leave-msg="You started filling in a form on this request (payment, notes or a status step) that was not saved. Leave anyway?" hidden></div>
-<div class="crumbs"><a href="{{ route('supplier.requests') }}">Rental Requests</a> / {{ $r->code }}</div>
+<div class="crumbs"><a href="{{ route('supplier.requests') }}">Rentals</a> / {{ $r->code }}</div>
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><div class="mb-1">@include('partials.txn-code', ['code' => $r->code, 'side' => 'supplier'])</div><p>@if($r->event_type && $r->event_type !== 'Other'){{ $r->event_type }} · @endif event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status]) @if($r->status !== 'pending') @include('partials.badges', ['pay' => $f['status']])@endif @include('partials.badges', ['planBadge' => $r->plan])</div></div>
 @if($r->awaitingDownPayment())<div class="alert alert-warn">{{ icon('clock') }}<div><b>Accepted, waiting for the first payment.</b> Nothing is reserved yet: the stock is held once the {{ mb_strtolower($f['schedule'][0]['label'] ?? 'first payment') }} is verified. The customer has until <b>{{ fmt_datetime($r->pay_by) }}</b>; after that the request is cancelled. If another customer pays first for the same items and time, this one is declined automatically.</div></div>@endif
 @include('partials.case-alert', ['r' => $r])
@@ -275,7 +275,7 @@
     <div class="form-grid">
       <div class="field"><label>Payment type</label><select class="input" name="type">
         @if($f['balance'] - $f['pendingRental'] > 0)<option value="{{ $sug['type'] }}">{{ $sug['label'] }}</option><option value="balance">Remaining balance</option>@endif
-        @if($f['depositPaid'] < $f['depositRequired'])<option value="deposit">Security deposit</option>@endif
+        @if($f['depositPaid'] < $f['depositRequired'])<option value="deposit">Security deposit{{ term('security_deposit') }}</option>@endif
         @if($f['compensationDue'] > 0)<option value="compensation">Damage compensation</option>@endif
       </select></div>
       <div class="field"><label>Amount (₱)</label><input class="input" type="number" step="0.01" min="1" name="amount" required value="{{ $sug['amount'] ?: '' }}"></div>

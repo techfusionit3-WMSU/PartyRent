@@ -96,7 +96,7 @@ class ReserveOnDownPaymentTest extends TestCase
         $this->actingAs($this->s->owner);
         $this->assertTrue(Rentals::acceptRequest($r->fresh(), 'We will call you on your number before delivery.')['ok']);
         $this->assertDatabaseHas('request_messages', ['rental_request_id' => $r->id, 'side' => 'supplier', 'body' => 'We will call you on your number before delivery.']);
-        $this->assertDatabaseHas('app_notifications', ['user_id' => $r->customer_id, 'title' => 'Request accepted 🎉']);
+        $this->assertTrue(\App\Models\AppNotification::where('user_id', $r->customer_id)->where('title', 'like', 'Accepted 🎉 Pay %')->exists());
         $this->actingAs($r->customer)->get(route('rentals.show', $r))->assertOk()->assertSee('Message from '.$this->s->name)->assertSee('We will call you on your number before delivery.');
     }
 

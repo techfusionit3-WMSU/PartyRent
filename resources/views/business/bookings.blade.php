@@ -1,7 +1,7 @@
-@extends('layouts.dash', ['title' => 'Inquiries & Bookings', 'nav' => 'bookings'])
+@extends('layouts.dash', ['title' => 'Event Bookings', 'nav' => 'bookings'])
 
 @section('content')
-<div class="page-head"><div><h1>Inquiries & Bookings</h1><p>Customers send an inquiry, you reply with a quotation, and the date is yours once they pay the reservation fee.</p></div></div>
+<div class="page-head"><div><h1>Event Bookings</h1><p>Customers send an inquiry, you reply with a quotation, and the date is yours once they pay the reservation fee.</p></div></div>
 <div class="tabs">@foreach(\App\Http\Controllers\Business\BookingController::TABS as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('business.bookings', ['tab' => $k]) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
 @if($list->isEmpty())
   <div class="card">@include('partials.empty', ['emoji' => '📅', 'title' => 'Nothing here', 'text' => $tab === 'inquiry' ? 'New inquiries from customers show up here.' : ''])</div>

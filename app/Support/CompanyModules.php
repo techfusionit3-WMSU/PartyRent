@@ -23,21 +23,21 @@ class CompanyModules
             'label' => 'Owner', 'icon' => 'store', 'roles' => ['org_admin'], 'home' => 'supplier.dashboard',
             'about' => 'Everything: catalog, policies, team, reports and payouts.',
             'nav' => [
-                ['Overview'], ['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['requests', 'supplier.requests', 'list', 'Rental Requests', 'requests', 'orders.view'], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns', null, 'orders.view'], ['cases', 'supplier.shortfalls', 'alert', 'Problems & Cases', 'cases', 'orders.view'],
+                ['Overview'], ['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['requests', 'supplier.requests', 'list', 'Rentals', 'requests', 'orders.view'], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns', null, 'orders.view'], ['cases', 'supplier.shortfalls', 'alert', 'Problems & Cases', 'cases', 'orders.view'],
                 ['Catalog'], ['products', 'supplier.products', 'box', 'Products', null, 'products.manage'], ['packages', 'supplier.packages', 'package', 'Packages', null, 'products.manage'], ['discounts', 'supplier.discounts', 'tag', 'Discounts', null, 'products.manage'], ['inventory', 'supplier.inventory', 'layers', 'Inventory', null, 'inventory.manage'], ['locations', 'supplier.locations', 'map', 'Inventory Locations', null, 'locations.manage'], ['calendar', 'supplier.calendar', 'calendar', 'Inventory Calendar', null, 'orders.view'],
                 ['Money & reports'], ['payments', 'supplier.payments', 'card', 'Payments', 'payments', 'payments.view'], ['damages', 'supplier.damages', 'tool', 'Damage & Compensation', null, 'returns.inspect'], ['reports', 'supplier.reports', 'bars', 'Business Reports', null, 'reports.view'],
                 ['Shop'], ['shop', 'supplier.shop', 'store', 'Shop Profile & Settings', null, 'shop.manage'], ['reviews', 'supplier.reviews', 'star', 'Reviews', null, 'orders.view'], ['team', 'supplier.team', 'users', 'Team & Roles', null, 'team.manage'], ['notifications', 'notifications', 'bell', 'Notifications'],
             ],
-            'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products', null, 'products.manage'], ['requests', 'supplier.requests', 'list', 'Requests', null, 'orders.view'], ['payments', 'supplier.payments', 'card', 'Payments', null, 'payments.view']],
+            'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products', null, 'products.manage'], ['requests', 'supplier.requests', 'list', 'Rentals', null, 'orders.view'], ['payments', 'supplier.payments', 'card', 'Payments', null, 'payments.view']],
         ],
         'desk' => [
             'label' => 'Front Desk', 'icon' => 'list', 'roles' => ['desk'], 'home' => 'supplier.desk',
             'about' => 'New requests, customer chat, schedule changes, problem cases and reviews.',
             'nav' => [
-                ['Front desk'], ['desk', 'supplier.desk', 'grid', 'Front Desk'], ['requests', 'supplier.requests', 'list', 'Rental Requests', 'requests', 'orders.view'], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns', null, 'orders.view'], ['calendar', 'supplier.calendar', 'calendar', 'Availability Calendar', null, 'orders.view'],
+                ['Front desk'], ['desk', 'supplier.desk', 'grid', 'Front Desk'], ['requests', 'supplier.requests', 'list', 'Rentals', 'requests', 'orders.view'], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns', null, 'orders.view'], ['calendar', 'supplier.calendar', 'calendar', 'Availability Calendar', null, 'orders.view'],
                 ['Customers'], ['cases', 'supplier.shortfalls', 'alert', 'Problems & Cases', 'cases', 'orders.view'], ['reviews', 'supplier.reviews', 'star', 'Reviews', null, 'orders.view'], ['notifications', 'notifications', 'bell', 'Notifications'],
             ],
-            'bottom' => [['desk', 'supplier.desk', 'grid', 'Home'], ['requests', 'supplier.requests', 'list', 'Requests', null, 'orders.view'], ['cases', 'supplier.shortfalls', 'alert', 'Cases', null, 'orders.view'], ['calendar', 'supplier.calendar', 'calendar', 'Calendar', null, 'orders.view']],
+            'bottom' => [['desk', 'supplier.desk', 'grid', 'Home'], ['requests', 'supplier.requests', 'list', 'Rentals', null, 'orders.view'], ['cases', 'supplier.shortfalls', 'alert', 'Cases', null, 'orders.view'], ['calendar', 'supplier.calendar', 'calendar', 'Calendar', null, 'orders.view']],
         ],
         'cashier' => [
             'label' => 'Cashier', 'icon' => 'card', 'roles' => ['cashier'], 'home' => 'cashier.dashboard',

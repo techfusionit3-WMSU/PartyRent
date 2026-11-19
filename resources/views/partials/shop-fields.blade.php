@@ -40,7 +40,7 @@
         @if($v === 'down')
         <div class="arr-panel" data-arr-panel="down"><div><div class="pay-box">
           <div class="field" data-amount="down" data-sample-label="rental">
-            <label>Down payment</label>
+            <label>Down payment{{ term('down_payment') }}</label>
             <input type="hidden" name="downType" value="{{ $po('downType') === 'fixed' ? 'fixed' : 'percent' }}" data-amount-type>
             <div class="seg pay-seg" role="group" aria-label="Down payment type"><button type="button" data-type="percent">Percentage of the rental</button><button type="button" data-type="fixed">Fixed amount (₱)</button></div>
             <div class="affix"><span class="affix-pre">₱</span><input class="input" type="number" min="0" step="any" name="downValue" value="{{ $po('downValue') }}" data-amount-value data-min-positive aria-label="Down payment value"><span class="affix-post">%</span></div>
@@ -77,7 +77,7 @@
   </div>
   <div class="pay-box mt-2">
     <div class="field" data-amount="deposit" style="margin:0">
-      <label>Security deposit</label>
+      <label>Security deposit{{ term('security_deposit') }}</label>
       <input type="hidden" name="depositType" value="{{ $po('depositType') === 'percent' ? 'percent' : 'fixed' }}" data-amount-type>
       <div class="seg pay-seg" role="group" aria-label="Security deposit type"><button type="button" data-type="fixed">₱ fixed</button><button type="button" data-type="percent">% of items</button></div>
       <div class="affix"><span class="affix-pre">₱</span><input class="input" type="number" min="0" step="any" name="depositValue" value="{{ $po('depositValue') }}" data-amount-value aria-label="Security deposit value"><span class="affix-post">%</span></div>

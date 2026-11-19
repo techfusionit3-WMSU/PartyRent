@@ -1,4 +1,4 @@
-@extends('layouts.dash', ['title' => 'Transactions & Reservations', 'nav' => 'transactions'])
+@extends('layouts.dash', ['title' => 'Rentals & Transactions', 'nav' => 'transactions'])
 
 @section('content')
 <div class="page-head"><div><h1>Transactions & reservations</h1><p>Every rental request on the platform (read-only — suppliers and cashiers act on them).</p></div>

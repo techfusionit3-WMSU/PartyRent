@@ -6,7 +6,7 @@
 @section('content')
 <div class="page-head"><div><h1>Rental Packages</h1><p>Bundles of your items at a fixed price. Reserving a package deducts each included item from inventory.</p></div><a class="btn btn-primary" href="{{ route('supplier.packages.create') }}">{{ icon('plus') }}Create package</a></div>
 @if($list->isEmpty())
-  <div class="card">@include('partials.empty', ['emoji' => '📦', 'title' => 'No packages yet', 'text' => 'Bundle items that customers often rent together.'])</div>
+  <div class="card">@include('partials.empty', ['emoji' => '📦', 'title' => 'No packages yet', 'text' => __('Bundle items that customers often rent together, like "Kiddie party set: 30 chairs, 5 tables, balloons".'), 'action' => auth()->user()->orgCan('products.manage') ? '<a class="btn btn-primary" href="'.e(route('supplier.packages.create')).'">'.icon('plus').e(__('Create a package')).'</a>' : ''])</div>
 @else
   <div class="grid grid-2">
     @foreach($list as $n => $k)

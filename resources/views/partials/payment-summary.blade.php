@@ -4,14 +4,14 @@
 @php($ip = $r->installment_plan)
 @php($plan = $p['plan'] ?? 'full')
 <div class="row between mb-1"><h3 class="mb-0">Payment summary</h3>@include('partials.badges', ['pay' => $f['status']])</div>
-<div class="row wrap gap-sm mb-1">@include('partials.badges', ['planBadge' => $plan])@if($f['reservationConfirmed'])<span class="badge b-green plain">{{ $plan === 'full' ? 'Order confirmed' : 'Reserved' }}</span>@endif @if($f['pendingRental'])<span class="badge b-gold plain">Awaiting verification: {{ money($f['pendingRental']) }}</span>@endif</div>
+<div class="row wrap gap-sm mb-1">@include('partials.badges', ['planBadge' => $plan])@if($f['reservationConfirmed'])<span class="badge b-green plain">{{ $plan === 'full' ? 'Order confirmed' : 'Reserved' }}</span>{{ term('reserved') }}@endif @if($f['pendingRental'])<span class="badge b-gold plain">Awaiting verification: {{ money($f['pendingRental']) }}</span>@endif</div>
 @include('partials.rental-charges', ['q' => $p])
 @if($plan === 'full')
-  <div class="sum-line"><span class="muted">Full Payment (100%)</span><span>{{ money($p['total']) }}</span></div>
+  <div class="sum-line"><span class="muted">Full Payment (100%){{ term('full_payment') }}</span><span>{{ money($p['total']) }}</span></div>
 @else
-  @if($p['reservationFee'])<div class="sum-line"><span class="muted">Reservation Fee ({{ $p['terms']['resPct'] }}%) <span class="badge b-teal plain">non-refundable · credited</span></span><span>{{ money($p['reservationFee']) }}</span></div>@endif
-  @if($p['downPayment'])<div class="sum-line"><span class="muted">Down Payment ({{ $p['terms']['downPct'] }}%) <span class="badge b-teal plain">credited</span></span><span>{{ money($p['downPayment']) }}</span></div>@endif
-  <div class="sum-line"><span class="muted">{{ $plan === 'installment' ? 'Installment balance' : 'Final Balance' }} ({{ 100 - ($p['terms']['resPct'] ?? 0) - ($p['terms']['downPct'] ?? 0) }}%)</span><span>{{ money($p['finalBalance']) }}</span></div>
+  @if($p['reservationFee'])<div class="sum-line"><span class="muted">Reservation Fee ({{ $p['terms']['resPct'] }}%){{ term('reservation_fee') }} <span class="badge b-teal plain">non-refundable · credited</span></span><span>{{ money($p['reservationFee']) }}</span></div>@endif
+  @if($p['downPayment'])<div class="sum-line"><span class="muted">Down Payment ({{ $p['terms']['downPct'] }}%){{ term('down_payment') }} <span class="badge b-teal plain">credited</span></span><span>{{ money($p['downPayment']) }}</span></div>@endif
+  <div class="sum-line"><span class="muted">{{ $plan === 'installment' ? 'Installment balance' : 'Final Balance' }}{{ term($plan === 'installment' ? 'installment' : 'final_balance') }} ({{ 100 - ($p['terms']['resPct'] ?? 0) - ($p['terms']['downPct'] ?? 0) }}%)</span><span>{{ money($p['finalBalance']) }}</span></div>
 @endif
 @if($ip)<div class="small mt-1">Installment schedule: <span class="badge {{ ['approved' => 'b-green', 'proposed' => 'b-gold', 'rejected' => 'b-red'][$ip['status']] ?? 'b-gray' }}">{{ ucfirst($ip['status'] === 'proposed' ? 'awaiting supplier approval' : $ip['status']) }}</span>@if($ip['status'] === 'rejected' && ! empty($ip['reason']))<div class="muted">{{ $ip['reason'] }}</div>@endif</div>@endif
 <div class="sum-line strong mt-1"><span>Total rental amount</span><span>{{ money($f['payable']) }}</span></div>

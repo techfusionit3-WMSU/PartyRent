@@ -11,7 +11,7 @@
 </form>
 <div class="card pad-0">
   @if($list->isEmpty())
-    @include('partials.empty', ['emoji' => '📦', 'title' => 'No products here', 'text' => 'Add your first rental item.'])
+    @include('partials.empty', ['emoji' => '📦', 'title' => 'No products here', 'text' => __('Add your first item: a name, a photo, the price per day and how many you have.'), 'action' => auth()->user()->orgCan('products.manage') ? '<a class="btn btn-primary" href="'.e(route('supplier.products.create')).'">'.icon('plus').e(__('Add a product')).'</a>' : ''])
   @else
     <div class="table-wrap"><table class="table cards"><thead><tr><th>Item</th><th>Price</th><th>Stock today</th><th class="num">Rentals</th><th>Status</th><th></th></tr></thead><tbody>
       @foreach($list as $p)

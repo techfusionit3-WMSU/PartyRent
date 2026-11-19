@@ -2,7 +2,7 @@
 
 @section('content')
 @if($prods->isEmpty())
-  <div class="card">@include('partials.empty', ['emoji' => '📅', 'title' => 'No items yet', 'text' => 'Add a product to see its calendar.'])</div>
+  <div class="card">@include('partials.empty', ['emoji' => '📅', 'title' => 'No items yet', 'text' => __('Each item gets a calendar of booked and free days once you add it.'), 'action' => auth()->user()->orgCan('products.manage') ? '<a class="btn btn-primary" href="'.e(route('supplier.products.create')).'">'.icon('plus').e(__('Add a product')).'</a>' : ''])</div>
 @else
 @php($q = fn (array $o) => route('supplier.calendar', array_merge(['item' => $p->id, 'view' => $view, 'd' => $cursor], $o)))
 <div class="page-head"><div><h1>Inventory Calendar</h1><p>Select an item to see its rental schedule.</p></div>

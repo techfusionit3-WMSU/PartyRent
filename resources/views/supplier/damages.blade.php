@@ -27,7 +27,7 @@
 </div>
 <div class="card pad-0">
   @if($list->isEmpty())
-    @include('partials.empty', ['emoji' => '🧰', 'title' => 'No inspections recorded yet.', 'text' => ''])
+    @include('partials.empty', ['emoji' => '🧰', 'title' => __('No inspections yet'), 'text' => __('When items come back, record the inspection on the rental. Damage and charges then show here.')])
   @else
   <div class="table-wrap"><table class="table cards"><thead><tr><th>Request</th><th>Confirmed</th><th class="num">Repairable</th><th class="num">Non-repairable</th><th class="num">Lost</th><th class="num">Compensation</th><th>Settlement</th><th>Evidence</th><th></th></tr></thead><tbody>
     @foreach($list as $r)

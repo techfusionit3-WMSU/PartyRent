@@ -23,7 +23,7 @@
       <div class="row between mt-1"><span class="small muted">{{ $s->products->count() }} items · {{ $s->packages_count }} packages</span><a class="btn btn-sm btn-outline" href="{{ route('suppliers.show', $s) }}">Visit shop</a></div>
     </div>
   @empty
-    @include('partials.empty', ['emoji' => '🏪', 'title' => 'No suppliers found', 'text' => 'Try another search.'])
+    @include('partials.empty', ['emoji' => '🏪', 'title' => 'No suppliers found', 'text' => __('Try a shorter name, another city, or clear the search.')])
   @endforelse
 </div>
 @endsection

@@ -21,7 +21,7 @@
     <div class="card"><div class="card-head"><h3>{{ $t }}</h3><span class="badge {{ $cls }}">{{ $l->count() }}</span></div>
       @forelse($l as $r)
         <a href="{{ route('supplier.requests.show', $r) }}" class="card card-flat mb-1" style="display:block;padding:12px;color:inherit;text-decoration:none"><div class="row between"><b>{{ $r->code }}</b><span class="small muted">{{ fmt_range($r->start_date, $r->end_date) }}</span></div><div class="small">{{ $r->event_name }} · {{ $r->customer->name }}</div><div class="small muted">{{ $r->fulfillment === 'delivery' ? '🚚 Delivery' : '🏬 Pickup' }} · @include('partials.badges', ['pay' => $r->fin()['status']])</div></a>
-      @empty <p class="small muted">None</p> @endforelse
+      @empty <p class="small muted">{{ __('Nothing at this step.') }}</p> @endforelse
     </div>
   @endforeach
 </div>

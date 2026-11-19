@@ -102,7 +102,7 @@
     <div class="field"><label for="poCat">Category</label><select class="input" id="poCat">@foreach($cats as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select></div>
     <div class="form-grid"><div class="field"><label for="poStock">How many you have</label><input class="input" type="number" id="poStock" min="1" max="100000" value="1"></div>
       <div class="field"><label for="poPrice">Value (₱ <span id="poPer">per day</span>)</label><input class="input" type="number" id="poPrice" min="0.01" step="0.01" placeholder="e.g. 500"><div class="hint">Used when the package price is a sum of its items, and shown as the "separately" value.</div></div></div>
-    <div class="form-grid" id="poDmg"><div class="field"><label for="poRep">Replacement value (₱ each)</label><input class="input" type="number" id="poRep" min="0.01" step="0.01" placeholder="what it costs to replace"><div class="hint">Charged if it is lost or beyond repair; repairs never cost more.</div></div>
+    <div class="form-grid" id="poDmg"><div class="field"><label for="poRep">Replacement value (₱ each){{ term('replacement_value') }}</label><input class="input" type="number" id="poRep" min="0.01" step="0.01" placeholder="what it costs to replace"><div class="hint">Charged if it is lost or beyond repair; repairs never cost more.</div></div>
       <div class="field"><label for="poMinor">Minor damage fee (₱ each) <span class="muted">(optional)</span></label><input class="input" type="number" id="poMinor" min="0" step="0.01" placeholder="cleaning, stain"></div></div>
   </div>
   <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn btn-primary" id="poSave">Add to package</button></div></div></div>

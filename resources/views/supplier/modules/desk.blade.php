@@ -3,7 +3,7 @@
 {{-- Front Desk module home: everything that needs an answer to a customer. --}}
 @section('content')
 <div class="page-head"><div><h1>Front Desk</h1><p>{{ $sup->name }} · requests, messages and problems that need an answer, {{ fmt_date($T) }}.</p></div>
-  <a class="btn btn-primary" href="{{ route('supplier.requests') }}">{{ icon('list') }}All requests</a></div>
+  <a class="btn btn-primary" href="{{ route('supplier.requests') }}">{{ icon('list') }}All rentals</a></div>
 @include('partials.guides', ['welcome' => \App\Domain\Guides::welcome(auth()->user(), 'desk')])
 @include('partials.needs-you', ['tasks' => \App\Domain\Tasks::forModule(auth()->user(), 'desk')])
 <div class="stats">

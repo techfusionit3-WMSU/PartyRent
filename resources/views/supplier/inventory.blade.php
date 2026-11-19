@@ -24,7 +24,7 @@
 </div>
 <div class="card pad-0">
   @if($prods->isEmpty())
-    @include('partials.empty', ['emoji' => '📦', 'title' => 'No products yet', 'text' => 'Add products to track their inventory.'])
+    @include('partials.empty', ['emoji' => '📦', 'title' => 'No products yet', 'text' => __('Stock appears here once you add a product.'), 'action' => auth()->user()->orgCan('products.manage') ? '<a class="btn btn-primary" href="'.e(route('supplier.products.create')).'">'.icon('plus').e(__('Add a product')).'</a>' : ''])
   @else
   <div class="table-wrap"><table class="table cards"><thead><tr><th>Item</th><th class="num">Total</th><th class="num">Reserved</th><th class="num">Damaged</th><th class="num">Written off</th><th class="num">Missing</th><th class="num">Maint.</th><th class="num">Set aside</th><th class="num">Available</th><th class="num">Pending</th><th></th></tr></thead><tbody>
     @foreach($rows as ['p' => $p, 'b' => $b])

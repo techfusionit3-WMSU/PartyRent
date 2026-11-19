@@ -143,13 +143,26 @@
 
   {{-- 5 · Delivery & payments --}}
   <section data-step="4">
+    <div data-for="organization">
+      <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">As an event company you set up on-site at the customer's venue, so there is no delivery or pickup. Customers book you by asking for a quotation; you set the price per event.</div></div>
+      @php($bset = array_replace(\App\Domain\Events::SETTINGS, (array) data_get($d, 'business_profile.settings', [])))
+      <div class="field @error('serviceAreas') invalid @enderror" data-tagfield="serviceAreas"><label>Cities and areas you serve</label>@include('partials.tag-input', ['name' => 'serviceAreas', 'values' => old('serviceAreas', $bset['serviceAreas']), 'suggest' => [], 'placeholder' => 'Type a city and press Enter, e.g. Zamboanga City'])<div class="error-text" @error('serviceAreas') style="display:block" @enderror>{{ $errors->first('serviceAreas') ?: 'Add at least one city or area.' }}</div></div>
+      <h3 class="mt-2 mb-1">Payment schedule for bookings</h3>
+      <p class="small muted mt-0">Customers pay to your payout account (next step) in parts. You can change this later and per quotation.</p>
+      <div class="form-grid">
+        <div class="field"><label>Reservation fee (% to hold the date)</label><input class="input" type="number" min="0" max="100" step="0.5" name="reservePct" required value="{{ old('reservePct', $bset['reservePct']) }}">{!! $err('reservePct') !!}</div>
+        <div class="field"><label>Deposit (% due {{ $bset['depositDays'] }} days before)</label><input class="input" type="number" min="0" max="100" step="0.5" name="depositPct" required value="{{ old('depositPct', $bset['depositPct']) }}">{!! $err('depositPct') !!}<div class="hint">The rest is the balance, due {{ $bset['balanceDays'] }} days before the event.</div></div>
+      </div>
+    </div>
+    <div data-for="individual">
     <div class="stack-sm">@foreach([['delivery', 'Delivery only', 'You bring items to the customer.'], ['pickup', 'Pickup only', 'Customers collect from your location.'], ['both', 'Both delivery and pickup', 'Let customers choose.']] as [$v, $l, $desc])
       <label class="card card-flat row" style="padding:12px 14px;cursor:pointer"><input type="radio" name="fulfillment" value="{{ $v }}" @checked($o('fulfillment', 'both') === $v) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $desc }}</div></div></label>
     @endforeach</div>{!! $err('fulfillment') !!}
     <div class="field"><label>Accepted payment methods</label>
       @foreach(['cash' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $k => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $k }}" @checked(in_array($k, $methods, true))> {{ $l }}</label>@endforeach
       {!! $err('methods') !!}</div>
-    <div class="alert alert-info">{{ icon('info') }}<div class="small">No delivery fee, down payment or deposit percentages are asked here. They differ per item, event and situation, so you set them in Shop Settings after approval and when you post each package.</div></div>
+    </div>
+    <div class="alert alert-info" data-for="individual">{{ icon('info') }}<div class="small">No delivery fee, down payment or deposit percentages are asked here. They differ per item, event and situation, so you set them in Shop Settings after approval and when you post each package.</div></div>
   </section>
 
   {{-- 6 · Payout --}}
@@ -166,10 +179,11 @@
 
   {{-- 7 · Policies --}}
   <section data-step="6">
-    <div class="field"><label>Free cancellation window (days before rental)</label><input class="input" type="number" min="0" max="30" name="cancelDays" value="{{ old('cancelDays', $pol['cancelDays'] ?? 3) }}"></div>
+    <div class="field" data-for="individual"><label>Free cancellation window (days before rental)</label><input class="input" type="number" min="0" max="30" name="cancelDays" value="{{ old('cancelDays', $pol['cancelDays'] ?? 3) }}"></div>
     <div class="field"><label>Cancellation policy</label><textarea class="input" name="cancellation" required>{{ old('cancellation', $pol['cancellation'] ?? '') }}</textarea>{!! $err('cancellation') !!}</div>
-    <div class="field"><label>Return policy</label><textarea class="input" name="returns" required>{{ old('returns', $pol['returns'] ?? '') }}</textarea></div>
-    <div class="field"><label>Rental conditions</label><textarea class="input" name="conditions" required>{{ old('conditions', $pol['conditions'] ?? '') }}</textarea></div>
+    <div class="field" data-for="individual"><label>Return policy</label><textarea class="input" name="returns" required>{{ old('returns', $pol['returns'] ?? '') }}</textarea></div>
+    <div class="field" data-for="individual"><label>Rental conditions</label><textarea class="input" name="conditions" required>{{ old('conditions', $pol['conditions'] ?? '') }}</textarea></div>
+    <div class="field" data-for="organization"><label>Rescheduling policy</label><textarea class="input" name="rescheduling" required minlength="10" placeholder="e.g. One free date change if asked at least 14 days before the event.">{{ old('rescheduling', $pol['rescheduling'] ?? 'One free date change if asked at least 14 days before the event, subject to availability.') }}</textarea>{!! $err('rescheduling') !!}</div>
   </section>
 
   {{-- 8 · Review --}}
@@ -187,7 +201,7 @@
 @push('scripts')
 <script>
 (function () {
-  var f = document.getElementById('wf'), steps = f.querySelectorAll('section[data-step]'), titles = @json($steps), step = 0;
+  var f = document.getElementById('wf'), steps = f.querySelectorAll('section[data-step]'), indTitles = @json($steps), orgTitles = @json(\App\Http\Controllers\Customer\StartSellingController::ORG_STEPS), titles = indTitles, step = 0;
   var $$ = function (s, r) { return Array.prototype.slice.call((r || f).querySelectorAll(s)); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var val = function (n) { var i = f.querySelector('[name="' + n + '"]'); return i ? i.value.trim() : ''; };
@@ -213,7 +227,10 @@
     else { rows.push(['Applicant', val('app[personal][fullName]') + ' · born ' + (val('app[personal][birthDate]') || '—')]); rows.push(['ID', val('app[identity][idType]') + ' · ' + val('app[identity][idNumber]')]); }
     rows.push(['Shop contact', val('phone') + ' · ' + val('email')]);
     rows.push(['Address', [val('shop_addr[street]'), val('shop_addr[barangay]')].filter(Boolean).join(', ')]);
-    rows.push(['Methods', $$('[name="methods[]"]:checked').map(function (c) { return c.parentNode.textContent.trim(); }).join(', ')]);
+    if (org()) {
+      rows.push(['Serves', $$('[name="serviceAreas[]"]:not([disabled])').map(function (i) { return i.value; }).join(', ')]);
+      rows.push(['Payments', val('reservePct') + '% to reserve · ' + val('depositPct') + '% deposit · rest before the event']);
+    } else rows.push(['Methods', $$('[name="methods[]"]:checked').map(function (c) { return c.parentNode.textContent.trim(); }).join(', ')]);
     rows.push(['Payout', [val('app[payout][provider]'), val('app[payout][accountName]'), val('app[payout][accountNumber]')].join(' · ')]);
     var docs = $$('[data-docrow]').filter(function (r) { return !r.closest('[hidden]') && !r.querySelector('[data-docname]').hidden; }).map(function (r) { return '<span class="tag">' + esc(r.dataset.label) + '</span>'; }).join(' ');
     var logo = f.querySelector('[name=logo]:checked'), ful = f.querySelector('[name=fulfillment]:checked'), miss = missingDocs();
@@ -224,6 +241,8 @@
   }
   function draw() {
     applyType();
+    titles = org() ? orgTitles : indTitles;
+    $$('[data-ws]', document).forEach(function (w) { w.lastChild.textContent = titles[+w.dataset.ws]; });
     steps.forEach(function (s) { s.classList.toggle('hidden', +s.dataset.step !== step); });
     $$('[data-ws]', document).forEach(function (w) { var i = +w.dataset.ws; w.className = 'ws ' + (i === step ? 'on' : i < step ? 'done' : ''); });
     document.getElementById('stepTitle').innerHTML = esc(titles[step]) + (step && type() ? ' <span class="badge ' + (org() ? 'b-purple' : 'b-pink') + ' plain">' + (org() ? 'Organization / Company Supplier' : 'Individual Supplier') + '</span>' : '');
@@ -269,7 +288,12 @@
       var pc = window.PR_portfolioCount ? window.PR_portfolioCount() : 0;
       if (pc < {{ \App\Models\Supplier::PORTFOLIO_MIN }}) { toast('Add at least {{ \App\Models\Supplier::PORTFOLIO_MIN }} photos of events you have done (you have ' + pc + ').'); var pf = f.querySelector('[data-portfolio]'); if (pf) pf.scrollIntoView({ block: 'center', behavior: 'smooth' }); return false; }
     }
-    if (step === 4) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } }
+    if (step === 4 && !org()) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } }
+    if (step === 4 && org()) {
+      var sa = f.querySelector('[data-tagfield="serviceAreas"]'), none = !f.querySelector('[name="serviceAreas[]"]:not([disabled])');
+      sa.classList.toggle('invalid', none); if (none) { toast('Add at least one city or area you serve.'); return false; }
+      if ((+val('reservePct') || 0) + (+val('depositPct') || 0) > 100) { toast('The reservation fee and deposit together cannot be more than 100%.'); return false; }
+    }
     if (!ok) { toast('Please fix the highlighted fields before continuing.'); firstBad.focus({ preventScroll: true }); firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     return ok;
   }

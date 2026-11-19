@@ -81,7 +81,7 @@ return new class extends Migration
         });
 
         // Business shops stop renting single items: hide their old listings (kept, not deleted).
-        $biz = DB::table('suppliers')->where('type', 'organization')->orWhere('account_type', 'business')->pluck('id');
+        $biz = DB::table('suppliers')->where('type', 'organization')->pluck('id');
         if ($biz->isNotEmpty()) {
             DB::table('products')->whereIn('supplier_id', $biz)->update(['status' => 'inactive']);
             DB::table('packages')->whereIn('supplier_id', $biz)->update(['active' => false]);

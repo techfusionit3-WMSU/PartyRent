@@ -294,3 +294,6 @@ Route::prefix('superadmin')->name('super.')->middleware(['auth', 'role:superadmi
 /* ---------- Payment gateway webhooks (no session; checked by signature; CSRF exempt in bootstrap/app.php) ---------- */
 Route::post('/webhooks/paymongo', \App\Http\Controllers\PayMongoWebhookController::class)->middleware('throttle:120,1')->name('webhooks.paymongo');
 Route::post('/webhooks/xendit', \App\Http\Controllers\XenditWebhookController::class)->middleware('throttle:120,1')->name('webhooks.xendit');
+
+// Business suppliers (event companies) and booking them.
+require __DIR__.'/business.php';

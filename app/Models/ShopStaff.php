@@ -73,6 +73,19 @@ class ShopStaff extends Model
         'team' => 'team.manage', 'team.*' => 'team.manage', 'staff' => 'team.manage', 'staff.*' => 'team.manage',
     ];
 
+    /** Business (event company) workspace routes (after "business.") => permission; no match = any member. */
+    public const BUSINESS_ROUTE_PERMS = [
+        'dashboard' => null,
+        'bookings.quote' => 'orders.manage', 'bookings.decline' => 'orders.manage', 'bookings.cancel' => 'orders.manage', 'bookings.complete' => 'orders.manage',
+        'bookings' => 'orders.view', 'bookings.*' => 'orders.view',
+        'payments.remind' => 'payments.view', 'payments.proof' => 'payments.view', 'payments.*' => 'payments.verify', 'payments' => 'payments.view',
+        'packages' => 'products.manage', 'packages.*' => 'products.manage',
+        'settings' => 'shop.manage', 'settings.*' => 'shop.manage',
+    ];
+
+    /** Supplier pages a business still uses (the rest are for solo item-rental shops). */
+    public const BUSINESS_KEEPS = ['supplier.team', 'supplier.team.*', 'supplier.shop', 'supplier.shop.*', 'supplier.business'];
+
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
 
@@ -91,6 +104,15 @@ class ShopStaff extends Model
     /** Permission needed to open a supplier route (null = any member of the shop). */
     public static function permFor(string $routeName): ?string
     {
+        if (str_starts_with($routeName, 'business.')) {
+            foreach (self::BUSINESS_ROUTE_PERMS as $pattern => $perm) {
+                if (fnmatch($pattern, substr($routeName, 9))) {
+                    return $perm;
+                }
+            }
+
+            return null;
+        }
         $name = str_starts_with($routeName, 'supplier.') ? substr($routeName, 9) : $routeName;
         foreach (self::ROUTE_PERMS as $pattern => $perm) {
             if (fnmatch($pattern, $name)) {

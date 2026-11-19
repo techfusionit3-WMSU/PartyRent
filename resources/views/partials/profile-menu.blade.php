@@ -23,6 +23,7 @@
     <div class="sep"></div>
     @if($shellRole === 'customer')
       <a href="{{ route('rentals.index') }}">{{ icon('list') }}My Rentals</a>
+      <a href="{{ route('events.index') }}">{{ icon('calendar') }}My Events</a>
       <a href="{{ route('customer.payments') }}">{{ icon('card') }}Payment History</a>
       <a href="{{ route('profile') }}">{{ icon('user') }}Profile & Settings</a>
       <div class="sep"></div>

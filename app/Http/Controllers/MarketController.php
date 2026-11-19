@@ -200,9 +200,12 @@ class MarketController extends Controller
         $q = mb_strtolower((string) $request->query('q', ''));
         $f = (string) $request->query('f', '');
         $list = Supplier::approved()->with(['products' => fn ($p) => $p->where('status', 'active')->where('package_only', false)->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
-            ->filter(fn ($s) => (! $q || str_contains(mb_strtolower($s->name.' '.$s->city.' '.$s->description), $q)) && (! $f || $s->fulfillment === 'both' || $s->fulfillment === $f));
+            ->filter(fn ($s) => (! $q || str_contains(mb_strtolower($s->name.' '.$s->city.' '.$s->description), $q)) && (! $f || $s->isOrganization() || $s->fulfillment === 'both' || $s->fulfillment === $f));
+        // rental shops (1-to-1 item rentals) and event companies (book a whole event by quotation)
+        $type = in_array($request->query('type'), ['shops', 'business'], true) ? $request->query('type') : '';
+        $list = $list->filter(fn ($s) => ! $type || ($type === 'business') === $s->isOrganization());
 
-        return view('market.suppliers', ['list' => $list, 'q' => $request->query('q', ''), 'f' => $f]);
+        return view('market.suppliers', ['list' => $list, 'q' => $request->query('q', ''), 'f' => $f, 'type' => $type]);
     }
 
     public function supplier(Request $request, Supplier $supplier)

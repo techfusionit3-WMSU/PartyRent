@@ -112,10 +112,13 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return $this->staffOf !== null && $this->supplier?->status !== 'approved';
     }
 
-    /** A shop's own cashier: Business Mode opens the cashier workspace for that shop only. */
+    /**
+     * A shop's own cashier: Business Mode opens the cashier workspace for that shop only.
+     * A business (event company) cashier works in the business workspace instead (event payments there).
+     */
     public function isShopCashier(): bool
     {
-        return $this->isEmployee() && $this->orgRole() === 'cashier';
+        return $this->isEmployee() && $this->orgRole() === 'cashier' && ! $this->staffOf?->supplier?->isOrganization();
     }
 
     /** Organization permission check (Auth.orgCan). */
@@ -183,6 +186,10 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     /** Route name of this user's home page for a mode. */
     public function homeRoute(?string $mode = null): string
     {
+        if ($this->activeRole($mode) === 'supplier' && $this->shop()?->isOrganization()) {
+            return 'business.dashboard'; // event companies have their own workspace
+        }
+
         return [
             'customer' => 'home',
             'supplier' => 'supplier.dashboard',

@@ -32,7 +32,7 @@
     };
 @endphp
 @section('content')
-<div class="page-head"><div><h1>Shop Profile & Settings</h1><p>{{ $s->name }} · <a href="{{ route('suppliers.show', $s) }}">View public shop</a></p></div></div>
+<div class="page-head"><div><h1>{{ $s->isOrganization() ? 'Business Profile' : 'Shop Profile & Settings' }}</h1><p>{{ $s->name }} · <a href="{{ route('suppliers.show', $s) }}">View public shop</a></p></div></div>
 @unless($owner)<div class="alert alert-info mb-2">{{ icon('info') }}<div>Only the Organization Admin can change shop settings. You can view them here.</div></div>@endunless
 <div class="tabs">@foreach($tabs as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.shop', ['tab' => $k]) }}">{{ $l }}</a>@endforeach</div>
 <form class="card" method="POST" action="{{ route('supplier.shop.update') }}" style="max-width:900px" id="sf" enctype="multipart/form-data">

@@ -23,6 +23,18 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Event companies (Organization suppliers) don't rent single items: their item listings and item packages never go live.
+        \App\Models\Product::saving(function ($p) {
+            if ($p->status === 'active' && \App\Models\Supplier::whereKey($p->supplier_id)->value('type') === 'organization') {
+                $p->status = 'inactive';
+            }
+        });
+        \App\Models\Package::saving(function ($k) {
+            if ($k->active && \App\Models\Supplier::whereKey($k->supplier_id)->value('type') === 'organization') {
+                $k->active = false;
+            }
+        });
+
         \Illuminate\Auth\Notifications\VerifyEmail::toMailUsing(fn ($user, string $url) => (new \Illuminate\Notifications\Messages\MailMessage)
             ->subject('Verify your PartyRent email')
             ->greeting('Hi '.$user->firstName().'!')

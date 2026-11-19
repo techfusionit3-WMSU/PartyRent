@@ -28,6 +28,7 @@
     ];
     $cfg = $NAV[$role] ?? $NAV['admin'];
     $sup = in_array($role, ['supplier', 'cashier'], true) ? $shellUser->shop() : null;
+    if ($role === 'supplier' && $sup?->isOrganization()) { $cfg = \App\Support\BusinessNav::config($sup); } // event companies: their own workspace
     $emp = $shellUser->isEmployee();
     // Supplier employees only see the sections their organization role allows; a group label shows only before a visible item.
     $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && (empty($it[5]) || ($role === 'supplier' ? $shellUser->orgCan($it[5]) : ($role !== 'admin' || $shellUser->hasPerm($it[5]))));

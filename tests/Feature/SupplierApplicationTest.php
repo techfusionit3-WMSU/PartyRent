@@ -35,6 +35,9 @@ class SupplierApplicationTest extends TestCase
         return [
             'events_catered' => ['wedding', 'Corporate', 'Graduation'], 'offers' => ['Full event coordination', 'balloon styling'],
             'event_size' => '150_300', 'packages_from' => 25000,
+            // an event company: service areas and a payment schedule instead of delivery and payment methods
+            'serviceAreas' => ['Marikina', 'pasig city'], 'reservePct' => 20, 'depositPct' => 30,
+            'rescheduling' => 'One free date change up to 14 days before.',
             'portfolio' => $portfolio ?? [$this->photo('a.jpg'), $this->photo('b.jpg'), $this->photo('c.jpg')],
             'app' => ['type' => 'organization',
                 'company' => ['legalName' => 'Garcia Events Corp.', 'companyType' => 'cooperative', 'branches' => 2, 'address' => '7 Sampaguita St., Marikina Heights, Marikina', 'email' => 'ops@garcia.ph', 'phone' => '0923 555 0707', 'natureOfBusiness' => 'Party and event equipment rental', 'description' => 'Tents, sound and lights for Marikina events.'],
@@ -84,7 +87,13 @@ class SupplierApplicationTest extends TestCase
         $this->assertSame(['bank', 'BPI'], [$s->payout_method, $s->payout_bank]);
         $this->assertEquals(0, $s->delivery_fee); // delivery fee is not asked in the application (form value ignored)
         // what the business offers (typed tags keep the suggested spelling) and its portfolio
-        $this->assertEquals(['events' => ['Wedding', 'Corporate', 'Graduation'], 'offers' => ['Full event coordination', 'Balloon Styling'], 'eventSize' => '150_300', 'packagesFrom' => 25000.0], $s->business_profile);
+        $bp = $s->business_profile;
+        $this->assertEquals(['Wedding', 'Corporate', 'Graduation'], $bp['events']);
+        $this->assertEquals(['Full event coordination', 'Balloon Styling'], $bp['offers']);
+        $this->assertEquals(['150_300', 25000], [$bp['eventSize'], $bp['packagesFrom']]);
+        $this->assertEquals(['Marikina', 'Pasig City'], $s->bizSettings()['serviceAreas']);
+        $this->assertEquals([20, 30], [$s->bizSettings()['reservePct'], $s->bizSettings()['depositPct']]);
+        $this->assertSame('One free date change up to 14 days before.', $s->policy['rescheduling']);
         $this->assertCount(3, $s->portfolio);
         Storage::disk('public')->assertExists($s->portfolio[0]);
         $this->get(route('suppliers.show', $s))->assertOk()->assertSee('Events we cater')->assertSee('Balloon Styling')->assertSee('Packages from');
@@ -131,11 +140,11 @@ class SupplierApplicationTest extends TestCase
         $this->postJson('/start-selling/check', array_merge($form, ['phone' => '0917']) + ['step' => 3])->assertStatus(422)->assertJsonValidationErrors('phone');
         // a business must say which events it caters and what it offers
         $this->postJson('/start-selling/check', array_merge($form, ['events_catered' => [], 'event_size' => '']) + ['step' => 3])->assertStatus(422)->assertJsonValidationErrors(['events_catered', 'event_size']);
-        // no pin yet is fine on Shop details; once Pickup is offered (step 4) it sends the applicant back to step 3
+        // an event company has no pickup, so no pin is needed; it must list the areas it serves instead of delivery/methods
         $noPin = array_merge($form, ['lat' => null, 'lng' => null]);
-        $this->postJson('/start-selling/check', $noPin + ['step' => 3])->assertOk();
-        $this->postJson('/start-selling/check', $noPin + ['step' => 4])->assertStatus(422)->assertJsonPath('step', 3);
-        $this->postJson('/start-selling/check', array_merge($noPin, ['fulfillment' => 'delivery']) + ['step' => 4])->assertOk();
+        $this->postJson('/start-selling/check', $noPin + ['step' => 4])->assertOk();
+        $this->postJson('/start-selling/check', array_merge($form, ['serviceAreas' => [], 'fulfillment' => null, 'methods' => []]) + ['step' => 4])
+            ->assertStatus(422)->assertJsonValidationErrors('serviceAreas')->assertJsonMissingValidationErrors(['fulfillment', 'methods']);
         // no payment percentages are asked in the application any more
         $this->postJson('/start-selling/check', array_merge($form, ['depositValue' => 150, 'offerPlans' => []]) + ['step' => 4])->assertOk();
     }

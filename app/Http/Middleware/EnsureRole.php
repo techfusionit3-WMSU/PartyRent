@@ -60,11 +60,25 @@ class EnsureRole
         return redirect()->route($u->homeRoute(session('mode')));
     }
 
-    /** Business staff only open the pages their role allows (owners open everything). */
+    /**
+     * Business staff only open the pages their role allows (owners open everything).
+     * Solo item-rental shops and business event companies each have their own workspace.
+     */
     private function shopPage(Request $request, Closure $next): Response
     {
         $name = (string) $request->route()?->getName();
-        if (! str_starts_with($name, 'supplier.') || $request->user()->canShop($name)) {
+        $biz = (bool) $request->user()->shop()?->isOrganization();
+        if (str_starts_with($name, 'business.') && ! $biz) {
+            return redirect()->route('supplier.dashboard');
+        }
+        if (str_starts_with($name, 'supplier.') && $biz && ! collect(\App\Models\ShopStaff::BUSINESS_KEEPS)->contains(fn ($p) => fnmatch($p, $name))) {
+            if ($request->expectsJson()) {
+                abort(403, 'Business accounts use the business workspace.');
+            }
+
+            return redirect()->route('business.dashboard');
+        }
+        if (! (str_starts_with($name, 'supplier.') || str_starts_with($name, 'business.')) || $request->user()->canShop($name)) {
             return $next($request);
         }
         $msg = 'Your role ('.(\App\Models\ShopStaff::ORG_ROLES[$request->user()->orgRole()] ?? 'none').') cannot open that page. Ask your Organization Admin.';
@@ -72,6 +86,6 @@ class EnsureRole
             abort(403, $msg);
         }
 
-        return redirect()->route('supplier.dashboard')->with('error', $msg);
+        return redirect()->route($biz ? 'business.dashboard' : 'supplier.dashboard')->with('error', $msg);
     }
 }

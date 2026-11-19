@@ -39,8 +39,12 @@ class Supplier extends Model
 
     public function isBusiness(): bool { return $this->account_type === 'business'; }
 
-    /** Business (organization) supplier: offers services and event packages, works from a physical workplace. */
-    public function isOrganization(): bool { return $this->type === 'organization' || $this->isBusiness(); }
+    /**
+     * Event company (applied as Organization / Company): books whole events by quotation, works on-site from a
+     * physical workplace, no 1-to-1 item rentals. Not the same as isBusiness(): a solo item-rental shop can
+     * verify its business papers (account_type business) and stay a rental shop.
+     */
+    public function isOrganization(): bool { return $this->type === 'organization'; }
 
     /** "What your business offers" (business suppliers). */
     public const EVENT_SIZES = ['up_to_50' => 'Up to 50 guests', '50_150' => '50–150 guests', '150_300' => '150–300 guests', '300_plus' => '300+ guests'];
@@ -54,6 +58,12 @@ class Supplier extends Model
     public function profile(string $k, $def = null) { return data_get($this->business_profile ?? [], $k, $def); }
 
     public function logoUrl(): ?string { return $this->logo_path ? asset('storage/'.$this->logo_path) : null; }
+
+    public function eventPackages(): HasMany { return $this->hasMany(EventPackage::class); }
+    public function eventBookings(): HasMany { return $this->hasMany(EventBooking::class); }
+
+    /** Business booking settings (service areas, setup time, payment schedule), with defaults. */
+    public function bizSettings(): array { return array_replace(\App\Domain\Events::SETTINGS, (array) $this->profile('settings', [])); }
     public function isVerifiedBusiness(): bool { return $this->isBusiness() && $this->biz_status === 'verified'; }
     public function accountLabel(): string { return $this->isBusiness() ? 'Business' : 'Personal'; }
     public function products(): HasMany { return $this->hasMany(Product::class); }

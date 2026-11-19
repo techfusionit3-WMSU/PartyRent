@@ -17,6 +17,9 @@ class StartSellingController extends Controller
 
     public const STEPS = ['Supplier type', 'Applicant', 'Documents', 'Shop details', 'Delivery & payments', 'Payout', 'Policies', 'Review'];
 
+    /** Same steps for an event company (business): no shop, delivery or payment methods; service areas and a payment schedule instead. */
+    public const ORG_STEPS = ['Supplier type', 'Company', 'Documents', 'Business profile', 'Service areas & payments', 'Payout', 'Booking policies', 'Review'];
+
     public function show(Request $request)
     {
         $u = $request->user();
@@ -75,8 +78,8 @@ class StartSellingController extends Controller
             str_starts_with($k, 'app.personal'), str_starts_with($k, 'app.identity'), str_starts_with($k, 'app.company'), str_starts_with($k, 'app.representative') => 1,
             str_starts_with($k, 'docs'), str_starts_with($k, 'app.applicable') => 2,
             str_starts_with($k, 'app.payout') => 5,
-            in_array($k, ['fulfillment', 'methods'], true) => 4,
-            in_array($k, ['cancelDays', 'cancellation', 'returns', 'conditions'], true) => 6,
+            in_array($k, ['fulfillment', 'methods', 'serviceAreas', 'reservePct', 'depositPct'], true) => 4,
+            in_array($k, ['cancelDays', 'cancellation', 'returns', 'conditions', 'rescheduling'], true) => 6,
             default => 3,
         };
     }
@@ -102,9 +105,16 @@ class StartSellingController extends Controller
             'location_type' => 'required|in:shop,home,none',
             ...AddressInput::rules('shop_addr', $request->input('location_type', 'shop') !== 'none'),
             'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
-            'fulfillment' => 'required|in:delivery,pickup,both',
-            'methods' => 'required|array|min:1', 'methods.*' => 'in:cash,bank,debit',
-            'cancelDays' => 'nullable|integer|min:0|max:30', 'cancellation' => 'required|string|max:1000', 'returns' => 'required|string|max:1000', 'conditions' => 'required|string|max:1000',
+            ...($type === 'organization' ? [
+                'serviceAreas' => 'required|array|min:1|max:40', 'serviceAreas.*' => 'string|max:80',
+                'reservePct' => 'required|numeric|min:0|max:100', 'depositPct' => 'required|numeric|min:0|max:100',
+                'rescheduling' => 'required|string|min:10|max:1000',
+            ] : [
+                'fulfillment' => 'required|in:delivery,pickup,both',
+                'methods' => 'required|array|min:1', 'methods.*' => 'in:cash,bank,debit',
+                'returns' => 'required|string|max:1000', 'conditions' => 'required|string|max:1000',
+            ]),
+            'cancelDays' => 'nullable|integer|min:0|max:30', 'cancellation' => 'required|string|max:1000',
             'app.applicable' => 'nullable|array', 'app.applicable.*' => 'in:'.implode(',', Applications::allDocKeys()),
             'docs' => 'nullable|array', 'docs.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
             ...($type === 'organization' ? [
@@ -139,6 +149,9 @@ class StartSellingController extends Controller
     {
         $errors = [];
         $in = $request->only(['location_type', 'fulfillment', 'lat', 'lng']) + ['location_type' => 'shop', 'fulfillment' => 'both', 'lat' => null, 'lng' => null];
+        if ($request->input('app.type') === 'organization') {
+            $in['fulfillment'] = 'delivery'; // no customer pickup at an event company's workplace: the pin is optional
+        }
         $errors += self::locationErrors($in, AddressInput::attributes((array) $request->input('shop_addr', []))['city_code']);
 
         return $errors;
@@ -223,6 +236,13 @@ class StartSellingController extends Controller
         $app['history'] = array_merge((array) ($old['history'] ?? []), $existing ? [['status' => $existing->status, 'reason' => $existing->reject_reason ?: $existing->revision_note, 'at' => $existing->reviewed_at?->toIso8601String()]] : []);
 
         $addr = AddressInput::attributes($v['shop_addr'] ?? []);
+        if ($org) { // event companies work on-site: no delivery/pickup choice, payment by schedule
+            $v['fulfillment'] = 'delivery';
+            $v['methods'] = ['bank'];
+            if ((float) $v['reservePct'] + (float) $v['depositPct'] > 100) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['depositPct' => 'The reservation fee and deposit together cannot be more than 100%.']);
+            }
+        }
         if ($loc = self::locationErrors($v, $addr['city_code'])) {
             throw \Illuminate\Validation\ValidationException::withMessages($loc);
         }
@@ -254,19 +274,26 @@ class StartSellingController extends Controller
             'fulfillment' => $v['fulfillment'], 'delivery_fee' => (float) ($existing?->delivery_fee ?? 0), // not asked in the application: set in Shop Settings (zones + standard rate)
             'delivery' => $existing?->delivery ?? \App\Models\Supplier::DELIVERY_DEFAULTS,
             'methods' => array_values(array_unique($v['methods'])), 'payment_plans' => $plans, 'arrangements' => [], // legacy column (v4 uses payment_plans)
-            'policy' => array_merge($oldPol, ['depositType' => $oldPol['depositType'] ?? 'fixed', 'depositValue' => (float) ($oldPol['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions']]),
+            'policy' => array_merge($oldPol, ['depositType' => $oldPol['depositType'] ?? 'fixed', 'depositValue' => (float) ($oldPol['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'] ?? '', 'conditions' => $v['conditions'] ?? ''] + ($org ? ['rescheduling' => trim($v['rescheduling'])] : [])),
             'time_settings' => $existing?->time_settings ?: \App\Domain\Slots::DEFAULT,
             'damage_policy' => $existing?->damage_policy ?: \App\Domain\Damage::DEFAULT,
             'type' => $type, 'company' => $org ? ['legalName' => $app['company']['legalName'], 'companyType' => $app['company']['companyType']] : null,
             'application' => $app, 'revision_note' => null,
             // app-only flags kept in step with the supplier type
             'account_type' => $org ? 'business' : 'personal', 'biz_status' => $org ? 'pending' : null,
-        ] + $payout + ($org ? $photos + ['business_profile' => \App\Domain\BusinessProfile::profile($v)] : []);
+        ] + $payout + ($org ? $photos + ['business_profile' => \App\Domain\BusinessProfile::profile($v) + ['settings' => array_replace(
+            array_replace(\App\Domain\Events::SETTINGS, (array) data_get($existing?->business_profile, 'settings', [])),
+            ['serviceAreas' => \App\Domain\BusinessProfile::tags($v['serviceAreas'], [], 40), 'reservePct' => (float) $v['reservePct'], 'depositPct' => (float) $v['depositPct']]
+        )]] : []);
         $res = Rentals::submitApplication($u, $attrs);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }
         session()->forget(['apply_docs', 'apply_photos']);
+        if ($org) { // an event company does not rent single items: hide any old listings (kept, not deleted)
+            \App\Models\Product::where('supplier_id', $res['supplier']->id)->update(['status' => 'inactive']);
+            \App\Models\Package::where('supplier_id', $res['supplier']->id)->update(['active' => false]);
+        }
 
         return redirect()->route('start-selling')->with('success', $res['supplier']->status === 'approved' ? 'Your shop is approved!' : 'Application submitted for review.');
     }

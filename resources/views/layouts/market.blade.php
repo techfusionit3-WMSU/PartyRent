@@ -41,9 +41,9 @@
 <footer class="mk-footer"><div class="container">
   <div class="cols">
     <div>@include('partials.brand')<p class="mt-2">The party supplies rental marketplace for Filipino celebrations — discover, schedule, and rent from trusted local suppliers.</p><p class="small">{{ setting('supportEmail') }} · {{ setting('supportPhone') }}</p></div>
-    <div><h4>Rent</h4><ul><li><a href="{{ route('home') }}">Browse supplies</a></li><li><a href="{{ route('packages.index') }}">Rental packages</a></li><li><a href="{{ route('ai') }}">AI event planner</a></li></ul></div>
+    <div><h4>Rent</h4><ul><li><a href="{{ route('home') }}">Browse supplies</a></li><li><a href="{{ route('packages.index') }}">Rental packages</a></li><li><a href="{{ route('suppliers.index', ['type' => 'business']) }}">Event companies</a></li><li><a href="{{ route('ai') }}">AI event planner</a></li></ul></div>
     <div><h4>Sell</h4><ul><li><a href="{{ route('start-selling') }}">Start selling</a></li><li><a href="{{ route('suppliers.index') }}">Our suppliers</a></li></ul></div>
-    <div><h4>Account</h4><ul>@auth<li><a href="{{ route('rentals.index') }}">My rentals</a></li><li><a href="{{ route('notifications') }}">Notifications</a></li>@else<li><a href="{{ route('login') }}">Log in</a></li><li><a href="{{ route('register') }}">Create an account</a></li>@endauth</ul></div>
+    <div><h4>Account</h4><ul>@auth<li><a href="{{ route('rentals.index') }}">My rentals</a></li><li><a href="{{ route('events.index') }}">My events</a></li><li><a href="{{ route('notifications') }}">Notifications</a></li>@else<li><a href="{{ route('login') }}">Log in</a></li><li><a href="{{ route('register') }}">Create an account</a></li>@endauth</ul></div>
   </div>
   <hr style="border-color:rgba(255,255,255,.1)">
   <div class="small">© {{ date('Y') }} {{ setting('platformName', 'PartyRent') }} · Payments are verified by PartyRent cashiers. PartyRent Assist suggests items but never books, prices or reserves anything.</div>

@@ -147,9 +147,11 @@ class SupplierController extends Controller
     public function shop(Request $request)
     {
         $s = $request->user()->shop();
-        $tab = array_key_exists($request->query('tab'), self::SHOP_TABS) ? $request->query('tab') : 'profile';
+        // an event company only keeps its profile here; bookings, payments and policies are in Business settings
+        $tabs = $s->isOrganization() ? ['profile' => 'Business profile'] : self::SHOP_TABS;
+        $tab = array_key_exists($request->query('tab'), $tabs) ? $request->query('tab') : 'profile';
 
-        return view('supplier.shop', ['s' => $s, 'tab' => $tab, 'tabs' => self::SHOP_TABS, 'd' => $s->toArray(), 'logos' => StartSellingController::LOGOS,
+        return view('supplier.shop', ['s' => $s, 'tab' => $tab, 'tabs' => $tabs, 'd' => $s->toArray(), 'logos' => StartSellingController::LOGOS,
             'cats' => \App\Models\Category::where('active', true)->orderBy('sort')->get()]);
     }
 
@@ -158,6 +160,9 @@ class SupplierController extends Controller
     {
         $s = $request->user()->shop();
         $section = (string) $request->input('section', 'profile');
+        if ($s->isOrganization() && $section !== 'profile') {
+            return redirect()->route('business.settings')->with('error', 'Event companies set bookings, payments and policies in Bookings & Payment Settings.');
+        }
         $back = fn ($ok, $msg) => redirect()->route('supplier.shop', ['tab' => $section])->with($ok ? 'success' : 'error', $msg)->withInput($ok ? [] : $request->input());
         switch ($section) {
             case 'profile':

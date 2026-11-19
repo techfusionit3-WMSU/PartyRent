@@ -50,3 +50,12 @@ Schedule::call(fn () => \App\Domain\Damage::expireReviews())->hourly()->name('da
 
 /* An accepted request whose first payment is not made within 24 hours is cancelled and its items released. */
 Schedule::call(fn () => \App\Domain\Rentals::expireUnpaid())->everyFiveMinutes()->name('expire-unpaid');
+
+/* Event companies: expire old quotations and unpaid reservation fees, remind customers of installments due
+   (3 days before, on the day, and daily while overdue). Expiry also runs when booking pages load. */
+Artisan::command('partyrent:events-daily', function () {
+    $r = \App\Domain\Events::daily();
+    $this->info($r['expired'].' booking(s) expired, '.$r['reminders'].' payment reminder(s) sent.');
+})->purpose('Expire event quotations/reservations and send event payment reminders');
+
+Schedule::command('partyrent:events-daily')->dailyAt('08:00');

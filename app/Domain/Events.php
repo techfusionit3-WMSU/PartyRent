@@ -211,7 +211,8 @@ class Events
         return ['ok' => true];
     }
 
-    public static function confirmPayment(EventPayment $p, User $by, bool $ok, string $reason = ''): array
+    /** $by = null when a payment gateway confirmed it (paid online). */
+    public static function confirmPayment(EventPayment $p, ?User $by, bool $ok, string $reason = ''): array
     {
         $b = $p->booking;
         if ($p->status !== 'pending') {
@@ -227,11 +228,14 @@ class Events
             return self::fail('That date is already full. Cancel this booking or raise "events per day" in Business settings first.');
         }
         DB::transaction(function () use ($p, $b, $by) {
-            $p->update(['status' => 'paid', 'paid_at' => now(), 'confirmed_by' => $by->id, 'receipt_no' => 'EOR-'.(10000 + (int) EventPayment::whereNotNull('receipt_no')->count() + 1)]);
+            $p->update(['status' => 'paid', 'paid_at' => now(), 'confirmed_by' => $by?->id, 'receipt_no' => 'EOR-'.(10000 + (int) EventPayment::whereNotNull('receipt_no')->count() + 1)]);
             if ($p->kind === 'reservation' && $b->status === 'booked') {
                 $b->update(['status' => 'confirmed', 'confirmed_at' => now()]);
             }
         });
+        if (! $by) {
+            Notifier::notify($b->supplier->owner, 'supplier', 'Paid online · '.$b->code, $b->customer->name.' paid the '.mb_strtolower($p->label).' of '.money($p->amount).' online. PartyRent sends it to your payout account.', route('business.bookings.show', $b, false));
+        }
         Notifier::notify($b->customer_id, 'customer', 'Payment confirmed · '.$b->code, $b->supplier->name.' received your '.mb_strtolower($p->label).' of '.money($p->amount).'.'.($b->fresh()->status === 'confirmed' && $p->kind === 'reservation' ? ' Your date is booked! 🎉' : ''), route('events.show', $b, false));
 
         return ['ok' => true];
@@ -267,6 +271,72 @@ class Events
         Notifier::notify($b->customer_id, 'customer', 'Thank you for booking '.$b->supplier->name, 'Your '.$b->event_type.' ('.$b->code.') is marked as done.', route('events.show', $b, false));
 
         return ['ok' => true];
+    }
+
+    /* ---------- after the event ---------- */
+
+    /** One review per completed booking; it rates the business (shown on its page, counts in its rating). */
+    public static function review(EventBooking $b, User $u, int $rating, string $comment, array $photos = []): array
+    {
+        if ($b->customer_id !== $u->id || $b->status !== 'completed') {
+            return self::fail('You can review an event once it is done.');
+        }
+        if (\App\Models\Review::where('event_booking_id', $b->id)->exists()) {
+            return self::fail('You already reviewed this event.');
+        }
+        if ($rating < 1 || $rating > 5 || mb_strlen(trim($comment)) < Reviews::MIN_COMMENT) {
+            return self::fail('Choose 1 to 5 stars and write at least '.Reviews::MIN_COMMENT.' characters.');
+        }
+        $media = array_map(fn ($f) => ['type' => 'image', 'path' => $f->store('reviews/events/'.$b->id, 'public'), 'mime' => $f->getMimeType()], array_slice($photos, 0, Reviews::MAX_PHOTOS));
+        \App\Models\Review::create([
+            'supplier_id' => $b->supplier_id, 'event_booking_id' => $b->id, 'customer_id' => $u->id,
+            'rating' => $rating, 'comment' => trim($comment), 'media' => $media ?: null,
+        ]);
+        Reviews::recalcSupplier($b->supplier_id);
+        Notifier::notify($b->supplier->owner, 'supplier', 'New review · '.$b->code, $u->name.' rated your '.$b->event_type.' '.$rating.'★.', route('supplier.reviews', [], false));
+
+        return ['ok' => true];
+    }
+
+    /** PartyRent sent an online payment on to the business's payout account. */
+    public static function remit(EventPayment $p, User $by): array
+    {
+        if ($p->status !== 'paid' || ! $p->gateway || $p->remitted_at) {
+            return self::fail('Only online payments not yet sent can be marked as sent.');
+        }
+        $p->update(['remitted_at' => now(), 'remitted_by' => $by->id]);
+        $b = $p->booking;
+        Notifier::notify($b->supplier->owner, 'supplier', 'Payment sent to you · '.$b->code, 'PartyRent sent '.money($p->amount).' ('.$p->label.', paid online) to your payout account.', route('business.payments', [], false));
+        Notifier::audit('Sent event payment to business', $b->code.' · '.$p->code.' · '.money($p->amount), $by);
+
+        return ['ok' => true];
+    }
+
+    /**
+     * Daily (scheduler): expire old quotations and unpaid reservations, and remind customers of payments due
+     * in 3 days, due today, or overdue (each payment at most once a day).
+     */
+    public static function daily(): array
+    {
+        $expired = self::expire();
+        $sent = 0;
+        $pay = EventPayment::where('status', 'due')->whereDate('due_date', '<=', today()->addDays(3))
+            ->whereHas('booking', fn ($q) => $q->whereIn('status', ['booked', 'confirmed']))->with('booking.supplier')->get();
+        foreach ($pay as $p) {
+            $days = (int) today()->diffInDays($p->due_date, false);
+            if (! in_array($days, [3, 0], true) && $days >= 0) {
+                continue; // remind 3 days before, on the day, and every day once overdue
+            }
+            $key = 'event-auto-remind:'.$p->id.':'.today()->toDateString();
+            if (\Illuminate\Support\Facades\Cache::add($key, true, now()->addDay())) {
+                $b = $p->booking;
+                $when = $days > 0 ? 'is due in 3 days ('.fmt_date($p->due_date->toDateString()).')' : ($days === 0 ? 'is due today' : 'is overdue since '.fmt_date($p->due_date->toDateString()));
+                Notifier::notify($b->customer_id, 'customer', 'Payment reminder · '.$b->code, 'Your '.mb_strtolower($p->label).' of '.money($p->amount).' for '.$b->supplier->name.' '.$when.'.', route('events.show', $b, false));
+                $sent++;
+            }
+        }
+
+        return ['expired' => $expired, 'reminders' => $sent];
     }
 
     /** Quotations not accepted in time, and booked dates whose reservation fee was never paid, close themselves. */

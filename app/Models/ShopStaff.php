@@ -75,7 +75,7 @@ class ShopStaff extends Model
 
     /** Business (event company) workspace routes (after "business.") => permission; no match = any member. */
     public const BUSINESS_ROUTE_PERMS = [
-        'dashboard' => null,
+        'dashboard' => null, 'calendar' => 'orders.view',
         'bookings.quote' => 'orders.manage', 'bookings.decline' => 'orders.manage', 'bookings.cancel' => 'orders.manage', 'bookings.complete' => 'orders.manage',
         'bookings' => 'orders.view', 'bookings.*' => 'orders.view',
         'payments.remind' => 'payments.view', 'payments.proof' => 'payments.view', 'payments.*' => 'payments.verify', 'payments' => 'payments.view',
@@ -84,7 +84,7 @@ class ShopStaff extends Model
     ];
 
     /** Supplier pages a business still uses (the rest are for solo item-rental shops). */
-    public const BUSINESS_KEEPS = ['supplier.team', 'supplier.team.*', 'supplier.shop', 'supplier.shop.*', 'supplier.business'];
+    public const BUSINESS_KEEPS = ['supplier.team', 'supplier.team.*', 'supplier.shop', 'supplier.shop.*', 'supplier.business', 'supplier.reviews', 'supplier.reviews.*'];
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'role:supplier'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/calendar', [DashboardController::class, 'calendar'])->name('calendar');
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
     Route::get('/bookings/{eventBooking}', [BookingController::class, 'show'])->name('bookings.show');
     Route::post('/bookings/{eventBooking}/quote', [BookingController::class, 'quote'])->name('bookings.quote');
@@ -34,6 +35,12 @@ Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'r
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
 });
 
+/* PartyRent admins: all event bookings, and online event payments to send on to the businesses */
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadmin'])->group(function () {
+    Route::get('/events', [\App\Http\Controllers\Admin\EventBookingController::class, 'index'])->name('events');
+    Route::post('/events/payments/{eventPayment}/sent', [\App\Http\Controllers\Admin\EventBookingController::class, 'remit'])->name('events.remit');
+});
+
 /* customers booking a business */
 Route::middleware('auth')->group(function () {
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
@@ -44,4 +51,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/events/{eventBooking}/cancel', [EventController::class, 'cancel'])->name('events.cancel');
     Route::post('/events/{eventBooking}/payments/{eventPayment}', [EventController::class, 'pay'])->middleware('throttle:10,1')->name('events.pay');
     Route::get('/events/{eventBooking}/payments/{eventPayment}/proof', [EventController::class, 'proof'])->name('events.proof');
+    Route::post('/events/{eventBooking}/payments/{eventPayment}/online', [EventController::class, 'payOnline'])->middleware('throttle:10,1')->name('events.online');
+    Route::get('/events/{eventBooking}/payments/{eventPayment}/online', [EventController::class, 'onlineReturn'])->name('events.online.return');
+    Route::get('/events/{eventBooking}/payments/{eventPayment}/practice', [EventController::class, 'practice'])->name('events.online.practice');
+    Route::post('/events/{eventBooking}/payments/{eventPayment}/practice', [EventController::class, 'practicePay'])->name('events.online.practice.pay');
+    Route::post('/events/{eventBooking}/review', [EventController::class, 'review'])->middleware('throttle:10,1')->name('events.review');
 });

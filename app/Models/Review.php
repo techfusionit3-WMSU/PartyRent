@@ -21,15 +21,17 @@ class Review extends Model
     public function package(): BelongsTo { return $this->belongsTo(Package::class); }
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function rentalRequest(): BelongsTo { return $this->belongsTo(RentalRequest::class); }
+    /** Review of an event company, left after a completed event booking. */
+    public function eventBooking(): BelongsTo { return $this->belongsTo(EventBooking::class); }
     public function reports(): HasMany { return $this->hasMany(ReviewReport::class); }
 
     /** Reviews that count toward ratings and are shown publicly. */
     public function scopeVisible(Builder $q): Builder { return $q->whereNull('hidden_at'); }
 
     /** Written by a customer who actually rented through PartyRent. */
-    public function isVerified(): bool { return (bool) $this->rental_request_id; }
+    public function isVerified(): bool { return (bool) ($this->rental_request_id || $this->event_booking_id); }
 
-    public function itemName(): string { return $this->product?->name ?? $this->package?->name ?? ''; }
+    public function itemName(): string { return $this->product?->name ?? $this->package?->name ?? ($this->event_booking_id ? ($this->eventBooking?->event_type ?? 'Event').' event' : ''); }
 
     /** @return array<int, array{type:string,url:string,mime:string}> */
     public function mediaItems(): array

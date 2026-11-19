@@ -107,6 +107,61 @@ class DemoSeeder extends Seeder
         $this->notifications();
         $this->audit();
         $this->cart();
+        $this->eventCompany();
+    }
+
+    /**
+     * App-only: an approved event company (Organization supplier, books whole events by quotation) with event
+     * packages, booking settings and bookings in each stage. Owner: events@demo.ph / demo123.
+     */
+    protected function eventCompany(): void
+    {
+        $u = new User(array_merge(['name' => 'Marco Villanueva', 'email' => 'events@demo.ph', 'phone' => '0917 555 2020', 'roles' => ['customer'], 'status' => 'active', 'password' => Hash::make('demo123')], $this->addr(['88 Kalayaan Ave.', 'Diliman', '137404000'])));
+        $u->created_at = $this->ts(-150);
+        $u->email_verified_at = $u->created_at;
+        $u->save();
+        $a = $this->addr(['88 Kalayaan Ave.', 'Diliman', '137404000'], 'Grand Fiesta Events office');
+        $s = Supplier::create(array_merge($a, [
+            'owner_id' => $u->id, 'name' => 'Grand Fiesta Events Co.', 'logo' => '🎊', 'color' => '#9333EA',
+            'description' => 'Full-service event company: we plan, style and run weddings, debuts and corporate nights across Metro Manila, from the first call to the last guest.',
+            'city' => Locations::name($a['city_code']), 'phone' => '0917 555 2020', 'email' => 'hello@grandfiesta.ph', 'contact_person' => $u->name, 'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM',
+            'fulfillment' => 'delivery', 'delivery_fee' => 0, 'methods' => ['bank'], 'arrangements' => [], 'rating' => 0, 'status' => 'approved', 'location_type' => 'shop',
+            'applied_at' => $this->ts(-140), 'approved_at' => $this->ts(-138), 'type' => 'organization', 'account_type' => 'business',
+            'company' => ['legalName' => 'Grand Fiesta Events Co.', 'companyType' => 'corporation'],
+            'application' => ['type' => 'organization', 'company' => ['legalName' => 'Grand Fiesta Events Co.', 'companyType' => 'corporation'], 'docs' => []],
+            'payout_method' => 'bank', 'payout_bank' => 'BDO', 'payout_account_name' => 'Grand Fiesta Events Co.', 'payout_account_no' => '0034-5566-7788',
+            'policy' => ['cancellation' => 'The reservation fee is non-refundable. Cancel at least 30 days before the event for a full refund of the deposit.', 'rescheduling' => 'One free date change if asked at least 14 days before the event, subject to availability.'],
+            'business_profile' => [
+                'events' => ['Wedding', 'Debut', 'Corporate', 'Birthday'], 'offers' => ['Full event coordination', 'Styling & décor', 'Lights & sound', 'Host / emcee', 'Setup & teardown'],
+                'eventSize' => '150_300', 'packagesFrom' => 45000,
+                'settings' => array_replace(\App\Domain\Events::SETTINGS, ['serviceAreas' => ['Quezon City', 'Pasig', 'Makati', 'Taguig', 'Mandaluyong'], 'travelNote' => 'Free within Metro Manila', 'setupHours' => 4, 'minNoticeDays' => 14]),
+            ],
+        ]));
+        $pk = [];
+        foreach ([
+            ['Classic Debut Package', 'An elegant 18th birthday: stage and backdrop, 18 roses and candles set-up, host, lights and sound, and a coordinator running the program.', 85000, 100, 150, ['Debut'], ['Event coordinator on the day', 'Stage & backdrop', 'Host / emcee', 'Lights & sound system', '18 roses & 18 candles set-up', 'Tables & chairs with covers', 'Setup & teardown']],
+            ['Garden Wedding Package', 'A romantic garden reception styled in your motif, with ceremony and reception set-ups, florals, lights and a full coordination team.', 150000, 150, 250, ['Wedding'], ['Full coordination team', 'Ceremony & reception styling', 'Fresh floral centerpieces', 'Tent', 'Lights & sound system', 'Host / emcee', 'Setup & teardown']],
+            ['Corporate Night Package', 'Company parties and awards nights: stage, LED wall, sound, lighting and a show caller to keep the program on time.', 120000, 100, 300, ['Corporate'], ['Stage & LED wall', 'Lights & sound system', 'Show caller / host', 'Registration table', 'Setup & teardown']],
+            ['Kids Party Package', 'A themed birthday party with balloon décor, host and games, and a party table for the celebrant.', 45000, 30, 80, ['Birthday'], ['Theme styling & balloon décor', 'Host with games & prizes', 'Kiddie tables & chairs', 'Cake & dessert table', 'Setup & teardown']],
+        ] as [$n, $desc, $price, $min, $max, $ev, $inc]) {
+            $pk[] = \App\Models\EventPackage::create(['supplier_id' => $s->id, 'name' => $n, 'description' => $desc, 'price' => $price, 'min_guests' => $min, 'max_guests' => $max, 'events' => $ev, 'inclusions' => $inc, 'active' => true]);
+        }
+        $maria = $this->U['u1'];
+        $jose = $this->U['u7'];
+        $mk = fn (int $n, array $x) => \App\Models\EventBooking::create($x + ['code' => 'EVT-'.(10000 + $n), 'supplier_id' => $s->id, 'venue' => 'Function Hall, '.Locations::name($a['city_code']), 'city' => 'Quezon City', 'start_time' => '17:00', 'end_time' => '22:00']);
+        // a new inquiry, a quotation waiting, and a confirmed debut with its reservation fee paid
+        $mk(1, ['customer_id' => $jose, 'event_package_id' => $pk[2]->id, 'status' => 'inquiry', 'event_type' => 'Corporate', 'event_date' => $this->D(45), 'guests' => 180, 'notes' => 'Year-end party for our team, blue and silver theme.']);
+        $q = fn (array $items) => ['items' => $items, 'total' => array_sum(array_column($items, 'amount')), 'note' => '', 'validUntil' => $this->D(6)];
+        $b2 = $mk(2, ['customer_id' => $maria, 'event_package_id' => $pk[3]->id, 'status' => 'quoted', 'event_type' => 'Birthday', 'event_date' => $this->D(30), 'guests' => 60, 'quoted_at' => $this->ts(-1)]);
+        $b2->update(['quote' => $q([['label' => 'Kids Party Package (60 guests)', 'amount' => 45000], ['label' => 'Extra balloon arch', 'amount' => 3500]]) + ['schedule' => \App\Domain\Events::schedule($s, 48500, $this->D(30))]]);
+        $b3 = $mk(3, ['customer_id' => $maria, 'event_package_id' => $pk[0]->id, 'status' => 'confirmed', 'event_type' => 'Debut', 'event_date' => $this->D(75), 'guests' => 120, 'quoted_at' => $this->ts(-10), 'accepted_at' => $this->ts(-9), 'confirmed_at' => $this->ts(-8)]);
+        $b3->update(['quote' => $q([['label' => 'Classic Debut Package (120 guests)', 'amount' => 85000]]) + ['schedule' => \App\Domain\Events::schedule($s, 85000, $this->D(75))]]);
+        foreach ($b3->quote['schedule'] as $i => $st) {
+            $paid = $st['kind'] === 'reservation';
+            \App\Models\EventPayment::create(['code' => 'EVP-'.(10001 + $i), 'event_booking_id' => $b3->id, 'kind' => $st['kind'], 'label' => $st['label'], 'amount' => $st['amount'],
+                'due_date' => $paid ? $this->D(-8) : $st['due'], 'status' => $paid ? 'paid' : 'due', 'method' => $paid ? 'bank' : null, 'reference' => $paid ? 'BDO-772211' : null,
+                'submitted_at' => $paid ? $this->ts(-8) : null, 'paid_at' => $paid ? $this->ts(-8, 15) : null, 'confirmed_by' => $paid ? $u->id : null, 'receipt_no' => $paid ? 'EOR-10001' : null]);
+        }
     }
 
     /** App-only: PartyRent's own collection accounts for bank / e-wallet transfers (superadmin Pay accounts). */

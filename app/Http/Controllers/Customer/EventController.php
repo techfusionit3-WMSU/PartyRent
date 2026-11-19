@@ -95,6 +95,71 @@ class EventController extends Controller
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payment sent. '.$b->supplier->name.' will confirm it once it reaches their account.' : $res['error']);
     }
 
+    private function step(Request $request, EventBooking $b, EventPayment $p): EventPayment
+    {
+        $this->mine($request, $b);
+        abort_unless($p->event_booking_id === $b->id, 404);
+
+        return $p;
+    }
+
+    /** "Pay online": opens the gateway (or the practice checkout). */
+    public function payOnline(Request $request, EventBooking $eventBooking, EventPayment $eventPayment)
+    {
+        $res = \App\Domain\EventOnlinePay::start($this->step($request, $eventBooking, $eventPayment));
+
+        return $res['ok'] ? redirect()->away($res['url']) : back()->with('error', $res['error']);
+    }
+
+    /** Back from the gateway: check the invoice right away (the webhook does the same). */
+    public function onlineReturn(Request $request, EventBooking $eventBooking, EventPayment $eventPayment)
+    {
+        $p = $this->step($request, $eventBooking, $eventPayment);
+        if ($request->boolean('cancelled')) {
+            return redirect()->route('events.show', $eventBooking)->with('error', 'The online payment was not completed. You can try again or pay by transfer.');
+        }
+        $r = \App\Domain\EventOnlinePay::sync($p);
+
+        return redirect()->route('events.show', $eventBooking)->with(in_array($r, ['paid', 'done'], true) ? 'success' : 'error', match ($r) {
+            'paid', 'done' => 'Payment received. Thank you!',
+            'review' => 'Payment received; '.$eventBooking->supplier->name.' will check the amount.',
+            default => 'We have not received the payment yet. If you paid, it will show here in a few minutes.',
+        });
+    }
+
+    /** Built-in practice checkout (no real money; PAYMONGO_FAKE, never in production). */
+    public function practice(Request $request, EventBooking $eventBooking, EventPayment $eventPayment)
+    {
+        $p = $this->step($request, $eventBooking, $eventPayment);
+        abort_unless(\App\Domain\EventOnlinePay::mode() === 'practice' && $p->gateway === 'practice', 404);
+
+        return view('customer.event-practice', ['b' => $eventBooking, 'p' => $p]);
+    }
+
+    public function practicePay(Request $request, EventBooking $eventBooking, EventPayment $eventPayment)
+    {
+        $p = $this->step($request, $eventBooking, $eventPayment);
+        abort_unless(\App\Domain\EventOnlinePay::mode() === 'practice' && $p->gateway === 'practice', 404);
+        if ($request->input('result') === 'fail') {
+            return redirect()->route('events.show', $eventBooking)->with('error', 'Practice payment failed (nothing was charged). Try again or pay by transfer.');
+        }
+        \App\Domain\EventOnlinePay::settle($p, $p->gateway_ref, $p->amount, 'practice checkout');
+
+        return redirect()->route('events.show', $eventBooking)->with('success', 'Practice payment received (no real money).');
+    }
+
+    public function review(Request $request, EventBooking $eventBooking)
+    {
+        $b = $this->mine($request, $eventBooking);
+        $v = $request->validate([
+            'rating' => 'required|integer|min:1|max:5', 'comment' => 'required|string|min:'.\App\Domain\Reviews::MIN_COMMENT.'|max:2000',
+            'photos' => 'nullable|array|max:'.\App\Domain\Reviews::MAX_PHOTOS, 'photos.*' => 'image|max:'.\App\Domain\Reviews::MAX_PHOTO_KB,
+        ], ['rating.required' => 'Choose a star rating.']);
+        $res = Events::review($b, $request->user(), (int) $v['rating'], $v['comment'], (array) $request->file('photos', []));
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Thank you for your review!' : $res['error']);
+    }
+
     public function proof(Request $request, EventBooking $eventBooking, EventPayment $eventPayment)
     {
         $b = $this->mine($request, $eventBooking);

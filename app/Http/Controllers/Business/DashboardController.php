@@ -29,4 +29,19 @@ class DashboardController extends BusinessController
             'needsSettings' => empty($s->profile('settings.serviceAreas')),
         ]);
     }
+
+    /** Month calendar of events (inquiries, quoted, booked, confirmed, done) with how full each day is. */
+    public function calendar(Request $request)
+    {
+        $s = $this->biz($request);
+        Events::expire();
+        $month = preg_match('/^\d{4}-\d{2}$/', (string) $request->query('m')) ? \Carbon\Carbon::parse($request->query('m').'-01') : today()->startOfMonth();
+        $from = $month->copy()->startOfMonth()->startOfWeek(\Carbon\Carbon::SUNDAY);
+        $to = $month->copy()->endOfMonth()->endOfWeek(\Carbon\Carbon::SATURDAY);
+        $list = EventBooking::where('supplier_id', $s->id)->whereIn('status', ['inquiry', 'quoted', 'booked', 'confirmed', 'completed'])
+            ->whereBetween('event_date', [$from->toDateString(), $to->toDateString()])->with('customer')->orderBy('start_time')->get()
+            ->groupBy(fn ($b) => $b->event_date->toDateString());
+
+        return view('business.calendar', ['s' => $s, 'month' => $month, 'from' => $from, 'to' => $to, 'byDay' => $list, 'max' => (int) $s->bizSettings()['maxEventsPerDay']]);
+    }
 }

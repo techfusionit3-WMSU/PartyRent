@@ -7,6 +7,8 @@
     $order = array_keys($steps);
     $at = array_search($b->status, $order, true);
     $payTo = $s->payout_method === 'gcash' ? 'GCash' : ($s->payout_bank ?: 'Bank');
+    $online = \App\Domain\EventOnlinePay::mode();
+    $myReview = \App\Models\Review::where('event_booking_id', $b->id)->first();
 @endphp
 <div class="crumbs"><a href="{{ route('events.index') }}">My Events</a> / {{ $b->code }}</div>
 <div class="page-head"><div><h1>{{ $b->event_type }} · {{ $b->event_date->format('D, M j, Y') }}</h1><p>with <a href="{{ route('suppliers.show', $s) }}">{{ $s->name }}</a> · {{ $b->code }} · <span class="badge {{ $b->statusBadge() }}">{{ $b->statusLabel() }}</span></p></div></div>
@@ -52,7 +54,7 @@
     @if($b->payments->isEmpty())
       <p class="muted mb-0">Nothing to pay yet. You pay nothing until you accept a quotation.</p>
     @else
-      <p class="small muted">Pay to <b>{{ $s->name }}</b>'s account and send a screenshot: <b>{{ $payTo }}</b> · {{ $s->payout_account_name }} · <b>{{ $s->payout_account_no }}</b>. They confirm each payment.</p>
+      <p class="small muted">@if($online)<b>Pay online</b> (confirmed right away{{ $online === 'practice' ? ', practice mode: no real money' : '' }}), or @endif pay to <b>{{ $s->name }}</b>'s account and send a screenshot: <b>{{ $payTo }}</b> · {{ $s->payout_account_name }} · <b>{{ $s->payout_account_no }}</b>.</p>
       <div class="stack-sm">
       @foreach($b->payments as $p)
         <div class="card card-flat" style="padding:12px 14px">
@@ -61,13 +63,14 @@
           @if($p->status === 'pending')<div class="small muted mt-1">Sent {{ fmt_datetime($p->submitted_at) }} · ref {{ $p->reference }}. Waiting for {{ $s->name }} to confirm.</div>@endif
           @if($p->status === 'due' && in_array($b->status, ['booked', 'confirmed'], true))
             @if($p->reject_reason)<div class="small mt-1" style="color:var(--red)">Not confirmed: {{ $p->reject_reason }}</div>@endif
+            @if($online)<form method="POST" action="{{ route('events.online', [$b, $p]) }}" class="mt-1">@csrf<button class="btn btn-primary btn-sm">{{ icon('card') }}Pay {{ money($p->amount) }} online</button></form><div class="small muted mt-1">or by transfer:</div>@endif
             <form method="POST" action="{{ route('events.pay', [$b, $p]) }}" enctype="multipart/form-data" class="mt-1">@csrf
               <div class="form-grid">
                 <div class="field"><label>Paid with</label><select class="input" name="method"><option value="bank">Bank transfer</option><option value="gcash" @selected($s->payout_method === 'gcash')>GCash</option></select></div>
                 <div class="field"><label>Reference no.</label><input class="input" name="reference" required minlength="4" maxlength="80"></div>
               </div>
               <div class="field"><label>Screenshot or receipt</label><input class="input" type="file" name="proof" accept="image/*,.pdf" required></div>
-              <button class="btn btn-primary btn-sm">{{ icon('upload') }}Send payment</button>
+              <button class="btn {{ $online ? '' : 'btn-primary' }} btn-sm">{{ icon('upload') }}Send transfer proof</button>
             </form>
           @endif
         </div>
@@ -78,6 +81,26 @@
     @if(! empty($pol['cancellation']))<p class="small muted mt-2 mb-0"><b>Cancellation:</b> {{ $pol['cancellation'] }}@if(! empty($pol['rescheduling']))<br><b>Rescheduling:</b> {{ $pol['rescheduling'] }}@endif</p>@endif
   </div>
 </div>
+
+@if($b->status === 'completed')
+<div class="card mt-3" id="review">
+  @if($myReview)
+    <h3>Your review</h3>
+    <div><span class="stars">{{ str_repeat('★', $myReview->rating) }}{{ str_repeat('☆', 5 - $myReview->rating) }}</span></div>
+    <p class="mb-0" style="white-space:pre-line">{{ $myReview->comment }}</p>
+    @if($myReview->reply)<p class="small muted mt-1 mb-0"><b>{{ $s->name }} replied:</b> {{ $myReview->reply }}</p>@endif
+  @else
+    <h3>How was your event?</h3>
+    <p class="small muted">Your review helps other customers choose {{ $s->name }}.</p>
+    <form method="POST" action="{{ route('events.review', $b) }}" enctype="multipart/form-data">@csrf
+      <div class="field @error('rating') invalid @enderror"><label>Rating</label><div class="row gap-sm">@for($i = 5; $i >= 1; $i--)<label class="chip"><input type="radio" name="rating" value="{{ $i }}" @checked((int) old('rating') === $i) style="accent-color:var(--brand)"> {{ str_repeat('★', $i) }}</label>@endfor</div>@error('rating')<div class="error-text">{{ $message }}</div>@enderror</div>
+      <div class="field @error('comment') invalid @enderror"><label>Your review</label><textarea class="input" name="comment" required minlength="{{ \App\Domain\Reviews::MIN_COMMENT }}" maxlength="2000" placeholder="How did the setup, team and day go?">{{ old('comment') }}</textarea>@error('comment')<div class="error-text">{{ $message }}</div>@enderror</div>
+      <div class="field"><label>Photos <span class="muted small">(optional, up to {{ \App\Domain\Reviews::MAX_PHOTOS }})</span></label><input class="input" type="file" name="photos[]" accept="image/*" multiple></div>
+      <button class="btn btn-primary">{{ icon('star') }}Post review</button>
+    </form>
+  @endif
+</div>
+@endif
 
 <div class="modal-backdrop hidden" id="cancelM"><div class="modal sm" role="dialog" aria-modal="true"><div class="modal-head"><h3>Cancel?</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
   <form method="POST" action="{{ route('events.cancel', $b) }}">@csrf<div class="modal-body">@if($b->paid() > 0)<p class="small">You paid {{ money($b->paid()) }}. Refunds follow {{ $s->name }}'s cancellation policy.</p>@endif<div class="field"><label>Reason <span class="muted small">(optional)</span></label><input class="input" name="reason" maxlength="300"></div></div>

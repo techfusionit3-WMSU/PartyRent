@@ -10,11 +10,11 @@ class EventPayment extends Model
 {
     protected $guarded = ['id'];
 
-    public const METHODS = ['bank' => 'Bank transfer', 'gcash' => 'GCash', 'cash' => 'Cash'];
+    public const METHODS = ['bank' => 'Bank transfer', 'gcash' => 'GCash', 'cash' => 'Cash', 'online' => 'Paid online'];
 
     protected function casts(): array
     {
-        return ['amount' => 'float', 'due_date' => 'date', 'submitted_at' => 'datetime', 'paid_at' => 'datetime'];
+        return ['amount' => 'float', 'due_date' => 'date', 'submitted_at' => 'datetime', 'paid_at' => 'datetime', 'remitted_at' => 'datetime'];
     }
 
     public function booking(): BelongsTo { return $this->belongsTo(EventBooking::class, 'event_booking_id'); }

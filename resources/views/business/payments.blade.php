@@ -31,10 +31,11 @@
 
 <div class="card"><div class="card-head"><h3>Received</h3><span class="small muted">{{ money($paid->sum('amount')) }}</span></div>
   @if($paid->isEmpty())<p class="muted mb-0">No confirmed payments yet.</p>@else
-  <div class="table-wrap"><table class="table cards"><thead><tr><th>Receipt</th><th>Booking</th><th>Payment</th><th>Amount</th><th>Confirmed</th></tr></thead><tbody>
+  <div class="table-wrap"><table class="table cards"><thead><tr><th>Receipt</th><th>Booking</th><th>Payment</th><th>Amount</th><th>Confirmed</th><th>Money</th></tr></thead><tbody>
   @foreach($paid as $p)
     <tr><td data-label="Receipt">{{ $p->receipt_no }}</td><td data-label="Booking"><a href="{{ route('business.bookings.show', $p->booking) }}">{{ $p->booking->code }}</a></td>
-      <td data-label="Payment">{{ $p->label }}</td><td data-label="Amount">{{ money($p->amount) }}</td><td data-label="Confirmed">{{ fmt_datetime($p->paid_at) }}</td></tr>
+      <td data-label="Payment">{{ $p->label }}</td><td data-label="Amount">{{ money($p->amount) }}</td><td data-label="Confirmed">{{ fmt_datetime($p->paid_at) }}</td>
+      <td data-label="Money">@if($p->gateway)@if($p->remitted_at)<span class="badge b-green">Sent to you {{ $p->remitted_at->format('M j') }}</span>@else<span class="badge b-gold">Paid online · PartyRent sends it</span>@endif @else<span class="small muted">In your account</span>@endif</td></tr>
   @endforeach
   </tbody></table></div>@endif
 </div>

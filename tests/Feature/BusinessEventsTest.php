@@ -33,7 +33,7 @@ class BusinessEventsTest extends TestCase
         parent::setUp();
         Storage::fake('local');
         Storage::fake('public');
-        $this->s = Supplier::where('type', 'organization')->firstOrFail(); // Aquino Events Corp.
+        $this->s = Supplier::where('name', 'Aquino Events Corp.')->firstOrFail(); // a pending application, approved here
         $this->s->update(['status' => 'approved', 'payout_method' => 'bank', 'payout_bank' => 'BDO', 'payout_account_name' => 'Aquino Events Corp.', 'payout_account_no' => '0012-345-678']);
         $this->owner = $this->s->owner;
     }
@@ -110,7 +110,7 @@ class BusinessEventsTest extends TestCase
             'min_guests' => 100, 'max_guests' => 300, 'events' => ['corporate'], 'inclusions' => ['Stage', 'lights & sound'],
             'photos' => [UploadedFile::fake()->create('gala.jpg', 60, 'image/jpeg')], 'active' => 1,
         ])->assertRedirect(route('business.packages'));
-        $k = EventPackage::firstOrFail();
+        $k = EventPackage::where('supplier_id', $this->s->id)->firstOrFail();
         $this->assertSame(['Corporate'], $k->events);
         $this->assertCount(1, $k->photos);
         $this->get(route('business.packages'))->assertOk()->assertSee('Corporate Gala Package');
@@ -129,7 +129,7 @@ class BusinessEventsTest extends TestCase
         $date = today()->addDays(60)->toDateString();
         $this->inquiry(today()->addDays(2)->toDateString(), 'maria@demo.ph', $k)->assertSessionHas('error'); // not enough notice
         $this->inquiry($date, 'maria@demo.ph', $k)->assertRedirect();
-        $b = EventBooking::firstOrFail();
+        $b = EventBooking::where('supplier_id', $this->s->id)->firstOrFail();
         $this->assertSame('inquiry', $b->status);
         $this->get(route('events.show', $b))->assertOk()->assertSee('preparing your quotation');
         $this->asCustomer('jose@demo.ph')->get(route('events.show', $b))->assertNotFound(); // not theirs
@@ -187,7 +187,7 @@ class BusinessEventsTest extends TestCase
     public function test_quotes_expire_and_bookings_can_be_cancelled(): void
     {
         $this->inquiry(today()->addDays(40)->toDateString())->assertRedirect();
-        $b = EventBooking::firstOrFail();
+        $b = EventBooking::where('supplier_id', $this->s->id)->firstOrFail();
         $this->asOwner()->post(route('business.bookings.quote', $b), ['items' => [['label' => 'Custom event', 'amount' => 50000]], 'reservePct' => 0, 'depositPct' => 50, 'valid_days' => 3]);
         $this->travel(5)->days();
         $this->asCustomer()->post(route('events.accept', $b))->assertSessionHas('error');
@@ -195,7 +195,7 @@ class BusinessEventsTest extends TestCase
 
         // 0% reservation fee: accepting holds the date right away; the customer may cancel
         $this->inquiry(today()->addDays(40)->toDateString())->assertRedirect();
-        $c = EventBooking::latest('id')->firstOrFail();
+        $c = EventBooking::where('supplier_id', $this->s->id)->latest('id')->firstOrFail();
         $this->asOwner()->post(route('business.bookings.quote', $c), ['items' => [['label' => 'Custom event', 'amount' => 50000]], 'reservePct' => 0, 'depositPct' => 50, 'valid_days' => 7]);
         $this->asCustomer()->post(route('events.accept', $c))->assertSessionHas('success');
         $this->assertSame('confirmed', $c->fresh()->status);
@@ -205,7 +205,7 @@ class BusinessEventsTest extends TestCase
 
         // the business can decline an inquiry
         $this->inquiry(today()->addDays(45)->toDateString())->assertRedirect();
-        $d = EventBooking::latest('id')->firstOrFail();
+        $d = EventBooking::where('supplier_id', $this->s->id)->latest('id')->firstOrFail();
         $this->asOwner()->post(route('business.bookings.decline', $d), ['reason' => 'Fully booked'])->assertSessionHas('success');
         $this->assertSame('declined', $d->fresh()->status);
     }

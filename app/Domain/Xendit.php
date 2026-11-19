@@ -36,7 +36,7 @@ class Xendit
         return str_starts_with((string) config('services.xendit.secret_key'), 'xnd_production_');
     }
 
-    private static function http()
+    public static function http()
     {
         return Http::withBasicAuth((string) config('services.xendit.secret_key'), '')
             ->acceptJson()->asJson()->timeout(20)->baseUrl(rtrim((string) config('services.xendit.base_url'), '/'));
@@ -211,7 +211,10 @@ class Xendit
             return 'ignored';
         }
         $p = Payment::where('gateway', 'xendit')->where('gateway_ref', $inv['id'])->first();
-        if (! $p || ($inv['external_id'] ?? $p->code) !== $p->code) {
+        if (! $p) { // an event company's installment (EventOnlinePay) has its own table
+            return EventOnlinePay::handleCallback($inv) ?? 'unknown';
+        }
+        if (($inv['external_id'] ?? $p->code) !== $p->code) {
             return 'unknown';
         }
 

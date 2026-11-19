@@ -2,6 +2,7 @@
 
 @php($oldDef = old('def') ? json_decode(old('def'), true) : null)
 @php($startDef = is_array($oldDef) ? $oldDef : ['pricing' => $def['pricing'], 'components' => $def['components'], 'minGuests' => $def['minGuests'], 'maxGuests' => $def['maxGuests'], 'stages' => $def['stages'] ?? []])
+@php($biz = $sup->isBusiness())
 @php($groups = \App\Models\Package::where('supplier_id', $k->supplier_id ?? auth()->user()->shop()->id)->whereNotNull('tier_group')->distinct()->pluck('tier_group'))
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.packages') }}">Packages</a> / {{ $k->exists ? $k->name : 'New package' }}</div>
@@ -46,6 +47,11 @@
         <button type="button" class="btn btn-sm" data-add="choice">{{ icon('plus') }}Customer choice</button>
         <button type="button" class="btn btn-sm" data-add="addon">{{ icon('plus') }}Optional add-on</button>
       </div>
+      @unless($biz)
+        <div class="row wrap gap-sm mt-2" style="align-items:center"><button type="button" class="btn btn-sm" data-modal="pkgOnlyModal">{{ icon('plus') }}Item just for this package</button>
+          <span class="small muted">Not in your listings: customers can only get it with this package.</span></div>
+      @endunless
+    </div>
     </div>
 
     <div class="card"><h3>Inventory</h3>
@@ -53,6 +59,7 @@
       <div id="stockBox" class="small muted">Add rental items or consumables to see how many packages your stock covers.</div>
     </div>
 
+    @if($biz)
     <div class="card"><h3>Stages <span class="small muted">(optional)</span></h3>
       <p class="small muted">For events with parts, like a wedding: Preparation, Ceremony, Reception. Put each item or service in a stage below; customers give every stage its own time and venue when they book.</p>
       <div id="stages"></div>
@@ -64,10 +71,11 @@
       <div class="form-grid"><div class="field"><label for="tierGroup">Group name</label><input class="input" id="tierGroup" name="tier_group" maxlength="60" list="tierGroups" value="{{ old('tier_group', $k->tier_group) }}" placeholder="e.g. Wedding"><datalist id="tierGroups">@foreach($groups as $g)<option value="{{ $g }}">@endforeach</datalist></div>
         <div class="field"><label for="tierLabel">Tier name</label><input class="input" id="tierLabel" name="tier_label" maxlength="30" value="{{ old('tier_label', $k->tier_label) }}" placeholder="e.g. Gold"></div></div>
     </div>
+    @endif
 
-    <div class="card"><h3>Guests <span class="small muted">(optional)</span></h3>
-      <p class="small muted">Give an item a "per guest" quantity and it scales with the guest count the customer enters (rounded up).</p>
-      <div class="form-grid"><div class="field"><label for="minG">Minimum guests</label><input class="input" type="number" min="1" id="minG" data-def="minGuests"></div><div class="field"><label for="maxG">Maximum guests</label><input class="input" type="number" min="1" id="maxG" data-def="maxGuests"></div></div>
+    <div class="card"><h3>Guests</h3>
+      <p class="small muted">How many guests this package is good for. Customers who search or ask the AI planner for an event of that size or smaller are shown this package. Leave it empty if the package does not depend on the guest count.</p>
+      <div class="field" style="max-width:260px"><label for="maxG">Guests accommodated</label><input class="input" type="number" min="1" max="5000" id="maxG" data-def="maxGuests" placeholder="e.g. 50"></div>
     </div>
   </div>
 
@@ -85,6 +93,21 @@
 
 <div class="modal-backdrop hidden" id="pkgPreview"><div class="modal lg" role="dialog" aria-modal="true" aria-label="Customer preview"><div class="modal-head"><h3>Customer preview</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div><div class="modal-body pad-0" id="previewBody"></div></div></div>
 
+@unless($biz)
+<div class="modal-backdrop hidden" id="pkgOnlyModal"><div class="modal" role="dialog" aria-modal="true" aria-label="Item just for this package"><div class="modal-head"><h3>Item just for this package</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+  <div class="modal-body"><p class="small muted">The item is added to your inventory but is not listed on its own: customers cannot find it in Browse or rent it separately. It is only available inside your packages.</p>
+    <div id="poErr"></div>
+    <div class="field"><label>Type</label><div class="row gap-sm"><label class="check"><input type="radio" name="po_type" value="rent" checked> Rental item (comes back)</label><label class="check"><input type="radio" name="po_type" value="sale"> Consumable (used up)</label></div></div>
+    <div class="field"><label for="poName">Item name</label><input class="input" id="poName" maxlength="120" placeholder="e.g. Custom name backdrop"></div>
+    <div class="field"><label for="poCat">Category</label><select class="input" id="poCat">@foreach($cats as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select></div>
+    <div class="form-grid"><div class="field"><label for="poStock">How many you have</label><input class="input" type="number" id="poStock" min="1" max="100000" value="1"></div>
+      <div class="field"><label for="poPrice">Value (₱ <span id="poPer">per day</span>)</label><input class="input" type="number" id="poPrice" min="0.01" step="0.01" placeholder="e.g. 500"><div class="hint">Used when the package price is a sum of its items, and shown as the "separately" value.</div></div></div>
+    <div class="form-grid" id="poDmg"><div class="field"><label for="poRep">Replacement value (₱ each)</label><input class="input" type="number" id="poRep" min="0.01" step="0.01" placeholder="what it costs to replace"><div class="hint">Charged if it is lost or beyond repair; repairs never cost more.</div></div>
+      <div class="field"><label for="poMinor">Minor damage fee (₱ each) <span class="muted">(optional)</span></label><input class="input" type="number" id="poMinor" min="0" step="0.01" placeholder="cleaning, stain"></div></div>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn btn-primary" id="poSave">Add to package</button></div></div></div>
+@endunless
+
 <div class="modal-backdrop hidden" id="cropModal"><div class="modal" role="dialog" aria-modal="true" aria-label="Crop photo"><div class="modal-head"><h3>Crop photo</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
   <div class="modal-body"><p class="small muted">Drag the photo to position it inside the square. Use the slider to zoom.</p>
     <canvas id="cropCv" width="320" height="320" style="display:block;margin:0 auto;width:min(320px,100%);aspect-ratio:1;border-radius:12px;cursor:grab;touch-action:none;background:var(--surface-2)"></canvas>
@@ -94,8 +117,9 @@
 @push('scripts')
 <script>
 (function () {
-  var PRODS = @json($prods), MODES = @json($modes);
+  var PRODS = @json($prods), MODES = @json($modes), BIZ = @json($biz);
   var def = JSON.parse(document.getElementById('defInput').value || '{}');
+  if (!BIZ) def.stages = []; // stages are for business accounts
   def.pricing = def.pricing || { mode: 'sum_discount', price: 0, discountPct: 10 };
   def.components = def.components || [];
   var token = document.querySelector('meta[name="csrf-token"]').content;
@@ -112,7 +136,7 @@
   function prodOptions(type, selected) {
     var list = PRODS.filter(function (p) { return !type || p.type === type; });
     return '<option value="">Select…</option>' + list.map(function (p) {
-      return '<option value="' + p.id + '"' + (+selected === p.id ? ' selected' : '') + '>' + esc(p.name) + ' · ' + peso(p.price) + (p.type === 'sale' ? '/' + esc(p.unit) : '/day') + ' (' + p.stock + ' ' + (p.type === 'sale' ? 'on hand' : 'owned') + ')</option>';
+      return '<option value="' + p.id + '"' + (+selected === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.packageOnly ? ' (package only)' : '') + ' · ' + peso(p.price) + (p.type === 'sale' ? '/' + esc(p.unit) : '/day') + ' (' + p.stock + ' ' + (p.type === 'sale' ? 'on hand' : 'owned') + ')</option>';
     }).join('');
   }
   function num(path, val, attrs, label, cls) {
@@ -164,7 +188,7 @@
     }).join('') || '<div class="small muted">No stages: everything is for the whole event.</div>';
   }
   function render() {
-    renderStages();
+    if (document.getElementById('stages')) renderStages();
     var wrap = $('#comps');
     wrap.innerHTML = def.components.length ? def.components.map(function (c, i) {
       return '<div class="pkg-comp"><div class="head"><span class="badge ' + BADGE[c.kind] + '">' + LABEL[c.kind] + '</span><span class="grow"></span>' +
@@ -175,7 +199,6 @@
     $('#pMode').value = def.pricing.mode;
     $('#pPrice').value = def.pricing.price || '';
     $('#pDisc').value = def.pricing.discountPct || '';
-    $('#minG').value = def.minGuests || '';
     $('#maxG').value = def.maxGuests || '';
     document.querySelectorAll('[data-mode]').forEach(function (el) { el.hidden = el.getAttribute('data-mode') !== def.pricing.mode; });
     changed();
@@ -245,6 +268,29 @@
     if (b.hasAttribute('data-addopt')) { def.components[+b.getAttribute('data-addopt')].options.push({ productId: null, qty: 1, priceDelta: 0 }); render(); return; }
     if (b.hasAttribute('data-rmopt')) { var o = b.getAttribute('data-rmopt').split('.'); def.components[+o[0]].options.splice(+o[1], 1); render(); return; }
   });
+  // Package-only item (personal accounts): created right away as a package-only item, then added as a component.
+  var poSave = $('#poSave');
+  if (poSave) {
+    document.querySelectorAll('input[name="po_type"]').forEach(function (r) { r.addEventListener('change', function () { $('#poPer').textContent = r.value === 'sale' ? 'each' : 'per day'; $('#poDmg').hidden = r.value === 'sale'; }); });
+    poSave.addEventListener('click', function () {
+      var type = document.querySelector('input[name="po_type"]:checked').value;
+      $('#poErr').innerHTML = ''; poSave.disabled = true;
+      fetch(@json(route('supplier.packages.item')), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ type: type, name: $('#poName').value, category_id: $('#poCat').value, stock: $('#poStock').value, price: $('#poPrice').value, replacement_value: $('#poRep').value, minor_fee: $('#poMinor').value }) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          poSave.disabled = false;
+          if (!res.ok) { var m = res.j.errors ? Object.values(res.j.errors)[0][0] : (res.j.message || 'Could not add the item.'); $('#poErr').innerHTML = '<div class="alert alert-danger small">' + esc(m) + '</div>'; return; }
+          PRODS.push(res.j.product);
+          def.components.push({ kind: res.j.product.type, productId: res.j.product.id, qty: 1 });
+          $('#poName').value = ''; $('#poPrice').value = ''; $('#poRep').value = ''; $('#poMinor').value = ''; $('#poStock').value = 1;
+          window.PRUI.closeModal($('#pkgOnlyModal'));
+          render();
+          window.PR.toast(res.j.product.name + ' added to the package.', 'success');
+        }).catch(function () { poSave.disabled = false; $('#poErr').innerHTML = '<div class="alert alert-danger small">Could not add the item. Try again.</div>'; });
+    });
+  }
+
   document.getElementById('previewBtn').addEventListener('click', function () {
     var box = document.getElementById('previewBody');
     box.innerHTML = '<div class="small muted" style="padding:16px">Loading…</div>';

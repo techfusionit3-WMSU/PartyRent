@@ -60,7 +60,7 @@ class RequestController extends Controller
             'custHist' => RentalRequest::where('customer_id', $r->customer_id)->get(['status']),
             'due' => Rentals::paymentDue($r), 'reminderText' => Rentals::paymentReminderText($r),
             'canRemind' => in_array($r->status, Finance::ACTIVE, true) && $u->canShop('supplier.requests.remind'),
-            'peak' => $r->status === 'return_pending' ? Rentals::peakUnits($r) : [], 'sug' => Finance::suggestedNext($r),
+            'peak' => in_array($r->status, ['return_pending', 'ready', 'accepted', 'in_progress', 'out_delivery', 'ready_pickup'], true) ? Rentals::peakUnits($r) : [], 'sug' => Finance::suggestedNext($r),
         ]);
     }
 
@@ -127,7 +127,11 @@ class RequestController extends Controller
     public function advance(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);
-        $data = $request->validate(['to' => 'required|string', 'receivedBy' => 'nullable|string|max:120', 'releaseDate' => 'nullable|date', 'releaseQty' => 'nullable|string|max:500', 'note' => 'nullable|string|max:500']);
+        $data = $request->validate(['to' => 'required|string', 'receivedBy' => 'nullable|string|max:120', 'releaseDate' => 'nullable|date', 'releaseQty' => 'nullable|string|max:500', 'note' => 'nullable|string|max:500',
+            'release_photos' => 'nullable|array|max:6', 'release_photos.*' => 'image|max:8192']);
+        if ($data['to'] === 'ongoing') {
+            $data['releasePhotos'] = array_map(fn ($f) => $f->store('releases', 'public'), (array) $request->file('release_photos', []));
+        }
         $res = Rentals::advance($r, $data['to'], $data);
 
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Status updated to '.RentalRequest::statusLabel($data['to']).'.' : $res['error']);

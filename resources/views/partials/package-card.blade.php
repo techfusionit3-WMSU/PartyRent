@@ -10,7 +10,7 @@
   <div class="p-body">
     <a class="p-name" href="{{ $link }}">{{ $k->name }}</a>
     <div class="p-sup">{{ $k->supplier->name }} · {{ $k->supplier->city }}</div>
-    <div class="small muted">{{ count($k->items) }} items included</div>
+    <div class="small muted">{{ count($k->items) }} items included @if($k->max_guests)· good for up to {{ $k->max_guests }} guests @endif</div>
     <div class="p-meta"><div class="p-price">{{ money_short($k->price) }} <small>/ day</small></div>@if($avail !== null)@if($avail > 0)<span class="small muted">{{ $avail }} available</span>@else<span class="small" style="color:var(--red)">Fully booked</span>@endif @endif</div>
   </div>
 </article>

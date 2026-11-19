@@ -44,3 +44,9 @@ Artisan::command('partyrent:mail-test {to?}', function (?string $to = null) {
     }
     $this->info(config('mail.default') === 'log' ? 'Written to storage/logs/laravel.log (MAIL_MAILER=log, nothing was emailed).' : 'Sent to '.$to.'. Check Inbox, Spam and Promotions.');
 })->purpose('Send a test email to check the mail settings');
+
+/* Personal shops: a damage charge the customer did not answer within 48 hours counts as accepted. */
+Schedule::call(fn () => \App\Domain\Damage::expireReviews())->hourly()->name('damage-reviews');
+
+/* An accepted request whose first payment is not made within 24 hours is cancelled and its items released. */
+Schedule::call(fn () => \App\Domain\Rentals::expireUnpaid())->everyFiveMinutes()->name('expire-unpaid');

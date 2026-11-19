@@ -39,9 +39,21 @@ class RentalRequest extends Model
             'fulfillment_log' => 'array',
             'inspection' => 'array',
             'overdue_flags' => 'array',
-            'cancel_free' => 'boolean',
+            'cancel_free' => 'boolean', 'pay_by' => 'datetime', 'reserved_at' => 'datetime',
             'chat_customer_seen_at' => 'datetime', 'chat_supplier_seen_at' => 'datetime',
         ];
+    }
+
+    /** Accepted, but the items are not held until the first payment is verified. */
+    public function awaitingDownPayment(): bool
+    {
+        return $this->status === 'accepted' && ! $this->reserved_at;
+    }
+
+    /** Does this request hold stock? Every reserving status, except an accepted one still waiting for its down payment. */
+    public function holdsStock(): bool
+    {
+        return in_array($this->status, self::RESERVING, true) && ! $this->awaitingDownPayment();
     }
 
     /** A home-based supplier's exact address/pin is shared with the customer only while an accepted pickup is under way. */

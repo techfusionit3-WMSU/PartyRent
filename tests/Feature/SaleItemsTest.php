@@ -108,7 +108,8 @@ class SaleItemsTest extends TestCase
 
         // v4: the supplier accepts first; payments follow
         $this->as('juan@demo.ph', 'supplier')->post("/supplier/requests/{$r->code}/accept")->assertSessionHas('success');
-        inv()->flush();
+        $this->assertSame(0, inv()->committedSale($p->id)); // nothing held until the first payment is verified
+        $this->reserve($r);
         $this->assertSame(7, inv()->committedSale($p->id));
         // stock on hand cannot drop below what accepted orders need
         $this->put("/supplier/products/{$p->id}", $this->saleForm(['total_stock' => 5]))->assertSessionHas('error');

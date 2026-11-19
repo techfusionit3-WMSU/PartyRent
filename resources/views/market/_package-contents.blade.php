@@ -9,7 +9,7 @@
     @foreach(array_filter($pp['rows'], fn ($r) => $r['group'] === 'included') as $r)
       <div class="row pkg-row">
         @if(isset($r['productId']) && ($ip = inv()->product($r['productId'])))@include('partials.thumb', ['item' => $ip, 'cls' => 'sm'])@endif
-        <div class="grow">@if($simple && isset($r['productId']))<a href="{{ route('products.show', $r['productId']) }}">{{ $r['name'] }}</a>@else{{ $r['name'] }}@endif {!! $kindBadge[$r['kind']] ?? '' !!}@if(! empty($r['perGuest']))<div class="small muted">{{ rtrim(rtrim(number_format($r['perGuest'], 2), '0'), '.') }} per guest</div>@endif</div>
+        <div class="grow">@if($simple && isset($r['productId']) && ! inv()->product($r['productId'])?->package_only)<a href="{{ route('products.show', $r['productId']) }}">{{ $r['name'] }}</a>@else{{ $r['name'] }}@endif {!! $kindBadge[$r['kind']] ?? '' !!}@if(! empty($r['perGuest']))<div class="small muted">{{ rtrim(rtrim(number_format($r['perGuest'], 2), '0'), '.') }} per guest</div>@endif</div>
         <b>× {{ $r['qty'] }}</b>
       </div>
     @endforeach

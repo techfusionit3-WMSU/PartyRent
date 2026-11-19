@@ -113,6 +113,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::post('/rentals/{rentalRequest}/messages', [RentalController::class, 'sendMessage'])->middleware('throttle:30,1')->name('rentals.messages.send');
     Route::post('/rentals/{rentalRequest}/problem', [CaseController::class, 'customerReport'])->middleware('throttle:10,1')->name('rentals.problem');
     Route::post('/rentals/{rentalRequest}/cancel', [RentalController::class, 'cancel'])->name('rentals.cancel');
+    Route::post('/rentals/{rentalRequest}/damage', [RentalController::class, 'damageAnswer'])->name('rentals.damage');
     Route::post('/rentals/{rentalRequest}/installments', [RentalController::class, 'proposeInstallments'])->name('rentals.installments');
     Route::post('/rentals/{rentalRequest}/payments', [RentalController::class, 'pay'])->name('rentals.pay');
     Route::get('/rentals/{rentalRequest}/payments/{payment}/online', [RentalController::class, 'onlineReturn'])->name('rentals.online.return');
@@ -174,6 +175,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/products/{product}/edit', [CatalogController::class, 'editProduct'])->name('products.edit');
     Route::put('/products/{product}', [CatalogController::class, 'updateProduct'])->name('products.update');
     Route::post('/products/{product}/status', [CatalogController::class, 'productStatus'])->name('products.status');
+    Route::get('/products/{product}/receipt', [CatalogController::class, 'receipt'])->name('products.receipt');
     Route::get('/packages', [CatalogController::class, 'packages'])->name('packages');
     Route::get('/packages/new', [CatalogController::class, 'createPackage'])->name('packages.create');
     Route::post('/packages', [CatalogController::class, 'storePackage'])->name('packages.store');
@@ -181,6 +183,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::put('/packages/{package}', [CatalogController::class, 'updatePackage'])->name('packages.update');
     Route::post('/packages/price', [CatalogController::class, 'packagePrice'])->name('packages.price');
     Route::post('/packages/preview', [CatalogController::class, 'previewPackage'])->name('packages.preview');
+    Route::post('/packages/item', [CatalogController::class, 'packageOnlyItem'])->name('packages.item');
     Route::post('/packages/{package}/duplicate', [CatalogController::class, 'duplicatePackage'])->name('packages.duplicate');
     Route::post('/packages/{package}/move', [CatalogController::class, 'movePackage'])->name('packages.move');
     Route::post('/packages/{package}/active', [CatalogController::class, 'packageActive'])->name('packages.active');
@@ -253,10 +256,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/categories', [AdminController::class, 'categories'])->name('categories');
     Route::post('/categories', [AdminController::class, 'storeCategory'])->name('categories.store');
     Route::post('/categories/{category}', [AdminController::class, 'updateCategory'])->name('categories.update');
+    Route::post('/categories/{category}/review', [AdminController::class, 'resolveCategory'])->name('categories.review');
     Route::get('/complaints', [AdminController::class, 'complaints'])->name('complaints');
     Route::get('/cases', [CaseController::class, 'adminIndex'])->name('cases');
+    Route::get('/disputes', [\App\Http\Controllers\Admin\DisputeController::class, 'index'])->name('disputes');
+    Route::get('/disputes/{rentalRequest}', [\App\Http\Controllers\Admin\DisputeController::class, 'show'])->name('disputes.show');
+    Route::post('/disputes/{rentalRequest}', [\App\Http\Controllers\Admin\DisputeController::class, 'resolve'])->name('disputes.resolve');
+    Route::get('/receipts/{product}', [\App\Http\Controllers\Admin\DisputeController::class, 'receipt'])->name('receipts.show');
     Route::post('/complaints', [AdminController::class, 'storeComplaint'])->name('complaints.store');
-    Route::post('/categories/{category}/review', [AdminController::class, 'resolveCategory'])->name('categories.review');
     Route::post('/complaints/{complaint}', [AdminController::class, 'updateComplaint'])->name('complaints.update');
     Route::get('/reviews', [ReviewController::class, 'adminIndex'])->name('reviews');
     Route::post('/reviews/{review}/moderate', [ReviewController::class, 'moderate'])->name('reviews.moderate');

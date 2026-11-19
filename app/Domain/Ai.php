@@ -342,11 +342,17 @@ class Ai
             if (! empty($f['eventType']) && ! in_array($f['eventType'], $k->events ?? [], true)) {
                 continue;
             }
+            $fits = Packages::fitsGuests($k, $f['guests'] ?? null);
+            if ($fits === false) { // too small for the guest count
+                continue;
+            }
             $avail = inv()->packageMinAvailable($k->id, $dates);
             if ($avail > 0) {
-                $pkgs[] = ['pkg' => $k, 'available' => $avail, 'cost' => $k->price * max(1, count($dates))];
+                $pkgs[] = ['pkg' => $k, 'available' => $avail, 'cost' => $k->price * max(1, count($dates)), 'fits' => (bool) $fits];
             }
         }
+        // Packages sized for the guest count come first, the closest capacity first.
+        usort($pkgs, fn ($a, $b) => [$b['fits'], $a['fits'] ? $a['pkg']->max_guests : 0] <=> [$a['fits'], $b['fits'] ? $b['pkg']->max_guests : 0]);
         $total = array_sum(array_map(fn ($r) => $r['best'] && $r['best']['enough'] ? $r['best']['cost'] : 0, $rows));
 
         return ['filters' => $f, 'dates' => $dates, 'rows' => $rows, 'packages' => $pkgs, 'total' => $total, 'overBudget' => ! empty($f['budget']) && $total > $f['budget']];

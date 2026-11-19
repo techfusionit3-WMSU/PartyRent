@@ -116,6 +116,22 @@ class RentalController extends Controller
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Schedule sent to '.$r->supplier->name.' for approval.' : $res['error']);
     }
 
+    /** Accept or dispute each damage charge (personal shops, within 48 hours of the inspection). */
+    public function damageAnswer(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $data = $request->validate(['answers' => 'required|array', 'answers.*.action' => 'required|in:accept,dispute', 'answers.*.reason' => 'nullable|string|max:1000']);
+        if (\App\Domain\Damage::reviewStatus($r) !== 'pending') {
+            return back()->with('error', 'This damage charge is no longer waiting for your answer.');
+        }
+        $res = \App\Domain\Damage::closeReview($r, $data['answers']);
+        if (! $res['ok']) {
+            return back()->withInput()->with('error', $res['error']);
+        }
+
+        return back()->with('success', $res['disputed'] ? 'Dispute sent. A PartyRent admin will compare the photos and decide; your deposit stays held until then.' : 'Thank you. The damage charge is accepted.');
+    }
+
     public function cancel(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);

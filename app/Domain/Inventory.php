@@ -241,9 +241,10 @@ class Inventory
     {
         if ($this->demands === null) {
             $this->demands = [];
-            foreach (RentalRequest::whereIn('status', array_merge(self::RESERVING, ['pending']))->get(['id', 'code', 'status', 'lines']) as $r) {
+            foreach (RentalRequest::whereIn('status', array_merge(self::RESERVING, ['pending']))->get(['id', 'code', 'status', 'lines', 'reserved_at']) as $r) {
                 $lines = $r->lines ?? [];
-                $this->demands[] = ['id' => $r->id, 'code' => $r->code, 'status' => $r->status, 'lines' => $lines, 'sale' => $this->saleDemand($lines), 'svc' => $this->serviceDemand($lines)];
+                // accepted but the down payment is not verified yet: holds nothing, counted like a pending request
+                $this->demands[] = ['id' => $r->id, 'code' => $r->code, 'status' => $r->holdsStock() || $r->status !== 'accepted' ? $r->status : 'pending', 'lines' => $lines, 'sale' => $this->saleDemand($lines), 'svc' => $this->serviceDemand($lines)];
             }
         }
 

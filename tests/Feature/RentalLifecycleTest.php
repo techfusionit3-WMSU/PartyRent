@@ -16,6 +16,13 @@ class RentalLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** These cover the business-shop percentage damage policy (individual shops use outcomes: DamageOutcomesTest). */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        \App\Models\Supplier::query()->update(['account_type' => 'business']);
+    }
+
     protected bool $seed = true;
 
     protected string $seeder = \Database\Seeders\DemoSeeder::class;
@@ -55,13 +62,15 @@ class RentalLifecycleTest extends TestCase
         // 2. v4: no payments before the supplier accepts
         $this->post("/rentals/{$r->code}/payments", ['type' => 'full', 'amount' => 100, 'method' => 'cash'])->assertSessionHas('error');
 
-        // 3. the supplier accepts → stock is reserved per day
+        // 3. the supplier accepts → nothing is held until the first payment is verified (24 hours to pay)
         $this->actingAs($juan)->withSession(['mode' => 'supplier'])->post("/supplier/requests/{$r->code}/accept", ['note' => 'See you!'])->assertSessionHas('success');
         inv()->flush();
         $r->refresh();
         $this->assertSame('accepted', $r->status);
-        $this->assertSame($free1 - 4, inv()->availableOn($table->id, $d1));
-        $this->assertSame($free2 - 6, inv()->availableOn($table->id, $d2));
+        $this->assertTrue($r->awaitingDownPayment());
+        $this->assertEqualsWithDelta(now()->addHours(24)->timestamp, $r->pay_by->timestamp, 5);
+        $this->assertSame($free1, inv()->availableOn($table->id, $d1));
+        $this->assertSame($free2, inv()->availableOn($table->id, $d2));
         $total = (float) $r->fin()['total'];
 
         // 4. customer pays in full by bank transfer (needs proof) → pending until the shop's cashier verifies
@@ -91,6 +100,11 @@ class RentalLifecycleTest extends TestCase
         $this->actingAs($this->platformCashier())->withSession(['mode' => 'cashier'])->post("/cashier/payments/{$pay->code}/verify")->assertSessionHas('success');
         $pay->refresh();
         $this->assertSame('verified', $pay->status);
+        // the verified first payment reserves the stock per day
+        inv()->flush();
+        $this->assertNotNull($r->fresh()->reserved_at);
+        $this->assertSame($free1 - 4, inv()->availableOn($table->id, $d1));
+        $this->assertSame($free2 - 6, inv()->availableOn($table->id, $d2));
         $this->assertNotNull($pay->receipt_no);
         $this->assertSame('Fully Paid', $r->fresh()->fin()['status']);
         $this->actingAs($juan)->withSession(['mode' => 'supplier']);

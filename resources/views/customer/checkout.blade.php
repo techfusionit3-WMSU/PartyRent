@@ -27,9 +27,17 @@
       <div class="field full"><label for="ev-in">Special instructions (optional)</label><textarea class="input" id="ev-in" data-s="instructions" rows="2" placeholder="Setup location, gate codes…"></textarea></div>
     </div></div>
     <div class="stack" id="shops"></div>
+    @if($terms = collect($orders)->flatMap(fn ($o) => $o['damage'] ?? []))
+      @if($terms->isNotEmpty())
+      <div class="card"><h3>If something gets damaged</h3>
+        <p class="small muted">Per unit, agreed now so there are no surprises. The shop photographs the items at release and at return; you get {{ \App\Domain\Damage::REVIEW_HOURS }} hours to accept or dispute any charge, and PartyRent decides disputes. A normal fault (not working, not misused) is never charged.</p>
+        <div class="stack-sm">@foreach($terms as $t)<div class="small"><b>{{ $t['name'] }}</b>@if($t['receipt']) <span class="badge b-green plain">Receipt on file</span>@endif<div class="muted">{{ $t['text'] }}</div></div>@endforeach</div>
+      </div>
+      @endif
+    @endif
   </div>
   <aside class="card sticky-side"><h3>Order summary</h3><div id="sum"><div class="page-loading"><div class="spinner"></div></div></div>
-    <label class="check mt-2"><input type="checkbox" id="agree"> I agree to each shop's cancellation, return and rental policies.</label>
+    <label class="check mt-2"><input type="checkbox" id="agree"> I agree to each shop's cancellation, return and rental policies{{ collect($orders)->contains(fn ($o) => ! empty($o['damage'])) ? ', and the damage terms' : '' }}.</label>
     <button type="button" class="btn btn-primary btn-lg btn-block mt-1" id="submitBtn">Submit {{ count($orders) > 1 ? count($orders).' rental requests' : 'rental request' }}</button>
     <p class="small muted mt-1 mb-0">Requests stay <b>Pending</b> until each supplier reviews them. Payment deadlines start when a supplier accepts. {{ $direct ? '' : 'Unselected items stay in your Rental List.' }}</p>
   </aside>

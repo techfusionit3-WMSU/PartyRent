@@ -1,6 +1,8 @@
 {{-- Reference Shared.inspectionReport: confirmed return & damage report (compensation per damage policy). --}}
 @php($x = $r->inspection)
-@if($x)
+@if($x && ($x['model'] ?? null) === 'outcomes')
+  @include('partials.damage-outcomes', ['r' => $r, 'x' => $x, 'viewer' => $viewer ?? null])
+@elseif($x)
 @php($affected = collect($x['items'] ?? [])->filter(fn ($it) => ($it['repairable'] ?? 0) || ($it['nonRepairable'] ?? 0) || ($it['lost'] ?? 0) || ($it['returned'] ?? 0) !== ($it['rented'] ?? 0)))
 <div class="card">
   <div class="row between mb-1"><h3 class="mb-0">Return & damage report</h3><span class="small muted">Confirmed {{ fmt_datetime($x['confirmedAt'] ?? $x['at'] ?? null) }}</span></div>

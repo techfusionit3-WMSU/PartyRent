@@ -31,6 +31,8 @@ class Product extends Model
             'lead_days' => 'integer',
             'shelf_life_days' => 'integer',
             'low_stock_at' => 'integer',
+            'package_only' => 'boolean',
+            'purchase_price' => 'float', 'minor_fee' => 'float', 'purchased_on' => 'date:Y-m-d',
         ];
     }
 
@@ -80,10 +82,10 @@ class Product extends Model
     public function stockByLocation(): array { return $this->locationStock->pluck('qty', 'inventory_location_id')->map(fn ($q) => (int) $q)->all(); }
     public function reviews(): HasMany { return $this->hasMany(Review::class); }
 
-    /** Published listing from an approved supplier. */
+    /** Published listing from an approved supplier. Package-only items are never listed on their own. */
     public function scopeLive($q)
     {
-        return $q->where('status', 'active')->whereHas('supplier', fn ($s) => $s->where('status', 'approved'));
+        return $q->where('status', 'active')->where('package_only', false)->whereHas('supplier', fn ($s) => $s->where('status', 'approved'));
     }
 
     public function basePrice(): float { return Pricing::basePrice($this); }

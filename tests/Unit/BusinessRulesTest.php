@@ -71,6 +71,7 @@ class BusinessRulesTest extends TestCase
             'code' => 'PR-T'.(++$this->seq), 'customer_id' => $this->c->id, 'supplier_id' => $this->s->id, 'event_name' => 'E', 'event_type' => 'Birthday',
             'event_date' => $x['event'] ?? $dates[0], 'start_date' => min($dates), 'end_date' => max($dates), 'fulfillment' => 'pickup', 'lines' => [$line],
             'arrangement' => 'full', 'method' => 'bank', 'status' => $status, 'pricing' => [], 'accepted_at' => $x['accepted'] ?? null, 'plan' => $x['plan'] ?? 'full',
+            'reserved_at' => $status === 'pending' ? null : now(), // a booking that holds stock (down payment in)
         ]);
         $r->update(['pricing' => Pricing::quoteRequest($r->fresh())]);
         inv()->flush();

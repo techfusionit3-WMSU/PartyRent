@@ -10,6 +10,7 @@
 <div data-leave-warn="dirty" data-leave-msg="You started filling in a form on this request (payment, notes or a status step) that was not saved. Leave anyway?" hidden></div>
 <div class="crumbs"><a href="{{ route('supplier.requests') }}">Rental Requests</a> / {{ $r->code }}</div>
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><div class="mb-1">@include('partials.txn-code', ['code' => $r->code, 'side' => 'supplier'])</div><p>@if($r->event_type && $r->event_type !== 'Other'){{ $r->event_type }} · @endif event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status]) @if($r->status !== 'pending') @include('partials.badges', ['pay' => $f['status']])@endif @include('partials.badges', ['planBadge' => $r->plan])</div></div>
+@if($r->awaitingDownPayment())<div class="alert alert-warn">{{ icon('clock') }}<div><b>Accepted, waiting for the first payment.</b> Nothing is reserved yet: the stock is held once the {{ mb_strtolower($f['schedule'][0]['label'] ?? 'first payment') }} is verified. The customer has until <b>{{ fmt_datetime($r->pay_by) }}</b>; after that the request is cancelled. If another customer pays first for the same items and time, this one is declined automatically.</div></div>@endif
 @include('partials.case-alert', ['r' => $r])
 <div class="card mb-2">@include('partials.progress')</div>
 
@@ -117,7 +118,8 @@
       @endif
       @if($pendPays->count())<div class="alert alert-warn mb-1">{{ icon('clock') }}<div class="grow">{{ $pendPays->count() }} payment(s) awaiting verification. @if($finOK)Check each one below and verify or reject it here. <a href="{{ route('supplier.payments', ['tab' => 'verify']) }}" class="small">Open the Payments page</a>@else Your Cashier or Organization Admin verifies them.@endif</div></div>@endif
       @include('partials.payment-history', ['inlineVerify' => $finOK])<p class="small muted mt-1 mb-0">Only verified payments reduce the balance. Duplicate reference numbers and amounts above the outstanding balance are blocked.</p></div>
-    @include('partials.inspection-report')
+    @include('partials.inspection-report', ['viewer' => 'supplier'])
+    @if(! $r->inspection && ! empty($r->fulfillment_log['releasePhotos']))<div class="card"><h3>Condition at release</h3><p class="small muted">Photos the shop took when the items were handed over. They are compared with the condition at return.</p><div class="thumbs">@foreach($r->fulfillment_log['releasePhotos'] as $ph)<a href="{{ asset('storage/'.$ph) }}" target="_blank" rel="noopener"><img src="{{ asset('storage/'.$ph) }}" alt="Condition at release"></a>@endforeach</div></div>@endif
     @include('partials.request-chat', ['chatSide' => 'supplier'])
     <div class="card"><h3>Activity</h3>@include('partials.timeline')</div>
   </div>
@@ -140,17 +142,18 @@
 {{-- ===== modals ===== --}}
 @if($review)
 <div class="modal-backdrop hidden" id="acceptModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Accept {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.accept', $r) }}" data-confirm="Accepting reserves the stock for these dates and starts the customer's payment deadlines. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Accept {{ $r->code }}?" data-confirm-ok="Accept">@csrf<div class="modal-body"><div class="stack-sm">
+  <form method="POST" action="{{ route('supplier.requests.accept', $r) }}" data-confirm="The customer then has 24 hours to pay the first payment. The stock is reserved only once that payment is verified; if another customer pays first for the same items and time, this request is declined automatically. This can't be undone." data-confirm-title="Accept {{ $r->code }}?" data-confirm-ok="Accept">@csrf<div class="modal-body"><div class="stack-sm">
     <div class="row">{{ $review['check']['ok'] ? '✅' : '❌' }}<b>1. Inventory re-checked for {{ count(date_range($r->start_date, $r->end_date)) }} date(s)</b></div>
     @if($review['check']['ok'])<div class="small muted" style="padding-left:28px">All quantities fit within available stock.</div>
     @else<div class="alert alert-danger">{{ icon('alert') }}<div>{!! collect($review['check']['bad'])->map(fn ($b) => e(fmt_date($b['date']).': '.$b['name'].' needs '.$b['requested'].', only '.$b['available'].' available'))->implode('<br>') !!}<br><b>Acceptance is blocked to prevent double-booking.</b> Decline, or ask the customer to change quantities.</div></div>@endif
     <div class="row">{{ $review['priceChanged'] ? '⚠️' : '✅' }}<b>2. Pricing validated</b></div><div class="small muted" style="padding-left:28px">{{ $review['priceChanged'] ? 'Your current prices total '.money($review['fresh']['total']).'; the customer was quoted '.money($r->pricing['total']).'. The quoted price will be honored.' : 'Quoted total '.money($r->pricing['total']).' matches your current prices.' }}</div>
     <div class="row">{{ $review['policyIssues'] ? '⚠️' : '✅' }}<b>3. Payment plan confirmed</b></div><div class="small muted" style="padding-left:28px">{{ $review['policyIssues'] ? implode(' ', $review['policyIssues']) : (\App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '').'. Security deposit '.money($r->pricing['deposit']).'.' }}</div>
     @if($review['durationNotes'])<div class="row">⚠️<b>Rental duration</b></div><div class="small muted" style="padding-left:28px">{{ collect($review['durationNotes'])->pluck('message')->implode(' ') }} (It complied when submitted, so you may still accept.)</div>@endif
-    @php($probe = (clone $r)->forceFill(['accepted_at' => today_iso()]))
-    <div class="row">📅<b>4. Payment schedule from today</b></div><div style="padding-left:28px">@foreach(\App\Domain\Finance::schedule($probe) as $x)<div class="sum-line small"><span>{{ $x['label'] }} · due {{ fmt_date($x['due']) }}</span><b>{{ money($x['amount']) }}</b></div>@endforeach</div>
+    @php($probe = (clone $r)->forceFill(['accepted_at' => today_iso(), 'pay_by' => now()->addHours(\App\Domain\Rentals::PAY_HOURS)]))
+    <div class="row">📅<b>4. Payment schedule from today</b></div><div style="padding-left:28px">@foreach(\App\Domain\Finance::schedule($probe) as $x)<div class="sum-line small"><span>{{ $x['label'] }} · due {{ isset($x['dueAt']) ? fmt_datetime($x['dueAt']) : fmt_date($x['due']) }}</span><b>{{ money($x['amount']) }}</b></div>@endforeach</div>
+    <div class="alert alert-info mt-1">{{ icon('info') }}<div class="small"><b>The stock is reserved when the first payment is verified,</b> not when you accept. The customer has {{ \App\Domain\Rentals::PAY_HOURS }} hours to pay it, or the request is cancelled. If another customer pays first for the same items, day and time, and your stock can't cover both, this request is declined automatically.</div></div>
   </div><div class="field mt-2"><label>Note to customer (optional)</label><textarea class="input" name="note" placeholder="e.g. We will deliver at 8 AM.">{{ $r->supplier_notes }}</textarea></div></div>
-  <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-success" @disabled(! $review['canAccept'])>{{ icon('check') }}Accept & reserve stock</button></div></form>
+  <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-success" @disabled(! $review['canAccept'])>{{ icon('check') }}Accept request</button></div></form>
 </div></div>
 <div class="modal-backdrop hidden" id="declineModal"><div class="modal sm" role="dialog" aria-modal="true"><div class="modal-head"><h3>Decline {{ $r->code }}?</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
   <form method="POST" action="{{ route('supplier.requests.decline', $r) }}" data-confirm="The customer is told the request was declined. A declined request can't be reopened." data-confirm-title="Decline {{ $r->code }}?" data-confirm-ok="Decline" data-danger>@csrf<div class="modal-body"><p>The customer will be notified. The request record is kept.</p><div class="field"><label>Reason (shown to the customer)</label><textarea class="input" name="reason" required maxlength="500"></textarea></div></div>
@@ -160,15 +163,54 @@
 
 @if(in_array('ongoing', $next, true))
 <div class="modal-backdrop hidden" id="releaseModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Record release to customer</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.advance', $r) }}" data-confirm="Record that the items were handed to the customer. Consumables are deducted from stock. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Confirm release?" data-confirm-ok="Yes, released">@csrf<input type="hidden" name="to" value="ongoing"><div class="modal-body">
+  <form method="POST" action="{{ route('supplier.requests.advance', $r) }}" enctype="multipart/form-data" data-confirm="Record that the items were handed to the customer. Consumables are deducted from stock. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Confirm release?" data-confirm-ok="Yes, released">@csrf<input type="hidden" name="to" value="ongoing"><div class="modal-body">
     <div class="form-grid"><div class="field"><label>Release date</label><input class="input" type="date" name="releaseDate" value="{{ today_iso() }}" required></div><div class="field"><label>Person receiving the items</label><input class="input" name="receivedBy" required value="{{ $r->contact_name ?: $c->name }}"></div></div>
     @php($firstDay = collect($r->lines)->map(function ($l) { $d = array_key_first($l['days']); return $l['days'][$d].'× '.inv()->itemName($l); })->implode(', '))
     <div class="field"><label>Released quantity</label><textarea class="input" name="releaseQty" required>{{ $firstDay }}</textarea><div class="hint">First-day quantities shown. For multi-day rentals with changing quantities, note any later drop-offs.</div></div>
+    @if(\App\Domain\Damage::usesOutcomes($r->supplier) && $peak)
+      <div class="field"><label>Condition photos at release (1 to 6)</label><input class="input" type="file" name="release_photos[]" accept="image/*" multiple required>
+        <div class="hint">Photograph the items as they are handed over. The customer sees these photos; if something is damaged later, they are compared with the return photos.</div></div>
+    @endif
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Confirm release</button></div></form>
 </div></div>
 @endif
 
-@if($r->status === 'return_pending')
+@php($outcomes = \App\Domain\Damage::usesOutcomes($r->supplier))
+@if($r->status === 'return_pending' && $outcomes)
+<div class="modal-backdrop hidden" id="inspectModal"><div class="modal lg" role="dialog" aria-modal="true"><div class="modal-head"><h3>Return inspection · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+  <form method="POST" action="{{ route('supplier.requests.inspection', $r) }}" enctype="multipart/form-data" id="outForm" novalidate>@csrf<input type="hidden" name="confirmed" value="1"><div class="modal-body">
+    <p class="small muted">Count what came back and say what happened to any unit with a problem. <b>Minor</b> = your minor fee. <b>Repairable</b> = what the repair costs (never more than the replacement value). <b>Not working</b> is free unless the customer misused it. <b>Beyond repair</b> and <b>lost</b> = the replacement value. The customer then has {{ \App\Domain\Damage::REVIEW_HOURS }} hours to accept or dispute each charge.</p>
+    <div class="field"><label>Return date</label><input class="input" type="date" name="returnDate" value="{{ today_iso() }}" required style="max-width:200px"></div>
+    @foreach(inv()->saleDemand($r->lines) as $spid => $sq)
+      <div class="card card-flat mb-1 soft" style="padding:10px 14px"><div class="row between"><b>{{ inv()->product($spid)?->name }}</b><span class="small">{{ $sq }} sold · <span class="badge b-gold plain">Consumed — not returned</span></span></div></div>
+    @endforeach
+    @foreach($peak as $pid => $q)
+      @php($p = inv()->product($pid))
+      <div class="card card-flat mb-1" data-out data-name="{{ $p->name }}" data-rented="{{ $q }}" data-value="{{ (float) $p->replacement_value }}" data-fee="{{ (float) $p->minor_fee }}" style="padding:14px">
+        <div class="mb-1"><b>{{ $p->name }}</b><div class="small muted">Rented {{ $q }} · replacement value {{ $p->replacement_value ? money($p->replacement_value) : 'not set' }} · minor fee {{ $p->minor_fee !== null ? money($p->minor_fee) : 'not set' }}</div></div>
+        <div class="form-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <div class="field"><label class="small">Returned</label><input class="input input-sm" type="number" min="0" max="{{ $q }}" name="items[{{ $pid }}][returned]" data-k="returned" value="{{ $q }}"></div>
+          <div class="field"><label class="small">Minor (cleaning, stain)</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][minor]" data-k="minor" value="0"></div>
+          <div class="field"><label class="small">Lost / not returned</label><input class="input input-sm" type="number" data-k="lost" value="0" readonly tabindex="-1" aria-label="Lost units (rented minus returned)"></div>
+          <div class="field"><label class="small">Repairable</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][repairable]" data-k="repairable" value="0"></div>
+          <div class="field"><label class="small">Repair cost, all units (₱)</label><input class="input input-sm" type="number" min="0" step="0.01" name="items[{{ $pid }}][repairCost]" data-k="repairCost" placeholder="from a quote or receipt"></div>
+          <div class="field"><label class="small">Beyond repair</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][beyond]" data-k="beyond" value="0"></div>
+          <div class="field"><label class="small">Not working</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][notWorking]" data-k="notWorking" value="0"></div>
+          <div class="field" style="grid-column:span 2"><label class="check small"><input type="checkbox" name="items[{{ $pid }}][misuse]" value="1" data-k="misuse"> Caused by misuse (water, dropped, wrong power…), shown in the photos</label>
+            <input class="input input-sm mt-1" type="number" min="0" step="0.01" name="items[{{ $pid }}][misuseCost]" data-k="misuseCost" placeholder="Repair cost (₱)" hidden></div>
+        </div>
+        <div class="field"><label class="small">What happened</label><textarea class="input" name="items[{{ $pid }}][description]" data-k="description" rows="2" placeholder="e.g. One table leg cracked; repair shop quote ₱600"></textarea></div>
+        <div class="row between small"><span class="muted" data-calc></span><b data-amt>₱0.00</b></div><div class="error-text" data-err></div>
+      </div>
+    @endforeach
+    <div class="field"><label>Inspection notes</label><textarea class="input" name="notes" placeholder="General notes for the customer…"></textarea></div>
+    <div class="field"><label>Photos of the returned items (up to 4)</label><input class="input" type="file" name="photos[]" accept="image/*" multiple><div class="hint">Needed for any charge: they are compared with the photos taken at release.</div></div>
+    <div class="sum-line total"><span>Total compensation</span><span id="outT">₱0.00</span></div>
+  </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Confirm assessment</button></div></form>
+</div></div>
+@endif
+
+@if($r->status === 'return_pending' && ! $outcomes)
 @php($C = \App\Domain\Damage::CONDITIONS)
 <div class="modal-backdrop hidden" id="inspectModal"><div class="modal lg" role="dialog" aria-modal="true"><div class="modal-head"><h3>Return inspection · {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
   <form method="POST" action="{{ route('supplier.requests.inspection', $r) }}" enctype="multipart/form-data" id="inspForm" novalidate>@csrf<input type="hidden" name="confirmed" value="1"><div class="modal-body">
@@ -247,6 +289,48 @@
 @endif
 @push('scripts')
 <script>
+// Return inspection, personal shops: minor fee / repair cost (capped) / not working (free unless misuse) / beyond repair / lost.
+(function () {
+  var f = document.getElementById('outForm'); if (!f) return;
+  var peso = function (n) { return '₱' + (Math.round(n * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var cards = Array.prototype.slice.call(f.querySelectorAll('[data-out]'));
+  var calc = function () {
+    var errors = [], total = 0;
+    cards.forEach(function (c) {
+      var el = function (k) { return c.querySelector('[data-k=' + k + ']'); };
+      var n = function (k) { return Math.max(0, Math.floor(+el(k).value || 0)); };
+      var m = function (k) { return Math.max(0, +el(k).value || 0); };
+      var rented = +c.dataset.rented, v = +c.dataset.value || 0, fee = +c.dataset.fee || 0, name = c.dataset.name;
+      var ret = n('returned'), minor = n('minor'), rep = n('repairable'), nw = n('notWorking'), bey = n('beyond'), lost = Math.max(0, rented - ret);
+      var misuse = el('misuse').checked && nw > 0; el('misuseCost').hidden = !el('misuse').checked;
+      var cap = function (u, cost) { return v > 0 ? Math.min(cost, v * u) : cost; };
+      var a = { minor: fee * minor, rep: rep ? cap(rep, m('repairCost')) : 0, nw: misuse ? cap(nw, m('misuseCost')) : 0, bey: v * bey, lost: v * lost };
+      var t = a.minor + a.rep + a.nw + a.bey + a.lost; total += t;
+      el('lost').value = lost;
+      var errs = [];
+      if (ret > rented) errs.push('returned cannot exceed ' + rented + '.');
+      if (minor + rep + nw + bey > ret) errs.push('units with a problem cannot exceed the units returned.');
+      if (rep && !(m('repairCost') > 0)) errs.push('enter the repair cost.');
+      if (misuse && !(m('misuseCost') > 0)) errs.push('enter the repair cost for the misused units.');
+      if (minor + rep + nw + bey + lost > 0 && !el('description').value.trim()) errs.push('describe what happened.');
+      c.querySelector('[data-calc]').textContent = [minor ? minor + ' minor × ' + peso(fee) : '', rep ? 'repair ' + peso(a.rep) : '', nw ? nw + ' not working' + (misuse ? ' (misuse) ' + peso(a.nw) : ' — free') : '', bey ? bey + ' beyond repair × ' + peso(v) : '', lost ? lost + ' lost × ' + peso(v) : ''].filter(Boolean).join(' + ') || 'No problems';
+      c.querySelector('[data-amt]').textContent = peso(t);
+      var er = c.querySelector('[data-err]'); er.textContent = errs.join(' '); er.style.display = errs.length ? 'block' : 'none';
+      errs.forEach(function (e) { errors.push(name + ': ' + e); });
+    });
+    document.getElementById('outT').textContent = peso(total);
+    return { errors: errors, total: total };
+  };
+  f.addEventListener('input', calc); f.addEventListener('change', calc); calc();
+  f.addEventListener('submit', function (e) {
+    if (f.dataset.confirmed) return;
+    var as = calc();
+    if (as.errors.length) { e.preventDefault(); e.stopImmediatePropagation(); delete f.dataset.confirm; window.PR.toast(as.errors[0], 'error'); return; }
+    f.dataset.confirmTitle = 'Confirm the assessment?'; f.dataset.confirmOk = 'Confirm';
+    f.dataset.confirm = as.total > 0 ? 'Charge ' + peso(as.total) + '? The customer gets {{ \App\Domain\Damage::REVIEW_HOURS }} hours to accept or dispute it; a PartyRent admin decides disputes.' : 'All items came back fine: no charge.';
+  });
+})();
+
 // Return inspection (reference inspectFlow): live compensation per damage policy, then review & confirm.
 (function () {
   var f = document.getElementById('inspForm'); if (!f) return;

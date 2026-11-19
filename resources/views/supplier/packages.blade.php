@@ -23,6 +23,7 @@
             <div class="small muted">{{ $k->description }}</div>
             @if($hidden)<div class="small" style="color:var(--red)">Hidden by a PartyRent admin: {{ $k->hidden_reason }}. It cannot be republished.</div>@endif
             <div class="mt-1"><span class="price">{{ money($pp['package']) }}</span> <span class="small muted">{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : '/ day · ' }}items separately {{ money($pp['separate']) }}</span></div>
+            @if($k->max_guests)<div class="small muted">Good for up to {{ $k->max_guests }} guests</div>@endif
           </div>
         </div>
         <div class="mt-1 small">@foreach($inc as $r)<span class="tag">{{ $r['qty'] }}× {{ $r['name'] }}</span> @endforeach</div>
@@ -35,7 +36,7 @@
             <form method="POST" action="{{ route('supplier.packages.duplicate', $k) }}">@csrf<button class="btn btn-xs btn-ghost">Duplicate</button></form>
             <form method="POST" action="{{ route('supplier.packages.move', $k) }}">@csrf<input type="hidden" name="dir" value="up"><button class="btn btn-xs btn-ghost" aria-label="Move up" title="Show earlier to customers" @disabled($n === 0)>↑</button></form>
             <form method="POST" action="{{ route('supplier.packages.move', $k) }}">@csrf<input type="hidden" name="dir" value="down"><button class="btn btn-xs btn-ghost" aria-label="Move down" title="Show later to customers" @disabled($n === $list->count() - 1)>↓</button></form>
-            <form method="POST" action="{{ route('supplier.packages.delete', $k) }}" data-confirm="Delete {{ $k->name }}? It disappears from customers' Rental Lists. Requests already booked keep their copy." data-confirm-title="Delete package?" data-confirm-ok="Delete" data-danger>@csrf @method('DELETE')<button class="btn btn-xs btn-ghost" aria-label="Delete package">{{ icon('trash') }}</button></form>
+            <form method="POST" action="{{ route('supplier.packages.delete', $k) }}" data-confirm="Delete {{ $k->name }}? It disappears from customers' Rental Lists. Requests already booked keep their copy.{{ collect(\App\Domain\Packages::productIds($def))->contains(fn ($id) => inv()->product($id)?->package_only) ? ' Its package-only items stay in your inventory, unlisted (moved to Archived).' : '' }}" data-confirm-title="Delete package?" data-confirm-ok="Delete" data-danger>@csrf @method('DELETE')<button class="btn btn-xs btn-ghost" aria-label="Delete package">{{ icon('trash') }}</button></form>
           </div>
         </div>
       </div>

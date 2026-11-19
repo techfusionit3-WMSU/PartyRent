@@ -14,6 +14,13 @@ class ReplacementValueTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** These cover the business-shop percentage damage policy (individual shops use outcomes: DamageOutcomesTest). */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        \App\Models\Supplier::query()->update(['account_type' => 'business']);
+    }
+
     protected bool $seed = true;
 
     protected string $seeder = \Database\Seeders\DemoSeeder::class;

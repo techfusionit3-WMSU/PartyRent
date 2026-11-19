@@ -20,6 +20,7 @@
       @if($tiers->count() > 1)<div class="tabs mb-1" aria-label="{{ $k->tier_group }} tiers">@foreach($tiers as $t)<a class="tab {{ $t->id === $k->id ? 'active' : '' }}" href="{{ route('packages.show', $t) }}">{{ $t->tier_label ?: $t->name }}<span class="count">{{ money_short(\App\Domain\Packages::headlinePrice(\App\Domain\Packages::def($t))) }}</span></a>@endforeach</div>@endif
     @endif
     <p>{{ $k->description }}</p>
+    @if($k->max_guests)<p class="small">{{ icon('users') }} Good for up to <b>{{ $k->max_guests }}</b> guests</p>@endif
     <div><span class="price-lg" data-pkg-headline>{{ money($pp['package']) }}</span> <span class="muted">/ package{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : ' / day' }}</span>@if($pp['savings'] > 0) <span class="badge b-gold">Save {{ money($pp['savings']) }} vs. getting it separately</span>@endif</div>
     @if($lead)<div class="alert alert-info mt-1">{{ icon('info') }}<div>Contains made-to-order items: book at least <b data-pkg-lead>{{ $lead }}</b> day(s) before your event.</div></div>@endif
     <div class="card mt-2 pad-0" data-pkg-config data-package="{{ $k->id }}" data-quote="{{ route('api.package-quote') }}">

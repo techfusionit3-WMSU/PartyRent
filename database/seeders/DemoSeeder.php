@@ -100,6 +100,8 @@ class DemoSeeder extends Seeder
         $this->requests();
         $this->payAccounts();
         $this->payments();
+        // demo bookings past "pending" already hold their stock (their first payment is treated as made)
+        RentalRequest::whereNotIn('status', ['pending', 'declined', 'cancelled'])->whereNull('reserved_at')->update(['reserved_at' => now()]);
         $this->payouts();
         $this->reviewsAndComplaints();
         $this->notifications();

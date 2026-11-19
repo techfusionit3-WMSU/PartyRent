@@ -40,7 +40,7 @@ class RefundsTest extends TestCase
             'code' => 'PR-R'.random_int(100, 999), 'customer_id' => User::where('email', 'maria@demo.ph')->value('id'), 'supplier_id' => $p->supplier_id,
             'event_name' => 'Refund Party', 'event_type' => 'Birthday', 'event_date' => $d, 'start_date' => $d, 'end_date' => $d, 'fulfillment' => 'pickup',
             'lines' => [['id' => 'l1', 'type' => 'item', 'ref_id' => $p->id, 'days' => [$d => 50]]], 'arrangement' => 'full', 'method' => 'online', 'plan' => 'full',
-            'status' => 'accepted', 'pricing' => [], 'accepted_at' => today_iso(),
+            'status' => 'accepted', 'pricing' => [], 'accepted_at' => today_iso(), 'reserved_at' => now(),
         ]);
         $r->update(['pricing' => Pricing::quoteRequest($r->fresh())]);
         Payment::create(['code' => 'PAY-R1', 'rental_request_id' => $r->id, 'type' => 'full', 'method' => 'online', 'gateway' => $gateway, 'gateway_ref' => $ref,

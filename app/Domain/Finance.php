@@ -238,6 +238,11 @@ class Finance
                 $items[] = ['key' => 'bal', 'type' => 'balance', 'label' => 'Final Balance', 'due' => $E, 'amount' => (float) $p['finalBalance']];
             }
         }
+        // The first payment reserves the items and is due within 24 hours of acceptance.
+        if ($items && $req->pay_by) {
+            $items[0]['due'] = min($items[0]['due'], $req->pay_by->format('Y-m-d'));
+            $items[0]['dueAt'] = $req->pay_by->toIso8601String();
+        }
         $cum = 0.0;
         foreach ($items as &$it) {
             $cum = r2($cum + $it['amount']);

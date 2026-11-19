@@ -49,7 +49,7 @@ class ShortfallCasesTest extends TestCase
             'code' => 'PR-S'.(++$this->seq), 'customer_id' => $customer->id, 'supplier_id' => $p->supplier_id, 'event_name' => 'Party '.$this->seq, 'event_type' => 'Birthday',
             'event_date' => $dates[0], 'start_date' => min($dates), 'end_date' => max($dates), 'fulfillment' => 'pickup',
             'lines' => [['id' => 'l1', 'type' => 'item', 'ref_id' => $p->id, 'days' => $days]], 'arrangement' => 'full', 'method' => 'bank', 'plan' => 'full',
-            'status' => 'accepted', 'pricing' => [], 'accepted_at' => $acceptedAt,
+            'status' => 'accepted', 'pricing' => [], 'accepted_at' => $acceptedAt, 'reserved_at' => now(),
         ]);
         $r->update(['pricing' => Pricing::quoteRequest($r->fresh())]);
         Payment::create(['code' => 'PAY-S'.$this->seq, 'rental_request_id' => $r->id, 'type' => 'full', 'method' => 'bank', 'amount' => $r->pricing['total'], 'date' => today_iso(),

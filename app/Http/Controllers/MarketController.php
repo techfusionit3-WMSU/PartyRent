@@ -66,14 +66,18 @@ class MarketController extends Controller
         $dates = $st['start'] ? array_slice(date_range($st['start'], $st['end']), 0, (int) setting('maxRentalDays', 30)) : [];
         $need = max(1, (int) $st['qty']);
         $ai = $st['q'] ? Ai::interpret($st['q']) : null;
-        $words = array_values(array_filter(preg_split('/\s+/', mb_strtolower($st['q'])) ?: [], fn ($w) => mb_strlen($w) > 1));
+        $guests = $ai['guests'] ?? null;
+        // "for 50 guests" is the event size, not words to match in names
+        $qWords = $guests ? preg_replace('/\b\d{1,4}\s*\+?\s*(guests?|pax|people|persons?|bisita|katao|tao|visitors|attendees|heads)\b/iu', ' ', $st['q']) : $st['q'];
+        $words = array_values(array_filter(preg_split('/\s+/', mb_strtolower($qWords)) ?: [], fn ($w) => mb_strlen($w) > 1));
         $matchText = fn (string $hay) => ! $words || collect($words)->every(fn ($w) => str_contains($hay, $w)) || ($ai && $ai['items'] && collect($words)->contains(fn ($w) => str_contains($hay, $w)));
 
         $prods = $this->live();
         $sups = Supplier::approved()->get();
 
         if ($st['view'] === 'packages') {
-            $list = Package::live()->with('supplier')->get()->filter(function ($k) use ($st, $dates, $need, $matchText, $to) {
+            $list = Package::live()->with('supplier')->get()->filter(function ($k) use ($st, $dates, $need, $matchText, $to, $guests) {
+                if (\App\Domain\Packages::fitsGuests($k, $guests) === false) return false; // too small for the event
                 $s = $k->supplier;
                 if (! $matchText(mb_strtolower($k->name.' '.$k->description.' '.$s->name.' '.implode(' ', $k->events ?? [])))) {
                     return false;
@@ -95,6 +99,11 @@ class MarketController extends Controller
                 'price_asc' => $list->sortBy('price'), 'price_desc' => $list->sortByDesc('price'),
                 'recent' => $list->sortByDesc('created_at'), default => $list->sortByDesc(fn ($k) => $k->supplier->rating),
             };
+            // A guest count in the search: packages sized for it first, the closest capacity first.
+            if ($guests) {
+                [$fit, $rest] = $list->partition(fn ($k) => \App\Domain\Packages::fitsGuests($k, $guests));
+                $list = ($st['sort'] === 'recommended' ? $fit->sortBy('max_guests') : $fit)->concat($rest);
+            }
         } else {
             $list = $prods->filter(function ($x) use ($st, $dates, $need, $matchText, $ai, $to) {
                 $s = $x->supplier;
@@ -190,7 +199,7 @@ class MarketController extends Controller
     {
         $q = mb_strtolower((string) $request->query('q', ''));
         $f = (string) $request->query('f', '');
-        $list = Supplier::approved()->with(['products' => fn ($p) => $p->where('status', 'active')->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
+        $list = Supplier::approved()->with(['products' => fn ($p) => $p->where('status', 'active')->where('package_only', false)->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
             ->filter(fn ($s) => (! $q || str_contains(mb_strtolower($s->name.' '.$s->city.' '.$s->description), $q)) && (! $f || $s->fulfillment === 'both' || $s->fulfillment === $f));
 
         return view('market.suppliers', ['list' => $list, 'q' => $request->query('q', ''), 'f' => $f]);
@@ -200,7 +209,7 @@ class MarketController extends Controller
     {
         $own = $request->user() && $supplier->owner_id === $request->user()->id;
         abort_unless($supplier->status === 'approved' || $own, 404);
-        $items = $supplier->products()->where('status', 'active')->with(['supplier', 'category'])->get();
+        $items = $supplier->products()->where('status', 'active')->where('package_only', false)->with(['supplier', 'category'])->get();
         inv()->primeProducts($items);
 
         return view('market.supplier', [
@@ -213,7 +222,7 @@ class MarketController extends Controller
 
     public function product(Request $request, Product $product)
     {
-        abort_unless($product->status === 'active' && $product->supplier->status === 'approved', 404);
+        abort_unless($product->status === 'active' && ! $product->package_only && $product->supplier->status === 'approved', 404);
         $today = today_iso();
         $earliest = add_days($today, $product->isSale() ? (int) $product->lead_days : 0);
         $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : max(add_days($today, 7), $earliest);

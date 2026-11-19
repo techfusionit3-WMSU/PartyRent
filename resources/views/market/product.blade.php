@@ -129,7 +129,14 @@
       @if($p->colors)<dt>Colors</dt><dd><div class="row wrap gap-sm">@foreach($p->colors as $c)<span class="tag"><span class="swatch" title="{{ $c }}" style="background:{{ color_hex($c) }}"></span> {{ $c }}</span>@endforeach</div></dd>@endif
       @if($p->themes)<dt>Themes</dt><dd><div class="row wrap gap-sm">@foreach($p->themes as $t)<span class="tag">{{ $t }}</span>@endforeach</div></dd>@endif
       @if(! $p->isSale())<dt>Stock</dt><dd>{{ $p->total_stock }} {{ $p->unitWord() }}{{ $p->total_stock === 1 ? '' : 's' }} in total</dd>@endif
-      @if(! $p->isSale() && $p->replacement_value)<dt>Replacement value</dt><dd>{{ money($p->replacement_value) }} per {{ $p->unitWord() }}: the most you would pay if one is lost or destroyed.</dd>@endif
+      @if($dt = \App\Domain\Damage::terms($p))
+        <dt>If something happens</dt><dd>
+          @if($dt['minor'] !== null)<div><b>Minor</b> (cleaning, stain, small scratch): {{ money($dt['minor']) }} per {{ $p->unitWord() }}</div>@endif
+          <div><b>Damaged</b>: the repair cost{{ $dt['value'] > 0 ? ', never more than '.money($dt['value']) : '' }}</div>
+          <div><b>Not working</b>: free if it is a normal fault; charged as a repair only if misused</div>
+          <div><b>Lost or beyond repair</b>: {{ $dt['value'] > 0 ? money($dt['value']).' per '.$p->unitWord() : 'replacement value not set' }} @if($dt['receipt'])<span class="badge b-green plain">Receipt on file</span>@endif</div>
+          <div class="small muted">The shop photographs the items at release and at return. You get {{ \App\Domain\Damage::REVIEW_HOURS }} hours to accept or dispute any charge; PartyRent decides disputes.</div></dd>
+      @elseif(! $p->isSale() && $p->replacement_value)<dt>Replacement value</dt><dd>{{ money($p->replacement_value) }} per {{ $p->unitWord() }}: the most you would pay if one is lost or destroyed.</dd>@endif
       @if(! $p->isSale() && $p->rental_policy)<dt>Item rental policy</dt><dd style="white-space:pre-line">{{ $p->rental_policy }}</dd>@endif
     </dl>
   </section>

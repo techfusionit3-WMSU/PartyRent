@@ -161,6 +161,7 @@ class CartController extends Controller
                 'lines' => array_map(fn ($l) => ['cart_id' => $l['id'], 'name' => inv()->itemName($l), 'type' => $l['type'], 'days' => Rentals::cleanDays($l['days']),
                     'time' => Slots::time($l) ?? Slots::defaultTime($s, $l['type'] === 'package' ? null : inv()->product($l['ref_id'])), 'destId' => 'd1', 'group' => $l['id']], $chosen),
                 'inst' => ['n' => min(3, (int) $cfg['installment']['maxInstallments']), 'items' => [], 'auto' => true],
+                'damage' => self::damageTerms($chosen),
                 // static shop info for the page
                 'shop' => [
                     'name' => $s->name, 'logo' => $s->logo, 'color' => $s->color, 'address' => $s->publicAddress(), 'hours' => $s->hours, 'fulfillment' => $s->fulfillment,
@@ -171,6 +172,29 @@ class CartController extends Controller
             ];
         }
         return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'direct' => (bool) $direct]);
+    }
+
+    /** Damage terms of the rental items in these lines (packages expand into their items), individual shops only. */
+    private static function damageTerms(array $lines): array
+    {
+        $pids = [];
+        foreach ($lines as $l) {
+            if ($l['type'] === 'package') {
+                $def = inv()->lineDef($l);
+                $pids = array_merge($pids, $def ? array_keys(\App\Domain\Packages::units($def, $l['sel'] ?? null)['rent']) : []);
+            } else {
+                $pids[] = (int) $l['ref_id'];
+            }
+        }
+        $out = [];
+        foreach (array_unique($pids) as $pid) {
+            $p = inv()->product($pid);
+            if ($t = \App\Domain\Damage::terms($p)) {
+                $out[] = ['name' => $p->name, 'text' => $t['text'], 'receipt' => $t['receipt']];
+            }
+        }
+
+        return $out;
     }
 
     /**

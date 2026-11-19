@@ -314,6 +314,33 @@ class Packages
         return $out;
     }
 
+    /** Every product a package can use (included items, every choice option, product add-ons). */
+    public static function productIds(array $def): array
+    {
+        $ids = [];
+        foreach ($def['components'] as $c) {
+            $ids[] = $c['productId'] ?? null;
+            foreach ($c['options'] ?? [] as $o) {
+                $ids[] = $o['productId'] ?? null;
+            }
+        }
+
+        return array_values(array_unique(array_map('intval', array_filter($ids))));
+    }
+
+    /**
+     * Does the package suit an event of this size? `max_guests` is "guests accommodated" set by the supplier.
+     * null = the package has no guest capacity (or no guest count was given), so it neither fits nor misses.
+     */
+    public static function fitsGuests(Package $k, ?int $guests): ?bool
+    {
+        if (! $guests || ! $k->max_guests) {
+            return null;
+        }
+
+        return $guests <= $k->max_guests;
+    }
+
     /** Longest lead time among the sale items in a selection. */
     public static function leadDays(array $def, ?array $sel = null): int
     {

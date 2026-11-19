@@ -65,7 +65,7 @@ class Rentals
         return route($route, $params, false);
     }
 
-    private static function history(RentalRequest $r, string $status, ?string $note = null): void
+    public static function history(RentalRequest $r, string $status, ?string $note = null): void
     {
         RequestEvent::create(['rental_request_id' => $r->id, 'status' => $status, 'user_id' => auth()->id(), 'note' => $note ?: null, 'created_at' => now()]);
     }
@@ -176,7 +176,7 @@ class Rentals
 
     private static function listed(Product|Package|null $item): bool
     {
-        return $item && $item->status === 'active' && ! ($item instanceof Package && $item->is_draft) && $item->supplier?->status === 'approved';
+        return $item && $item->status === 'active' && ! ($item instanceof Product && $item->package_only) && ! ($item instanceof Package && $item->is_draft) && $item->supplier?->status === 'approved';
     }
 
     /**
@@ -840,7 +840,9 @@ class Rentals
 
                 return self::fail('Not enough stock on '.implode('; ', array_map(fn ($b) => fmt_date($b['date']).' ('.$b['name'].(! empty($b['location_id']) ? ' at '.$locName($b['location_id']) : '').': need '.$b['requested'].', available '.$b['available'].')', $rev['check']['bad'])), ['conflict' => $rev['check']['bad'], 'review' => $rev]);
             }
+            // Accepting holds nothing yet: the items are reserved when the first payment is verified (within 24 hours).
             $r->update(['status' => 'accepted', 'accepted_at' => today_iso(), 'supplier_notes' => $note ?: $r->supplier_notes,
+                'pay_by' => now()->addHours(self::PAY_HOURS), 'reserved_at' => null,
                 'allocation' => ['status' => 'approved', 'at' => now()->toIso8601String(), 'by' => $by?->id]]);
             self::history($r, 'accepted', $note ?: 'Request accepted');
 
@@ -854,11 +856,102 @@ class Rentals
             return $result;
         }
         self::changed($r);
-        $first = $r->fresh()->fin()['schedule'][0] ?? null;
-        Notifier::notify($r->customer_id, 'customer', 'Request accepted 🎉', $r->supplier->name.' accepted '.$r->code.'. '.($first ? $first['label'].' of '.money($first['amount']).' is due by '.fmt_date($first['due']).'.' : ''), self::link('rentals.show', $r));
+        $r->refresh();
+        $first = $r->fin()['schedule'][0] ?? null;
+        if (trim((string) $note) !== '' && $by) { // the note also lands in the conversation with the customer
+            Chat::post($r, $by, 'supplier', trim((string) $note), false);
+        }
+        Notifier::notify($r->customer_id, 'customer', 'Request accepted 🎉', $r->supplier->name.' accepted '.$r->code.'. '.(trim((string) $note) !== '' ? 'Message from the shop: "'.mb_strimwidth(trim((string) $note), 0, 200, '…').'" ' : '').($first
+            ? 'Pay the '.mb_strtolower($first['label']).' of '.money($first['amount']).' by '.fmt_datetime($r->pay_by).' to reserve your items. They are not held for you until it is verified, and the request is cancelled if it is not paid in time.'
+            : ''), self::link('rentals.show', $r));
         Notifier::audit('Accepted rental request', $r->code.' · '.money($r->pricing['total']));
+        self::secureIfPaid($r); // nothing to pay first (e.g. a ₱0 request): reserved at once
 
         return self::ok();
+    }
+
+    /** Hours the customer has, after acceptance, to pay the first payment that reserves the items. */
+    public const PAY_HOURS = 24;
+
+    /**
+     * The first payment of an accepted request is verified: reserve the items. First to pay wins: other accepted,
+     * unpaid requests that no longer fit the stock (same items, overlapping day and time) are declined.
+     * If this request itself no longer fits, it is declined and its payment refunded.
+     */
+    public static function secureIfPaid(RentalRequest $r): void
+    {
+        $r = $r->fresh();
+        if (! $r || ! $r->awaitingDownPayment()) {
+            return;
+        }
+        $f = $r->fin();
+        if (! ($f['reservationConfirmed'] || ! $f['schedule'] || $f['balance'] <= 0)) {
+            return;
+        }
+        $won = DB::transaction(function () use ($r) {
+            self::lockProducts($r->lines);
+            inv()->flush();
+            if (! inv()->check($r->lines, $r->id)['ok']) {
+                return false;
+            }
+            $r->update(['reserved_at' => now()]);
+            self::history($r, 'accepted', 'Payment verified: items reserved');
+
+            return true;
+        });
+        inv()->flush();
+        if (! $won) {
+            self::dropUnreserved($r, 'Another customer booked the same items for the same day and time first, so they could not be reserved for you.');
+
+            return;
+        }
+        Notifier::notify($r->customer_id, 'customer', 'Items reserved ✅', 'Your payment for '.$r->code.' is verified and your items are now reserved.', self::link('rentals.show', $r));
+        Notifier::notify($r->supplier->owner_id, 'supplier', 'Items reserved', $r->code.': the first payment is verified, so the items are now reserved. You can start preparing.', self::link('supplier.requests.show', $r));
+        foreach (RentalRequest::where('supplier_id', $r->supplier_id)->where('status', 'accepted')->whereNull('reserved_at')->where('id', '!=', $r->id)->get() as $o) {
+            if (! inv()->check($o->lines, $o->id)['ok']) {
+                self::dropUnreserved($o, 'Another customer booked the same items for the same day and time first.');
+                inv()->flush();
+            }
+        }
+    }
+
+    /**
+     * End an accepted request that never got its items reserved (lost to an earlier payer, or not paid in time).
+     * Payments waiting for verification are rejected; verified ones are refunded in full.
+     */
+    public static function dropUnreserved(RentalRequest $r, string $reason, bool $expired = false): void
+    {
+        $r = $r->fresh();
+        if (! $r || ! $r->awaitingDownPayment()) {
+            return;
+        }
+        $r->update($expired ? ['status' => 'cancelled', 'cancel_reason' => $reason, 'cancel_free' => true] : ['status' => 'declined', 'decline_reason' => $reason]);
+        $r->payments()->whereIn('status', ['pending', 'awaiting'])->update(['status' => 'rejected', 'reject_reason' => $reason, 'verified_at' => now()]);
+        self::history($r, $expired ? 'cancelled' : 'declined', $reason);
+        self::changed($r);
+        $paid = $r->fresh()->fin()['paidRental'];
+        $refund = $paid > 0 ? ' Your '.money($paid).' will be refunded in full.' : '';
+        Notifier::notify($r->customer_id, 'customer', $expired ? 'Request cancelled' : 'Items no longer available', $r->code.': '.$reason.$refund, self::link('rentals.show', $r));
+        Notifier::notify($r->supplier->owner_id, 'supplier', $expired ? 'Request cancelled (not paid)' : 'Request declined automatically', $r->code.': '.$reason, self::link('supplier.requests.show', $r));
+        if ($paid > 0) {
+            Notifier::platformFinance('Refund due', $r->code.' ('.$r->supplier->name.') could not be reserved. Refund the customer\'s '.money($paid).' in full.', self::link('cashier.record', ['request' => $r->code]));
+        }
+        Notifier::audit($expired ? 'Cancelled unpaid request' : 'Declined request (items taken)', $r->code.' — '.$reason);
+    }
+
+    /** Cancel accepted requests whose first payment was not made within 24 hours (one waiting for verification is kept). */
+    public static function expireUnpaid(): int
+    {
+        $n = 0;
+        foreach (RentalRequest::where('status', 'accepted')->whereNull('reserved_at')->whereNotNull('pay_by')->where('pay_by', '<', now())->get() as $r) {
+            if ($r->payments()->whereIn('status', ['pending', 'awaiting'])->whereIn('type', Finance::RENTAL_TYPES)->exists()) {
+                continue;
+            }
+            self::dropUnreserved($r, 'The first payment was not made within '.self::PAY_HOURS.' hours of acceptance, so the request was cancelled and the items were released.', true);
+            $n++;
+        }
+
+        return $n;
     }
 
     public static function declineRequest(RentalRequest $r, string $reason): array
@@ -898,6 +991,9 @@ class Rentals
         $out = [];
         $secured = $f['reservationConfirmed'] || ! $f['schedule'] || $f['balance'] <= 0;
         $openCase = \App\Models\ShortfallCase::where('rental_request_id', $r->id)->where('status', '!=', 'resolved')->exists();
+        if (in_array($to, ['in_progress', 'ready_pickup', 'out_delivery', 'ongoing'], true) && $r->awaitingDownPayment() && $secured) {
+            $out[] = 'The items are not reserved yet. Reload the page; they are reserved as soon as the first payment is verified.';
+        }
         if (in_array($to, ['in_progress', 'ready_pickup', 'out_delivery', 'ongoing'], true) && ! $secured) {
             $first = $f['schedule'][0] ?? null;
             $out[] = "The customer's ".strtolower($first['label'] ?? 'first payment').($first ? ' ('.money($first['amount']).')' : '').' is not verified yet.';
@@ -945,7 +1041,12 @@ class Rentals
             if (empty($data['receivedBy'])) {
                 return self::fail('Enter the name of the person receiving the items.');
             }
-            $log = array_merge($log, ['releaseDate' => $data['releaseDate'] ?? today_iso(), 'releaseQty' => $data['releaseQty'] ?? '', 'receivedBy' => $data['receivedBy'], 'method' => $r->fulfillment]);
+            // Personal shops photograph the condition of rental items at release (evidence for any damage later).
+            if (Damage::usesOutcomes($r->supplier) && self::peakUnits($r) && empty($data['releasePhotos'])) {
+                return self::fail('Add at least one photo of the items\' condition at release.');
+            }
+            $log = array_merge($log, ['releaseDate' => $data['releaseDate'] ?? today_iso(), 'releaseQty' => $data['releaseQty'] ?? '', 'receivedBy' => $data['receivedBy'], 'method' => $r->fulfillment],
+                ! empty($data['releasePhotos']) ? ['releasePhotos' => array_values($data['releasePhotos'])] : []);
         }
         $low = [];
         DB::transaction(function () use ($r, $to, $data, &$log, &$low) {
@@ -1054,22 +1155,27 @@ class Rentals
         if (empty($data['confirmed'])) {
             return self::fail('Review and confirm the damage assessment before it is finalized.');
         }
-        $as = Damage::assess($r, (array) ($data['items'] ?? []));
+        // Personal shops: minor / repairable / not working / beyond repair / lost, then the customer reviews it.
+        $outcomes = Damage::usesOutcomes($r->supplier);
+        $as = $outcomes ? Damage::assessOutcomes($r, (array) ($data['items'] ?? [])) : Damage::assess($r, (array) ($data['items'] ?? []));
         if (! $as['ok']) {
             return self::fail($as['errors'][0]);
         }
         $comp = $as['total'];
-        DB::transaction(function () use ($r, $as, $data, $comp) {
+        DB::transaction(function () use ($r, $as, $data, $comp, $outcomes) {
             foreach ($as['items'] as $it) {
                 $p = Product::lockForUpdate()->find($it['productId']);
                 if (! $p) {
                     continue;
                 }
-                $p->damaged += $it['repairable'];
+                $p->damaged += $it['repairable'] + ($it['notWorking'] ?? 0); // both wait for repair
                 $p->written_off += $it['nonRepairable'];
                 $p->missing += $it['lost'];
                 $p->save();
-                foreach ([['repairable', 'damaged', 'repairable damage (unavailable until repaired)'], ['nonRepairable', 'write_off', 'non-repairable'], ['lost', 'lost', 'lost / not returned']] as [$k, $type, $note]) {
+                foreach ([['repairable', 'damaged', 'repairable damage (unavailable until repaired)'], ['notWorking', 'damaged', 'not working (unavailable until repaired)'], ['nonRepairable', 'write_off', $outcomes ? 'beyond repair' : 'non-repairable'], ['lost', 'lost', 'lost / not returned']] as [$k, $type, $note]) {
+                    if (! isset($it[$k])) {
+                        continue;
+                    }
                     if ($it[$k]) {
                         StockMovement::create(['product_id' => $p->id, 'qty' => -$it[$k], 'type' => $type, 'rental_request_id' => $r->id, 'user_id' => auth()->id(), 'balance' => $p->stockOnHand(), 'note' => $r->code.' — '.$note, 'created_at' => now()]);
                     }
@@ -1079,13 +1185,14 @@ class Rentals
             $returnDate = $data['returnDate'] ?? today_iso();
             $r->fulfillment_log = array_merge($r->fulfillment_log ?? [], ['returnDate' => $returnDate, 'returnedQty' => $summary]);
             $now = now()->toIso8601String();
-            $r->inspection = ['at' => $now, 'by' => auth()->id(), 'returnDate' => $returnDate, 'items' => $as['items'], 'notes' => $data['notes'] ?? '', 'photos' => $data['photos'] ?? [], 'compensation' => $comp, 'settlement' => $comp > 0 ? 'pending' : 'settled', 'confirmed' => true, 'confirmedAt' => $now];
+            $r->inspection = ['at' => $now, 'by' => auth()->id(), 'returnDate' => $returnDate, 'items' => $as['items'], 'notes' => $data['notes'] ?? '', 'photos' => $data['photos'] ?? [], 'compensation' => $comp, 'settlement' => $comp > 0 ? 'pending' : 'settled', 'confirmed' => true, 'confirmedAt' => $now]
+                + ($outcomes ? ['model' => 'outcomes'] : []) + ($outcomes && $comp > 0 ? ['review' => Damage::newReview($as['items'])] : []);
             $r->status = 'inspection';
             $r->save();
             self::history($r, 'inspection', $comp > 0 ? 'Damage assessment confirmed: '.money($comp).' compensation' : 'All items returned in good condition');
         });
         self::changed($r);
-        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? 'Damage report' : 'Return inspection done', $comp > 0 ? 'The supplier confirmed damaged or missing items for '.$r->code.'. Compensation: '.money($comp).'. Open the rental to see the breakdown and evidence.' : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
+        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? 'Damage report' : 'Return inspection done', $comp > 0 ? 'The supplier confirmed damaged or missing items for '.$r->code.'. Compensation: '.money($comp).'. Open the rental to see the breakdown and evidence.'.($outcomes ? ' You have '.Damage::REVIEW_HOURS.' hours to accept or dispute it; with no answer it is accepted.' : '') : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
         if ($comp > 0 && $r->supplier) {
             Notifier::finance($r->supplier, 'Damage compensation due', $r->code.': '.money($comp).' compensation recorded.', route('cashier.balances'));
         }
@@ -1104,10 +1211,23 @@ class Rentals
         if (! in_array($mode, ['deducted', 'paid', 'waived', 'settled'], true)) {
             return self::fail('Choose how to settle the deposit.');
         }
+        $review = Damage::reviewStatus($r);
+        if ($review === 'pending' && $mode !== 'waived') {
+            return self::fail('The customer has until '.fmt_datetime($r->inspection['review']['deadline']).' to accept or dispute the damage charge.');
+        }
+        if ($review === 'disputed' && $mode !== 'waived') {
+            return self::fail('The customer disputed the damage charge. A PartyRent admin decides it before the deposit can be settled.');
+        }
+        $r->finCache = null;
+        $f = $r->fin();
         if ($mode === 'paid' && $f['compensationDue'] > 0 && $f['compPaidDirect'] < $f['compensation']) {
             return self::fail('Compensation has not been paid yet. The customer must pay '.money($f['compensationDue']).' (verified by the cashier).');
         }
         $insp = $r->inspection;
+        if ($mode === 'waived' && in_array($review, ['pending', 'disputed'], true)) {
+            $insp['review']['status'] = 'done'; // the supplier dropped the charge: nothing left to review
+            $insp['review']['waived'] = true;
+        }
         $insp['settlement'] = ($insp['compensation'] ?? 0) > 0 ? $mode : 'settled';
         $insp['settledAt'] = now()->toIso8601String();
         $r->update(['inspection' => $insp]);
@@ -1139,6 +1259,7 @@ class Rentals
 
         return [
             ['label' => 'Returned items inspected', 'ok' => (bool) $insp, 'detail' => ''],
+            ...(isset($insp['review']) ? [['label' => 'Damage charge accepted or decided', 'ok' => in_array(Damage::reviewStatus($r), ['done', null], true), 'detail' => ['pending' => 'waiting for the customer', 'disputed' => 'waiting for a PartyRent admin'][$insp['review']['status']] ?? '']] : []),
             ['label' => 'Rental balance fully paid', 'ok' => $f['balance'] <= 0, 'detail' => $f['balance'] > 0 ? money($f['balance']).' outstanding' : ''],
             ['label' => 'Compensation settled', 'ok' => ! $insp || (($insp['settlement'] ?? '') !== 'pending' && $f['compensationDue'] <= 0), 'detail' => $f['compensationDue'] > 0 ? money($f['compensationDue']).' due' : ''],
             ['label' => 'Security deposit resolved', 'ok' => $f['depositHeld'] <= 0, 'detail' => $f['depositHeld'] > 0 ? money($f['depositHeld']).' still held' : ''],
@@ -1237,6 +1358,20 @@ class Rentals
         if ($err = self::validatePayment($r, $data)) {
             return self::fail($err);
         }
+        // Not reserved yet: refuse the money if the time ran out or another customer took the items first.
+        if ($r->awaitingDownPayment() && in_array($data['type'], Finance::RENTAL_TYPES, true)) {
+            if ($r->pay_by && $r->pay_by->isPast() && ! $r->payments()->whereIn('status', ['pending', 'awaiting', 'verified'])->whereIn('type', Finance::RENTAL_TYPES)->exists()) {
+                self::expireUnpaid();
+
+                return self::fail('The '.self::PAY_HOURS.'-hour payment window for '.$r->code.' has passed, so the request was cancelled. Nothing was charged.');
+            }
+            inv()->flush();
+            if (! inv()->check($r->lines, $r->id)['ok']) {
+                self::dropUnreserved($r, 'Another customer booked the same items for the same day and time first.');
+
+                return self::fail('Sorry, another customer booked the same items for the same day and time first, so this request can no longer be reserved. Nothing was charged.');
+            }
+        }
         $online = $data['method'] === 'online';
         if (in_array($data['method'], ['bank', 'debit'], true) && $source === 'customer' && PayAccount::where('active', true)->exists()) {
             $acc = empty($data['pay_account_id']) ? null : PayAccount::find($data['pay_account_id']);
@@ -1320,7 +1455,7 @@ class Rentals
      */
     public static function confirmPayment(Payment $p, ?User $by): array
     {
-        return DB::transaction(function () use ($p, $by) {
+        $res = DB::transaction(function () use ($p, $by) {
             $p = Payment::lockForUpdate()->find($p->id);
             if (! $p || ! ($p->status === 'pending' || ($by === null && $p->status === 'awaiting'))) {
                 return self::fail('Only pending payments can be verified.');
@@ -1342,8 +1477,13 @@ class Rentals
             Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment confirmed', money($p->amount).' for '.$r->code.' was confirmed by '.($by === null ? 'PartyRent (paid online)' : (Payouts::isCash($p->method) ? 'your shop (cash)' : 'PartyRent')).'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
             Notifier::audit($by ? 'Verified payment' : 'Online payment confirmed by '.OnlinePay::name($p->gateway), $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
 
-            return self::ok(['payment' => $p]);
+            return self::ok(['payment' => $p, 'request' => $r]);
         });
+        if ($res['ok']) {
+            self::secureIfPaid($res['request']); // the first payment reserves the items
+        }
+
+        return $res;
     }
 
     public static function rejectPayment(Payment $p, string $reason, User $by): array
@@ -1476,6 +1616,9 @@ class Rentals
         Notifier::notify($r->customer_id, 'customer', $isRefund ? 'Refund update' : 'Payment verified ✅', money($p->amount).' '.($isRefund ? 'refunded' : 'received').' for '.$r->code.'. Receipt '.$p->receipt_no.'.', self::link('rentals.show', $r));
         Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment recorded', $by->name.' recorded '.money($p->amount).' ('.$p->typeLabel().', '.$p->methodLabel().') for '.$r->code.'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
         Notifier::audit('Recorded offline '.($isRefund ? 'refund' : 'payment'), $p->code.' · '.money($p->amount).' · '.$r->code, $by);
+        if (! $isRefund) {
+            self::secureIfPaid($r); // cash recorded by the shop reserves the items at once
+        }
 
         return self::ok(['payment' => $p]);
     }
@@ -1514,6 +1657,7 @@ class Rentals
     /** Flag newly overdue schedule items and notify everyone involved (runs on a schedule and on dashboard loads). */
     public static function scanOverdue(): int
     {
+        self::expireUnpaid(); // also runs on dashboard loads, like this scan
         $count = 0;
         foreach (RentalRequest::whereIn('status', Finance::ACTIVE)->with(['payments', 'supplier', 'customer'])->get() as $r) {
             $f = $r->fin();
@@ -1797,6 +1941,14 @@ class Rentals
             return self::fail($v['error']);
         }
         $def = $v['def'];
+        if (! $s->isBusiness()) { // stages and tiers are for business accounts
+            $def['stages'] = [];
+            foreach ($def['components'] as &$c) {
+                $c['stage'] = null;
+            }
+            unset($c);
+            $data['tier_group'] = null;
+        }
         $attrs = [
             'name' => trim($data['name']), 'emoji' => ($data['emoji'] ?? '') ?: '🎉', 'description' => (string) ($data['description'] ?? ''),
             'conditions' => (string) ($data['conditions'] ?? ''), 'events' => array_values($data['events'] ?? []),
@@ -1856,12 +2008,30 @@ class Rentals
         }
     }
 
-    /** Removing a package never touches booked requests (they hold a snapshot); rental-list lines are dropped. */
-    public static function deletePackage(Package $k): void
+    /**
+     * Removing a package never touches booked requests (they hold a snapshot); rental-list lines are dropped.
+     * Its package-only items stay in the supplier's inventory, unlisted: those no other package uses are archived
+     * (unless they still have upcoming reservations), so the supplier can restore them later.
+     * @return string[] names of the archived package-only items
+     */
+    public static function deletePackage(Package $k): array
     {
+        $own = Packages::productIds(Packages::def($k));
         CartLine::where('type', 'package')->where('ref_id', $k->id)->delete();
         Notifier::audit('Deleted package', $k->name);
+        $sid = $k->supplier_id;
         $k->delete();
+        $usedElsewhere = Package::where('supplier_id', $sid)->get()->flatMap(fn ($o) => Packages::productIds(Packages::def($o)))->all();
+        $archived = [];
+        foreach (Product::whereIn('id', $own)->where('package_only', true)->whereNotIn('status', ['archived', 'deleted', 'hidden'])->get() as $p) {
+            if (in_array($p->id, $usedElsewhere, true) || array_filter(inv()->reservedDates($p->id), fn ($d) => $d >= today_iso())) {
+                continue;
+            }
+            $p->update(['status' => 'archived']);
+            $archived[] = $p->name;
+        }
         inv()->flush();
+
+        return $archived;
     }
 }

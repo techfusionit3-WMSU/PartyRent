@@ -21,10 +21,20 @@ abstract class TestCase extends BaseTestCase
      * v4: customers pay only after the supplier accepts. Mark a seeded request accepted without the stock
      * re-check (tests that need the real accept flow call Rentals::acceptRequest).
      */
+    /** The first payment of an accepted request was verified: its items are now reserved (as Rentals::secureIfPaid does). */
+    protected function reserve(RentalRequest|string $r): RentalRequest
+    {
+        $r = is_string($r) ? RentalRequest::where('code', $r)->firstOrFail() : $r;
+        $r->update(['reserved_at' => now()]);
+        inv()->flush();
+
+        return $r->fresh();
+    }
+
     protected function accepted(string $code): RentalRequest
     {
         $r = RentalRequest::where('code', $code)->firstOrFail();
-        $r->update(['status' => 'accepted', 'accepted_at' => today_iso()]);
+        $r->update(['status' => 'accepted', 'accepted_at' => today_iso(), 'reserved_at' => now()]); // a booking whose down payment is in
 
         return $r->fresh();
     }

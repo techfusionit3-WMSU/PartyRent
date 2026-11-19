@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * An employee account tied to one supplier (port of Auth.ORG_ROLES / ORG_PERMS in reference js/core/auth.js).
- * The supplier's owner is always the Organization Admin; employees are Cashier, Inventory Staff or Staff and
- * only ever see that supplier's data.
+ * A member of one company (supplier). Roles live inside the company, not in the system: the system only knows
+ * customer / admin / superadmin, and "works at company X as Cashier" is this row. The owner is always the Owner
+ * (org_admin). A member can hold several roles; each role opens its own module (App\Support\CompanyModules).
+ * The owner can add or remove single permissions per member on top of the role defaults.
  */
 class ShopStaff extends Model
 {
@@ -16,12 +18,28 @@ class ShopStaff extends Model
 
     protected $guarded = ['id'];
 
-    public const ORG_ROLES = ['org_admin' => 'Organization Admin', 'cashier' => 'Cashier', 'inventory' => 'Inventory Staff', 'staff' => 'Staff'];
+    protected function casts(): array
+    {
+        return ['roles' => 'array', 'perms_add' => 'array', 'perms_remove' => 'array'];
+    }
 
-    /** Roles an owner can give an employee. */
-    public const EMPLOYEE_ROLES = ['cashier', 'inventory', 'staff'];
+    public const ORG_ROLES = ['org_admin' => 'Owner', 'desk' => 'Front Desk', 'cashier' => 'Cashier', 'inventory' => 'Inventory Keeper', 'crew' => 'Field Crew'];
 
-    public const ROLE_BADGE = ['org_admin' => 'b-purple', 'cashier' => 'b-teal', 'inventory' => 'b-sky', 'staff' => 'b-gray'];
+    /** Roles an owner can give an employee (one or more). */
+    public const EMPLOYEE_ROLES = ['desk', 'cashier', 'inventory', 'crew'];
+
+    /** One line per role, shown when choosing roles. */
+    public const ROLE_HINTS = [
+        'desk' => 'Takes bookings: accepts or declines requests, chats with customers, handles problem cases and reviews.',
+        'cashier' => 'Handles money: confirms payments, records cash, receipts, balances and overdue accounts.',
+        'inventory' => 'Keeps the stock: products and packages, stock per location, maintenance, return inspections.',
+        'crew' => 'Does the field work: deliveries, pickups and returns, and marks each step done.',
+    ];
+
+    public const ROLE_BADGE = ['org_admin' => 'b-purple', 'desk' => 'b-pink', 'cashier' => 'b-teal', 'inventory' => 'b-sky', 'crew' => 'b-gray'];
+
+    /** Permissions an owner may NOT hand to an employee. */
+    public const OWNER_ONLY = ['team.manage'];
 
     public const ORG_PERM_LIST = [
         'orders.view' => 'View rental requests & schedules',
@@ -41,9 +59,10 @@ class ShopStaff extends Model
     ];
 
     public const ORG_PERMS = [
+        'desk' => ['orders.view', 'orders.manage'],
         'cashier' => ['payments.view', 'payments.verify', 'payments.record', 'receipts.issue', 'reports.view'],
         'inventory' => ['orders.view', 'products.manage', 'inventory.manage', 'locations.manage', 'returns.inspect'],
-        'staff' => ['orders.view', 'fulfillment.update', 'returns.inspect'],
+        'crew' => ['orders.view', 'fulfillment.update', 'returns.inspect'],
     ];
 
     /**
@@ -52,6 +71,8 @@ class ShopStaff extends Model
      */
     public const ROUTE_PERMS = [
         'dashboard' => null,
+        // module home pages (App\Support\CompanyModules)
+        'desk' => 'orders.manage', 'stock' => 'inventory.manage', 'crew' => 'fulfillment.update',
         'requests.accept' => 'orders.manage', 'requests.decline' => 'orders.manage', 'requests.notes' => 'orders.manage',
         'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage',
         'requests.advance' => 'fulfillment.update', 'requests.complete' => 'fulfillment.update',
@@ -89,7 +110,47 @@ class ShopStaff extends Model
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
 
-    public function label(): string { return self::ORG_ROLES[$this->role] ?? ucfirst($this->role); }
+    /** Members holding a role (main role or one of their extra roles). */
+    public function scopeWithRole(Builder $q, string $role): Builder
+    {
+        return $q->where(fn ($w) => $w->where('role', $role)->orWhereJsonContains('roles', $role));
+    }
+
+    /** All roles of this member, main role first. */
+    public function roleList(): array
+    {
+        return array_values(array_unique(array_filter(array_merge([$this->role], (array) $this->roles))));
+    }
+
+    public function label(): string { return self::rolesLabel($this->roleList()); }
+
+    public static function rolesLabel(array $roles): string
+    {
+        return implode(' + ', array_map(fn ($r) => self::ORG_ROLES[$r] ?? ucfirst($r), $roles));
+    }
+
+    /** Role defaults of this member (before the owner's tweaks). */
+    public function rolePerms(): array
+    {
+        return self::permsOfRoles($this->roleList());
+    }
+
+    /** What this member may do: role defaults + permissions the owner added − permissions the owner removed. */
+    public function perms(): array
+    {
+        $add = array_diff((array) $this->perms_add, self::OWNER_ONLY);
+
+        return array_values(array_diff(array_unique(array_merge($this->rolePerms(), $add)), (array) $this->perms_remove));
+    }
+
+    /** Store the member's final permission list as tweaks against their role defaults. */
+    public function setPerms(array $perms): void
+    {
+        $perms = array_values(array_intersect(array_keys(self::ORG_PERM_LIST), array_diff($perms, self::OWNER_ONLY)));
+        $base = $this->rolePerms();
+        $this->perms_add = array_values(array_diff($perms, $base)) ?: null;
+        $this->perms_remove = array_values(array_diff($base, $perms)) ?: null;
+    }
 
     /** Permissions of an organization role (org_admin = all). */
     public static function permsOf(?string $role): array
@@ -99,6 +160,11 @@ class ShopStaff extends Model
         }
 
         return self::ORG_PERMS[$role] ?? [];
+    }
+
+    public static function permsOfRoles(array $roles): array
+    {
+        return array_values(array_unique(array_merge([], ...array_map(fn ($r) => self::permsOf($r), $roles))));
     }
 
     /** Permission needed to open a supplier route (null = any member of the shop). */
@@ -126,11 +192,13 @@ class ShopStaff extends Model
     /** Can this organization role open the supplier route with this name? */
     public static function allows(?string $role, string $routeName): bool
     {
-        if ($role === null) {
-            return false;
-        }
+        return $role !== null && self::permsAllow(self::permsOf($role), $routeName);
+    }
+
+    public static function permsAllow(array $perms, string $routeName): bool
+    {
         $perm = self::permFor($routeName);
 
-        return $perm === null || in_array($perm, self::permsOf($role), true);
+        return $perm === null || in_array($perm, $perms, true);
     }
 }

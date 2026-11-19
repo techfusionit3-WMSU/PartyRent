@@ -65,6 +65,7 @@ Route::post('/invite/{token}/decline', [\App\Http\Controllers\InviteController::
 /* ---------- any signed-in user ---------- */
 Route::middleware('auth')->group(function () {
     Route::post('/mode', [AccountController::class, 'switchMode'])->name('mode.switch');
+    Route::post('/module', [AccountController::class, 'switchModule'])->name('module.switch');
     Route::get('/notifications', [AccountController::class, 'notifications'])->name('notifications');
     Route::post('/notifications/read', [AccountController::class, 'markRead'])->name('notifications.read');
     Route::get('/notifications/{notification}/open', [AccountController::class, 'openNotification'])->name('notifications.open');
@@ -133,6 +134,10 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
 /* ---------- supplier mode ---------- */
 Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'role:supplier'])->group(function () {
     Route::get('/', [SupplierController::class, 'dashboard'])->name('dashboard');
+    // company role modules: each role's home page (App\Support\CompanyModules)
+    Route::get('/desk', [\App\Http\Controllers\Supplier\ModuleController::class, 'desk'])->name('desk');
+    Route::get('/stock', [\App\Http\Controllers\Supplier\ModuleController::class, 'stock'])->name('stock');
+    Route::get('/crew', [\App\Http\Controllers\Supplier\ModuleController::class, 'crew'])->name('crew');
     Route::get('/schedule', [SupplierController::class, 'schedule'])->name('schedule');
     Route::get('/payments', [SupplierController::class, 'payments'])->name('payments');
     Route::post('/payments/{payment}/verify', [SupplierController::class, 'verifyPayment'])->name('payments.verify');

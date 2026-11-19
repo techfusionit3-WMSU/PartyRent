@@ -85,14 +85,52 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return $s && $s->status === 'approved' ? $s : null;
     }
 
-    /** Organization role (Auth.orgRole): owner = org_admin; employees cashier | inventory | staff; else null. */
+    /** Main company role (Auth.orgRole): owner = org_admin; employees desk | cashier | inventory | crew; else null. */
     public function orgRole(): ?string
     {
+        return $this->orgRoles()[0] ?? null;
+    }
+
+    /** All company roles of this user (roles live inside the company, see ShopStaff). */
+    public function orgRoles(): array
+    {
         if ($this->supplier?->status === 'approved') {
-            return 'org_admin';
+            return ['org_admin'];
         }
 
-        return $this->shop() ? $this->staffOf->role : null;
+        return $this->shop() ? $this->staffOf->roleList() : [];
+    }
+
+    public function isShopOwner(): bool
+    {
+        return $this->supplier?->status === 'approved';
+    }
+
+    /** Company permissions: everything for the owner; role defaults ± the owner's tweaks for an employee. */
+    public function orgPerms(): array
+    {
+        if ($this->isShopOwner()) {
+            return array_keys(ShopStaff::ORG_PERM_LIST);
+        }
+
+        return $this->shop() ? $this->staffOf->perms() : [];
+    }
+
+    /** Company modules this user can open (App\Support\CompanyModules). */
+    public function modules(): array
+    {
+        return \App\Support\CompanyModules::forUser($this);
+    }
+
+    public function currentModule(): ?string
+    {
+        return \App\Support\CompanyModules::current($this);
+    }
+
+    /** Works the cashier module of a solo shop / rental company (owner or a member with the Cashier role). */
+    public function hasShopCashierModule(): bool
+    {
+        return in_array('cashier', $this->modules(), true);
     }
 
     /** Kept for older callers: 'owner' for the account owner, else the organization role. */
@@ -113,24 +151,24 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     }
 
     /**
-     * A shop's own cashier: Business Mode opens the cashier workspace for that shop only.
+     * Working in a shop's Cashier module right now: Business Mode shows the cashier workspace for that shop only.
      * A business (event company) cashier works in the business workspace instead (event payments there).
      */
     public function isShopCashier(): bool
     {
-        return $this->isEmployee() && $this->orgRole() === 'cashier' && ! $this->staffOf?->supplier?->isOrganization();
+        return $this->hasShopCashierModule() && $this->currentModule() === 'cashier';
     }
 
     /** Organization permission check (Auth.orgCan). */
     public function orgCan(string $perm): bool
     {
-        return in_array($perm, ShopStaff::permsOf($this->orgRole()), true);
+        return in_array($perm, $this->orgPerms(), true);
     }
 
     /** May this user open the given supplier route? */
     public function canShop(string $routeName): bool
     {
-        return ShopStaff::allows($this->orgRole(), $routeName);
+        return $this->shop() !== null && ShopStaff::permsAllow($this->orgPerms(), $routeName);
     }
 
     public function rentalRequests(): HasMany
@@ -188,6 +226,9 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     {
         if ($this->activeRole($mode) === 'supplier' && $this->shop()?->isOrganization()) {
             return 'business.dashboard'; // event companies have their own workspace
+        }
+        if (in_array($this->activeRole($mode), ['supplier', 'cashier'], true) && ($m = $this->currentModule())) {
+            return \App\Support\CompanyModules::get($m)['home'];
         }
 
         return [

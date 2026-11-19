@@ -26,6 +26,19 @@ class AccountController extends Controller
         return redirect()->route($u->homeRoute($mode))->with('success', 'Switched to '.$label.' Mode');
     }
 
+    /** Move between the company modules of the user's roles (Owner / Front Desk / Cashier / Inventory / Field Crew). */
+    public function switchModule(Request $request)
+    {
+        $u = $request->user();
+        $m = (string) $request->input('module');
+        if (! in_array($m, $u->modules(), true)) {
+            return back()->with('error', 'That module is not part of your roles.');
+        }
+        session(['mode' => 'supplier', 'module' => $m]);
+
+        return redirect()->route(\App\Support\CompanyModules::get($m)['home']);
+    }
+
     public function notifications(Request $request)
     {
         $u = $request->user();

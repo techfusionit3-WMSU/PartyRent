@@ -14,7 +14,7 @@
       @if(in_array($shellRole, ['supplier', 'cashier'], true) && $shop)<div class="small" style="margin-top:4px">{{ $shop->logo }} {{ $shop->name }}</div>@endif
     </div>
     @if($shellRole === 'customer' && $emp && $shop)
-      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="menu-switch-top" title="Switch to Business Mode">{{ icon('store') }}<span class="ellipsis">Switch to Business Mode<span class="sub ellipsis">{{ \App\Models\ShopStaff::ORG_ROLES[$u->orgRole()] ?? 'Staff' }} · {{ $shop->name }}</span></span></button></form>
+      <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="menu-switch-top" title="Switch to Business Mode">{{ icon('store') }}<span class="ellipsis">Switch to Business Mode<span class="sub ellipsis">{{ \App\Models\ShopStaff::rolesLabel($u->orgRoles()) }} · {{ $shop->name }}</span></span></button></form>
     @elseif($shellRole === 'customer' && $sup && $sup->status === 'approved')
       <form method="POST" action="{{ route('mode.switch') }}">@csrf<input type="hidden" name="mode" value="supplier"><button class="menu-switch-top" title="Switch to Supplier Mode">{{ icon('store') }}<span class="ellipsis">Switch to your shop<span class="sub ellipsis">{{ $sup->name }}</span></span></button></form>
     @elseif(($shellRole === 'supplier' || $shellRole === 'cashier') && ! $u->isStaff())
@@ -34,7 +34,7 @@
         <a href="{{ route('start-selling') }}" class="menu-switch">{{ icon('store') }}Start Selling / Become a Supplier</a>
       @endif
     @elseif(in_array($shellRole, ['supplier', 'cashier'], true) && $emp)
-      <div class="menu-head small" style="padding-top:0">{{ \App\Models\ShopStaff::ORG_ROLES[$u->orgRole()] ?? '' }} · {{ $shop?->name }}</div>
+      <div class="menu-head small" style="padding-top:0">{{ \App\Models\ShopStaff::rolesLabel($u->orgRoles()) }} · {{ $shop?->name }}</div>
       @if($shop)<a href="{{ route('suppliers.show', $shop) }}">{{ icon('eye') }}View Public Shop</a>@endif
       <a href="{{ route('account') }}">{{ icon('user') }}Account</a>
     @elseif($shellRole === 'supplier')

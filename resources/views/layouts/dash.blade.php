@@ -29,9 +29,13 @@
     $cfg = $NAV[$role] ?? $NAV['admin'];
     $sup = in_array($role, ['supplier', 'cashier'], true) ? $shellUser->shop() : null;
     if ($role === 'supplier' && $sup?->isOrganization()) { $cfg = \App\Support\BusinessNav::config($sup); } // event companies: their own workspace
+    // solo shops / rental companies: each company role has its own module (App\Support\CompanyModules)
+    $mods = $sup && ! $sup->isOrganization() ? $shellUser->modules() : [];
+    $curMod = $mods ? $shellUser->currentModule() : null;
+    if ($curMod) { $cfg = \App\Support\CompanyModules::nav($shellUser, $curMod, $b); }
     $emp = $shellUser->isEmployee();
     // Supplier employees only see the sections their organization role allows; a group label shows only before a visible item.
-    $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && (empty($it[5]) || ($role === 'supplier' ? $shellUser->orgCan($it[5]) : ($role !== 'admin' || $shellUser->hasPerm($it[5]))));
+    $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && (empty($it[5]) || ($curMod || $role === 'supplier' ? $shellUser->orgCan($it[5]) : ($role !== 'admin' || $shellUser->hasPerm($it[5]))));
     $items = [];
     $label = null;
     foreach ($cfg['items'] as $it) {
@@ -40,8 +44,8 @@
         if ($label) { $items[] = $label; $label = null; }
         $items[] = $it;
     }
-    $bottom = array_filter($cfg['bottom'], fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && ($role !== 'supplier' || empty($it[4]) || $shellUser->orgCan($it[4])));
-    $tag = $role === 'supplier' && $emp ? (\App\Models\ShopStaff::ORG_ROLES[$shellUser->orgRole()] ?? 'Staff') : ($role === 'supplier' && $sup && $sup->type === 'organization' ? 'Org Admin' : $cfg['tag']);
+    $bottom = array_filter($cfg['bottom'], fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && ($curMod || $role !== 'supplier' || empty($it[4]) || $shellUser->orgCan($it[4])));
+    $tag = $curMod ? $cfg['tag'] : ($role === 'supplier' && $emp ? \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles()) : ($role === 'supplier' && $sup && $sup->type === 'organization' ? 'Owner' : $cfg['tag']));
     $nav = $nav ?? '';
 @endphp
 
@@ -51,6 +55,15 @@
     @include('partials.brand', ['tag' => $tag])
     @if($sup)
       <div style="display:flex;gap:10px;align-items:center;padding:0 8px 12px"><div class="logo-tile" style="width:40px;height:40px;font-size:1.3rem;background:rgba(255,255,255,.1)">{{ $sup->logo }}</div><div class="small" style="color:#fff;font-weight:700;line-height:1.25">{{ $sup->name }}<div style="color:#8E83A8;font-weight:500">{{ $sup->city }}{{ $sup->type === 'organization' ? ' · Organization' : '' }}</div></div></div>
+    @endif
+    @if(count($mods) > 1)
+      <div class="mod-switch" aria-label="Your modules">
+        <div class="nav-label" style="margin-top:0">Your modules</div>
+        @foreach($mods as $mk)
+          @php($md = \App\Support\CompanyModules::get($mk))
+          <form method="POST" action="{{ route('module.switch') }}">@csrf<input type="hidden" name="module" value="{{ $mk }}"><button class="mod-btn {{ $mk === $curMod ? 'on' : '' }}" @if($mk === $curMod) aria-current="true" @endif>{{ icon($md['icon']) }}<span>{{ $md['label'] }}</span></button></form>
+        @endforeach
+      </div>
     @endif
     @foreach($items as $it)
       @if(count($it) === 1)

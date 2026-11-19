@@ -24,7 +24,7 @@ class StaffInvite extends Model
 
     protected function casts(): array
     {
-        return ['expires_at' => 'datetime', 'last_sent_at' => 'datetime'];
+        return ['expires_at' => 'datetime', 'last_sent_at' => 'datetime', 'roles' => 'array'];
     }
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
@@ -68,8 +68,14 @@ class StaffInvite extends Model
         return max(0, self::RESEND_SECONDS - (int) $this->last_sent_at->diffInSeconds(now()));
     }
 
+    /** Roles offered in this invitation, main role first. */
+    public function roleList(): array
+    {
+        return array_values(array_unique(array_filter(array_merge([$this->role], (array) $this->roles))));
+    }
+
     public function roleLabel(): string
     {
-        return ShopStaff::ORG_ROLES[$this->role] ?? ucfirst($this->role);
+        return ShopStaff::rolesLabel($this->roleList());
     }
 }

@@ -30,7 +30,7 @@ class TeamController extends Controller
 
     public function store(Request $request)
     {
-        $res = ShopStaffs::invite($request->user()->shop(), $request->user(), $request->only('email', 'role'));
+        $res = ShopStaffs::invite($request->user()->shop(), $request->user(), $request->only('email', 'role', 'roles'));
         if (! $res['ok']) {
             return back()->withInput()->withErrors(['team' => $res['error']])->with('error', $res['error']);
         }
@@ -63,11 +63,15 @@ class TeamController extends Controller
 
     public function update(Request $request, User $user)
     {
-        $res = ShopStaffs::update($request->user()->shop(), $request->user(), $user, $request->only('role', 'status'));
+        $res = ShopStaffs::update($request->user()->shop(), $request->user(), $user, $request->only('role', 'roles', 'perms', 'perms_set', 'status'));
         if (! $res['ok']) {
             return back()->with('error', $res['error']);
         }
-        $msg = $request->filled('role') ? 'Role updated.' : $user->name.' is now '.$res['member']->status.'.';
+        $msg = match (true) {
+            $request->filled('roles') || $request->filled('role') => $user->name.' is now '.$res['member']->label().'.',
+            $request->boolean('perms_set') => 'Permissions of '.$user->name.' saved.',
+            default => $user->name.' is now '.$res['member']->status.'.',
+        };
 
         return back()->with('success', $msg);
     }

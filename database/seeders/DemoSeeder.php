@@ -222,6 +222,7 @@ class DemoSeeder extends Seeder
             ['u10', 'Grace Villanueva', 'cashier@elegantoccasion.ph', '0917 800 1010', $BGC, ['customer'], 'active', -230],
             ['u15', 'Rico Santos', 'inventory@elegantoccasion.ph', '0917 800 1515', $BGC, ['customer'], 'active', -200],
             ['u16', 'Joy Lim', 'staff@elegantoccasion.ph', '0917 800 1616', 'Pasig City', ['customer'], 'active', -120],
+            ['u17', 'Leah Cruz', 'desk@elegantoccasion.ph', '0917 800 1717', $BGC, ['customer'], 'active', -150],
             ['u11', 'Mark Reyes', 'admin@partyrent.ph', '0917 800 1111', $HQ, ['admin'], 'active', -340],
             ['u13', 'Paolo Cruz', 'paolo.admin@partyrent.ph', '0917 800 1313', $HQ, ['admin'], 'active', -100],
             ['u12', 'Patricia Lim', 'super@partyrent.ph', '0917 800 1212', $HQ, ['superadmin'], 'active', -365],
@@ -325,9 +326,9 @@ class DemoSeeder extends Seeder
                 $this->L[$key.'|'.$l['id']] = InventoryLocation::create(['supplier_id' => $s->id, 'name' => $l['name'], 'address' => $l['address'], 'contact' => $l['contact'], 'phone' => $l['phone']])->id;
             }
         }
-        // Elegant Occasion's employees (organization)
-        foreach ([['u10', 'cashier'], ['u15', 'inventory'], ['u16', 'staff']] as [$u, $role]) {
-            ShopStaff::create(['supplier_id' => $this->S['s4'], 'user_id' => $this->U[$u], 'role' => $role, 'added_by' => $this->U['u5']]);
+        // Elegant Occasion's team: one member per company role; Rico holds two roles (module switcher)
+        foreach ([['u10', ['cashier']], ['u15', ['inventory', 'crew']], ['u16', ['crew']], ['u17', ['desk']]] as [$u, $roles]) {
+            ShopStaff::create(['supplier_id' => $this->S['s4'], 'user_id' => $this->U[$u], 'role' => $roles[0], 'roles' => $roles, 'added_by' => $this->U['u5']]);
         }
     }
 
@@ -540,7 +541,7 @@ class DemoSeeder extends Seeder
                 unset($extra['stage']);
             }
             // verified by the shop's cashier if it has one, else the supplier owner
-            $cashier = ShopStaff::where('supplier_id', $r->supplier_id)->where('role', 'cashier')->value('user_id');
+            $cashier = ShopStaff::where('supplier_id', $r->supplier_id)->withRole('cashier')->value('user_id');
             Payment::create(array_merge([
                 'code' => $code, 'rental_request_id' => $r->id, 'type' => $type, 'method' => $method, 'amount' => $amount ?? 0,
                 'date' => $this->D($n), 'submitted_at' => $this->ts($n, 13), 'reference' => $ref, 'status' => $status, 'recorded_by' => 'customer',

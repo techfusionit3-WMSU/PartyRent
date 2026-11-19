@@ -15,9 +15,9 @@ use Illuminate\Support\Str;
 /**
  * Team & Roles (port of Services.orgMembers / addEmployee / updateEmployee).
  * Employees are ordinary customer accounts with a membership in one supplier's team. They sign in as a
- * customer and switch to Business Mode: a Cashier gets the cashier workspace for that shop only; Inventory
- * Staff and Staff get the supplier workspace with their role's permissions.
- * The owner stays the Organization Admin.
+ * customer and switch to Business Mode. Roles live inside the company: Front Desk, Cashier, Inventory Keeper and
+ * Field Crew each open their own module (App\Support\CompanyModules); a member can hold several roles, and the
+ * owner can add or remove single permissions per member. The owner is always the Owner.
  *
  * Nobody is added directly: the owner invites an email and the person confirms from that inbox. An existing
  * account accepts while signed in; a new email enters the emailed code and sets their own password.
@@ -28,9 +28,9 @@ class ShopStaffs
     /** @return array<int, array{role: string, user: User}> owner first */
     public static function members(Supplier $s): array
     {
-        $out = [['role' => 'org_admin', 'user' => $s->owner, 'status' => 'active', 'since' => $s->created_at]];
+        $out = [['role' => 'org_admin', 'roles' => ['org_admin'], 'user' => $s->owner, 'status' => 'active', 'since' => $s->created_at]];
         foreach ($s->staff()->with('user')->get()->sortBy('created_at') as $m) {
-            $out[] = ['role' => $m->role, 'user' => $m->user, 'member' => $m, 'status' => $m->status, 'since' => $m->created_at];
+            $out[] = ['role' => $m->role, 'roles' => $m->roleList(), 'user' => $m->user, 'member' => $m, 'status' => $m->status, 'since' => $m->created_at];
         }
 
         return $out;
@@ -96,24 +96,36 @@ class ShopStaffs
         return ['state' => 'existing', 'message' => self::maskName($u->name).' has a PartyRent account. They will be asked to accept your invitation.'];
     }
 
+    /** Roles from a form: `roles[]` (one or more) or a single `role`. Null when empty or not an employee role. */
+    public static function rolesFrom(array $data): ?array
+    {
+        $roles = array_values(array_unique(array_filter((array) ($data['roles'] ?? ($data['role'] ?? [])), 'is_string')));
+        if (! $roles || array_diff($roles, ShopStaff::EMPLOYEE_ROLES)) {
+            return null;
+        }
+        // keep the order of EMPLOYEE_ROLES only when no main role was picked first
+        return $roles;
+    }
+
     /** Invite an email to the team. Nobody joins until the person confirms from that inbox. */
     public static function invite(Supplier $s, User $by, array $data): array
     {
         if (! $by->orgCan('team.manage') || $by->shop()?->id !== $s->id) {
             return ['ok' => false, 'error' => 'Only the Organization Admin can add employees.'];
         }
-        $role = $data['role'] ?? '';
-        if (! in_array($role, ShopStaff::EMPLOYEE_ROLES, true)) {
-            return ['ok' => false, 'error' => 'Choose Cashier, Inventory Staff or Staff. Organization Admin rights stay with the account owner.'];
+        $roles = self::rolesFrom($data);
+        if (! $roles) {
+            return ['ok' => false, 'error' => 'Choose at least one role: Front Desk, Cashier, Inventory Keeper or Field Crew. Owner rights stay with the account owner.'];
         }
+        $role = $roles[0];
         $email = Str::lower(trim((string) ($data['email'] ?? '')));
         $chk = self::check($s, $email);
         if (! in_array($chk['state'], ['existing', 'new'], true)) {
             return ['ok' => false, 'error' => $chk['message']];
         }
-        $inv = new StaffInvite(['supplier_id' => $s->id, 'email' => $email, 'role' => $role, 'invited_by' => $by->id]);
+        $inv = new StaffInvite(['supplier_id' => $s->id, 'email' => $email, 'role' => $role, 'roles' => $roles, 'invited_by' => $by->id]);
         $sent = self::send($inv);
-        Notifier::audit('Invited employee', $s->name.' · '.$email.' ('.ShopStaff::ORG_ROLES[$role].')', $by);
+        Notifier::audit('Invited employee', $s->name.' · '.$email.' ('.ShopStaff::rolesLabel($roles).')', $by);
 
         return ['ok' => true, 'invite' => $inv, 'existing' => $chk['state'] === 'existing', 'sent' => $sent];
     }
@@ -174,7 +186,7 @@ class ShopStaffs
             return ['ok' => false, 'error' => str_replace('That account', 'Your account', $why)];
         }
         DB::transaction(function () use ($inv, $u, $s) {
-            ShopStaff::updateOrCreate(['supplier_id' => $s->id, 'user_id' => $u->id], ['role' => $inv->role, 'status' => 'active', 'added_by' => $inv->invited_by]);
+            ShopStaff::updateOrCreate(['supplier_id' => $s->id, 'user_id' => $u->id], ['role' => $inv->role, 'roles' => $inv->roleList(), 'perms_add' => null, 'perms_remove' => null, 'status' => 'active', 'added_by' => $inv->invited_by]);
             StaffInvite::where('email', $inv->email)->delete(); // other shops' invitations no longer apply
         });
         Notifier::notify($s->owner, 'supplier', $u->name.' joined your team', $u->name.' accepted your invitation and is now '.$inv->roleLabel().'.', route('supplier.team', [], false));
@@ -229,7 +241,10 @@ class ShopStaffs
         return self::accept($inv, $u) + ['user' => $u];
     }
 
-    /** patch: role | status (active|deactivated). Deactivating ends their access to the shop, not their own account. */
+    /**
+     * patch: roles[] (or role) | perms[] (+ perms_set flag) | status (active|deactivated).
+     * Deactivating ends their access to the shop, not their own account.
+     */
     public static function update(Supplier $s, User $by, User $u, array $patch): array
     {
         if (! $by->orgCan('team.manage') || $by->shop()?->id !== $s->id) {
@@ -240,12 +255,22 @@ class ShopStaffs
             return ['ok' => false, 'error' => 'You can only manage your own organization\'s employees.'];
         }
         $changes = [];
-        if (! empty($patch['role'])) {
-            if (! in_array($patch['role'], ShopStaff::EMPLOYEE_ROLES, true)) {
-                return ['ok' => false, 'error' => 'Invalid role.'];
+        if (! empty($patch['roles']) || ! empty($patch['role'])) {
+            $roles = self::rolesFrom($patch);
+            if (! $roles) {
+                return ['ok' => false, 'error' => 'Choose at least one valid role.'];
             }
-            $m->role = $patch['role'];
-            $changes[] = 'role: '.$patch['role'];
+            $m->role = $roles[0];
+            $m->roles = $roles;
+            // the owner's tweaks stay, trimmed to what still differs from the new roles' defaults
+            $base = $m->rolePerms();
+            $m->perms_add = array_values(array_diff((array) $m->perms_add, $base)) ?: null;
+            $m->perms_remove = array_values(array_intersect((array) $m->perms_remove, $base)) ?: null;
+            $changes[] = 'roles: '.implode(', ', $roles);
+        }
+        if (! empty($patch['perms_set'])) {
+            $m->setPerms((array) ($patch['perms'] ?? []));
+            $changes[] = 'permissions: +'.implode(',', (array) $m->perms_add).' -'.implode(',', (array) $m->perms_remove);
         }
         if (! empty($patch['status'])) {
             if (! in_array($patch['status'], ['active', 'deactivated'], true)) {

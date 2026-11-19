@@ -91,10 +91,10 @@ class TeamRolesTest extends TestCase
         $this->actingAs($this->owner())->withSession(['mode' => 'supplier']);
         $this->post('/supplier/team', ['email' => 'x@demo.ph', 'role' => 'org_admin'])->assertSessionHas('error');
         // another shop's owner, platform staff and someone already working for another shop cannot be invited
-        $this->post('/supplier/team', ['email' => 'ana@demo.ph', 'role' => 'staff'])->assertSessionHas('error');
+        $this->post('/supplier/team', ['email' => 'ana@demo.ph', 'role' => 'crew'])->assertSessionHas('error');
         $this->post('/supplier/team', ['email' => 'admin@partyrent.ph', 'role' => 'cashier'])->assertSessionHas('error');
         $this->post('/supplier/team', ['email' => 'cashier@elegantoccasion.ph', 'role' => 'cashier'])->assertSessionHas('error');
-        $this->post('/supplier/team', ['email' => 'not-an-email', 'role' => 'staff'])->assertSessionHas('error');
+        $this->post('/supplier/team', ['email' => 'not-an-email', 'role' => 'crew'])->assertSessionHas('error');
         $this->assertSame(0, StaffInvite::count());
 
         // the live check in the form
@@ -107,10 +107,10 @@ class TeamRolesTest extends TestCase
     /** A new email gets a code; the person sets their own password. Wrong codes are limited. */
     public function test_new_email_joins_with_the_emailed_code(): void
     {
-        [$path, $code] = $this->invite('staff', 'fresh@demo.ph');
+        [$path, $code] = $this->invite('crew', 'fresh@demo.ph');
         $this->get('/supplier/team')->assertSee('fresh@demo.ph')->assertSee('Invited · waiting');
         // inviting the same email twice is refused
-        $this->post('/supplier/team', ['email' => 'fresh@demo.ph', 'role' => 'staff'])->assertSessionHas('error');
+        $this->post('/supplier/team', ['email' => 'fresh@demo.ph', 'role' => 'crew'])->assertSessionHas('error');
         $this->post('/logout');
 
         $wrong = $code === '000000' ? '111111' : '000000';
@@ -170,7 +170,7 @@ class TeamRolesTest extends TestCase
 
     public function test_invitation_for_someone_else_and_decline(): void
     {
-        [$path] = $this->invite('staff', 'maria@demo.ph');
+        [$path] = $this->invite('crew', 'maria@demo.ph');
         $jose = User::where('email', 'jose@demo.ph')->firstOrFail();
         $this->actingAs($jose)->withSession(['mode' => 'customer'])->get($path)->assertOk()->assertSee('this invitation is for');
         $this->post($path.'/accept')->assertSessionHas('error');
@@ -206,12 +206,14 @@ class TeamRolesTest extends TestCase
         $this->assertSame('customer', $u->defaultMode());
         $this->actingAs($u)->withSession(['mode' => 'customer']);
         $this->get('/')->assertOk()->assertSee('Switch to Business Mode');
-        $this->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('supplier.dashboard'));
+        // their Business Mode opens the Inventory module, not the owner's dashboard
+        $this->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('supplier.stock'));
         $this->get('/supplier/products')->assertOk();
         $this->get('/supplier/inventory')->assertOk();
-        $this->get('/supplier/payments')->assertRedirect('/supplier');
-        $this->get('/supplier/team')->assertRedirect('/supplier');
-        $this->get('/supplier')->assertOk()->assertSee('Inventory Staff')->assertSee('Switch to Customer Mode');
+        $this->get('/supplier/payments')->assertRedirect('/supplier/stock');
+        $this->get('/supplier/team')->assertRedirect('/supplier/stock');
+        $this->get('/supplier')->assertRedirect('/supplier/stock');
+        $this->get('/supplier/stock')->assertOk()->assertSee('Stock Room')->assertSee('Inventory Keeper')->assertSee('Switch to Customer Mode');
     }
 
     public function test_cashier_logs_in_as_customer_and_switches_to_business_mode(): void
@@ -238,7 +240,7 @@ class TeamRolesTest extends TestCase
 
     public function test_change_role_and_deactivate(): void
     {
-        $u = $this->add('staff', 'crew@demo.ph');
+        $u = $this->add('crew', 'crew@demo.ph');
         $this->actingAs($this->owner())->withSession(['mode' => 'supplier']);
         $this->put("/supplier/team/{$u->id}", ['role' => 'cashier'])->assertSessionHas('success');
         $this->assertSame('cashier', ShopStaff::where('user_id', $u->id)->value('role'));
@@ -254,9 +256,9 @@ class TeamRolesTest extends TestCase
         $this->actingAs($this->owner())->withSession(['mode' => 'supplier'])->put("/supplier/team/{$u->id}", ['status' => 'active'])->assertSessionHas('success');
         $this->assertNotNull($u->fresh()->shop());
         // the owner cannot be managed, nor can another shop's people
-        $this->put('/supplier/team/'.$this->owner()->id, ['role' => 'staff'])->assertSessionHas('error');
+        $this->put('/supplier/team/'.$this->owner()->id, ['role' => 'crew'])->assertSessionHas('error');
         $ana = User::where('email', 'ana@demo.ph')->first();
-        $this->put("/supplier/team/{$ana->id}", ['role' => 'staff'])->assertSessionHas('error');
+        $this->put("/supplier/team/{$ana->id}", ['role' => 'crew'])->assertSessionHas('error');
     }
 
     public function test_route_permission_map(): void
@@ -265,7 +267,7 @@ class TeamRolesTest extends TestCase
         $this->assertSame('orders.view', ShopStaff::permFor('supplier.requests.show'));
         $this->assertSame('payments.view', ShopStaff::permFor('supplier.payments'));
         $this->assertNull(ShopStaff::permFor('supplier.dashboard'));
-        $this->assertTrue(ShopStaff::allows('staff', 'supplier.requests.advance'));
-        $this->assertFalse(ShopStaff::allows('staff', 'supplier.requests.accept'));
+        $this->assertTrue(ShopStaff::allows('crew', 'supplier.requests.advance'));
+        $this->assertFalse(ShopStaff::allows('crew', 'supplier.requests.accept'));
     }
 }

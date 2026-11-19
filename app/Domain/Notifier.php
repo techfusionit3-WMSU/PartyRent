@@ -38,7 +38,7 @@ class Notifier
      */
     public static function finance(\App\Models\Supplier $s, string $title, string $body, string $link = ''): void
     {
-        $cashiers = \App\Models\ShopStaff::where('supplier_id', $s->id)->where('role', 'cashier')->where('status', 'active')->pluck('user_id');
+        $cashiers = \App\Models\ShopStaff::where('supplier_id', $s->id)->withRole('cashier')->where('status', 'active')->pluck('user_id');
         if ($cashiers->isEmpty()) {
             self::notify($s->owner_id, 'supplier', $title, $body, $link);
 

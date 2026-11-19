@@ -37,16 +37,24 @@ class EnsureRole
 
             return $next($request);
         }
-        if (in_array('cashier', $roles, true) && $u->isShopCashier()) {
-            session(['mode' => 'supplier']);
+        // a shop member with the Cashier module (owner or Cashier role) opening a cashier page enters that module
+        if (in_array('cashier', $roles, true) && ! $u->isStaff() && $u->hasShopCashierModule()) {
+            session(['mode' => 'supplier', 'module' => 'cashier']);
 
             return $next($request);
         }
         if (in_array('supplier', $roles, true) && ! $u->isStaff()) {
             if ($u->isShopCashier()) {
-                session(['mode' => 'supplier']);
+                // only a cashier module: stay there; with other modules, move to the one that owns this page
+                $to = \App\Support\CompanyModules::moduleFor($u, (string) $request->route()?->getName());
+                if (! $to || $to === 'cashier') {
+                    session(['mode' => 'supplier']);
 
-                return redirect()->route('cashier.dashboard');
+                    return redirect()->route('cashier.dashboard');
+                }
+                session(['mode' => 'supplier', 'module' => $to]);
+
+                return $this->shopPage($request, $next);
             }
             if ($u->isApprovedSupplier()) {
                 session(['mode' => 'supplier']);
@@ -78,14 +86,25 @@ class EnsureRole
 
             return redirect()->route('business.dashboard');
         }
-        if (! (str_starts_with($name, 'supplier.') || str_starts_with($name, 'business.')) || $request->user()->canShop($name)) {
+        $u = $request->user();
+        // the owner's dashboard is the Owner module; a member lands on the home page of their own module
+        if ($name === 'supplier.dashboard' && ! $biz && ! in_array('manage', $u->modules(), true) && ! $request->expectsJson()) {
+            return redirect()->route($u->homeRoute('supplier'));
+        }
+        if (! (str_starts_with($name, 'supplier.') || str_starts_with($name, 'business.')) || $u->canShop($name)) {
+            // keep the menu in step: a page of another of the user's modules switches to that module
+            if (! $biz && ($to = \App\Support\CompanyModules::moduleFor($u, $name)) && $to !== session('module')) {
+                session(['module' => $to]);
+            }
+
             return $next($request);
         }
-        $msg = 'Your role ('.(\App\Models\ShopStaff::ORG_ROLES[$request->user()->orgRole()] ?? 'none').') cannot open that page. Ask your Organization Admin.';
+        $msg = 'Your role ('.\App\Models\ShopStaff::rolesLabel($u->orgRoles() ?: ['none']).') cannot open that page. Ask the shop owner.';
         if ($request->expectsJson()) {
             abort(403, $msg);
         }
+        $home = $biz ? 'business.dashboard' : $u->homeRoute('supplier');
 
-        return redirect()->route($biz ? 'business.dashboard' : 'supplier.dashboard')->with('error', $msg);
+        return $home === $name ? abort(403, $msg) : redirect()->route($home)->with('error', $msg);
     }
 }

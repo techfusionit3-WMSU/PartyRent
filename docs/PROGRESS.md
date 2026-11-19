@@ -4,7 +4,19 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Feedback batch 2 (2026-11-18 late)** — user pasted list. ALL DONE (140 tests green). Order / status:
+**Company role modules + event-focused rentals** (user 2026-11-19; professor: roles live inside the company,
+each role its own module). Plan + decisions: `docs/ROLE_MODULES_PLAN.md`. Stay inside the title (party & event
+rental): add Event venues + Event equipment, any event (not only weddings). Fixed roles + per-member tweaks,
+several roles per member with a module switcher.
+- [x] Step 1: registry + switcher + solo modules (Owner / Front Desk / Cashier / Inventory / Field Crew), 198 tests green
+- [ ] Step 2: event company modules (Owner / Coordinator / Finance / Crew) + job assignment
+- [ ] Step 3: business picks Rental company and/or Event company
+- [ ] Step 4: Event venues + Event equipment rental types
+- [ ] Step 5: any-event wording + event list + AI examples
+- [ ] Step 6: role-based notifications
+- [ ] Step 7: demo data per company type + SE docs (use cases, RBAC matrix, ERD, state diagrams, test plan)
+
+(previous) **Feedback batch 2 (2026-11-18 late)** — user pasted list. ALL DONE (140 tests green). Order / status:
 - [x] F1 Speed: OPcache enabled in C:\xampp\php\php.ini (backup php.ini.bak-before-opcache; 3-6x per request);
       Inventory interval index + demandOn memo (home controller 145 -> 35 ms)
 - [x] F2 Accounts: EnsureSameAccount (pages stamp `_auth` / X-Auth-Id via app.js; writes from a page of another

@@ -1671,7 +1671,7 @@ class Rentals
                 $msg = $s['label'].' of '.money($s['amount']).' for '.$r->code.' was due '.fmt_date($s['due']).'. Outstanding: '.money($f['overdueAmount']).'.';
                 Notifier::notify($r->customer_id, 'customer', 'Payment overdue', $msg.' Please pay as soon as possible.', self::link('rentals.show', $r));
                 Notifier::notify($r->supplier->owner_id, 'supplier', 'Overdue payment', $r->customer->name.': '.$msg, self::link('supplier.requests.show', $r));
-                if (\App\Models\ShopStaff::where('supplier_id', $r->supplier_id)->where('role', 'cashier')->where('status', 'active')->exists()) {
+                if (\App\Models\ShopStaff::where('supplier_id', $r->supplier_id)->withRole('cashier')->where('status', 'active')->exists()) {
                     Notifier::finance($r->supplier, 'Overdue payment', $r->customer->name.': '.$msg, self::link('cashier.balances'));
                 }
                 Notifier::notify('admin', 'admin', 'Overdue payment', $r->customer->name.' · '.$msg, '');

@@ -264,7 +264,7 @@ class Payouts
     private static function tellShop(Supplier $s, string $title, string $body): void
     {
         Notifier::notify($s->owner_id, 'supplier', $title, $body, route('supplier.payouts', [], false));
-        foreach (\App\Models\ShopStaff::where('supplier_id', $s->id)->where('role', 'cashier')->where('status', 'active')->pluck('user_id') as $uid) {
+        foreach (\App\Models\ShopStaff::where('supplier_id', $s->id)->withRole('cashier')->where('status', 'active')->pluck('user_id') as $uid) {
             Notifier::notify($uid, 'cashier', $title, $body, route('cashier.payouts', [], false));
         }
     }

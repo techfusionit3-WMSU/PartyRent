@@ -176,6 +176,14 @@
 .side .mode-switch { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 11px; background: rgba(255, 255, 255, .08); color: #fff; font-weight: 700; font-size: .86rem; text-decoration: none; margin-bottom: 10px; border: 0; width: 100%; cursor: pointer; font-family: var(--font); }
 .side .mode-switch svg { width: 18px; height: 18px; }
 .side .mode-switch:hover { background: rgba(255, 255, 255, .14); }
+/* company role modules: switcher for owners and members with several roles */
+.side .mod-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 0 10px; border-bottom: 1px solid rgba(255, 255, 255, .08); margin-bottom: 4px; }
+.side .mod-switch .nav-label { grid-column: 1 / -1; padding-top: 0; }
+.side .mod-btn { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 9px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .04); color: #D9D0EA; font: 600 .78rem var(--font); cursor: pointer; text-align: left; }
+.side .mod-btn svg { width: 16px; height: 16px; flex: none; opacity: .85; }
+.side .mod-btn:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.side .mod-btn.on { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .35); color: #fff; }
+.side .mod-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .dash-body { min-width: 0; }
 .dash-top { position: sticky; top: 0; z-index: 400; height: var(--header-h); background: rgba(255, 255, 255, .92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 0 24px; }
 .dash-top .ttl { font-weight: 800; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

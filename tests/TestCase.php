@@ -69,7 +69,7 @@ abstract class TestCase extends BaseTestCase
     protected function shopCashier(string $code): User
     {
         $r = RentalRequest::where('code', $code)->firstOrFail();
-        $existing = ShopStaff::where('supplier_id', $r->supplier_id)->where('role', 'cashier')->value('user_id');
+        $existing = ShopStaff::where('supplier_id', $r->supplier_id)->withRole('cashier')->value('user_id');
         if ($existing) {
             return User::find($existing);
         }

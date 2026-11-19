@@ -80,25 +80,11 @@ class SupplierController extends Controller
 
     public function schedule(Request $request)
     {
-        $sup = $request->user()->shop();
         $T = today_iso();
-        $reqs = RentalRequest::where('supplier_id', $sup->id)->whereIn('status', Finance::ACTIVE)->with(['customer', 'payments'])->get();
-        $events = [];
-        foreach ($reqs as $r) {
-            if (in_array($r->status, ['accepted', 'in_progress', 'ready_pickup', 'out_delivery'], true)) {
-                $events[] = ['d' => $r->start_date, 'kind' => $r->fulfillment === 'delivery' ? 'Delivery' : 'Pickup', 'r' => $r];
-            }
-            if (in_array($r->status, ['accepted', 'in_progress', 'ready_pickup', 'out_delivery', 'ongoing'], true)) {
-                $events[] = ['d' => add_days($r->end_date, 1), 'kind' => 'Return', 'r' => $r];
-            }
-            if ($r->status === 'return_pending') {
-                $events[] = ['d' => $T, 'kind' => 'Inspect return', 'r' => $r];
-            }
-        }
-        usort($events, fn ($a, $b) => strcmp($a['d'], $b['d']));
+        $reqs = \App\Domain\Jobs::active($request->user()->shop());
 
         return view('supplier.schedule', [
-            'events' => array_values(array_filter($events, fn ($e) => $e['d'] <= add_days($T, 14))), 'reqs' => $reqs, 'T' => $T,
+            'events' => \App\Domain\Jobs::list($reqs), 'reqs' => $reqs, 'T' => $T,
             'cols' => [['To prepare', ['accepted'], 'b-sky'], ['Preparing', ['in_progress'], 'b-purple'], ['Ready / out for delivery', ['ready_pickup', 'out_delivery'], 'b-teal'], ['With customer', ['ongoing'], 'b-pink'], ['Return pending', ['return_pending'], 'b-gold'], ['Inspection', ['inspection'], 'b-purple']],
         ]);
     }
@@ -116,7 +102,7 @@ class SupplierController extends Controller
 
         return view('supplier.payments', [
             'tab' => $tab, 'canVerify' => $canVerify, 'pays' => $pays, 'pend' => $pays->where('status', 'pending')->values(), 'fins' => $fins,
-            'cashiers' => \App\Models\ShopStaff::where('supplier_id', $sup->id)->where('role', 'cashier')->where('status', 'active')->with('user')->get()->pluck('user')->filter(fn ($x) => $x && $x->status === 'active'),
+            'cashiers' => \App\Models\ShopStaff::where('supplier_id', $sup->id)->withRole('cashier')->where('status', 'active')->with('user')->get()->pluck('user')->filter(fn ($x) => $x && $x->status === 'active'),
             'collected' => (float) $pays->where('status', 'verified')->whereIn('type', Finance::RENTAL_TYPES)->sum('amount'),
             'outstanding' => (float) $fins->filter(fn ($x) => in_array($x['r']->status, Finance::ACTIVE, true))->sum(fn ($x) => $x['f']['balance']),
             'overdue' => $fins->filter(fn ($x) => $x['f']['isOverdue']),

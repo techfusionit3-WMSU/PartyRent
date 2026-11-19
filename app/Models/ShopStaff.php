@@ -126,7 +126,7 @@ class ShopStaff extends Model
 
     public static function rolesLabel(array $roles): string
     {
-        return implode(' + ', array_map(fn ($r) => self::ORG_ROLES[$r] ?? ucfirst($r), $roles));
+        return implode(' + ', array_map(fn ($r) => __(self::ORG_ROLES[$r] ?? ucfirst($r)), $roles));
     }
 
     /** Role defaults of this member (before the owner's tweaks). */

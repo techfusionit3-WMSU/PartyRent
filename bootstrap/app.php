@@ -12,7 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['role' => \App\Http\Middleware\EnsureRole::class]);
-        $middleware->web(append: [\App\Http\Middleware\EnsureSameAccount::class]);
+        $middleware->web(append: [\App\Http\Middleware\EnsureSameAccount::class, \App\Http\Middleware\SetLocale::class]);
         $middleware->validateCsrfTokens(except: ['webhooks/*']);
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route(auth()->user()->homeRoute(session('mode'))));

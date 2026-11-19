@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() === 'fil' ? 'fil' : 'en' }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -37,6 +37,7 @@ window.PR = {
 @stack('head')
 </head>
 <body @if(! empty($bodyClass)) class="{{ $bodyClass }}" @endif>
+<a class="skip-link" href="#main">{{ __('Skip to content') }}</a>
 @yield('body')
 @stack('scripts')
 </body>

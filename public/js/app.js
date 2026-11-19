@@ -791,3 +791,144 @@
   window.addEventListener('scroll', close, { passive: true });
   window.addEventListener('resize', close);
 })();
+
+/*
+ * Step-by-step forms: <form data-wizard> whose blocks carry data-wiz-step="Title" (blocks may share a title).
+ * One step at a time with a progress bar; Next checks the visible required fields first; the save button
+ * ([data-wiz-submit]) shows on the last step; a server error opens the step that holds it.
+ */
+(function () {
+  document.querySelectorAll('form[data-wizard]').forEach(function (f) {
+    const blocks = Array.from(f.querySelectorAll('[data-wiz-step]'));
+    const titles = blocks.map(b => b.dataset.wizStep).filter((t, i, a) => a.indexOf(t) === i);
+    if (titles.length < 2) return;
+    f.classList.add('wizarding');
+    let cur = 0;
+    const head = document.createElement('div');
+    head.className = 'wiz-head';
+    head.innerHTML = '<div class="wiz-bar" role="progressbar" aria-valuemin="1"><span></span></div><div class="wiz-progress"></div>';
+    const bar = head.querySelector('.wiz-bar'), prog = head.querySelector('.wiz-progress');
+    bar.setAttribute('aria-valuemax', titles.length);
+    bar.setAttribute('aria-label', 'Form progress');
+    titles.forEach(function (t, i) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = '<span class="wn"></span><span></span>';
+      b.firstChild.textContent = i + 1;
+      b.lastChild.textContent = t;
+      b.addEventListener('click', () => { if (i <= cur || valid()) go(i); });
+      prog.appendChild(b);
+    });
+    f.parentNode.insertBefore(head, f);
+    const nav = document.createElement('div');
+    nav.className = 'wiz-nav';
+    nav.innerHTML = '<button type="button" class="btn" data-wb>&larr; Back</button><span class="wiz-draft" aria-live="polite"></span><button type="button" class="btn btn-primary" data-wn>Next &rarr;</button>';
+    (f.querySelector('[data-wiz-nav]') || f).appendChild(nav);
+    const submits = Array.from(f.querySelectorAll('[data-wiz-submit]'));
+    const fields = () => blocks.filter(b => b.dataset.wizStep === titles[cur])
+      .flatMap(b => Array.from(b.querySelectorAll('input,select,textarea')))
+      .filter(i => !i.disabled && i.type !== 'hidden' && i.offsetParent !== null);
+    function valid() {
+      for (const i of fields()) { if (!i.checkValidity()) { i.reportValidity(); return false; } }
+      return true;
+    }
+    function go(i, focus) {
+      cur = Math.max(0, Math.min(titles.length - 1, i));
+      blocks.forEach(b => b.classList.toggle('wiz-off', b.dataset.wizStep !== titles[cur]));
+      Array.from(prog.children).forEach((b, k) => { b.className = k === cur ? 'on' : (k < cur ? 'ok' : ''); b.setAttribute('aria-current', k === cur ? 'step' : 'false'); });
+      bar.firstChild.style.width = Math.round((cur + 1) / titles.length * 100) + '%';
+      bar.setAttribute('aria-valuenow', cur + 1);
+      nav.querySelector('[data-wb]').style.visibility = cur === 0 ? 'hidden' : '';
+      nav.querySelector('[data-wn]').classList.toggle('wiz-off', cur === titles.length - 1);
+      submits.forEach(s => s.classList.toggle('wiz-off', cur !== titles.length - 1));
+      if (focus !== false) {
+        head.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        const first = fields()[0];
+        if (first) setTimeout(() => first.focus({ preventScroll: true }), 50);
+      }
+    }
+    nav.querySelector('[data-wn]').addEventListener('click', () => { if (valid()) go(cur + 1); });
+    nav.querySelector('[data-wb]').addEventListener('click', () => go(cur - 1));
+    // a field the browser refuses on submit (in a hidden step): open its step
+    f.addEventListener('invalid', e => { const b = e.target.closest('[data-wiz-step]'); if (b) { const i = titles.indexOf(b.dataset.wizStep); if (i !== cur) go(i, false); } }, true);
+    const bad = f.querySelector('.invalid, .error-text');
+    const start = bad && bad.closest('[data-wiz-step]') ? titles.indexOf(bad.closest('[data-wiz-step]').dataset.wizStep) : 0;
+    go(start, false);
+  });
+})();
+
+/*
+ * Drafts: <form data-draft="key"> keeps what was typed in this browser until it is sent. Coming back shows
+ * "Restore draft / Discard". Files and passwords are never kept.
+ */
+(function () {
+  const uid = (document.querySelector('meta[name="auth-id"]') || {}).content || 'guest';
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage full or blocked */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } },
+  };
+  document.querySelectorAll('form[data-draft]').forEach(function (f) {
+    const key = 'pr-draft:' + uid + ':' + f.dataset.draft;
+    const skip = i => !i.name || ['file', 'password', 'hidden', 'submit', 'button'].includes(i.type) || i.name === '_token' || i.name === '_method' || i.closest('[data-no-draft]');
+    const all = () => Array.from(f.querySelectorAll('input,select,textarea')).filter(i => !skip(i));
+    function collect() {
+      const d = {};
+      all().forEach(i => {
+        if (i.type === 'checkbox' || i.type === 'radio') { d[i.name] = d[i.name] || { c: [] }; if (i.checked) d[i.name].c.push(i.value); }
+        else if (i.tagName === 'SELECT' && i.multiple) d[i.name] = { m: Array.from(i.selectedOptions).map(o => o.value) };
+        else { d[i.name] = d[i.name] || { v: [] }; d[i.name].v.push(i.value); }
+      });
+      return d;
+    }
+    function apply(d) {
+      const seen = {};
+      all().forEach(i => {
+        const x = d[i.name];
+        if (!x) return;
+        if (x.c) i.checked = x.c.includes(i.value);
+        else if (x.m) Array.from(i.options).forEach(o => { o.selected = x.m.includes(o.value); });
+        else if (x.v) { const n = seen[i.name] || 0; if (n < x.v.length) i.value = x.v[n]; seen[i.name] = n + 1; }
+        i.dispatchEvent(new Event('input', { bubbles: true }));
+        i.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+    const status = msg => { const s = f.querySelector('.wiz-draft'); if (s) s.textContent = msg; };
+    let saved = null;
+    try { saved = JSON.parse(store.get(key) || 'null'); } catch (e) { saved = null; }
+    if (saved && saved.d) {
+      const box = document.createElement('div');
+      box.className = 'alert alert-info mb-2';
+      box.setAttribute('role', 'status');
+      box.innerHTML = '<div class="grow"><b>You have an unsent draft</b> from <span data-when></span>. Photos and files are not kept.</div><div class="row gap-sm"><button type="button" class="btn btn-sm btn-primary" data-dr>Restore draft</button><button type="button" class="btn btn-sm btn-ghost" data-dd>Discard</button></div>';
+      box.querySelector('[data-when]').textContent = new Date(saved.at).toLocaleString();
+      const anchor = f.previousElementSibling && f.previousElementSibling.classList.contains('wiz-head') ? f.previousElementSibling : f;
+      anchor.parentNode.insertBefore(box, anchor);
+      box.querySelector('[data-dr]').addEventListener('click', () => { apply(saved.d); box.remove(); status('Draft restored'); });
+      box.querySelector('[data-dd]').addEventListener('click', () => { store.del(key); box.remove(); });
+    }
+    let t = null;
+    const save = () => { clearTimeout(t); t = setTimeout(() => { store.set(key, JSON.stringify({ at: Date.now(), d: collect() })); status('Draft saved'); }, 700); };
+    f.addEventListener('input', save);
+    f.addEventListener('change', save);
+    f.addEventListener('submit', e => { setTimeout(() => { if (!e.defaultPrevented) store.del(key); }, 0); });
+  });
+})();
+
+/*
+ * Accessibility helpers: a field label without "for" is tied to its input so screen readers read it;
+ * an icon-only button without a name gets its title as its name.
+ */
+(function () {
+  let n = 0;
+  document.querySelectorAll('.field > label:not([for])').forEach(function (l) {
+    if (l.querySelector('input,select,textarea')) return; // the label wraps its input already
+    const i = l.parentElement.querySelector('input:not([type=hidden]),select,textarea');
+    if (!i || i.closest('label')) return;
+    if (!i.id) i.id = 'f-auto-' + (++n);
+    l.htmlFor = i.id;
+  });
+  document.querySelectorAll('button:not([aria-label]),a.icon-btn:not([aria-label])').forEach(function (b) {
+    if (!b.textContent.trim() && b.title) b.setAttribute('aria-label', b.title);
+  });
+})();

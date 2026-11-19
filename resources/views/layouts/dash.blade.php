@@ -58,32 +58,33 @@
     @endif
     @if(count($mods) > 1)
       <div class="mod-switch" aria-label="Your modules">
-        <div class="nav-label" style="margin-top:0">Your modules</div>
+        <div class="nav-label" style="margin-top:0">{{ __('Your modules') }}</div>
         @foreach($mods as $mk)
           @php($md = \App\Support\CompanyModules::get($mk))
-          <form method="POST" action="{{ route('module.switch') }}">@csrf<input type="hidden" name="module" value="{{ $mk }}"><button class="mod-btn {{ $mk === $curMod ? 'on' : '' }}" @if($mk === $curMod) aria-current="true" @endif>{{ icon($md['icon']) }}<span>{{ $md['label'] }}</span></button></form>
+          <form method="POST" action="{{ route('module.switch') }}">@csrf<input type="hidden" name="module" value="{{ $mk }}"><button class="mod-btn {{ $mk === $curMod ? 'on' : '' }}" @if($mk === $curMod) aria-current="true" @endif>{{ icon($md['icon']) }}<span>{{ __($md['label']) }}</span></button></form>
         @endforeach
       </div>
     @endif
     @foreach($items as $it)
       @if(count($it) === 1)
-        <div class="nav-label">{{ $it[0] }}</div>
+        <div class="nav-label">{{ __($it[0]) }}</div>
       @else
-        <a class="nav {{ $nav === $it[0] ? 'active' : '' }}" href="{{ route($it[1]) }}">{{ icon($it[2]) }}<span>{{ $it[3] }}</span>@if(! empty($it[4]))<span class="cnt">{{ $it[4] }}</span>@endif</a>
+        <a class="nav {{ $nav === $it[0] ? 'active' : '' }}" href="{{ route($it[1]) }}">{{ icon($it[2]) }}<span>{{ __($it[3]) }}</span>@if(! empty($it[4]))<span class="cnt">{{ $it[4] }}</span>@endif</a>
       @endif
     @endforeach
-    <div class="side-foot">Signed in as <b style="color:#fff">{{ $shellUser->name }}</b><br>{{ $shellUser->email }}</div>
+    <div class="mb-1">@include('partials.lang-switch', ['dark' => true])</div>
+    <div class="side-foot">{{ __('Signed in as') }} <b style="color:#fff">{{ $shellUser->name }}</b><br>{{ $shellUser->email }}</div>
   </aside>
   <div class="side-backdrop" id="sideBd"></div>
   <div class="dash-body">
     <header class="dash-top"><button class="icon-btn menu-toggle" data-side-open aria-label="Open menu">{{ icon('menu') }}</button><div class="ttl grow">{{ $title ?? '' }}</div>@if($sup)<span class="working-as" title="{{ __('You are working in this company module') }}">{{ icon('store') }}<span class="ellipsis">{{ __('Working as :role', ['role' => $curMod ? __(\App\Support\CompanyModules::get($curMod)['label']) : \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles())]) }} · {{ $sup->name }}</span></span>@endif@include('partials.notif-dropdown')@include('partials.profile-menu')</header>
-    <main class="dash-main" id="main">
+    <main class="dash-main" id="main" tabindex="-1">
       @yield('content')
     </main>
   </div>
 </div>
 <nav class="bottom-nav">
-  @foreach($bottom as $it)<a href="{{ route($it[1]) }}" class="{{ $nav === $it[0] ? 'active' : '' }}">{{ icon($it[2]) }}{{ $it[3] }}</a>@endforeach
-  <button type="button" data-side-open>{{ icon('menu') }}More</button>
+  @foreach($bottom as $it)<a href="{{ route($it[1]) }}" class="{{ $nav === $it[0] ? 'active' : '' }}">{{ icon($it[2]) }}{{ __($it[3]) }}</a>@endforeach
+  <button type="button" data-side-open>{{ icon('menu') }}{{ __('More') }}</button>
 </nav>
 @endsection

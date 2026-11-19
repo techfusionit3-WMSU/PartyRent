@@ -25,11 +25,11 @@
 <div class="crumbs"><a href="{{ route('supplier.products') }}">Products</a> / {{ $p->exists ? $p->name : 'New product' }}</div>
 <div class="page-head"><div><h1>{{ $p->exists ? 'Edit product' : ($lt === 'sale' ? 'Add an item for sale' : 'Add product') }}</h1><p>{{ $p->exists ? '#'.$p->id.' · created '.fmt_date($p->created_at) : 'Prices you set here are the only prices customers and the AI assistant ever see.' }}</p></div>
   @if($p->exists)<a class="btn btn-sm" href="{{ route('products.show', $p) }}" target="_blank">{{ icon('eye') }}View listing</a>@endif</div>
-<form method="POST" action="{{ $p->exists ? route('supplier.products.update', $p) : route('supplier.products.store') }}" enctype="multipart/form-data" class="grid grid-side" id="productForm">
+<form method="POST" action="{{ $p->exists ? route('supplier.products.update', $p) : route('supplier.products.store') }}" enctype="multipart/form-data" class="grid grid-side" id="productForm" data-wizard data-draft="{{ $p->exists ? 'product-'.$p->id : 'product-new' }}">
   @csrf @if($p->exists) @method('PUT') @endif
   <div class="stack">
     {{-- Specs --}}
-    <div class="card"><h3>Basic information</h3>
+    <div class="card" data-wiz-step="{{ __('Item') }}"><h3>Basic information</h3>
       <div class="field"><label>Listing type</label><div class="row wrap gap-sm">
         <label class="check"><input type="radio" name="listing_type" value="rent" @checked($lt === 'rent')> <span><b>For rent</b> <span class="small muted">· returned after the event</span></span></label>
         <label class="check"><input type="radio" name="listing_type" value="sale" @checked($lt === 'sale')> <span><b>For sale</b> <span class="small muted">· consumables sold once (food, flowers, favors)</span></span></label>
@@ -74,7 +74,7 @@
     </div>
 
     {{-- Pricing --}}
-    <div class="card"><h3>Pricing</h3>
+    <div class="card" data-wiz-step="{{ __('Price') }}"><h3>Pricing</h3>
       <div class="form-grid">
         <div class="field" data-for="rent"><label>How is it rented?</label><select class="input" name="rental_mode" id="rentalMode"><option value="day" @selected($mode === 'day')>Per day</option><option value="hour" @selected($mode === 'hour')>By the hour</option></select></div>
         <div class="field" data-for="rent"><label>Pricing unit</label><select class="input" name="unit">@foreach(['piece', 'set', 'unit', 'pair', 'panel', 'kit', 'system'] as $un)<option value="{{ $un }} / day" @selected(explode(' /', old('unit', $p->unit ?? 'piece'))[0] === $un)>{{ $un }}</option>@endforeach</select></div>
@@ -94,7 +94,7 @@
     </div>
 
     {{-- Sale-only: ordering & freshness --}}
-    <div class="card" data-for="sale"><h3>Ordering & freshness</h3>
+    <div class="card" data-for="sale" data-wiz-step="{{ __('Price') }}"><h3>Ordering & freshness</h3>
       <div class="form-grid">
         <div class="field"><label>Order lead time (days)</label><input class="input" type="number" min="0" max="60" name="lead_days" value="{{ old('lead_days', $p->lead_days ?? 0) }}"><div class="hint">Customers must order at least this many days before the event.</div></div>
         <div class="field"><label>Low-stock alert at</label><input class="input" type="number" min="0" name="low_stock_at" value="{{ old('low_stock_at', $p->low_stock_at) }}" placeholder="No alert"></div>
@@ -106,7 +106,7 @@
 
   <aside class="stack">
     {{-- Inventory --}}
-    <div class="card"><h3>Inventory</h3>
+    <div class="card" data-wiz-step="{{ __('Stock & listing') }}"><h3>Inventory</h3>
       <div data-for="rent">
         @if($locs->isNotEmpty())
           <div class="label mb-1">Quantity per inventory location</div>
@@ -127,7 +127,7 @@
     </div>
 
     {{-- Listing --}}
-    <div class="card"><h3>Listing</h3>
+    <div class="card" data-wiz-step="{{ __('Stock & listing') }}"><h3>Listing</h3>
       <div class="field"><label>Status</label><select class="input" name="status">@foreach(['active' => 'Active (visible to customers)', 'inactive' => 'Inactive (hidden)'] as $k => $l)<option value="{{ $k }}" @selected(old('status', $p->status ?: 'active') === $k)>{{ $l }}</option>@endforeach</select></div>
       @unless(auth()->user()->shop()?->isBusiness())
         <label class="check"><input type="hidden" name="package_only" value="0"><input type="checkbox" name="package_only" value="1" @checked(old('package_only', $p->package_only))> Only available inside my packages</label>
@@ -152,7 +152,8 @@
         <div class="field"><label>Item rental policy <span class="muted">(optional)</span></label><textarea class="input" name="rental_policy" rows="3" placeholder="e.g. Indoor use only">{{ old('rental_policy', $p->rental_policy) }}</textarea></div>
       </div>
     </div>
-    <button class="btn btn-primary btn-block btn-lg">{{ $p->exists ? 'Save changes' : 'Add product' }}</button>
+    <div data-wiz-nav></div>
+    <button class="btn btn-primary btn-block btn-lg" data-wiz-submit>{{ $p->exists ? 'Save changes' : 'Add product' }}</button>
     <a class="btn btn-block btn-ghost" href="{{ route('supplier.products') }}">Cancel</a>
   </aside>
 </form>

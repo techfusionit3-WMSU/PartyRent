@@ -7,18 +7,19 @@
     @include('partials.brand')
     <form class="mk-search" id="mkSearch" role="search" action="{{ route('home') }}" method="GET">
       <span>{{ icon('search') }}</span>
-      <input name="q" placeholder="Search chairs, tents, suppliers…" aria-label="Search" value="{{ request('q') }}">
-      <button type="submit" class="search-go">{{ icon('search') }}<span>Search</span></button>
+      <input name="q" placeholder="{{ __('Search chairs, tents, suppliers…') }}" aria-label="{{ __('Search') }}" value="{{ request('q') }}">
+      <button type="submit" class="search-go">{{ icon('search') }}<span>{{ __('Search') }}</span></button>
     </form>
     <button type="submit" form="mkSearch" formaction="{{ route('ai') }}" class="ai-square" title="AI Search: describe your event and let AI build the search" aria-label="AI Search">{{ icon('sparkle') }}<span>AI</span></button>
     <div class="mk-actions">
+      @include('partials.lang-switch')
       @auth
         @include('partials.notif-dropdown')
         <a class="icon-btn" href="{{ route('cart') }}" aria-label="Rental list">{{ icon('cart') }}@if($shellCart)<span class="dot-count">{{ $shellCart }}</span>@endif</a>
         @include('partials.profile-menu')
       @else
-        <a class="btn btn-ghost btn-sm hide-xs" href="{{ route('login') }}">Log in</a>
-        <a class="btn btn-primary btn-sm" href="{{ route('register') }}">Sign up</a>
+        <a class="btn btn-ghost btn-sm hide-xs" href="{{ route('login') }}">{{ __('Log in') }}</a>
+        <a class="btn btn-primary btn-sm" href="{{ route('register') }}">{{ __('Sign up') }}</a>
       @endauth
     </div>
   </div>
@@ -26,17 +27,17 @@
   <nav class="mk-nav" aria-label="Main">
     <div class="container mk-nav-in">
       @foreach([['home', 'home', 'Browse', 'grid'], ['packages', 'packages.index', 'Packages', 'package'], ['suppliers', 'suppliers.index', 'Suppliers', 'store'], ['rentals', 'rentals.index', 'My Rentals', 'list']] as [$k, $r, $l, $i])
-        <a href="{{ route($r) }}" class="{{ $nav === $k || ($k === 'home' && $nav === 'browse') ? 'active' : '' }}" @if($nav === $k) aria-current="page" @endif>{{ icon($i) }}<span>{{ $l }}</span>@if($k === 'rentals')@auth @if($shellPendingRentals)<span class="nav-count">{{ $shellPendingRentals }}</span>@endif @endauth @endif</a>
+        <a href="{{ route($r) }}" class="{{ $nav === $k || ($k === 'home' && $nav === 'browse') ? 'active' : '' }}" @if($nav === $k) aria-current="page" @endif>{{ icon($i) }}<span>{{ __($l) }}</span>@if($k === 'rentals')@auth @if($shellPendingRentals)<span class="nav-count">{{ $shellPendingRentals }}</span>@endif @endauth @endif</a>
       @endforeach
     </div>
   </nav>
   @yield('subheader')
 </header>
 
-<div class="mk-main"><div class="container">
+<main class="mk-main" id="main" tabindex="-1"><div class="container">
   @yield('content')
   @if(session(\App\Support\RentalPeriod::ASK))@include('partials.date-prompt')@endif
-</div></div>
+</div></main>
 
 <footer class="mk-footer"><div class="container">
   <div class="cols">
@@ -50,11 +51,11 @@
 </div></footer>
 
 <nav class="bottom-nav" aria-label="Main">
-  <a href="{{ route('home') }}" class="{{ in_array($nav, ['browse', 'home'], true) ? 'active' : '' }}">{{ icon('grid') }}Browse</a>
-  <a href="{{ route('suppliers.index') }}" class="{{ $nav === 'suppliers' ? 'active' : '' }}">{{ icon('store') }}Suppliers</a>
+  <a href="{{ route('home') }}" class="{{ in_array($nav, ['browse', 'home'], true) ? 'active' : '' }}">{{ icon('grid') }}{{ __('Browse') }}</a>
+  <a href="{{ route('suppliers.index') }}" class="{{ $nav === 'suppliers' ? 'active' : '' }}">{{ icon('store') }}{{ __('Suppliers') }}</a>
   <a href="{{ route('ai') }}" class="fab {{ $nav === 'ai' ? 'active' : '' }}" aria-label="AI Planner">{{ icon('sparkle') }}</a>
-  <a href="{{ route('rentals.index') }}" class="{{ $nav === 'rentals' ? 'active' : '' }}">{{ icon('list') }}Requests @auth @if($shellPendingRentals)<span class="bn-dot">{{ $shellPendingRentals }}</span>@endif @endauth</a>
-  <a href="{{ auth()->check() ? route('profile') : route('login') }}" class="{{ $nav === 'profile' ? 'active' : '' }}">{{ icon('user') }}Profile</a>
+  <a href="{{ route('rentals.index') }}" class="{{ $nav === 'rentals' ? 'active' : '' }}">{{ icon('list') }}{{ __('Rentals') }} @auth @if($shellPendingRentals)<span class="bn-dot">{{ $shellPendingRentals }}</span>@endif @endauth</a>
+  <a href="{{ auth()->check() ? route('profile') : route('login') }}" class="{{ $nav === 'profile' ? 'active' : '' }}">{{ icon('user') }}{{ __('Profile') }}</a>
 </nav>
 
 @if(setting('aiEnabled', true))

@@ -41,9 +41,10 @@
 <div class="page-head"><div><h1>Apply as a Supplier</h1><p>Join PartyRent and start offering your rental products — using your existing account.
   @if($existing && $existing->status === 'rejected')<span class="badge b-red">Previous application rejected: {{ $existing->reject_reason }}</span>@endif
   @if($existing && $existing->status === 'revision')<span class="badge b-purple">Requires revision: {{ $existing->revision_note }}</span>@endif</p></div></div>
+<div class="wiz-bar" style="max-width:820px" role="progressbar" aria-label="{{ __('Application progress') }}" aria-valuemin="1" aria-valuemax="{{ count($steps) }}" aria-valuenow="1"><span id="wizBar" style="width:{{ round(100 / count($steps)) }}%"></span></div>
 <div class="wizard-steps">@foreach($steps as $i => $t)<div class="ws {{ $i === 0 ? 'on' : '' }}" data-ws="{{ $i }}"><span>Step {{ $i + 1 }}</span>{{ $t }}</div>@endforeach</div>
 
-<form class="card" id="wf" method="POST" action="{{ route('start-selling.submit') }}" enctype="multipart/form-data" style="max-width:820px" novalidate
+<form class="card" id="wf" data-draft="start-selling" method="POST" action="{{ route('start-selling.submit') }}" enctype="multipart/form-data" style="max-width:820px" novalidate
       data-confirm-title="{{ $existing ? 'Resubmit' : 'Submit' }} supplier application?" data-confirm-ok="{{ $existing ? 'Resubmit' : 'Submit' }}"
       data-confirm="Your supplier profile will be linked to this account ({{ auth()->user()->email }}). You can keep renting as a customer.">
   @csrf
@@ -245,6 +246,7 @@
     $$('[data-ws]', document).forEach(function (w) { w.lastChild.textContent = titles[+w.dataset.ws]; });
     steps.forEach(function (s) { s.classList.toggle('hidden', +s.dataset.step !== step); });
     $$('[data-ws]', document).forEach(function (w) { var i = +w.dataset.ws; w.className = 'ws ' + (i === step ? 'on' : i < step ? 'done' : ''); });
+    var bar = document.getElementById('wizBar'); if (bar) { bar.style.width = Math.round((step + 1) / steps.length * 100) + '%'; bar.parentNode.setAttribute('aria-valuenow', step + 1); }
     document.getElementById('stepTitle').innerHTML = esc(titles[step]) + (step && type() ? ' <span class="badge ' + (org() ? 'b-purple' : 'b-pink') + ' plain">' + (org() ? 'Organization / Company Supplier' : 'Individual Supplier') + '</span>' : '');
     document.getElementById('back').disabled = step === 0;
     document.getElementById('next').classList.toggle('hidden', step === steps.length - 1);

@@ -3,7 +3,7 @@
 {{-- Reference SP.products (+ app: items for sale) --}}
 @section('content')
 <div class="page-head"><div><h1>Products</h1><p>Your rental items. Active items appear in the marketplace, search and AI suggestions.</p></div>
-  <div class="btn-group"><a class="btn" href="{{ route('supplier.products.create', ['type' => 'sale']) }}">{{ icon('plus') }}Add item for sale</a><a class="btn btn-primary" href="{{ route('supplier.products.create') }}">{{ icon('plus') }}Add product</a></div></div>
+  <div class="btn-group"><a class="btn btn-primary" href="{{ route('supplier.products.create') }}">{{ icon('plus') }}Add product</a></div></div>
 <form class="row wrap mb-2" method="GET">
   <input type="hidden" name="f" value="{{ $f }}">
   <input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search products" style="width:240px" aria-label="Search">
@@ -17,7 +17,7 @@
       @foreach($list as $p)
         @php($b = inv()->breakdown($p->id, $today))
         <tr>
-          <td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><a class="strong" href="{{ route('supplier.products.edit', $p) }}">{{ $p->name }}</a>@if($p->isSale()) <span class="badge b-purple">For sale</span>@endif @if($p->isLowStock()) <span class="badge b-red">Low stock</span>@endif<div class="small muted">#{{ $p->id }} · {{ $p->category->name ?? '' }}</div></div></div></td>
+          <td data-label="Item"><div class="row">@include('partials.thumb', ['item' => $p, 'cls' => 'sm'])<div><a class="strong" href="{{ route('supplier.products.edit', $p) }}">{{ $p->name }}</a>@if($p->isSale()) <span class="badge b-purple">For sale</span>@endif @if($p->package_only) <span class="badge b-pink" title="Not listed on its own: only available inside your packages">Package only</span>@endif @if($p->isLowStock()) <span class="badge b-red">Low stock</span>@endif<div class="small muted">#{{ $p->id }} · {{ $p->category->name ?? '' }}</div></div></div></td>
           <td data-label="Price"><div>{{ money($p->basePrice()) }}<div class="small muted">/{{ $p->unit }}{{ count($p->tiers) > 1 ? ' · '.count($p->tiers).' tiers' : '' }}{{ $p->max_rental_days ? ' · max '.$p->max_rental_days.' day'.($p->max_rental_days > 1 ? 's' : '').'/booking' : '' }}</div></div></td>
           <td data-label="Stock today"><div><b>{{ $b['available'] }}</b> avail. / {{ $b['total'] }}<div class="small muted">{{ $b['reserved'] }} {{ $p->isSale() ? 'committed' : 'reserved' }} · {{ $b['damaged'] + $b['missing'] + $b['maintenance'] + $b['setaside'] }} unusable</div></div></td>
           <td data-label="Rentals" class="num">{{ $p->rent_count }}</td>

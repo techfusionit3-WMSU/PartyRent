@@ -17,6 +17,7 @@
     @if($manage && in_array($b->status, ['inquiry', 'quoted'], true))<button class="btn btn-ghost" data-modal="declineM">Decline</button>@endif
     @if($manage && in_array($b->status, ['booked', 'confirmed'], true))<button class="btn btn-ghost" data-modal="cancelM">Cancel booking</button>@endif
   </div></div>
+@include('partials.next-step', ['ns' => \App\Domain\NextStep::event($b, 'shop')])
 
 @if($heldThatDay >= $set['maxEventsPerDay'] && in_array($b->status, ['inquiry', 'quoted', 'booked'], true))
   <div class="alert alert-warn mb-2">{{ icon('alert') }}<div>You already have {{ $heldThatDay }} event(s) booked on this date (your limit is {{ $set['maxEventsPerDay'] }} a day). The customer can't book it unless you raise the limit in Bookings & Payment Settings.</div></div>

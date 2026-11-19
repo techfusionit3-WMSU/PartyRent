@@ -12,7 +12,7 @@
 <div class="page-head"><div><h1>{{ $r->event_name }}</h1><div class="mb-1">@include('partials.txn-code', ['code' => $r->code, 'side' => 'supplier'])</div><p>@if($r->event_type && $r->event_type !== 'Other'){{ $r->event_type }} · @endif event {{ fmt_date($r->event_date) }} · submitted {{ fmt_datetime($r->created_at) }}</p></div><div class="row wrap">@include('partials.badges', ['status' => $r->status]) @if($r->status !== 'pending') @include('partials.badges', ['pay' => $f['status']])@endif @include('partials.badges', ['planBadge' => $r->plan])</div></div>
 @if($r->awaitingDownPayment())<div class="alert alert-warn">{{ icon('clock') }}<div><b>Accepted, waiting for the first payment.</b> Nothing is reserved yet: the stock is held once the {{ mb_strtolower($f['schedule'][0]['label'] ?? 'first payment') }} is verified. The customer has until <b>{{ fmt_datetime($r->pay_by) }}</b>; after that the request is cancelled. If another customer pays first for the same items and time, this one is declined automatically.</div></div>@endif
 @include('partials.case-alert', ['r' => $r])
-<div class="card mb-2">@include('partials.progress')</div>
+<div class="card mb-2">@include('partials.progress')@include('partials.next-step', ['ns' => \App\Domain\NextStep::rental($r, 'shop')])</div>
 
 {{-- next step --}}
 <div class="card mb-2">

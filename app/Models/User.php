@@ -59,6 +59,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
             'address_parts' => 'array',
             'admin_perms' => 'array',
             'cashier_perms' => 'array',
+            'ui_flags' => 'array',
         ];
     }
 
@@ -89,6 +90,17 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     public function orgRole(): ?string
     {
         return $this->orgRoles()[0] ?? null;
+    }
+
+    /** Interface flag set (e.g. a dismissed first-time guide). */
+    public function flag(string $key): bool
+    {
+        return isset(($this->ui_flags ?? [])[$key]);
+    }
+
+    public function setFlag(string $key): void
+    {
+        $this->forceFill(['ui_flags' => array_merge($this->ui_flags ?? [], [$key => now()->toIso8601String()])])->save();
     }
 
     /** All company roles of this user (roles live inside the company, see ShopStaff). */

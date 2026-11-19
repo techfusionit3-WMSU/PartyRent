@@ -7,7 +7,7 @@
 @if($r->supplier_notes && ! in_array($r->status, ['pending', 'declined'], true))<div class="alert alert-info">{{ icon('message') }}<div><b>Message from {{ $r->supplier->name }}:</b> {!! nl2br(e($r->supplier_notes)) !!}</div></div>@endif
 @if($r->awaitingDownPayment())<div class="alert alert-warn">{{ icon('clock') }}<div><b>Accepted. Your items are not reserved yet.</b> Pay the {{ mb_strtolower($f['schedule'][0]['label'] ?? 'first payment') }} of {{ money($f['schedule'][0]['amount'] ?? 0) }} by <b>{{ fmt_datetime($r->pay_by) }}</b>. The items are reserved once it is verified. If another customer pays first for the same items and time, they may no longer be available; if it is not paid in time, the request is cancelled.</div></div>@endif
 @include('partials.case-alert', ['r' => $r])
-<div class="card mb-2">@include('partials.progress')</div>
+<div class="card mb-2">@include('partials.progress')@include('partials.next-step', ['ns' => \App\Domain\NextStep::rental($r, 'customer')])</div>
 @if($f['isOverdue'])<div class="alert alert-danger mb-2">{{ icon('alert') }}<div><b>Payment overdue.</b> Outstanding: {{ money($f['overdueAmount']) }}. Please settle as soon as possible to keep your reservation. The supplier will review overdue accounts according to their policy.</div></div>@endif
 @if($r->status === 'pending')<div class="alert alert-info mb-2">{{ icon('clock') }}<div>Waiting for <b>{{ $sup->name }}</b> to review your request. Items are not reserved until it is accepted.</div></div>@endif
 

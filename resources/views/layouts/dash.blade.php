@@ -76,7 +76,7 @@
   </aside>
   <div class="side-backdrop" id="sideBd"></div>
   <div class="dash-body">
-    <header class="dash-top"><button class="icon-btn menu-toggle" data-side-open aria-label="Open menu">{{ icon('menu') }}</button><div class="ttl grow">{{ $title ?? '' }}</div>@include('partials.notif-dropdown')@include('partials.profile-menu')</header>
+    <header class="dash-top"><button class="icon-btn menu-toggle" data-side-open aria-label="Open menu">{{ icon('menu') }}</button><div class="ttl grow">{{ $title ?? '' }}</div>@if($sup)<span class="working-as" title="{{ __('You are working in this company module') }}">{{ icon('store') }}<span class="ellipsis">{{ __('Working as :role', ['role' => $curMod ? __(\App\Support\CompanyModules::get($curMod)['label']) : \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles())]) }} · {{ $sup->name }}</span></span>@endif@include('partials.notif-dropdown')@include('partials.profile-menu')</header>
     <main class="dash-main" id="main">
       @yield('content')
     </main>

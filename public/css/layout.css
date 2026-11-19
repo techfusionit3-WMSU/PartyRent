@@ -719,3 +719,5 @@
 .shop-portfolio { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .shop-portfolio img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; }
 @media (max-width: 560px) { .shop-cover { height: 130px; } }
+.dash-top .working-as { max-width: 340px; }
+@media (max-width: 768px) { .dash-top .working-as { max-width: 46vw; font-size: .72rem; } .dash-top .ttl { display: none; } }

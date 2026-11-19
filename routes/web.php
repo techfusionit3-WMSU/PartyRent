@@ -66,6 +66,7 @@ Route::post('/invite/{token}/decline', [\App\Http\Controllers\InviteController::
 Route::middleware('auth')->group(function () {
     Route::post('/mode', [AccountController::class, 'switchMode'])->name('mode.switch');
     Route::post('/module', [AccountController::class, 'switchModule'])->name('module.switch');
+    Route::post('/dismiss', [AccountController::class, 'dismiss'])->name('ui.dismiss');
     Route::get('/notifications', [AccountController::class, 'notifications'])->name('notifications');
     Route::post('/notifications/read', [AccountController::class, 'markRead'])->name('notifications.read');
     Route::get('/notifications/{notification}/open', [AccountController::class, 'openNotification'])->name('notifications.open');

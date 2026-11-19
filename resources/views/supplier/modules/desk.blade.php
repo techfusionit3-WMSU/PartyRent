@@ -4,6 +4,8 @@
 @section('content')
 <div class="page-head"><div><h1>Front Desk</h1><p>{{ $sup->name }} · requests, messages and problems that need an answer, {{ fmt_date($T) }}.</p></div>
   <a class="btn btn-primary" href="{{ route('supplier.requests') }}">{{ icon('list') }}All requests</a></div>
+@include('partials.guides', ['welcome' => \App\Domain\Guides::welcome(auth()->user(), 'desk')])
+@include('partials.needs-you', ['tasks' => \App\Domain\Tasks::forModule(auth()->user(), 'desk')])
 <div class="stats">
   @include('partials.stat', ['label' => 'New requests', 'value' => $pend->count(), 'sub' => $pend->count() ? 'waiting for an answer' : 'all caught up', 'icon' => 'clock', 'color' => 'gold', 'href' => route('supplier.requests')])
   @include('partials.stat', ['label' => 'Unread messages', 'value' => $unread->count(), 'sub' => $unread->count() ? 'customers waiting for a reply' : 'no new messages', 'icon' => 'message', 'color' => 'sky'])

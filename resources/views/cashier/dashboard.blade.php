@@ -3,6 +3,10 @@
 {{-- Reference CS.dashboard --}}
 @section('content')
 <div class="page-head"><div><h1>Payment overview</h1><p>{{ fmt_date(today_iso()) }} · Cashier {{ auth()->user()->name }}@if($shop) · <b>{{ $shop->name }}</b>@endif</p></div><div class="row wrap"><a class="btn" href="{{ route('cashier.record') }}">{{ icon('cash') }}Record payment</a><a class="btn btn-primary" href="{{ route('cashier.verification') }}">{{ icon('check') }}Verify payments ({{ $pending->count() }})</a></div></div>
+@if($shop)
+@include('partials.guides', ['welcome' => \App\Domain\Guides::welcome(auth()->user(), 'cashier')])
+@include('partials.needs-you', ['tasks' => \App\Domain\Tasks::forModule(auth()->user(), 'cashier')])
+@endif
 <div class="stats mb-3">
   @include('partials.stat', ['label' => "Today's verified payments", 'value' => money_short($today->sum('amount')), 'sub' => $today->count().' transactions', 'icon' => 'check', 'color' => 'teal'])
   @include('partials.stat', ['label' => 'Pending verification', 'value' => $pending->count(), 'sub' => money_short($pending->sum('amount')), 'icon' => 'clock', 'color' => 'gold', 'href' => route('cashier.verification')])
@@ -10,7 +14,6 @@
   @include('partials.stat', ['label' => 'Partial payments', 'value' => $partial->count(), 'sub' => money_short($partialLeft).' remaining', 'icon' => 'cash', 'color' => 'purple', 'href' => route('cashier.balances')])
   @include('partials.stat', ['label' => 'Overdue balances', 'value' => $overdue->count(), 'sub' => money_short($overdue->sum(fn ($r) => $r->fin()['overdueAmount'])).' overdue', 'icon' => 'alert', 'color' => 'red', 'href' => route('cashier.balances')])
   @include('partials.stat', ['label' => 'Down payments (verified)', 'value' => money_short($downPayments), 'icon' => 'tag', 'color' => 'pink'])
-  @include('partials.stat', ['label' => 'Down payments (verified)', 'value' => money_short($downPayments), 'icon' => 'tag', 'color' => 'purple'])
   @include('partials.stat', ['label' => 'Deposits held', 'value' => money_short($depositsHeld), 'sub' => 'refundable', 'icon' => 'shield', 'color' => 'sky'])
 </div>
 <div class="grid grid-2">

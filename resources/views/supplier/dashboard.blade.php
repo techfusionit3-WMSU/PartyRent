@@ -9,9 +9,8 @@
 @if($conflicts->isNotEmpty())
   <div class="alert alert-warn mb-2">{{ icon('alert') }}<div><b>Not enough stock:</b> {!! $conflicts->map(fn ($r) => '<a href="'.e(route('supplier.requests.show', $r)).'">'.e($r->code).'</a>')->implode(', ') !!} ask for more than you have available. Check before accepting.</div></div>
 @endif
-@if(! $hasProducts && $canProd)
-  <div class="card mb-2"><div class="row wrap between"><div><h3 class="mb-0">Get your shop ready</h3><p class="small muted mb-0">Customers can rent from you once you add your first product or package.</p></div><div class="row wrap gap-sm"><a class="btn btn-primary" href="{{ route('supplier.products.create') }}">{{ icon('plus') }}Add your first product</a><a class="btn" href="{{ route('supplier.shop') }}">{{ icon('store') }}Shop settings</a></div></div></div>
-@endif
+@include('partials.guides', ['guide' => \App\Domain\Guides::shop(auth()->user())])
+@include('partials.needs-you', ['tasks' => \App\Domain\Tasks::forModule(auth()->user(), 'manage')])
 <div class="stats">
   @include('partials.stat', ['label' => 'New requests', 'value' => $pend->count(), 'sub' => $pend->count() ? 'waiting for your answer' : 'all caught up', 'icon' => 'clock', 'color' => 'gold', 'href' => route('supplier.requests')])
   @if($money)

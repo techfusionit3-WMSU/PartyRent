@@ -4,6 +4,8 @@
 @section('content')
 <div class="page-head"><div><h1>Stock Room</h1><p>{{ $sup->name }} · what to prepare, inspect and fix, {{ fmt_date($T) }}.</p></div>
   <a class="btn btn-primary" href="{{ route('supplier.inventory') }}">{{ icon('layers') }}Open inventory</a></div>
+@include('partials.guides', ['welcome' => \App\Domain\Guides::welcome(auth()->user(), 'inventory')])
+@include('partials.needs-you', ['tasks' => \App\Domain\Tasks::forModule(auth()->user(), 'inventory')])
 <div class="stats">
   @include('partials.stat', ['label' => 'To prepare', 'value' => count($prep), 'sub' => $reqs->count().' booking'.($reqs->count() === 1 ? '' : 's').' in the next 3 days', 'icon' => 'box', 'color' => 'sky'])
   @include('partials.stat', ['label' => 'To inspect', 'value' => $inspect->count(), 'sub' => $inspect->count() ? 'returns waiting' : 'nothing came back', 'icon' => 'check', 'color' => 'gold'])

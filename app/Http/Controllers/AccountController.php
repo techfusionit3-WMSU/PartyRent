@@ -26,6 +26,16 @@ class AccountController extends Controller
         return redirect()->route($u->homeRoute($mode))->with('success', 'Switched to '.$label.' Mode');
     }
 
+    /** Hide a first-time guide or welcome card for good (key = guide.shop | welcome.<module>.<shop id>). */
+    public function dismiss(Request $request)
+    {
+        $key = (string) $request->input('key');
+        abort_unless(preg_match('/^(guide\.shop|welcome\.[a-z]+\.\d+)$/', $key), 422);
+        $request->user()->setFlag($key);
+
+        return $request->expectsJson() ? response()->json(['ok' => true]) : back();
+    }
+
     /** Move between the company modules of the user's roles (Owner / Front Desk / Cashier / Inventory / Field Crew). */
     public function switchModule(Request $request)
     {

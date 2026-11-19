@@ -12,6 +12,7 @@
 @endphp
 <div class="crumbs"><a href="{{ route('events.index') }}">My Events</a> / {{ $b->code }}</div>
 <div class="page-head"><div><h1>{{ $b->event_type }} · {{ $b->event_date->format('D, M j, Y') }}</h1><p>with <a href="{{ route('suppliers.show', $s) }}">{{ $s->name }}</a> · {{ $b->code }} · <span class="badge {{ $b->statusBadge() }}">{{ $b->statusLabel() }}</span></p></div></div>
+@include('partials.next-step', ['ns' => \App\Domain\NextStep::event($b, 'customer')])
 
 @if($at !== false)
   <div class="wizard-steps mb-2">@foreach($steps as $k => $l)@php($i = array_search($k, $order, true))<div class="ws {{ $i === $at ? 'on' : ($i < $at ? 'done' : '') }}"><span>Step {{ $i + 1 }}</span>{{ $l }}</div>@endforeach</div>

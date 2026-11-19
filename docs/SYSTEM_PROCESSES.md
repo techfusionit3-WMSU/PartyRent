@@ -167,7 +167,25 @@ delivery today → Field Crew) are **(planned)**.
 
 ---
 
-## 11. Planned (from docs/ROLE_MODULES_PLAN.md)
+## 11. Making it easy to follow (built 2026-11-19)
+
+| What | Where | How it works |
+|---|---|---|
+| What happens next | Every rental and event booking (customer and shop side) | One sentence under the step tracker: "Your turn: …" (highlighted) or "Waiting for …". `App\Domain\NextStep` |
+| Needs you | Home of Owner, Front Desk, Cashier, Inventory; "Needs you today" on My Jobs | Up to 6 tasks, one button each (Accept, Confirm payment, Start preparing, Reply, Inspect). Buttons follow the person's permissions. `App\Domain\Tasks` |
+| First-time guides | Owner dashboard; each module the first time an employee opens it | Shop setup checklist (description, first listing, payment plan, payout account, delivery) with progress; welcome card for employees. Hidden for good with "Hide this" / "Got it". `App\Domain\Guides` |
+| Working as | Header of every company page | "Working as Front Desk · Elegant Occasion" |
+| Term tips | Checkout, payment summary, product / shop pages, supplier forms | A small "?" opens a one-line meaning. Meanings in `App\Support\Glossary` |
+| Price before paying | Checkout summary | Charges open; "Pay first (after the shop accepts)", "Pay later (by the event date)", refundable deposit; nothing is charged until the shop accepts |
+| Helpful empty pages | Lists without data | Say what to do, with a button |
+| One name per thing | Menus and pages | **Rentals** = item rentals (customer: My Rentals). **Event Bookings** = bookings of event companies (customer: My Events) |
+| Phone-first field work | My Jobs | Call / Map buttons, the next step on the card (Start preparing, Out for delivery, Mark delivered with name + photo, Picked up) |
+| Step-by-step forms + drafts | Product form (Item → Price → Stock & listing), Start Selling (progress bar) | Next checks the step first; what you type is kept in this browser until sent ("Restore draft / Discard"); photos are not kept |
+| Action notifications | Bell + notifications page | Titles say what to do ("Verify Maria's ₱1,200 GCash payment") and show "Open →" |
+| English / Filipino | EN / FIL switch in the header, sign-in page and sidebar | Menus, guidance, tips, empty pages and the new screens are translated (`lang/fil.json`); older pages are still English |
+| Accessibility | Everywhere | "Skip to content" link, `main` landmark, visible keyboard focus, labels tied to inputs, `lang` attribute, reduced motion respected |
+
+## 12. Planned (from docs/ROLE_MODULES_PLAN.md)
 
 2. Event company role modules + assigning a booking to a crew member / coordinator.
 3. Business picks Rental company and/or Event company.

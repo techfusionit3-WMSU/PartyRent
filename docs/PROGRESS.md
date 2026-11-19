@@ -9,6 +9,9 @@ each role its own module). Plan + decisions: `docs/ROLE_MODULES_PLAN.md`. Stay i
 rental): add Event venues + Event equipment, any event (not only weddings). Fixed roles + per-member tweaks,
 several roles per member with a module switcher.
 - [x] Step 1: registry + switcher + solo modules (Owner / Front Desk / Cashier / Inventory / Field Crew), 198 tests green
+- [x] UX batch (user pasted 13 suggestions): next step, Needs you, guides, Working as, term tips, checkout pay first/later,
+      empty pages, naming (Rentals / Event Bookings), action notifications, phone-first crew, product wizard + drafts,
+      EN/FIL (shell + new screens only; older pages still English), a11y basics. 211 tests green. docs/SYSTEM_PROCESSES.md §11
 - [ ] Step 2: event company modules (Owner / Coordinator / Finance / Crew) + job assignment
 - [ ] Step 3: business picks Rental company and/or Event company
 - [ ] Step 4: Event venues + Event equipment rental types

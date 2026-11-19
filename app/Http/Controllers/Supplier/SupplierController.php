@@ -161,9 +161,12 @@ class SupplierController extends Controller
         $back = fn ($ok, $msg) => redirect()->route('supplier.shop', ['tab' => $section])->with($ok ? 'success' : 'error', $msg)->withInput($ok ? [] : $request->input());
         switch ($section) {
             case 'profile':
-                if ($s->type === 'organization' || $s->isBusiness()) { // a business always works from a physical workplace
+                $biz = $s->isOrganization();
+                if ($biz) { // a business always works from a physical workplace
                     $request->merge(['location_type' => 'shop']);
                 }
+                $new = $biz ? \App\Domain\BusinessProfile::storeUploads($request, $s->owner_id) : null;
+                $request->validate($biz ? \App\Domain\BusinessProfile::rules() : [], \App\Domain\BusinessProfile::messages());
                 $v = $request->validate([
                     'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
                     'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'], 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',
@@ -177,7 +180,9 @@ class SupplierController extends Controller
                 }
                 $pin = isset($v['lat'], $v['lng']) && $v['lat'] !== null ? [round((float) $v['lat'], 7), round((float) $v['lng'], 7)] : [null, null];
                 $s->update(['name' => trim($v['name']), 'description' => trim($v['description']), 'logo' => $v['logo'], 'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'],
-                    'color' => $v['color'] ?? $s->color, 'city' => \App\Domain\Locations::name($addr['city_code']), ...$addr, 'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1]]);
+                    'color' => $v['color'] ?? $s->color, 'city' => \App\Domain\Locations::name($addr['city_code']), ...$addr, 'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1],
+                    ...($biz ? \App\Domain\BusinessProfile::photos($request, ['logo' => $s->logo_path, 'cover' => $s->cover_path, 'portfolio' => (array) ($s->portfolio ?? [])], $new)
+                        + ['business_profile' => \App\Domain\BusinessProfile::profile($request->all())] : [])]);
                 break;
             case 'delivery':
                 $v = $request->validate(['fulfillment' => 'required|in:delivery,pickup,both', 'delivery_fee' => 'required|numeric|min:0', 'zones' => 'nullable|array', 'zones.*.name' => 'nullable|string|max:80', 'zones.*.fee' => 'nullable|numeric']);

@@ -24,9 +24,18 @@ class SupplierApplicationTest extends TestCase
         return UploadedFile::fake()->create($name, 40, 'application/pdf');
     }
 
-    private function orgForm(array $docs): array
+    private function photo(string $name): UploadedFile
+    {
+        return UploadedFile::fake()->create($name, 60, 'image/jpeg');
+    }
+
+    /** A business also says what it offers and shows at least 3 photos of past events. */
+    private function orgForm(array $docs, ?array $portfolio = null): array
     {
         return [
+            'events_catered' => ['wedding', 'Corporate', 'Graduation'], 'offers' => ['Full event coordination', 'balloon styling'],
+            'event_size' => '150_300', 'packages_from' => 25000,
+            'portfolio' => $portfolio ?? [$this->photo('a.jpg'), $this->photo('b.jpg'), $this->photo('c.jpg')],
             'app' => ['type' => 'organization',
                 'company' => ['legalName' => 'Garcia Events Corp.', 'companyType' => 'cooperative', 'branches' => 2, 'address' => '7 Sampaguita St., Marikina Heights, Marikina', 'email' => 'ops@garcia.ph', 'phone' => '0923 555 0707', 'natureOfBusiness' => 'Party and event equipment rental', 'description' => 'Tents, sound and lights for Marikina events.'],
                 'representative' => ['name' => 'Jose Garcia', 'position' => 'Manager', 'idType' => 'Passport', 'email' => 'jose@demo.ph', 'phone' => '0923 555 0707'],
@@ -53,6 +62,7 @@ class SupplierApplicationTest extends TestCase
     public function test_organization_application(): void
     {
         Storage::fake('local');
+        Storage::fake('public');
         $jose = User::where('email', 'jose@demo.ph')->firstOrFail();
         $this->actingAs($jose)->withSession(['mode' => 'customer'])->get('/start-selling')->assertOk()->assertSee('Organization / Company Supplier');
 
@@ -73,6 +83,11 @@ class SupplierApplicationTest extends TestCase
         $this->assertEquals(0, $s->policy['depositValue']);
         $this->assertSame(['bank', 'BPI'], [$s->payout_method, $s->payout_bank]);
         $this->assertEquals(0, $s->delivery_fee); // delivery fee is not asked in the application (form value ignored)
+        // what the business offers (typed tags keep the suggested spelling) and its portfolio
+        $this->assertEquals(['events' => ['Wedding', 'Corporate', 'Graduation'], 'offers' => ['Full event coordination', 'Balloon Styling'], 'eventSize' => '150_300', 'packagesFrom' => 25000.0], $s->business_profile);
+        $this->assertCount(3, $s->portfolio);
+        Storage::disk('public')->assertExists($s->portfolio[0]);
+        $this->get(route('suppliers.show', $s))->assertOk()->assertSee('Events we cater')->assertSee('Balloon Styling')->assertSee('Packages from');
 
         // asked to revise → the applicant can edit and resubmit; documents already sent are kept
         $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();
@@ -87,8 +102,12 @@ class SupplierApplicationTest extends TestCase
         $this->actingAs($jose->fresh())->withSession(['mode' => 'customer']); // reload the cached supplier relation
         $this->get('/start-selling')->assertSee('Requires Revision')->assertSee('Upload a clearer permit.');
         $this->get('/start-selling?edit=1')->assertOk()->assertSee('cda.pdf');
-        $this->post('/start-selling', $this->orgForm(['mayors_permit' => $this->pdf('permit-v2.pdf')]))->assertSessionHas('success');
+        $this->get('/start-selling?edit=1')->assertSee('portfolio_keep[]', false);
+        // keeping 2 of the 3 saved photos is not enough; keeping all 3 works without uploading again
+        $this->post('/start-selling', $this->orgForm(['mayors_permit' => $this->pdf('permit-v2.pdf')], []) + ['portfolio_keep' => array_slice($s->portfolio, 0, 2)])->assertSessionHasErrors('portfolio');
+        $this->post('/start-selling', $this->orgForm([], []) + ['portfolio_keep' => $s->portfolio])->assertSessionHas('success');
         $s->refresh();
+        $this->assertCount(3, $s->portfolio);
         $this->assertSame('pending', $s->status);
         $this->assertSame('permit-v2.pdf', $s->application['docs']['mayors_permit']['name']);
         $this->assertSame('revision', $s->application['history'][0]['status']);
@@ -110,6 +129,8 @@ class SupplierApplicationTest extends TestCase
         $this->postJson('/start-selling/check', array_merge($bad, ['phone' => 'abc']) + ['step' => 0])->assertOk();
 
         $this->postJson('/start-selling/check', array_merge($form, ['phone' => '0917']) + ['step' => 3])->assertStatus(422)->assertJsonValidationErrors('phone');
+        // a business must say which events it caters and what it offers
+        $this->postJson('/start-selling/check', array_merge($form, ['events_catered' => [], 'event_size' => '']) + ['step' => 3])->assertStatus(422)->assertJsonValidationErrors(['events_catered', 'event_size']);
         // no pin yet is fine on Shop details; once Pickup is offered (step 4) it sends the applicant back to step 3
         $noPin = array_merge($form, ['lat' => null, 'lng' => null]);
         $this->postJson('/start-selling/check', $noPin + ['step' => 3])->assertOk();
@@ -123,6 +144,7 @@ class SupplierApplicationTest extends TestCase
     public function test_uploaded_documents_survive_a_failed_submit(): void
     {
         Storage::fake('local');
+        Storage::fake('public');
         $jose = User::where('email', 'jose@demo.ph')->firstOrFail();
         $docs = ['cda_certificate' => $this->pdf('cda.pdf'), 'bir_cor' => $this->pdf('bir.pdf'), 'mayors_permit' => $this->pdf('permit.pdf'), 'rep_id' => $this->pdf('passport.pdf'), 'proof_of_authority' => $this->pdf('authority.pdf'), 'barangay_clearance' => $this->pdf('brgy.pdf')];
         $bad = $this->orgForm($docs);
@@ -130,8 +152,11 @@ class SupplierApplicationTest extends TestCase
         $this->actingAs($jose)->withSession(['mode' => 'customer'])->post('/start-selling', $bad)->assertSessionHasErrors('app.representative.phone');
         $this->get('/start-selling')->assertOk()->assertSee('permit.pdf');
 
-        // resubmitting without picking the files again works
-        $this->post('/start-selling', $this->orgForm([]))->assertSessionHas('success');
+        // resubmitting without picking the files again works (the photos from the failed submit are kept too)
+        $kept = session('apply_photos')['portfolio'];
+        $this->assertCount(3, $kept);
+        $this->post('/start-selling', $this->orgForm([], []) + ['portfolio_keep' => $kept])->assertSessionHas('success');
+        $this->assertCount(3, Supplier::where('name', 'Garcia Events')->firstOrFail()->portfolio);
         $this->assertCount(6, Supplier::where('name', 'Garcia Events')->firstOrFail()->application['docs']);
         $this->assertNull(session('apply_docs'));
     }

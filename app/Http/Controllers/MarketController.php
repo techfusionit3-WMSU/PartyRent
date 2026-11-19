@@ -207,7 +207,7 @@ class MarketController extends Controller
             's' => $supplier, 'items' => $items, 'own' => $own,
             'pkgs' => $supplier->packages()->where('active', true)->where('is_draft', false)->orderBy('sort')->with('supplier')->get(),
             'reviews' => Review::visible()->where('supplier_id', $supplier->id)->with(['customer', 'product', 'package'])->latest()->get(),
-            'tab' => $request->query('tab', 'items'), 'catFilter' => $request->query('category'),
+            'tab' => $request->query('tab', $supplier->isOrganization() ? 'packages' : 'items'), 'catFilter' => $request->query('category'),
         ]);
     }
 

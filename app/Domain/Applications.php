@@ -105,7 +105,7 @@ class Applications
                 return $e;
             }
         } else {
-            if ($e = $req($app['company'] ?? [], ['legalName', 'companyType', 'address', 'email', 'phone', 'natureOfBusiness', 'description'], 'Company information')) {
+            if ($e = $req($app['company'] ?? [], ['legalName', 'companyType', 'address', 'email', 'phone', 'natureOfBusiness'], 'Company information')) {
                 return $e;
             }
             if (! isset(self::COMPANY_TYPES[$app['company']['companyType']])) {

@@ -42,7 +42,7 @@ class StartSellingController extends Controller
         $app['docs'] = array_merge((array) ($app['docs'] ?? []), (array) session('apply_docs', []));
 
         return view('customer.start-selling', [
-            'existing' => $existing, 'logos' => self::LOGOS, 'steps' => self::STEPS, 'app' => $app,
+            'existing' => $existing, 'logos' => self::LOGOS, 'steps' => self::STEPS, 'app' => $app, 'photos' => self::hadPhotos($existing),
             'errorStep' => self::errorStep(array_keys(session('errors')?->getMessages() ?? [])),
             'd' => array_merge([
                 'name' => '', 'description' => '', 'logo' => '🎈', 'phone' => $u->phone, 'email' => $u->email,
@@ -51,6 +51,18 @@ class StartSellingController extends Controller
                 'policy' => ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3, 'cancellation' => 'Free cancellation up to 3 days before the rental start date. The down payment is non-refundable.', 'returns' => 'Items must be returned clean and complete on the agreed date.', 'conditions' => 'Renter is responsible for damaged or missing items, charged according to our damage policy.'],
             ], $existing?->toArray() ?? []),
         ]);
+    }
+
+    /** Business photos the form shows: saved on the supplier plus any uploaded on an earlier submit that failed. */
+    public static function hadPhotos(?\App\Models\Supplier $existing): array
+    {
+        $ps = (array) session('apply_photos', []);
+
+        return [
+            'logo' => $ps['logo'] ?? $existing?->logo_path,
+            'cover' => $ps['cover'] ?? $existing?->cover_path,
+            'portfolio' => array_values(array_unique(array_merge((array) ($existing?->portfolio ?? []), (array) ($ps['portfolio'] ?? [])))),
+        ];
     }
 
     /** Wizard step (0-based) that holds a field; keys like "methods.0" or "methods.*" belong to "methods". */
@@ -98,9 +110,10 @@ class StartSellingController extends Controller
             ...($type === 'organization' ? [
                 'app.company.legalName' => 'required|string|min:3|max:180', 'app.company.companyType' => 'required|in:'.implode(',', array_keys(Applications::COMPANY_TYPES)),
                 'app.company.branches' => 'required|integer|min:1|max:500', 'app.company.address' => 'required|string|min:8|max:300', 'app.company.email' => 'required|email|max:180',
-                'app.company.phone' => $phone, 'app.company.natureOfBusiness' => 'required|string|max:180', 'app.company.description' => 'required|string|min:20|max:2000', 'app.company.website' => 'nullable|string|max:255',
+                'app.company.phone' => $phone, 'app.company.natureOfBusiness' => 'required|string|max:180', 'app.company.description' => 'nullable|string|max:2000', 'app.company.website' => 'nullable|string|max:255',
                 'app.representative.name' => 'required|string|max:120', 'app.representative.position' => 'required|string|max:120', 'app.representative.idType' => 'required|in:'.implode(',', Applications::ID_TYPES),
                 'app.representative.email' => 'required|email|max:180', 'app.representative.phone' => $phone, 'app.payout.financeContact' => 'required|string|max:120',
+                ...\App\Domain\BusinessProfile::rules(),
             ] : [
                 'app.personal.fullName' => 'required|string|min:3|max:120', 'app.personal.birthDate' => 'required|date|before_or_equal:'.add_days(today_iso(), -365 * 18),
                 'app.personal.address' => 'required|string|min:8|max:300', 'app.personal.phone' => $phone, 'app.personal.email' => 'required|email|max:180',
@@ -115,6 +128,7 @@ class StartSellingController extends Controller
             'app.personal.birthDate.before_or_equal' => 'You must be at least 18 years old.',
             'phone.regex' => $badPhone, 'app.personal.phone.regex' => $badPhone, 'app.company.phone.regex' => $badPhone, 'app.representative.phone.regex' => $badPhone,
             ...AddressInput::messages('shop_addr'),
+            ...\App\Domain\BusinessProfile::messages(),
         ];
 
         return [$rules, $messages];
@@ -171,8 +185,19 @@ class StartSellingController extends Controller
             $stash[$key] = ['name' => mb_substr($file->getClientOriginalName(), 0, 120), 'path' => $file->store('applications/'.$u->id, 'local'), 'size' => $file->getSize(), 'uploadedAt' => now()->toIso8601String()];
         }
         session(['apply_docs' => $stash]);
+        $photos = null;
+        if ($type === 'organization') {
+            $had = self::hadPhotos($existing);
+            $new = \App\Domain\BusinessProfile::storeUploads($request, $u->id);
+            $ps = (array) session('apply_photos', []);
+            session(['apply_photos' => ['logo' => $new['logo'] ?? ($ps['logo'] ?? null), 'cover' => $new['cover'] ?? ($ps['cover'] ?? null), 'portfolio' => array_merge((array) ($ps['portfolio'] ?? []), $new['portfolio'])]]);
+            $request->merge(['portfolio_keep' => array_merge((array) $request->input('portfolio_keep', []), $new['portfolio'])]);
+        }
         [$rules, $messages] = self::applicationRules($request);
         $v = $request->validate($rules, $messages);
+        if ($type === 'organization') {
+            $photos = \App\Domain\BusinessProfile::photos($request, $had, $new);
+        }
 
         $in = (array) $request->input('app', []);
         $old = (array) ($existing?->application ?? []);
@@ -236,12 +261,12 @@ class StartSellingController extends Controller
             'application' => $app, 'revision_note' => null,
             // app-only flags kept in step with the supplier type
             'account_type' => $org ? 'business' : 'personal', 'biz_status' => $org ? 'pending' : null,
-        ] + $payout;
+        ] + $payout + ($org ? $photos + ['business_profile' => \App\Domain\BusinessProfile::profile($v)] : []);
         $res = Rentals::submitApplication($u, $attrs);
         if (! $res['ok']) {
             return back()->withInput()->with('error', $res['error']);
         }
-        session()->forget('apply_docs');
+        session()->forget(['apply_docs', 'apply_photos']);
 
         return redirect()->route('start-selling')->with('success', $res['supplier']->status === 'approved' ? 'Your shop is approved!' : 'Application submitted for review.');
     }

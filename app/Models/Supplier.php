@@ -21,6 +21,7 @@ class Supplier extends Model
             'delivery' => 'array',
             'free_ship' => 'boolean',
             'address_parts' => 'array',
+            'portfolio' => 'array', 'business_profile' => 'array',
             'rating' => 'float', 'review_count' => 'integer',
             'lat' => 'float',
             'lng' => 'float',
@@ -37,6 +38,22 @@ class Supplier extends Model
     public const REG_TYPES = ['dti' => 'DTI (sole proprietor)', 'sec' => 'SEC (corporation / partnership)', 'cda' => 'CDA (cooperative)'];
 
     public function isBusiness(): bool { return $this->account_type === 'business'; }
+
+    /** Business (organization) supplier: offers services and event packages, works from a physical workplace. */
+    public function isOrganization(): bool { return $this->type === 'organization' || $this->isBusiness(); }
+
+    /** "What your business offers" (business suppliers). */
+    public const EVENT_SIZES = ['up_to_50' => 'Up to 50 guests', '50_150' => '50–150 guests', '150_300' => '150–300 guests', '300_plus' => '300+ guests'];
+
+    public const OFFER_SUGGESTIONS = ['Full event coordination', 'Styling & décor', 'Catering', 'Lights & sound', 'Tent & venue setup', 'Host / emcee', 'Photo & video', 'Party entertainment', 'Event furniture', 'Setup & teardown'];
+
+    public const PORTFOLIO_MIN = 3;
+
+    public const PORTFOLIO_MAX = 8;
+
+    public function profile(string $k, $def = null) { return data_get($this->business_profile ?? [], $k, $def); }
+
+    public function logoUrl(): ?string { return $this->logo_path ? asset('storage/'.$this->logo_path) : null; }
     public function isVerifiedBusiness(): bool { return $this->isBusiness() && $this->biz_status === 'verified'; }
     public function accountLabel(): string { return $this->isBusiness() ? 'Business' : 'Personal'; }
     public function products(): HasMany { return $this->hasMany(Product::class); }

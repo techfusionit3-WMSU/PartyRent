@@ -35,7 +35,7 @@
 <div class="page-head"><div><h1>Shop Profile & Settings</h1><p>{{ $s->name }} · <a href="{{ route('suppliers.show', $s) }}">View public shop</a></p></div></div>
 @unless($owner)<div class="alert alert-info mb-2">{{ icon('info') }}<div>Only the Organization Admin can change shop settings. You can view them here.</div></div>@endunless
 <div class="tabs">@foreach($tabs as $k => $l)<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.shop', ['tab' => $k]) }}">{{ $l }}</a>@endforeach</div>
-<form class="card" method="POST" action="{{ route('supplier.shop.update') }}" style="max-width:900px" id="sf">
+<form class="card" method="POST" action="{{ route('supplier.shop.update') }}" style="max-width:900px" id="sf" enctype="multipart/form-data">
   @csrf<input type="hidden" name="section" value="{{ $tab }}">
   <fieldset @disabled(! $owner) style="border:0;padding:0;margin:0;min-width:0">
   @switch($tab)
@@ -43,14 +43,25 @@
       <div class="form-grid">
         <div class="field"><label>Business name</label><input class="input" name="name" required value="{{ $o('name') }}"></div>
         <div class="field"><label>Logo (emoji)</label><input class="input" name="logo" maxlength="4" value="{{ $o('logo') }}" style="width:90px"></div>
-        <div class="field full"><label>Business description</label><textarea class="input" name="description" required>{{ $o('description') }}</textarea></div>
+        <div class="field full"><label>{{ $s->isOrganization() ? 'About us' : 'Business description' }}</label><textarea class="input" name="description" required>{{ $o('description') }}</textarea></div>
         <div class="field"><label>Contact number</label><input class="input" name="phone" data-phone required value="{{ $o('phone') }}"></div>
         <div class="field"><label>Email address</label><input class="input" type="email" name="email" required value="{{ $o('email') }}"></div>
         <div class="field"><label>Operating hours</label><input class="input" name="hours" required value="{{ $o('hours') }}"></div>
         <div class="field"><label>Brand color</label><input class="input" type="color" name="color" value="{{ $o('color', '#E11D74') }}" style="height:44px;padding:4px"></div>
         <div class="field"><label>Supplier type</label><div><span class="badge b-purple">{{ \App\Domain\Applications::SUPPLIER_TYPES[$s->type] ?? 'Individual Supplier' }}</span></div></div>
       </div>
-      @include('partials.location-fields', ['locFor' => ($s->type === 'organization' || $s->isBusiness()) ? 'business' : 'individual'])
+      @if($s->isOrganization())
+        @php($bp = (array) ($s->business_profile ?? []))
+        <h3 class="mt-2 mb-1">What your business offers</h3>
+        <div class="field @error('events_catered') invalid @enderror"><label>Events you cater</label>@include('partials.tag-input', ['name' => 'events_catered', 'values' => old('events_catered', $bp['events'] ?? []), 'suggest' => array_keys(\App\Domain\Ai::EVENTS), 'placeholder' => 'Type an event, e.g. Graduation'])@error('events_catered')<div class="error-text">{{ $message }}</div>@enderror</div>
+        <div class="field @error('offers') invalid @enderror"><label>Services you offer</label>@include('partials.tag-input', ['name' => 'offers', 'values' => old('offers', $bp['offers'] ?? []), 'suggest' => \App\Models\Supplier::OFFER_SUGGESTIONS, 'placeholder' => 'Type a service, e.g. Balloon styling'])@error('offers')<div class="error-text">{{ $message }}</div>@enderror</div>
+        <div class="form-grid">
+          <div class="field"><label>Event size you can handle</label><select class="input" name="event_size" required>@foreach(\App\Models\Supplier::EVENT_SIZES as $k => $l)<option value="{{ $k }}" @selected(old('event_size', $bp['eventSize'] ?? '') === $k)>{{ $l }}</option>@endforeach</select></div>
+          <div class="field"><label>Packages start at (₱) <span class="muted small">(optional)</span></label><input class="input" type="number" min="0" step="1" name="packages_from" value="{{ old('packages_from', $bp['packagesFrom'] ?? '') }}"></div>
+        </div>
+        @include('partials.business-photos', ['photos' => ['logo' => $s->logo_path, 'cover' => $s->cover_path, 'portfolio' => (array) ($s->portfolio ?? [])]])
+      @endif
+      @include('partials.location-fields', ['locFor' => $s->isOrganization() ? 'business' : 'individual'])
       @break
     @case('delivery')
       <div class="stack-sm">@foreach(['delivery' => 'Delivery only', 'pickup' => 'Pickup only', 'both' => 'Both delivery and pickup'] as $v => $l)<label class="check"><input type="radio" name="fulfillment" value="{{ $v }}" @checked($o('fulfillment') === $v)> {{ $l }}</label>@endforeach</div>

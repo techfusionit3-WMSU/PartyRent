@@ -700,3 +700,14 @@
 .tag-sugs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .tag-sugs .chip { padding: 5px 12px; font-size: .8rem; }
 .tag-new { border-style: dashed; color: var(--brand); }
+
+/* business photos (partials/business-photos) and shop page */
+.bp-logo { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; border: 1px solid var(--line); }
+.bp-cover { width: 140px; height: 56px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); }
+.bp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.bp-thumb { display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+.bp-thumb img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+.shop-cover { height: 200px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background-size: cover; background-position: center; margin: -1px -1px 0; }
+.shop-portfolio { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.shop-portfolio img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; }
+@media (max-width: 560px) { .shop-cover { height: 130px; } }

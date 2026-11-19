@@ -12,6 +12,7 @@
     $pol = $d['policy'] ?? [];
     $applicable = old('app.applicable', $app['applicable'] ?? []);
     $docs = (array) ($app['docs'] ?? []);
+    $bp = (array) ($d['business_profile'] ?? []);
     $fld = function ($label, $name, $val, $attrs = 'required', $cls = '') use ($err) {
         $key = str_replace(['[', ']'], ['.', ''], $name);
 
@@ -91,7 +92,6 @@
         {!! $fld('Official company email', 'app[company][email]', $ao('company.email'), 'type="email" required') !!}
         {!! $fld('Company contact number', 'app[company][phone]', $ao('company.phone'), 'required data-phone') !!}
         {!! $fld('Nature of business', 'app[company][natureOfBusiness]', $ao('company.natureOfBusiness', 'Party and event equipment rental'), 'required', 'full') !!}
-        <div class="field full"><label>Business description</label><textarea class="input" name="app[company][description]" required minlength="20">{{ $ao('company.description') }}</textarea></div>
         {!! $fld('Website or social media page (optional)', 'app[company][website]', $ao('company.website'), '', 'full') !!}
       </div>
       <h3 class="mt-2">Authorized representative</h3>
@@ -119,7 +119,18 @@
   {{-- 4 · Shop details --}}
   <section data-step="3">
     <div class="field"><label data-org-label="Shop / brand name on PartyRent">Business or rental shop name</label><input class="input" name="name" required minlength="3" value="{{ $o('name') }}" placeholder="e.g. Santos Party Rentals">{!! $err('name') !!}</div>
-    <div class="field"><label>Shop description</label><textarea class="input" name="description" required minlength="20" placeholder="What do you rent out, and for which events?">{{ $o('description') }}</textarea>{!! $err('description') !!}</div>
+    <div class="field"><label data-org-label="About us">Shop description</label><textarea class="input" name="description" required minlength="20" placeholder="Tell customers about your shop: what you offer and for which events.">{{ $o('description', $ao('company.description')) }}</textarea>{!! $err('description') !!}</div>
+    <div data-for="organization">
+      <h3 class="mt-2 mb-1">What your business offers</h3>
+      <p class="small muted mt-0">Customers and the AI planner use this to find you. Pick suggestions or type your own.</p>
+      <div class="field @error('events_catered') invalid @enderror" data-tagfield="events_catered"><label>Events you cater</label>@include('partials.tag-input', ['name' => 'events_catered', 'values' => old('events_catered', $bp['events'] ?? []), 'suggest' => array_keys(\App\Domain\Ai::EVENTS), 'placeholder' => 'Type an event, e.g. Graduation'])<div class="error-text" @error('events_catered') style="display:block" @enderror>{{ $errors->first('events_catered') ?: 'Add at least one type of event.' }}</div></div>
+      <div class="field @error('offers') invalid @enderror" data-tagfield="offers"><label>Services you offer</label>@include('partials.tag-input', ['name' => 'offers', 'values' => old('offers', $bp['offers'] ?? []), 'suggest' => \App\Models\Supplier::OFFER_SUGGESTIONS, 'placeholder' => 'Type a service, e.g. Balloon styling'])<div class="error-text" @error('offers') style="display:block" @enderror>{{ $errors->first('offers') ?: 'Add at least one service.' }}</div></div>
+      <div class="form-grid">
+        <div class="field"><label>Event size you can handle</label><select class="input" name="event_size" required><option value="">Choose…</option>@foreach(\App\Models\Supplier::EVENT_SIZES as $k => $l)<option value="{{ $k }}" @selected(old('event_size', $bp['eventSize'] ?? '') === $k)>{{ $l }}</option>@endforeach</select>{!! $err('event_size') !!}</div>
+        <div class="field"><label>Packages start at (₱) <span class="muted small">(optional)</span></label><input class="input" type="number" min="0" step="1" name="packages_from" value="{{ old('packages_from', $bp['packagesFrom'] ?? '') }}" placeholder="e.g. 15000">{!! $err('packages_from') !!}</div>
+      </div>
+      @include('partials.business-photos', ['photos' => $photos])
+    </div>
     <div class="field" data-for="individual"><label>Types of rental products offered</label><input class="input" name="app[business][productTypes]" required value="{{ $ao('business.productTypes') }}" placeholder="e.g. chairs, tables, tents, sound system"></div>
     <div class="form-grid">
       <div class="field"><label>Business contact number</label><input class="input" name="phone" data-phone required value="{{ $o('phone') }}">{!! $err('phone') !!}</div>
@@ -251,6 +262,13 @@
     });
     if (step === 0 && !type()) { toast('Choose Individual Supplier or Organization / Company Supplier.'); return false; }
     if (step === 2 && missingDocs().length) { toast('Please upload: ' + missingDocs().join(', ') + '.'); return false; }
+    if (step === 3 && org()) {
+      var bad = null;
+      ['events_catered', 'offers'].forEach(function (n) { var fd = f.querySelector('[data-tagfield="' + n + '"]'), none = !f.querySelector('[name="' + n + '[]"]:not([disabled])'); fd.classList.toggle('invalid', none); if (none && !bad) bad = fd; });
+      if (bad) { toast(bad.querySelector('.error-text').textContent); bad.scrollIntoView({ block: 'center', behavior: 'smooth' }); return false; }
+      var pc = window.PR_portfolioCount ? window.PR_portfolioCount() : 0;
+      if (pc < {{ \App\Models\Supplier::PORTFOLIO_MIN }}) { toast('Add at least {{ \App\Models\Supplier::PORTFOLIO_MIN }} photos of events you have done (you have ' + pc + ').'); var pf = f.querySelector('[data-portfolio]'); if (pf) pf.scrollIntoView({ block: 'center', behavior: 'smooth' }); return false; }
+    }
     if (step === 4) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } }
     if (!ok) { toast('Please fix the highlighted fields before continuing.'); firstBad.focus({ preventScroll: true }); firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     return ok;
@@ -258,7 +276,7 @@
   // Ask the server to check this step with the same rules as the final submit (documents are checked above, not uploaded yet).
   function serverCheck() {
     var fd = new FormData(f);
-    Array.from(fd.keys()).forEach(function (k) { if (k.indexOf('docs[') === 0) fd.delete(k); });
+    Array.from(fd.keys()).forEach(function (k) { if (k.indexOf('docs[') === 0 || k.indexOf('portfolio[') === 0 || k === 'logo_file' || k === 'cover_file') fd.delete(k); });
     fd.append('step', step);
     return fetch(@json(route('start-selling.check')), { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); });

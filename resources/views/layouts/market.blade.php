@@ -12,7 +12,6 @@
     </form>
     <button type="submit" form="mkSearch" formaction="{{ route('ai') }}" class="ai-square" title="AI Search: describe your event and let AI build the search" aria-label="AI Search">{{ icon('sparkle') }}<span>AI</span></button>
     <div class="mk-actions">
-      @include('partials.lang-switch')
       @auth
         @include('partials.notif-dropdown')
         <a class="icon-btn" href="{{ route('cart') }}" aria-label="Rental list">{{ icon('cart') }}@if($shellCart)<span class="dot-count">{{ $shellCart }}</span>@endif</a>

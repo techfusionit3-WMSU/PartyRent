@@ -57,13 +57,6 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
 /* ---------- team invitations (link from the email) ---------- */
-// interface language (English / Filipino), for guests too
-Route::post('/lang', function (\Illuminate\Http\Request $request) {
-    $l = array_key_exists((string) $request->input('locale'), \App\Http\Middleware\SetLocale::LOCALES) ? $request->input('locale') : 'en';
-    session(['locale' => $l]);
-
-    return back()->withCookie(cookie()->forever('pr_lang', $l));
-})->name('lang.switch');
 Route::get('/invite/{token}', [\App\Http\Controllers\InviteController::class, 'show'])->name('invite.show');
 Route::post('/invite/{token}/join', [\App\Http\Controllers\InviteController::class, 'join'])->middleware(['guest', 'throttle:10,1,invite-join'])->name('invite.join');
 Route::post('/invite/{token}/accept', [\App\Http\Controllers\InviteController::class, 'accept'])->middleware('auth')->name('invite.accept');

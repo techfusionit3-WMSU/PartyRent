@@ -17,7 +17,6 @@
     <div class="small" style="opacity:.8;position:relative">Tables · Chairs · Tents · Sound · Lights · Décor — for every Filipino celebration.</div>
   </div>
   <main class="auth-form" id="main" tabindex="-1"><div class="box">
-    <div class="row" style="justify-content:flex-end">@include('partials.lang-switch')</div>
     @yield('content')
   </div></main>
 </div>

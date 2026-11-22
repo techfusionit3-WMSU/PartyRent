@@ -6,15 +6,17 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/** Interface language: English (en) or Filipino (fil), chosen with the EN / FIL switch and kept in a cookie. */
+/**
+ * Interface language. The EN / FIL switch was removed (2026-11-22): the app is English only, also for anyone who
+ * had picked Filipino before. lang/fil.json is kept so the switch can come back.
+ */
 class SetLocale
 {
-    public const LOCALES = ['en' => 'English', 'fil' => 'Filipino'];
+    public const LOCALES = ['en' => 'English'];
 
     public function handle(Request $request, Closure $next): Response
     {
-        $l = $request->session()->get('locale', $request->cookie('pr_lang'));
-        app()->setLocale(array_key_exists((string) $l, self::LOCALES) ? $l : 'en');
+        app()->setLocale('en');
 
         return $next($request);
     }

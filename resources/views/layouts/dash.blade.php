@@ -94,7 +94,6 @@
         @endforeach
         </div></div>
     @endforeach
-    <div class="mb-1">@include('partials.lang-switch', ['dark' => true])</div>
     <div class="side-foot">{{ __('Signed in as') }} <b style="color:#fff">{{ $shellUser->name }}</b><br>{{ $shellUser->email }}</div>
   </aside>
   <div class="side-backdrop" id="sideBd"></div>

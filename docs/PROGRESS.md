@@ -14,8 +14,8 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
       (POST checkout.dates moves every line, checks lead time / max days / stock first; CheckoutDatesTest)
 - [x] G5 One date everywhere: changing it updates the cart lines / browse bar / checkout together
 - [x] G6 Security deposit: what it is for, whether it must be paid, when it comes back
-- [ ] G7 Supplier side: every change / confirmation records who and when (visible history on the rental)
-- [ ] G8 Owner: transaction records page, organized + printable reports
+- [x] G7 Supplier side: every change / confirmation records who and when (visible history on the rental)
+- [x] G8 Owner: transaction records page, organized + printable reports
 - [x] G9 Phone: market top tabs (Browse / Packages / ...) hidden; bottom island stays
 - [ ] G10 Speed pass (logic unchanged)
 - [ ] G11 Phone: buttons that disappear / break

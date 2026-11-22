@@ -75,6 +75,66 @@ class ReportController extends Controller
         return view('supplier.damages', ['list' => $list]);
     }
 
+    /**
+     * Transaction records for the owner (feedback 2026-11-22): every rental whose dates fall in the period, grouped by
+     * month, with money and who processed it. Printable (and CSV with ?csv=1).
+     */
+    public function records(Request $request)
+    {
+        $sup = $request->user()->shop();
+        $rg = Report::range($request);
+        $status = array_key_exists((string) $request->query('status'), RentalRequest::STATUS) ? $request->query('status') : null;
+        $q = trim((string) $request->query('q', ''));
+        $list = RentalRequest::where('supplier_id', $sup->id)
+            ->where('start_date', '<=', $rg['to'])->where('end_date', '>=', $rg['from'])
+            ->when($status, fn ($x) => $x->where('status', $status))
+            ->when($q !== '', fn ($x) => $x->where(fn ($w) => $w->where('code', 'like', "%$q%")->orWhere('event_name', 'like', "%$q%")->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%$q%"))))
+            ->with(['customer', 'payments', 'events.user'])->orderBy('start_date')->orderBy('id')->get();
+        $rows = $list->map(function (RentalRequest $r) {
+            $f = $r->fin();
+            $acc = $r->events->firstWhere('status', 'accepted');
+            $last = $r->events->sortByDesc('id')->first();
+
+            return [
+                'r' => $r, 'total' => (float) $f['payable'], 'paid' => (float) $f['paidRental'], 'balance' => (float) $f['balance'], 'pay' => $f['status'],
+                'deposit' => (float) $f['depositPaid'], 'acceptedBy' => $acc?->user?->name, 'acceptedAt' => $acc?->created_at,
+                'lastBy' => $last?->user?->name ?? ($last ? 'System' : null), 'lastAt' => $last?->created_at,
+                'lastWhat' => $last ? ($last->status === 'activity' ? $last->note : RentalRequest::statusLabel($last->status)) : null,
+            ];
+        });
+        if ($request->boolean('csv')) {
+            $out = fopen('php://temp', 'r+');
+            fputcsv($out, ['Code', 'Customer', 'Event', 'Start', 'End', 'Status', 'Total', 'Paid', 'Balance', 'Payment status', 'Deposit held', 'Accepted by', 'Last change', 'Last change by', 'Last change at']);
+            foreach ($rows as $x) {
+                $r = $x['r'];
+                fputcsv($out, [$r->code, $r->customer->name, $r->event_name, $r->start_date, $r->end_date, RentalRequest::statusLabel($r->status), $x['total'], $x['paid'], $x['balance'], $x['pay'], $x['deposit'], $x['acceptedBy'], $x['lastWhat'], $x['lastBy'], $x['lastAt']?->format('Y-m-d H:i')]);
+            }
+            rewind($out);
+
+            return response(stream_get_contents($out), 200, ['Content-Type' => 'text/csv', 'Content-Disposition' => 'attachment; filename="transaction-records-'.$rg['from'].'-to-'.$rg['to'].'.csv"']);
+        }
+        $live = $rows->reject(fn ($x) => in_array($x['r']->status, ['declined', 'cancelled'], true));
+
+        return view('supplier.records', [
+            'sup' => $sup, 'rg' => $rg, 'status' => $status, 'q' => $q,
+            'groups' => $rows->groupBy(fn ($x) => substr($x['r']->start_date, 0, 7)),
+            'totals' => ['count' => $rows->count(), 'total' => $live->sum('total'), 'paid' => $live->sum('paid'), 'balance' => $live->sum('balance')],
+        ]);
+    }
+
+    /** Activity log for the owner: every change the shop's people made, who and when (RecordStaffAction). Printable. */
+    public function activity(Request $request)
+    {
+        $sup = $request->user()->shop();
+        $rg = Report::range($request);
+        $who = (int) $request->query('who');
+        $base = \App\Models\AuditLog::where('supplier_id', $sup->id)->whereBetween('created_at', [$rg['from'].' 00:00:00', $rg['to'].' 23:59:59']);
+        $people = \App\Models\User::whereIn('id', (clone $base)->whereNotNull('actor_id')->distinct()->pluck('actor_id'))->orderBy('name')->get();
+        $list = $base->when($who, fn ($x) => $x->where('actor_id', $who))->with('actor')->orderByDesc('created_at')->orderByDesc('id')->paginate(100)->withQueryString();
+
+        return view('supplier.activity', ['sup' => $sup, 'rg' => $rg, 'who' => $who, 'people' => $people, 'list' => $list]);
+    }
+
     private function data(Request $request): array
     {
         $sup = $request->user()->shop();

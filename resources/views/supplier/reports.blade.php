@@ -1,7 +1,8 @@
 @extends('layouts.dash', ['title' => 'Business Reports', 'nav' => 'reports'])
 
 @section('content')
-<div class="page-head"><div><h1>Business Reports</h1><p>{{ fmt_range($rg['from'], $rg['to']) }} · <b>How the shop is doing</b>: rentals, revenue, best-selling items and stock use. For the money record (each payment, refund and deposit) open Financial Reports in the Cashier module.</p></div>@include('partials.range-picker', ['route' => 'supplier.reports', 'csvRoute' => 'supplier.reports.csv'])</div>
+<div class="page-head"><div><h1>Business Reports</h1><p>{{ fmt_range($rg['from'], $rg['to']) }} · <b>How the shop is doing</b>: rentals, revenue, best-selling items and stock use. For the money record (each payment, refund and deposit) open Financial Reports in the Cashier module.</p></div><div class="row wrap no-print" style="gap:6px">@include('partials.range-picker', ['route' => 'supplier.reports', 'csvRoute' => 'supplier.reports.csv'])<button type="button" class="btn btn-sm" onclick="window.print()">{{ icon('print') }}Print</button></div></div>
+<div class="printable"><div class="print-only print-head"><b>{{ auth()->user()->shop()->name }}</b> · Business Reports · {{ fmt_range($rg['from'], $rg['to']) }}<br><span class="small">Printed {{ fmt_datetime(now()) }} by {{ auth()->user()->name }}</span></div>
 <div class="stats mb-3">
   @include('partials.stat', ['label' => 'Rental income', 'value' => money_short($income), 'sub' => 'verified, net of refunds'.($split['sales'] > 0 ? ' · sales '.money_short($split['sales']) : ''), 'icon' => 'chart', 'color' => 'teal'])
   @include('partials.stat', ['label' => 'Requests received', 'value' => $inRange->count(), 'sub' => $inRange->where('status', 'declined')->count().' declined', 'icon' => 'list', 'color' => 'purple'])
@@ -34,5 +35,6 @@
       @foreach($upcoming as $r)<tr><td data-label="Dates">{{ fmt_range($r->start_date, $r->end_date) }}</td><td data-label="Request"><a href="{{ route('supplier.requests.show', $r) }}">{{ $r->code }}</a></td><td data-label="Units" class="num">{{ collect($r->lines)->sum(fn ($l) => array_sum((array) ($l['days'] ?? []))) }}</td><td data-label="Amount" class="num">{{ money($r->fin()['payable']) }}</td></tr>@endforeach
     </tbody></table></div>@endif
   </div>
+</div>
 </div>
 @endsection

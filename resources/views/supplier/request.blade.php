@@ -121,7 +121,7 @@
     @include('partials.inspection-report', ['viewer' => 'supplier'])
     @if(! $r->inspection && ! empty($r->fulfillment_log['releasePhotos']))<div class="card"><h3>Condition at release</h3><p class="small muted">Photos the shop took when the items were handed over. They are compared with the condition at return.</p><div class="thumbs">@foreach($r->fulfillment_log['releasePhotos'] as $ph)<a href="{{ asset('storage/'.$ph) }}" target="_blank" rel="noopener"><img src="{{ asset('storage/'.$ph) }}" alt="Condition at release"></a>@endforeach</div></div>@endif
     @include('partials.request-chat', ['chatSide' => 'supplier'])
-    <div class="card"><h3>Activity</h3>@include('partials.timeline')</div>
+    <div class="card"><h3>Activity</h3><p class="small muted">Every step and change, with who did it and when.</p>@include('partials.timeline', ['staff' => true])</div>
   </div>
   <aside class="stack">
     <div class="card"><h3>Customer</h3>

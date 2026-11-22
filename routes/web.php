@@ -226,6 +226,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/damages', [SupplierReportController::class, 'damages'])->name('damages');
     Route::get('/reports', [SupplierReportController::class, 'reports'])->name('reports');
     Route::get('/reports.csv', [SupplierReportController::class, 'reportsCsv'])->name('reports.csv');
+    Route::get('/records', [SupplierReportController::class, 'records'])->name('records');
+    Route::get('/activity', [SupplierReportController::class, 'activity'])->name('activity');
 });
 
 /* ---------- cashier ---------- */

@@ -20,10 +20,14 @@
   // Every demo account (DemoSeeder). Only the PartyRent accounts exist after a plain seed; the rest need SEED_DEMO=true.
   $demoGroups = [
     'Customers' => [['Maria Santos', 'maria@demo.ph'], ['Jose Garcia', 'jose@demo.ph'], ['Kristine Aquino', 'kristine@demo.ph'], ['Bea Mendoza', 'bea@demo.ph'], ['Miguel Torres · suspended', 'miguel@demo.ph']],
-    'Shop owners' => [['Juan · Happy Moments', 'juan@demo.ph'], ['Ana · Celebration Hub', 'ana@demo.ph'], ['Carlo · Dream Events', 'carlo@demo.ph'], ['Liza · Elegant Occasion', 'liza@demo.ph'], ['Ramon · Party Essentials', 'ramon@demo.ph']],
-    'Elegant Occasion team' => [['Leah · Front Desk', 'desk@elegantoccasion.ph'], ['Grace · Cashier', 'cashier@elegantoccasion.ph'], ['Rico · Inventory + Field Crew', 'inventory@elegantoccasion.ph'], ['Joy · Field Crew', 'staff@elegantoccasion.ph']],
-    'Event companies' => [['Marco · Grand Fiesta Events', 'events@demo.ph']],
-    'Pending applications' => [['Kristine · Aquino Events Corp.', 'kristine@demo.ph'], ['Bea · Bea\'s Balloon Corner', 'bea@demo.ph']],
+    // one group per business, owner first, then the team
+    'Elegant Occasion Rentals (shop with a full team)' => [['Liza · Owner', 'liza@demo.ph'], ['Leah · Front Desk', 'desk@elegantoccasion.ph'], ['Grace · Cashier', 'cashier@elegantoccasion.ph'], ['Rico · Inventory + Field Crew', 'inventory@elegantoccasion.ph'], ['Joy · Field Crew', 'staff@elegantoccasion.ph']],
+    'Happy Moments Party Rentals' => [['Juan · Owner (no team)', 'juan@demo.ph']],
+    'Celebration Hub Rentals' => [['Ana · Owner (no team)', 'ana@demo.ph']],
+    'Dream Events Supplies' => [['Carlo · Owner (no team)', 'carlo@demo.ph']],
+    'Party Essentials Shop' => [['Ramon · Owner (no team)', 'ramon@demo.ph']],
+    'Grand Fiesta Events Co. (event company)' => [['Marco · Owner (no team)', 'events@demo.ph']],
+    'Pending applications' => [['Kristine · Owner, Aquino Events Corp.', 'kristine@demo.ph'], ['Bea · Owner, Bea\'s Balloon Corner', 'bea@demo.ph']],
     'PartyRent' => [['Rosa · Cashier', 'cashier@partyrent.ph'], ['Mark · Admin', 'admin@partyrent.ph'], ['Paolo · Admin (limited)', 'paolo.admin@partyrent.ph'], ['Patricia · Super admin', 'super@partyrent.ph']],
   ];
 @endphp

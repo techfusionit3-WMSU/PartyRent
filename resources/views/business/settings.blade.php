@@ -12,7 +12,7 @@
   <div class="form-grid">
     <div class="field"><label>Setup time (hours before the event)</label><input class="input" type="number" min="0" max="48" step="0.5" name="setupHours" value="{{ $v('setupHours') }}"></div>
     <div class="field"><label>Teardown time (hours after)</label><input class="input" type="number" min="0" max="48" step="0.5" name="teardownHours" value="{{ $v('teardownHours') }}"></div>
-    <div class="field"><label>Events you can handle in one day</label><input class="input" type="number" min="1" max="50" name="maxEventsPerDay" value="{{ $v('maxEventsPerDay') }}"><div class="hint">A date is closed to new bookings once this many are booked.</div></div>
+    <div class="field"><label>Events you can handle in one day</label><input class="input" type="number" min="1" max="50" name="maxEventsPerDay" value="{{ $v('maxEventsPerDay') }}">@if(\App\Domain\EventTeams::uses($s))<div class="alert alert-info mt-1 mb-1 small">{{ icon('users') }}<div>You use <a href="{{ route('business.teams') }}">Teams</a>, so this number is not used: how many events you take at the same time comes from your active teams.</div></div>@endif<div class="hint">A date is closed to new bookings once this many are booked.</div></div>
     <div class="field"><label>Minimum notice (days)</label><input class="input" type="number" min="0" max="365" name="minNoticeDays" value="{{ $v('minNoticeDays') }}"><div class="hint">Customers can't ask for dates sooner than this.</div></div>
   </div>
 

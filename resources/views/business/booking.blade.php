@@ -30,7 +30,7 @@
     <dl class="kv">
       <dt>Customer</dt><dd>{{ $b->customer->name }}<br><span class="small muted">{{ $b->customer->email }} · {{ $b->customer->phone }}</span></dd>
       <dt>Package</dt><dd>{{ $b->package ? $b->package->name.' · '.money($b->package->price) : 'Custom event (no package)' }}</dd>
-      <dt>Schedule</dt><dd>@include('partials.event-parts', ['b' => $b, 'canMark' => $manage && $b->status === 'confirmed'])</dd>
+      <dt>Schedule</dt><dd>@include('partials.event-parts', ['b' => $b, 'canMark' => $manage && $b->status === 'confirmed', 'teams' => \App\Domain\EventTeams::teams($b->supplier)])</dd>
       <dt>Guests</dt><dd>{{ $b->guests }}</dd>
       <dt>Venue</dt><dd>{{ $b->venue }}{{ $b->city ? ', '.$b->city : '' }}</dd>
       @if($b->budget)<dt>Budget</dt><dd>{{ money($b->budget) }}</dd>@endif

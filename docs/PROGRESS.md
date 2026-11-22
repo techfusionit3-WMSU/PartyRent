@@ -14,7 +14,8 @@ E3 teams + capacity · E4 event company roles (Coordinator / Finance / Crew) + j
       types, max guests within the verified limit; inquiries only for verified types, guests + per-type per-day checked.
       Existing companies grandfathered from their packages (EventTypes::grandfather, migration + DemoSeeder).
 - [x] E2 Event parts (package parts from the type template, optional parts with extra price; booking parts with own date / time / venue in event_booking_parts; capacity on every part date; event_date = first part; calendar per part; parts marked done; EventPartsTest)
-- [ ] E3 Teams + capacity · [ ] E4 Roles
+- [x] E3 Teams + capacity (event_teams, part.event_team_id; window = setup + event + teardown, no times = all day; Events::dateFree uses teams when there are any, else events a day; confirmed bookings auto-assigned; owner moves parts; Teams page; EventTeamsTest)
+- [ ] E4 Roles
 
 (previous) **Feedback batch 3 (2026-11-22)**
 **Feedback batch 3 (2026-11-22)** ALL DONE (213 tests green; docs/SYSTEM_PROCESSES.md section 12): tester doc from Downloads (Fahad, Kevin, Zhanjianah; 13 screenshots). Order / status:

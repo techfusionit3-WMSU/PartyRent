@@ -20,6 +20,7 @@ class BusinessNav
             ['Overview'], ['dashboard', 'business.dashboard', 'grid', 'Dashboard'],
             ['bookings', 'business.bookings', 'list', 'Event Bookings', $inq, 'orders.view'],
             ['calendar', 'business.calendar', 'calendar', 'Event Calendar', 0, 'orders.view'],
+            ['teams', 'business.teams', 'users', 'Teams', 0, 'orders.view'],
             ['payments', 'business.payments', 'card', 'Event Payments', $pay, 'payments.view'],
             ['reviews', 'supplier.reviews', 'star', 'Reviews', 0, 'orders.view'],
             ['What you offer'], ['event-types', 'business.event-types', 'shield', 'Event Types', $types, 'shop.manage'], ['packages', 'business.packages', 'package', 'Event Packages', 0, 'products.manage'],

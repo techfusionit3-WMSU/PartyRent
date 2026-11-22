@@ -19,7 +19,7 @@
       <div class="biz-cal-d {{ $d->isSameMonth($month) ? '' : 'out' }} {{ $d->isToday() ? 'today' : '' }} {{ $full ? 'full' : '' }}">
         <div class="row between"><span class="small strong">{{ $d->day }}</span>@if($full)<span class="badge b-red plain" style="font-size:.66rem">Full</span>@endif</div>
         @foreach($day as $b)
-          <a class="biz-cal-e badge {{ $b->statusBadge() }}" href="{{ route('business.bookings.show', $b) }}" title="{{ $b->code }} · {{ $b->statusLabel() }}">{{ $b->calTime ? \App\Domain\Slots::fmt12($b->calTime).' ' : '' }}{{ $b->event_type }}{{ $b->calPart ? ' ('.$b->calPart.')' : '' }} · {{ $b->customer->firstName() }}</a>
+          <a class="biz-cal-e badge {{ $b->statusBadge() }}" href="{{ route('business.bookings.show', $b) }}" title="{{ $b->code }} · {{ $b->statusLabel() }}">{{ $b->calTime ? \App\Domain\Slots::fmt12($b->calTime).' ' : '' }}{{ $b->event_type }}{{ $b->calPart ? ' ('.$b->calPart.')' : '' }} · {{ $b->customer->firstName() }}{{ $b->calTeam ? ' · '.$b->calTeam : '' }}</a>
         @endforeach
       </div>
     @endfor

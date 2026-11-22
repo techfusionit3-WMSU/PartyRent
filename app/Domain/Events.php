@@ -39,8 +39,16 @@ class Events
             ->whereHas('parts', fn ($q) => $q->whereDate('date', $date))->when($except, fn ($q) => $q->where('id', '!=', $except))->count();
     }
 
-    public static function dateFree(Supplier $s, string $date, ?int $except = null): bool
+    /**
+     * Can the business take one more event at that time? With teams: a team must be free for the hours (setup and
+     * teardown included, no times = all day). Without teams: fewer events that day than its "events a day" setting.
+     */
+    public static function dateFree(Supplier $s, string $date, ?int $except = null, ?string $start = null, ?string $end = null): bool
     {
+        if (EventTeams::uses($s)) {
+            return EventTeams::isFree($s, $date, $start, $end, $except);
+        }
+
         return self::heldOn($s, $date, $except) < max(1, (int) $s->bizSettings()['maxEventsPerDay']);
     }
 
@@ -70,7 +78,7 @@ class Events
             return self::fail($s->name.' needs at least '.$set['minNoticeDays'].' days\' notice before the first part. Choose '.fmt_date($min->toDateString()).' or later.');
         }
         // every date free, and only kinds of events PartyRent verified for this business, within its limits
-        if ($e = EventParts::capacityError($s, (string) $v['event_type'], (int) $v['guests'], $dates)) {
+        if ($e = EventParts::capacityError($s, (string) $v['event_type'], (int) $v['guests'], $parts)) {
             return self::fail($e);
         }
         $first = $parts[0];
@@ -174,7 +182,7 @@ class Events
 
             return self::fail('This quotation has expired. Ask the business for a new one.');
         }
-        if ($e = EventParts::capacityError($b->supplier, $b->event_type, (int) $b->guests, EventParts::bookingDates($b), $b->id)) {
+        if ($e = EventParts::capacityError($b->supplier, $b->event_type, (int) $b->guests, EventParts::bookingParts($b), $b->id)) {
             return self::fail('Sorry, it can no longer be booked: '.$e);
         }
         $hours = (int) $b->supplier->bizSettings()['reserveHours'];
@@ -242,9 +250,9 @@ class Events
             return ['ok' => true];
         }
         if ($p->kind === 'reservation' && $b->status === 'booked') {
-            foreach (EventParts::bookingDates($b) as $d) {
-                if (! self::dateFree($b->supplier, $d, $b->id)) {
-                    return self::fail(fmt_date($d).' is already full. Cancel this booking or raise "events per day" in Business settings first.');
+            foreach (EventParts::bookingParts($b) as $pt) {
+                if (! self::dateFree($b->supplier, $pt['date'], $b->id, $pt['start_time'], $pt['end_time'])) {
+                    return self::fail(fmt_date($pt['date']).' is already full ('.$pt['name'].'). Cancel this booking, add a team, or raise "events per day" in Business settings first.');
                 }
             }
         }
@@ -254,6 +262,9 @@ class Events
                 $b->update(['status' => 'confirmed', 'confirmed_at' => now()]);
             }
         });
+        if ($b->fresh()->status === 'confirmed') {
+            EventTeams::assign($b->fresh()); // every part gets a free team (businesses that use teams)
+        }
         if (! $by) {
             Notifier::notify($b->supplier->owner, 'supplier', 'Paid online · '.$b->code, $b->customer->name.' paid the '.mb_strtolower($p->label).' of '.money($p->amount).' online. PartyRent sends it to your payout account.', route('business.bookings.show', $b, false));
         }

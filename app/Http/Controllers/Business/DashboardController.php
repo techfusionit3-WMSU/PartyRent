@@ -50,6 +50,7 @@ class DashboardController extends BusinessController
                         $e = clone $b;
                         $e->calPart = $b->parts->count() > 1 ? $pt->name : null;
                         $e->calTime = $pt->start_time;
+                        $e->calTeam = $pt->event_team_id ? (\App\Models\EventTeam::find($pt->event_team_id)?->name) : null;
                         $list->push([$d, $e]);
                     }
                 }

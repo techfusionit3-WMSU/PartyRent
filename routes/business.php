@@ -26,6 +26,10 @@ Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'r
     Route::post('/payments/{eventPayment}/confirm', [BookingController::class, 'confirmPayment'])->name('payments.confirm');
     Route::get('/payments/{eventPayment}/proof', [BookingController::class, 'proof'])->name('payments.proof');
     Route::post('/payments/{eventPayment}/remind', [BookingController::class, 'remind'])->name('payments.remind');
+    Route::get('/teams', [\App\Http\Controllers\Business\TeamsController::class, 'index'])->name('teams');
+    Route::post('/teams', [\App\Http\Controllers\Business\TeamsController::class, 'save'])->name('teams.store');
+    Route::post('/teams/{eventTeam}', [\App\Http\Controllers\Business\TeamsController::class, 'save'])->name('teams.update');
+    Route::post('/bookings/{eventBooking}/parts/{part}/team', [\App\Http\Controllers\Business\TeamsController::class, 'assign'])->whereNumber('part')->name('bookings.part-team');
     Route::get('/event-types', [\App\Http\Controllers\Business\EventTypeController::class, 'index'])->name('event-types');
     Route::post('/event-types/request', [\App\Http\Controllers\Business\EventTypeController::class, 'request'])->middleware('throttle:10,1')->name('event-types.request');
     Route::post('/event-types/{eventType}', [\App\Http\Controllers\Business\EventTypeController::class, 'apply'])->middleware('throttle:20,1')->name('event-types.apply');

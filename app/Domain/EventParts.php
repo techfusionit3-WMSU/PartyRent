@@ -103,19 +103,30 @@ class EventParts
         return $d;
     }
 
-    /** Why these dates cannot be held for this type (null = every date is free). */
-    public static function capacityError(Supplier $s, string $type, int $guests, array $dates, ?int $except = null): ?string
+    /** Why these parts cannot be held (null = a team / slot is free for each, within the type's limits). */
+    public static function capacityError(Supplier $s, string $type, int $guests, array $parts, ?int $except = null): ?string
     {
-        foreach ($dates as $date) {
-            if (! Events::dateFree($s, $date, $except)) {
-                return $s->name.' is fully booked on '.fmt_date($date).'. Try another date for that part.';
+        foreach ($parts as $p) {
+            $date = $p['date'] instanceof \DateTimeInterface ? $p['date']->format('Y-m-d') : (string) $p['date'];
+            if (! Events::dateFree($s, $date, $except, $p['start_time'] ?? null, $p['end_time'] ?? null)) {
+                return $s->name.' is fully booked on '.fmt_date($date).(! empty($p['start_time']) ? ' at that time' : '').'. Try another date or time for '.($p['name'] ?? 'that part').'.';
             }
+        }
+        foreach (self::dates($parts) as $date) {
             if ($e = EventTypes::inquiryError($s, $type, $guests, $date, $except)) {
                 return $e;
             }
         }
 
         return null;
+    }
+
+    /** The booking's parts as plain rows (name, date, times). */
+    public static function bookingParts(EventBooking $b): array
+    {
+        $rows = $b->parts()->get()->map(fn ($p) => ['name' => $p->name, 'date' => $p->date->toDateString(), 'start_time' => $p->start_time, 'end_time' => $p->end_time])->all();
+
+        return $rows ?: [['name' => 'Event', 'date' => $b->event_date->toDateString(), 'start_time' => $b->start_time, 'end_time' => $b->end_time]];
     }
 
     /** Packages without parts get their type's usual parts; bookings without parts get one part on their date. */

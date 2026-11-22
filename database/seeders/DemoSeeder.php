@@ -168,6 +168,10 @@ class DemoSeeder extends Seeder
             \App\Domain\EventTypes::grandfather($org);
             \App\Domain\EventParts::backfill($org);
         }
+        // teams: Grand Fiesta runs two crews, so two events can happen at the same time; the confirmed debut has Team A
+        $ta = \App\Models\EventTeam::create(['supplier_id' => $s->id, 'name' => 'Team A', 'members' => [$u->id], 'active' => true]);
+        \App\Models\EventTeam::create(['supplier_id' => $s->id, 'name' => 'Team B', 'members' => [], 'active' => true]);
+        $b3->parts()->update(['event_team_id' => $ta->id]);
         // event parts: the garden wedding offers an optional prenup shoot for ₱15,000 on top of the ceremony and reception
         $pk[1]->update(['parts' => [['name' => 'Prenup shoot', 'optional' => true, 'price' => 15000], ['name' => 'Ceremony', 'optional' => false, 'price' => 0], ['name' => 'Reception', 'optional' => false, 'price' => 0]]]);
         if ($grad = \App\Models\EventType::where('name', 'Graduation')->first()) {

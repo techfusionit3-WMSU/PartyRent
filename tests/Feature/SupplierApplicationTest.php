@@ -96,7 +96,7 @@ class SupplierApplicationTest extends TestCase
         $this->assertSame('One free date change up to 14 days before.', $s->policy['rescheduling']);
         $this->assertCount(3, $s->portfolio);
         Storage::disk('public')->assertExists($s->portfolio[0]);
-        $this->get(route('suppliers.show', $s))->assertOk()->assertSee('Events we cater')->assertSee('Balloon Styling')->assertSee('Packages from');
+        $this->get(route('suppliers.show', $s))->assertOk()->assertSee('Balloon Styling')->assertSee('Packages from')->assertDontSee('Verified for');
 
         // asked to revise → the applicant can edit and resubmit; documents already sent are kept
         $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();

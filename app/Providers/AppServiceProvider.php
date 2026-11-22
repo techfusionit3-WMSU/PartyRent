@@ -77,6 +77,7 @@ class AppServiceProvider extends ServiceProvider
                 $badges['verification'] = Payment::where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->count();
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
                 $badges['payouts'] = \App\Models\PayoutBatch::where('status', 'pending')->count();
+                $badges['eventTypes'] = \App\Models\SupplierEventType::where(fn ($q) => $q->where('status', 'pending')->orWhere('raise_pending', true))->count() + \App\Models\EventType::where('status', 'requested')->count();
             } elseif ($role === 'admin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();
                 $badges['complaints'] = Complaint::where('status', '!=', 'resolved')->count();
@@ -84,6 +85,7 @@ class AppServiceProvider extends ServiceProvider
                 $badges['reviews'] = Review::whereHas('reports', fn ($q) => $q->where('status', 'open'))->count();
                 $badges['verification'] = Payment::where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->count();
                 $badges['payouts'] = \App\Models\PayoutBatch::where('status', 'pending')->count();
+                $badges['eventTypes'] = \App\Models\SupplierEventType::where(fn ($q) => $q->where('status', 'pending')->orWhere('raise_pending', true))->count() + \App\Models\EventType::where('status', 'requested')->count();
             }
             $view->with([
                 'shellUser' => $u,

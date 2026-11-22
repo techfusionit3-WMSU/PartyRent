@@ -40,9 +40,12 @@ class EventController extends Controller
     public function create(Request $request, Supplier $supplier)
     {
         abort_unless($supplier->isOrganization() && $supplier->status === 'approved', 404);
-        $pkg = $request->query('package') ? EventPackage::where('supplier_id', $supplier->id)->where('active', true)->find($request->query('package')) : null;
+        // only kinds of events PartyRent verified for this business, and packages for them
+        $types = \App\Domain\EventTypes::verified($supplier);
+        $packages = $supplier->eventPackages()->where('active', true)->get()->filter(fn ($k) => \App\Domain\EventTypes::offerable($k, $types))->values();
+        $pkg = $request->query('package') ? $packages->firstWhere('id', (int) $request->query('package')) : null;
 
-        return view('customer.event-form', ['s' => $supplier, 'pkg' => $pkg, 'set' => $supplier->bizSettings(), 'packages' => $supplier->eventPackages()->where('active', true)->get()]);
+        return view('customer.event-form', ['s' => $supplier, 'pkg' => $pkg, 'set' => $supplier->bizSettings(), 'packages' => $packages, 'types' => $types]);
     }
 
     public function store(Request $request, Supplier $supplier)

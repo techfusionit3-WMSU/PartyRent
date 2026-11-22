@@ -12,6 +12,8 @@ class BusinessNav
     public static function config(Supplier $s): array
     {
         $inq = EventBooking::where('supplier_id', $s->id)->where('status', 'inquiry')->count();
+        // event types still to apply for: none verified yet = everything waits on this page
+        $types = $s->eventTypes()->where('status', 'verified')->exists() ? 0 : 1;
         $pay = EventPayment::where('status', 'pending')->whereHas('booking', fn ($q) => $q->where('supplier_id', $s->id))->count();
 
         return ['tag' => 'Business', 'items' => [
@@ -20,7 +22,7 @@ class BusinessNav
             ['calendar', 'business.calendar', 'calendar', 'Event Calendar', 0, 'orders.view'],
             ['payments', 'business.payments', 'card', 'Event Payments', $pay, 'payments.view'],
             ['reviews', 'supplier.reviews', 'star', 'Reviews', 0, 'orders.view'],
-            ['What you offer'], ['packages', 'business.packages', 'package', 'Event Packages', 0, 'products.manage'],
+            ['What you offer'], ['event-types', 'business.event-types', 'shield', 'Event Types', $types, 'shop.manage'], ['packages', 'business.packages', 'package', 'Event Packages', 0, 'products.manage'],
             ['Business'], ['settings', 'business.settings', 'settings', 'Bookings & Payment Settings', 0, 'shop.manage'],
             ['shop', 'supplier.shop', 'store', 'Business Profile', 0, 'shop.manage'], ['team', 'supplier.team', 'users', 'Team & Roles', 0, 'team.manage'],
             ['notifications', 'notifications', 'bell', 'Notifications'],

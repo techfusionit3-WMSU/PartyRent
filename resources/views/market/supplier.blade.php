@@ -9,7 +9,8 @@
     $bp = (array) ($s->business_profile ?? []);
     $tabList = [['items', 'Products', $items->count()], ['packages', 'Packages', $pkgs->count()], ['policies', 'Policies & payments', null], ['reviews', 'Reviews', $reviews->count()]];
     if ($biz) { // an event company: event packages booked by quotation, no single-item rentals
-        $evPkgs = $s->eventPackages()->where('active', true)->orderBy('price')->get();
+        $evTypes = \App\Domain\EventTypes::verified($s); // kinds of events PartyRent verified this business for
+        $evPkgs = $s->eventPackages()->where('active', true)->orderBy('price')->get()->filter(fn ($k) => \App\Domain\EventTypes::offerable($k, $evTypes))->values();
         $set = $s->bizSettings();
         $tabList = [['packages', 'Event packages', $evPkgs->count()], ...($s->portfolio ? [['portfolio', 'Portfolio', count($s->portfolio)]] : []), ['policies', 'How booking works', null], ['reviews', 'Reviews', $reviews->count()]];
         if (! in_array($tab, ['packages', 'portfolio', 'policies', 'reviews'], true)) { $tab = 'packages'; }
@@ -22,7 +23,7 @@
   <div class="grow"><h1 class="mb-0">{{ $s->name }}</h1><div class="muted">{{ $s->city }} · <span class="stars">{{ stars($s->rating) }}</span> {{ $s->rating ? rating_text($s) : 'New' }} ({{ $reviews->count() }} reviews)</div>
     <p class="mt-1 mb-1">{{ $s->description }}</p>
     @if($biz && $bp)
-      @if($bp['events'] ?? [])<div class="small muted mb-0">Events we cater</div><div class="row wrap gap-sm mb-1">@foreach($bp['events'] as $e)<span class="badge b-pink plain">{{ $e }}</span>@endforeach</div>@endif
+      @if($evTypes->isNotEmpty())<div class="small muted mb-0">Verified for</div><div class="row wrap gap-sm mb-1">@foreach($evTypes as $name => $vt)<span class="badge b-pink plain" title="Checked by PartyRent">{{ icon('check', 'width:11px') }} {{ $name }} · up to {{ number_format($vt->max_guests) }} guests</span>@endforeach</div>@endif
       @if($bp['offers'] ?? [])<div class="small muted mb-0">Services</div><div class="row wrap gap-sm mb-1">@foreach($bp['offers'] as $x)<span class="badge b-purple plain">{{ $x }}</span>@endforeach</div>@endif
       <p class="small mb-1">@if($bp['eventSize'] ?? null){{ icon('users', 'width:14px;vertical-align:-2px') }} {{ \App\Models\Supplier::EVENT_SIZES[$bp['eventSize']] ?? '' }}@endif @if($bp['packagesFrom'] ?? null) · Packages from <b>{{ money($bp['packagesFrom']) }}</b>@endif</p>
     @endif

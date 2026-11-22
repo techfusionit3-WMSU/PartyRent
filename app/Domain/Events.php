@@ -65,6 +65,10 @@ class Events
         if (! self::dateFree($s, $v['event_date'])) {
             return self::fail($s->name.' is fully booked on '.fmt_date($v['event_date']).'. Try another date.');
         }
+        // only kinds of events PartyRent verified for this business, within its guest and per-day limits
+        if ($e = EventTypes::inquiryError($s, (string) $v['event_type'], (int) $v['guests'], $v['event_date'])) {
+            return self::fail($e);
+        }
         $b = EventBooking::create([
             'code' => self::code('EVT', EventBooking::class), 'supplier_id' => $s->id, 'customer_id' => $u->id, 'event_package_id' => $pkg?->id,
             'status' => 'inquiry', 'event_type' => $v['event_type'], 'event_date' => $v['event_date'],
@@ -159,6 +163,9 @@ class Events
         }
         if (! self::dateFree($b->supplier, $b->event_date->toDateString(), $b->id)) {
             return self::fail('Sorry, '.$b->supplier->name.' was booked by someone else on that date in the meantime.');
+        }
+        if ($e = EventTypes::inquiryError($b->supplier, $b->event_type, (int) $b->guests, $b->event_date->toDateString(), $b->id)) {
+            return self::fail($e);
         }
         $hours = (int) $b->supplier->bizSettings()['reserveHours'];
         DB::transaction(function () use ($b, $hours) {

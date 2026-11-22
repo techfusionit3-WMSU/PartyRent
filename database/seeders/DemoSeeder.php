@@ -162,6 +162,15 @@ class DemoSeeder extends Seeder
                 'due_date' => $paid ? $this->D(-8) : $st['due'], 'status' => $paid ? 'paid' : 'due', 'method' => $paid ? 'bank' : null, 'reference' => $paid ? 'BDO-772211' : null,
                 'submitted_at' => $paid ? $this->ts(-8) : null, 'paid_at' => $paid ? $this->ts(-8, 15) : null, 'confirmed_by' => $paid ? $u->id : null, 'receipt_no' => $paid ? 'EOR-10001' : null]);
         }
+        // What the event companies can handle: Grand Fiesta's four package types are verified (as they were offered
+        // before the checks); it has also applied for Graduation (waiting for PartyRent). Aquino Events is still pending.
+        foreach (Supplier::where('type', 'organization')->get() as $org) {
+            \App\Domain\EventTypes::grandfather($org);
+        }
+        if ($grad = \App\Models\EventType::where('name', 'Graduation')->first()) {
+            \App\Models\SupplierEventType::create(['supplier_id' => $s->id, 'event_type_id' => $grad->id, 'status' => 'pending', 'claimed_max_guests' => 200, 'claimed_per_day' => 1, 'past_events' => 6,
+                'note' => 'We styled six school graduation balls last season.', 'photos' => [], 'docs' => []]);
+        }
     }
 
     /** App-only: PartyRent's own collection accounts for bank / e-wallet transfers (superadmin Pay accounts). */

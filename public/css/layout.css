@@ -763,3 +763,9 @@
   .seg { flex-wrap: wrap; overflow-x: visible; border-radius: 16px; display: flex; }
   .seg button, .seg a { flex: 1 1 auto; text-align: center; }
 }
+/* Business: event types */
+.et-card > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.et-card > summary::-webkit-details-marker { display: none; }
+.et-card .et-body { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.et-thumb { display: flex; flex-direction: column; gap: 4px; width: 96px; }
+.et-thumb img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; }

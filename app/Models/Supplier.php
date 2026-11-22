@@ -60,6 +60,8 @@ class Supplier extends Model
     public function logoUrl(): ?string { return $this->logo_path ? asset('storage/'.$this->logo_path) : null; }
 
     public function eventPackages(): HasMany { return $this->hasMany(EventPackage::class); }
+    /** Kinds of events this business applied for / handles (App\Domain\EventTypes). */
+    public function eventTypes(): HasMany { return $this->hasMany(SupplierEventType::class); }
     public function eventBookings(): HasMany { return $this->hasMany(EventBooking::class); }
 
     /** Business booking settings (service areas, setup time, payment schedule), with defaults. */

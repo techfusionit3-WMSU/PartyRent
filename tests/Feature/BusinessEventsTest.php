@@ -36,6 +36,9 @@ class BusinessEventsTest extends TestCase
         $this->s = Supplier::where('name', 'Aquino Events Corp.')->firstOrFail(); // a pending application, approved here
         $this->s->update(['status' => 'approved', 'payout_method' => 'bank', 'payout_bank' => 'BDO', 'payout_account_name' => 'Aquino Events Corp.', 'payout_account_no' => '0012-345-678']);
         $this->owner = $this->s->owner;
+        // PartyRent verified it for corporate events (event types: only verified kinds of events can be offered)
+        \App\Models\SupplierEventType::create(['supplier_id' => $this->s->id, 'event_type_id' => \App\Models\EventType::where('name', 'Corporate Party')->value('id'),
+            'status' => 'verified', 'claimed_max_guests' => 300, 'claimed_per_day' => 1, 'max_guests' => 300, 'per_day' => 1]);
     }
 
     private function asOwner(): static
@@ -50,13 +53,13 @@ class BusinessEventsTest extends TestCase
 
     private function package(): EventPackage
     {
-        return $this->s->eventPackages()->create(['name' => 'Corporate Gala Package', 'description' => 'Stage, lights, sound and styling for a corporate night.', 'price' => 120000, 'min_guests' => 100, 'max_guests' => 300, 'events' => ['Corporate'], 'inclusions' => ['Stage', 'Lights & sound'], 'active' => true]);
+        return $this->s->eventPackages()->create(['name' => 'Corporate Gala Package', 'description' => 'Stage, lights, sound and styling for a corporate night.', 'price' => 120000, 'min_guests' => 100, 'max_guests' => 300, 'events' => ['Corporate Party'], 'inclusions' => ['Stage', 'Lights & sound'], 'active' => true]);
     }
 
     private function inquiry(string $date, string $email = 'maria@demo.ph', ?EventPackage $k = null)
     {
         return $this->asCustomer($email)->post(route('events.store', $this->s), [
-            'event_package_id' => $k?->id, 'event_type' => 'Corporate', 'event_date' => $date, 'start_time' => '18:00', 'end_time' => '22:00',
+            'event_package_id' => $k?->id, 'event_type' => 'Corporate Party', 'event_date' => $date, 'start_time' => '18:00', 'end_time' => '22:00',
             'guests' => 200, 'venue' => 'Grand Ballroom, Makati Shangri-La', 'city' => 'Makati', 'notes' => 'Blue and silver theme.',
         ]);
     }
@@ -107,11 +110,11 @@ class BusinessEventsTest extends TestCase
         $this->post(route('business.packages.store'), ['name' => 'Gala', 'description' => 'Too short', 'price' => 0, 'inclusions' => []])->assertSessionHasErrors(['description', 'price', 'inclusions']);
         $this->post(route('business.packages.store'), [
             'name' => 'Corporate Gala Package', 'description' => 'Stage, lights, sound and styling for a corporate night.', 'price' => 120000,
-            'min_guests' => 100, 'max_guests' => 300, 'events' => ['corporate'], 'inclusions' => ['Stage', 'lights & sound'],
+            'min_guests' => 100, 'max_guests' => 300, 'events' => ['Corporate Party'], 'inclusions' => ['Stage', 'lights & sound'],
             'photos' => [UploadedFile::fake()->create('gala.jpg', 60, 'image/jpeg')], 'active' => 1,
         ])->assertRedirect(route('business.packages'));
         $k = EventPackage::where('supplier_id', $this->s->id)->firstOrFail();
-        $this->assertSame(['Corporate'], $k->events);
+        $this->assertSame(['Corporate Party'], $k->events);
         $this->assertCount(1, $k->photos);
         $this->get(route('business.packages'))->assertOk()->assertSee('Corporate Gala Package');
         $this->get(route('business.packages.edit', $k))->assertOk()->assertSee('photos_keep[]', false);

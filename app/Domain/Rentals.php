@@ -1762,6 +1762,9 @@ class Rentals
         $s->update(['status' => $approve ? 'approved' : 'rejected', 'reviewed_at' => now(), 'reviewed_by' => $by->id, 'reject_reason' => $approve ? null : $reason, 'approved_at' => $approve ? now() : null]
             // Approving a business application also accepts its documents.
             + ($approve && $s->isBusiness() ? ['biz_status' => 'verified', 'biz_verified_at' => now()] : []));
+        if ($approve && $s->isOrganization()) {
+            EventTypes::fromApplication($s); // the events they listed wait for their own check (Event Types)
+        }
         Notifier::notify($s->owner_id, 'customer', $approve ? 'Supplier application approved 🎉' : 'Supplier application rejected', $approve ? $s->name.' is approved! Tap '.$s->name.' in your profile menu to start listing items.' : 'Your application for '.$s->name.' was not approved: '.$reason.'. You may update and resubmit.', self::link('start-selling'));
         Notifier::audit($approve ? 'Approved supplier application' : 'Rejected supplier application', $s->name.($reason ? ' — '.$reason : ''), $by);
 

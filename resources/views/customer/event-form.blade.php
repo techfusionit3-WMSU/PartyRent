@@ -9,6 +9,7 @@
   <h1 class="mb-0">Ask {{ $s->name }} for a quotation</h1>
   <p class="muted">Tell them about your event. They reply with a price and payment schedule; nothing is booked or paid until you accept.</p>
   @if(session('error'))<div class="alert alert-danger mb-2">{{ icon('alert') }}<div>{{ session('error') }}</div></div>@endif
+  @if($types->isEmpty())<div class="alert alert-warn mb-2">{{ icon('clock') }}<div>{{ $s->name }} is not taking event bookings yet: PartyRent has not verified the kinds of events they handle.</div></div>@endif
 
   <div class="field"><label>Package</label>
     <div class="stack-sm">
@@ -19,7 +20,7 @@
     </div>
   </div>
   <div class="form-grid">
-    <div class="field @error('event_type') invalid @enderror"><label>Type of event</label><input class="input" name="event_type" required maxlength="60" list="evTypes" value="{{ old('event_type', $pkg?->events[0] ?? '') }}" placeholder="e.g. Wedding"><datalist id="evTypes">@foreach(array_unique(array_merge(array_keys(\App\Domain\Ai::EVENTS), $s->profile('events', []))) as $e)<option value="{{ $e }}">@endforeach</datalist>@error('event_type')<div class="error-text">{{ $message }}</div>@enderror</div>
+    <div class="field @error('event_type') invalid @enderror"><label for="ev-type">Type of event</label><select class="input" id="ev-type" name="event_type" required>@php($evSel = old('event_type', $pkg?->events[0] ?? ''))<option value="">Choose…</option>@foreach($types as $name => $vt)<option value="{{ $name }}" data-max="{{ $vt->max_guests }}" @selected($evSel === $name)>{{ $name }} · up to {{ number_format($vt->max_guests) }} guests</option>@endforeach</select>@error('event_type')<div class="error-text">{{ $message }}</div>@enderror<div class="hint">The kinds of events PartyRent verified {{ $s->name }} for.</div></div>
     <div class="field @error('guests') invalid @enderror"><label>Number of guests</label><input class="input" type="number" name="guests" min="1" required value="{{ old('guests', $pkg?->max_guests ?? $pkg?->min_guests) }}">@error('guests')<div class="error-text">{{ $message }}</div>@enderror</div>
     <div class="field @error('event_date') invalid @enderror"><label>Event date</label><input class="input" type="date" name="event_date" required min="{{ today()->addDays((int) $set['minNoticeDays'])->toDateString() }}" value="{{ old('event_date') }}">@error('event_date')<div class="error-text">{{ $message }}</div>@enderror<div class="hint">At least {{ $set['minNoticeDays'] }} days from today.</div></div>
     <div class="field"><label>Time <span class="muted small">(optional)</span></label><div class="row" style="gap:8px"><input class="input" type="time" name="start_time" value="{{ old('start_time') }}"><span class="muted">to</span><input class="input" type="time" name="end_time" value="{{ old('end_time') }}"></div></div>

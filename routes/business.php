@@ -25,6 +25,10 @@ Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'r
     Route::post('/payments/{eventPayment}/confirm', [BookingController::class, 'confirmPayment'])->name('payments.confirm');
     Route::get('/payments/{eventPayment}/proof', [BookingController::class, 'proof'])->name('payments.proof');
     Route::post('/payments/{eventPayment}/remind', [BookingController::class, 'remind'])->name('payments.remind');
+    Route::get('/event-types', [\App\Http\Controllers\Business\EventTypeController::class, 'index'])->name('event-types');
+    Route::post('/event-types/request', [\App\Http\Controllers\Business\EventTypeController::class, 'request'])->middleware('throttle:10,1')->name('event-types.request');
+    Route::post('/event-types/{eventType}', [\App\Http\Controllers\Business\EventTypeController::class, 'apply'])->middleware('throttle:20,1')->name('event-types.apply');
+    Route::get('/event-types/proof/{row}/{which}/{i}', [\App\Http\Controllers\Business\EventTypeController::class, 'file'])->whereIn('which', ['photo', 'doc'])->whereNumber('i')->name('event-types.file');
     Route::get('/packages', [PackageController::class, 'index'])->name('packages');
     Route::get('/packages/new', [PackageController::class, 'create'])->name('packages.create');
     Route::post('/packages', [PackageController::class, 'store'])->name('packages.store');

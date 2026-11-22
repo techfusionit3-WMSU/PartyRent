@@ -101,6 +101,7 @@ class ShopStaff extends Model
         'bookings' => 'orders.view', 'bookings.*' => 'orders.view',
         'payments.remind' => 'payments.view', 'payments.proof' => 'payments.view', 'payments.*' => 'payments.verify', 'payments' => 'payments.view',
         'packages' => 'products.manage', 'packages.*' => 'products.manage',
+        'event-types' => 'shop.manage', 'event-types.*' => 'shop.manage',
         'settings' => 'shop.manage', 'settings.*' => 'shop.manage',
     ];
 

@@ -70,6 +70,8 @@ class RecordStaffAction
         'business.bookings.cancel' => 'Cancelled a booking',
         'business.bookings.complete' => 'Completed a booking',
         'business.payments.confirm' => 'Confirmed a payment',
+        'business.event-types.apply' => 'Applied for event type :ref',
+        'business.event-types.request' => 'Asked PartyRent to add an event type',
     ];
 
     /** Not worth a log line (chat keeps its own record; switches and lookups change nothing). */

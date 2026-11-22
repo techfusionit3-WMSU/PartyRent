@@ -4,6 +4,18 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
+**Event companies: what they can handle (user 2026-11-22, "build")**. Generic for every event type, not weddings only.
+Order (commit after each): E1 event types + verified capability per type · E2 event parts (stages / multi-day) ·
+E3 teams + capacity · E4 event company roles (Coordinator / Finance / Crew) + job assignment.
+- [x] E1 Event types catalog (admin-managed `event_types`: name, typical guests, parts template, usual services, proof
+      needed; businesses can request a new type) + `supplier_event_types` per business (claimed vs verified max guests and
+      events per day, past events, proof photos + permits, status pending/verified/rejected/paused, a raise = review).
+      Business "Event Types" page; admin review queue (approve with limits / reject / pause). Packages only for verified
+      types, max guests within the verified limit; inquiries only for verified types, guests + per-type per-day checked.
+      Existing companies grandfathered from their packages (EventTypes::grandfather, migration + DemoSeeder).
+- [ ] E2 Event parts · [ ] E3 Teams + capacity · [ ] E4 Roles
+
+(previous) **Feedback batch 3 (2026-11-22)**
 **Feedback batch 3 (2026-11-22)** ALL DONE (213 tests green; docs/SYSTEM_PROCESSES.md section 12): tester doc from Downloads (Fahad, Kevin, Zhanjianah; 13 screenshots). Order / status:
 - [x] G1 Notification bell prints `@include('partials.notif-dropdown')` in the dash header (`@endif@include` not compiled)
 - [x] G2 Cashier: "Also allowed" repeats Payments / Business Reports (same perms as own pages); Financial + Business Reports both

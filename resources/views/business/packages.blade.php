@@ -11,7 +11,8 @@
       <div class="card pad-0" style="overflow:hidden;{{ $k->active ? '' : 'opacity:.6' }}">
         @if($k->cover())<img src="{{ $k->cover() }}" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover">@else<div style="aspect-ratio:16/9;display:grid;place-items:center;background:var(--brand-50);font-size:2.5rem">🎉</div>@endif
         <div style="padding:14px 16px">
-          <div class="row between top"><b>{{ $k->name }}</b>@unless($k->active)<span class="badge b-gray">Hidden</span>@endunless</div>
+          <div class="row between top"><b>{{ $k->name }}</b>@unless($k->active)<span class="badge b-gray">Hidden</span>@elseif(! \App\Domain\EventTypes::offerable($k, $verified))<span class="badge b-gold" title="None of its event types is verified">Not shown</span>@endunless</div>
+          @if($k->active && ! \App\Domain\EventTypes::offerable($k, $verified))<div class="small" style="color:var(--red)">Customers cannot see it: its event type is not verified. <a href="{{ route('business.event-types') }}">Event Types</a></div>@endif
           <div class="small muted">{{ $k->guestsLabel() }}{{ $k->events ? ' · '.implode(', ', $k->events) : '' }}</div>
           <div class="mt-1"><span class="small muted">from</span> <b style="font-size:1.15rem">{{ money($k->price) }}</b></div>
           <div class="small muted mt-1">{{ count($k->inclusions ?? []) }} inclusions</div>

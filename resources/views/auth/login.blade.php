@@ -26,7 +26,7 @@
     'Celebration Hub Rentals' => [['Ana · Owner (no team)', 'ana@demo.ph']],
     'Dream Events Supplies' => [['Carlo · Owner (no team)', 'carlo@demo.ph']],
     'Party Essentials Shop' => [['Ramon · Owner (no team)', 'ramon@demo.ph']],
-    'Grand Fiesta Events Co. (event company)' => [['Marco · Owner (no team)', 'events@demo.ph']],
+    'Grand Fiesta Events Co. (event company)' => [['Marco · Owner', 'events@demo.ph'], ['Ella · Event Coordinator', 'coordinator@grandfiesta.ph'], ['Nina · Finance', 'finance@grandfiesta.ph'], ['Ben · Event Crew', 'crew@grandfiesta.ph']],
     'Pending applications' => [['Kristine · Owner, Aquino Events Corp.', 'kristine@demo.ph'], ['Bea · Owner, Bea\'s Balloon Corner', 'bea@demo.ph']],
     'PartyRent' => [['Rosa · Cashier', 'cashier@partyrent.ph'], ['Mark · Admin', 'admin@partyrent.ph'], ['Paolo · Admin (limited)', 'paolo.admin@partyrent.ph'], ['Patricia · Super admin', 'super@partyrent.ph']],
   ];

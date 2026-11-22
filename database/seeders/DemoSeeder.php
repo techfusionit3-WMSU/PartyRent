@@ -172,6 +172,19 @@ class DemoSeeder extends Seeder
         $ta = \App\Models\EventTeam::create(['supplier_id' => $s->id, 'name' => 'Team A', 'members' => [$u->id], 'active' => true]);
         \App\Models\EventTeam::create(['supplier_id' => $s->id, 'name' => 'Team B', 'members' => [], 'active' => true]);
         $b3->parts()->update(['event_team_id' => $ta->id]);
+        // its people: a coordinator (desk role) on the debut, a finance person (cashier role), a crew member in Team A
+        foreach ([['Ella Ramos', 'coordinator@grandfiesta.ph', '0917 555 3030', 'desk'], ['Nina Lopez', 'finance@grandfiesta.ph', '0917 555 4040', 'cashier'], ['Ben Cruz', 'crew@grandfiesta.ph', '0917 555 5050', 'crew']] as [$name, $email, $phone, $role]) {
+            $m = new User(['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => ['customer'], 'status' => 'active', 'password' => Hash::make('demo123'), 'address' => 'Quezon City']);
+            $m->email_verified_at = $this->ts(-100);
+            $m->save();
+            \App\Models\ShopStaff::create(['supplier_id' => $s->id, 'user_id' => $m->id, 'role' => $role, 'roles' => [$role], 'status' => 'active', 'added_by' => $u->id]);
+            if ($role === 'desk') {
+                $b3->update(['coordinator_id' => $m->id]);
+            }
+            if ($role === 'crew') {
+                $ta->update(['members' => [$u->id, $m->id]]);
+            }
+        }
         // event parts: the garden wedding offers an optional prenup shoot for ₱15,000 on top of the ceremony and reception
         $pk[1]->update(['parts' => [['name' => 'Prenup shoot', 'optional' => true, 'price' => 15000], ['name' => 'Ceremony', 'optional' => false, 'price' => 0], ['name' => 'Reception', 'optional' => false, 'price' => 0]]]);
         if ($grad = \App\Models\EventType::where('name', 'Graduation')->first()) {

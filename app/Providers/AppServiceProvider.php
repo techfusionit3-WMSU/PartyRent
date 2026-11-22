@@ -64,6 +64,10 @@ class AppServiceProvider extends ServiceProvider
                 $badges['cases'] = $openCases()->where('supplier_id', $shop->id)->count();
                 $badges['requests'] = RentalRequest::where('supplier_id', $shop->id)->where('status', 'pending')->count();
                 $badges['payments'] = Payment::where('status', 'pending')->whereIn('method', ['cash', 'cod'])->whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $shop->id))->count();
+                if ($shop->isOrganization()) { // event company role modules
+                    $badges['inquiries'] = \App\Models\EventBooking::where('supplier_id', $shop->id)->where('status', 'inquiry')->count();
+                    $badges['eventPayments'] = \App\Models\EventPayment::where('status', 'pending')->whereHas('booking', fn ($q) => $q->where('supplier_id', $shop->id))->count();
+                }
             } elseif ($role === 'cashier') {
                 $shop = $u->shop();
                 // a shop's cashier confirms cash only; PartyRent's cashier checks transfers for every shop

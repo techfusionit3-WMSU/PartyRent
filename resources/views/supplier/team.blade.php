@@ -1,5 +1,5 @@
 @extends('layouts.dash', ['title' => 'Team & Roles', 'nav' => 'team'])
-@php($R = \App\Models\ShopStaff::ORG_ROLES)
+@php($R = \App\Models\ShopStaff::labels($s))
 @php($P = \App\Models\ShopStaff::ORG_PERM_LIST)
 @php($solo = $s->type !== 'organization')
 @section('content')
@@ -41,7 +41,7 @@
 @if($solo)
 <div class="card mb-3"><h3>Modules by role</h3><p class="small muted">Each role works in its own module with its own home page and menu. Someone with two roles switches between their modules at the top of the menu.</p>
   <div class="grid grid-3">
-    @foreach(\App\Support\CompanyModules::matrix() as $k => $mod)
+    @foreach(\App\Support\CompanyModules::matrix($s) as $k => $mod)
       <div class="card card-flat" style="padding:12px"><b>{{ $mod['label'] }} module</b><div class="small muted mb-1">{{ $mod['about'] }}</div>@foreach($mod['roles'] as $r)<span class="badge {{ \App\Models\ShopStaff::ROLE_BADGE[$r] ?? 'b-gray' }}">{{ $R[$r] }}</span> @endforeach</div>
     @endforeach
   </div>
@@ -63,8 +63,8 @@
       <div class="hint" id="emHint">We check the email first. An account that already works for another business can't be added. A new email gets a code to create its own account.</div>
     </div>
     <div class="field"><label>Roles <span class="muted small">(one or more; the first one ticked is their main module)</span></label>
-      @foreach(\App\Models\ShopStaff::EMPLOYEE_ROLES as $r)
-        <label class="check mb-1"><input type="checkbox" name="roles[]" value="{{ $r }}" @checked(in_array($r, (array) old('roles', []), true))> <span><b>{{ $R[$r] }}</b><span class="small muted" style="display:block">{{ \App\Models\ShopStaff::ROLE_HINTS[$r] }}</span></span></label>
+      @foreach(\App\Models\ShopStaff::employeeRoles($s) as $r)
+        <label class="check mb-1"><input type="checkbox" name="roles[]" value="{{ $r }}" @checked(in_array($r, (array) old('roles', []), true))> <span><b>{{ $R[$r] }}</b><span class="small muted" style="display:block">{{ \App\Models\ShopStaff::hints($s)[$r] }}</span></span></label>
       @endforeach
     </div>
     <p class="small muted mb-0">Nobody joins until they confirm from their inbox. The invitation expires in {{ \App\Models\StaffInvite::TTL_HOURS }} hours.</p>
@@ -121,10 +121,10 @@
   @php($mem = $m['member'])
   <div class="modal-backdrop hidden" id="empRole{{ $m['user']->id }}"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Roles · {{ $m['user']->name }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
     <form method="POST" action="{{ route('supplier.team.update', $m['user']) }}">@csrf @method('PUT')<div class="modal-body">
-      <div class="field"><label>Main role <span class="muted small">(opens first in Business Mode)</span></label><select class="input" name="roles[]">@foreach(\App\Models\ShopStaff::EMPLOYEE_ROLES as $r)<option value="{{ $r }}" @selected($r === $mem->role)>{{ $R[$r] }}</option>@endforeach</select></div>
+      <div class="field"><label>Main role <span class="muted small">(opens first in Business Mode)</span></label><select class="input" name="roles[]">@foreach(\App\Models\ShopStaff::employeeRoles($s) as $r)<option value="{{ $r }}" @selected($r === $mem->role)>{{ $R[$r] }}</option>@endforeach</select></div>
       <div class="field"><label>Also works as</label>
-        @foreach(\App\Models\ShopStaff::EMPLOYEE_ROLES as $r)
-          <label class="check mb-1"><input type="checkbox" name="roles[]" value="{{ $r }}" @checked($r !== $mem->role && in_array($r, $m['roles'], true))> <span><b>{{ $R[$r] }}</b><span class="small muted" style="display:block">{{ \App\Models\ShopStaff::ROLE_HINTS[$r] }}</span></span></label>
+        @foreach(\App\Models\ShopStaff::employeeRoles($s) as $r)
+          <label class="check mb-1"><input type="checkbox" name="roles[]" value="{{ $r }}" @checked($r !== $mem->role && in_array($r, $m['roles'], true))> <span><b>{{ $R[$r] }}</b><span class="small muted" style="display:block">{{ \App\Models\ShopStaff::hints($s)[$r] }}</span></span></label>
         @endforeach
       </div>
     </div>

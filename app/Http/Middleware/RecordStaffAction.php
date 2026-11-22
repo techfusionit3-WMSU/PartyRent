@@ -72,6 +72,7 @@ class RecordStaffAction
         'business.bookings.part-done' => 'Marked a part of an event done',
         'business.bookings.part-team' => 'Changed the team of a part',
         'business.teams.store' => 'Added a team',
+        'business.bookings.coordinator' => 'Assigned a coordinator',
         'business.teams.update' => 'Changed a team',
         'business.payments.confirm' => 'Confirmed a payment',
         'business.event-types.apply' => 'Applied for event type :ref',

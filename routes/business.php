@@ -26,6 +26,9 @@ Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'r
     Route::post('/payments/{eventPayment}/confirm', [BookingController::class, 'confirmPayment'])->name('payments.confirm');
     Route::get('/payments/{eventPayment}/proof', [BookingController::class, 'proof'])->name('payments.proof');
     Route::post('/payments/{eventPayment}/remind', [BookingController::class, 'remind'])->name('payments.remind');
+    Route::get('/coordinator', [\App\Http\Controllers\Business\WorkController::class, 'coordinator'])->name('coordinator');
+    Route::get('/crew', [\App\Http\Controllers\Business\WorkController::class, 'crew'])->name('crew');
+    Route::post('/bookings/{eventBooking}/coordinator', [\App\Http\Controllers\Business\WorkController::class, 'setCoordinator'])->name('bookings.coordinator');
     Route::get('/teams', [\App\Http\Controllers\Business\TeamsController::class, 'index'])->name('teams');
     Route::post('/teams', [\App\Http\Controllers\Business\TeamsController::class, 'save'])->name('teams.store');
     Route::post('/teams/{eventTeam}', [\App\Http\Controllers\Business\TeamsController::class, 'save'])->name('teams.update');

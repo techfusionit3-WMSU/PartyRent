@@ -68,8 +68,9 @@ class Notifier
                 if (! ($role === 'cashier' && $u->isShopCashier())) {
                     $q->orWhere('role', $role);
                 }
-                // Business staff see the shop's notifications (sent to the owner).
-                if ($role === 'supplier' && ($shop = $u->shop()) && $shop->owner_id !== $u->id) {
+                // Shop staff see the shop's notifications (sent to the owner). Event company staff get their own,
+                // sent to their role (App\Domain\EventRoles), so a crew member is not flooded with payments.
+                if ($role === 'supplier' && ($shop = $u->shop()) && $shop->owner_id !== $u->id && ! $shop->isOrganization()) {
                     $q->orWhere(fn ($d) => $d->where('user_id', $shop->owner_id)->where('scope', 'supplier'));
                 }
                 if ($role === 'superadmin') {

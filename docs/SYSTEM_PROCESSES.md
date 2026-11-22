@@ -200,7 +200,18 @@ delivery today → Field Crew) are **(planned)**.
 | Product page | Rent box | Quantity starts empty (the customer sets it); end times shorter than the item minimum are not offered, with a note why |
 | Sign-up code | Register | Sent from the team Gmail (.env.example); a local copy without mail shows the code on the page |
 
-## 13. Planned (from docs/ROLE_MODULES_PLAN.md)
+## 13. Event companies: what they can handle (built 2026-11-22)
+
+| Part | Where | What happens |
+| --- | --- | --- |
+| Event types | Admin > Event Types (Catalog) | PartyRent keeps the kinds of events (18 to start, any event: wedding, wake, seminar, fiesta, concert...) with usual guests, usual parts, usual services and the documents needed. Businesses can ask for a new type |
+| What a business handles | Business > Event Types; Admin > Event Types (To review) | The business applies per type: biggest guest count, events a day, how many done, photos, permits. PartyRent verifies each with limits (may be lower), turns it down with a reason, or pauses one type. A higher limit waits for review while the old one applies |
+| Only verified types | Packages, company page, inquiry form | Packages only for verified types within the verified guest count; customers only see those and can only ask for verified types; guests and per-type events a day are checked |
+| Event parts | Package form, inquiry form, booking pages | A package lists its parts (from the type's usual parts; optional parts can cost extra). The customer gives each part its own date, time and venue. Every part's date must be free; payments are due before the first part; parts are marked done one by one |
+| Teams | Business > Teams | Teams decide how many events run at the same time; a team is busy from setup to teardown. Confirmed bookings get a free team per part; the owner can move parts. Without teams the events-a-day setting applies |
+| Roles | Business Mode for members | Event Coordinator (Front Desk role): My Desk with inquiries, quotations and assigned events. Finance (Cashier role): Event Payments. Event Crew (Field Crew role): My Events, phone-first, mark parts done. The owner assigns a coordinator per booking. Notifications go to the role: inquiries to coordinators, payments to Finance, team work to the team |
+
+## 14. Planned (from docs/ROLE_MODULES_PLAN.md)
 
 2. Event company role modules + assigning a booking to a crew member / coordinator.
 3. Business picks Rental company and/or Event company.

@@ -219,9 +219,11 @@ class BusinessEventsTest extends TestCase
         \App\Models\ShopStaff::create(['supplier_id' => $this->s->id, 'user_id' => User::where('email', 'jose@demo.ph')->value('id'), 'role' => 'cashier', 'status' => 'active', 'added_by' => $this->owner->id]);
         $cashier = User::where('email', 'jose@demo.ph')->firstOrFail();
         $this->assertFalse($cashier->isShopCashier()); // not the item-rental cashier workspace
-        $this->actingAs($cashier)->withSession(['mode' => 'customer'])->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('business.dashboard'));
-        $this->get(route('business.payments'))->assertOk();
-        $this->get(route('business.packages'))->assertRedirect(route('business.dashboard')); // cashiers don't manage packages
+        // an event company's cashier works in the Finance module: Event Payments is their home
+        $this->actingAs($cashier)->withSession(['mode' => 'customer'])->post('/mode', ['mode' => 'supplier'])->assertRedirect(route('business.payments'));
+        $this->get(route('business.payments'))->assertOk()->assertSee('Finance');
+        $this->get(route('business.packages'))->assertRedirect(route('business.payments')); // cashiers don't manage packages
+        $this->get(route('business.dashboard'))->assertRedirect(route('business.payments')); // the owner's overview is not theirs
         $this->assertNotNull($u);
     }
 }

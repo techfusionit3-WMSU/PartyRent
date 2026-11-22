@@ -33,6 +33,7 @@ class EventBooking extends Model
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function customer(): BelongsTo { return $this->belongsTo(User::class, 'customer_id'); }
+    public function coordinator(): BelongsTo { return $this->belongsTo(User::class, 'coordinator_id'); }
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
     public function payments(): HasMany { return $this->hasMany(EventPayment::class)->orderBy('due_date')->orderBy('id'); }
     /** The parts of the event (stages / days), in date order (App\Domain\EventParts). */

@@ -238,7 +238,10 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     public function homeRoute(?string $mode = null): string
     {
         if ($this->activeRole($mode) === 'supplier' && $this->shop()?->isOrganization()) {
-            return 'business.dashboard'; // event companies have their own workspace
+            // event companies have their own workspace; a member lands on their role module's home
+            $m = $this->currentModule();
+
+            return $m ? \App\Support\CompanyModules::get($m)['home'] : 'business.dashboard';
         }
         if (in_array($this->activeRole($mode), ['supplier', 'cashier'], true) && ($m = $this->currentModule())) {
             return \App\Support\CompanyModules::get($m)['home'];

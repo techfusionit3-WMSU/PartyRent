@@ -36,6 +36,32 @@ class ShopStaff extends Model
         'crew' => 'Does the field work: deliveries, pickups and returns, and marks each step done.',
     ];
 
+    /** The same roles in an event company, in event words (no item stock, so no Inventory Keeper). */
+    public const EVENT_ROLES = ['org_admin' => 'Owner', 'desk' => 'Event Coordinator', 'cashier' => 'Finance', 'crew' => 'Event Crew'];
+
+    public const EVENT_ROLE_HINTS = [
+        'desk' => 'Handles clients: answers inquiries, sends quotations, follows the events assigned to them.',
+        'cashier' => 'Handles money: confirms reservation fees, deposits and balances, sends payment reminders.',
+        'crew' => 'Works the events: sees the parts their team works (when, where, who to call) and marks each done.',
+    ];
+
+    /** Role names for this company (event companies use event words). */
+    public static function labels(?Supplier $s): array
+    {
+        return $s && $s->isOrganization() ? self::EVENT_ROLES : self::ORG_ROLES;
+    }
+
+    /** Roles an owner can give in this company. */
+    public static function employeeRoles(?Supplier $s): array
+    {
+        return $s && $s->isOrganization() ? ['desk', 'cashier', 'crew'] : self::EMPLOYEE_ROLES;
+    }
+
+    public static function hints(?Supplier $s): array
+    {
+        return $s && $s->isOrganization() ? self::EVENT_ROLE_HINTS : self::ROLE_HINTS;
+    }
+
     public const ROLE_BADGE = ['org_admin' => 'b-purple', 'desk' => 'b-pink', 'cashier' => 'b-teal', 'inventory' => 'b-sky', 'crew' => 'b-gray'];
 
     /** Permissions an owner may NOT hand to an employee. */
@@ -96,8 +122,8 @@ class ShopStaff extends Model
 
     /** Business (event company) workspace routes (after "business.") => permission; no match = any member. */
     public const BUSINESS_ROUTE_PERMS = [
-        'dashboard' => null, 'calendar' => 'orders.view',
-        'bookings.quote' => 'orders.manage', 'bookings.decline' => 'orders.manage', 'bookings.cancel' => 'orders.manage', 'bookings.complete' => 'orders.manage', 'bookings.part-done' => 'orders.manage',
+        'dashboard' => 'shop.manage', 'calendar' => 'orders.view', 'coordinator' => 'orders.manage', 'crew' => 'fulfillment.update', 'bookings.coordinator' => 'team.manage',
+        'bookings.quote' => 'orders.manage', 'bookings.decline' => 'orders.manage', 'bookings.cancel' => 'orders.manage', 'bookings.complete' => 'orders.manage', 'bookings.part-done' => 'fulfillment.update',
         'bookings' => 'orders.view', 'bookings.*' => 'orders.view',
         'payments.remind' => 'payments.view', 'payments.proof' => 'payments.view', 'payments.*' => 'payments.verify', 'payments' => 'payments.view',
         'packages' => 'products.manage', 'packages.*' => 'products.manage',
@@ -126,9 +152,11 @@ class ShopStaff extends Model
 
     public function label(): string { return self::rolesLabel($this->roleList()); }
 
-    public static function rolesLabel(array $roles): string
+    public static function rolesLabel(array $roles, ?Supplier $s = null): string
     {
-        return implode(' + ', array_map(fn ($r) => __(self::ORG_ROLES[$r] ?? ucfirst($r)), $roles));
+        $l = self::labels($s);
+
+        return implode(' + ', array_map(fn ($r) => __($l[$r] ?? self::ORG_ROLES[$r] ?? ucfirst($r)), $roles));
     }
 
     /** Role defaults of this member (before the owner's tweaks). */

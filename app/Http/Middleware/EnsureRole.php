@@ -93,7 +93,7 @@ class EnsureRole
         }
         if (! (str_starts_with($name, 'supplier.') || str_starts_with($name, 'business.')) || $u->canShop($name)) {
             // keep the menu in step: a page of another of the user's modules switches to that module
-            if (! $biz && ($to = \App\Support\CompanyModules::moduleFor($u, $name)) && $to !== session('module')) {
+            if (($to = \App\Support\CompanyModules::moduleFor($u, $name)) && $to !== session('module')) {
                 session(['module' => $to]);
             }
 
@@ -103,7 +103,7 @@ class EnsureRole
         if ($request->expectsJson()) {
             abort(403, $msg);
         }
-        $home = $biz ? 'business.dashboard' : $u->homeRoute('supplier');
+        $home = $u->homeRoute('supplier');
 
         return $home === $name ? abort(403, $msg) : redirect()->route($home)->with('error', $msg);
     }

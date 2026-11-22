@@ -30,6 +30,11 @@
     <dl class="kv">
       <dt>Customer</dt><dd>{{ $b->customer->name }}<br><span class="small muted">{{ $b->customer->email }} · {{ $b->customer->phone }}</span></dd>
       <dt>Package</dt><dd>{{ $b->package ? $b->package->name.' · '.money($b->package->price) : 'Custom event (no package)' }}</dd>
+      <dt>Coordinator</dt><dd>@if($u->orgCan('team.manage') && $b->isOpen())
+          <form method="POST" action="{{ route('business.bookings.coordinator', $b) }}" class="row" style="gap:6px">@csrf
+            <select class="input input-sm" name="coordinator" style="width:auto" aria-label="Coordinator"><option value="">Nobody yet</option>@foreach(\App\Domain\EventRoles::coordinators($b->supplier) as $cu)<option value="{{ $cu->id }}" @selected($b->coordinator_id === $cu->id)>{{ $cu->name }}{{ $cu->id === $b->supplier->owner_id ? ' (owner)' : '' }}</option>@endforeach</select>
+            <button class="btn btn-xs">Set</button></form>
+        @else{{ $b->coordinator?->name ?? 'Nobody yet' }}@endif</dd>
       <dt>Schedule</dt><dd>@include('partials.event-parts', ['b' => $b, 'canMark' => $manage && $b->status === 'confirmed', 'teams' => \App\Domain\EventTeams::teams($b->supplier)])</dd>
       <dt>Guests</dt><dd>{{ $b->guests }}</dd>
       <dt>Venue</dt><dd>{{ $b->venue }}{{ $b->city ? ', '.$b->city : '' }}</dd>

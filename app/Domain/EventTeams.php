@@ -99,6 +99,7 @@ class EventTeams
             $t = self::freeTeams($s, $p->date->toDateString(), $w, $b->id, null, array_values(array_filter($taken, fn ($x) => true)))->first();
             if ($t) {
                 $p->update(['event_team_id' => $t->id]);
+                EventRoles::notifyTeam($p->fresh('booking.customer'));
                 $taken[] = ['team' => $t->id, 'w' => $w, 'id' => $p->id];
             } else {
                 $left++;
@@ -130,6 +131,9 @@ class EventTeams
             }
         }
         $p->update(['event_team_id' => $teamId ?: null]);
+        if ($teamId) {
+            EventRoles::notifyTeam($p->fresh('booking.customer'));
+        }
         Notifier::audit('Assigned team', $b->code.' · '.$p->name.' → '.($teamId ? EventTeam::find($teamId)->name : 'no team'), $by);
 
         return ['ok' => true];

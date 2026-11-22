@@ -30,7 +30,7 @@
     $sup = in_array($role, ['supplier', 'cashier'], true) ? $shellUser->shop() : null;
     if ($role === 'supplier' && $sup?->isOrganization()) { $cfg = \App\Support\BusinessNav::config($sup); } // event companies: their own workspace
     // solo shops / rental companies: each company role has its own module (App\Support\CompanyModules)
-    $mods = $sup && ! $sup->isOrganization() ? $shellUser->modules() : [];
+    $mods = $sup && $role === 'supplier' || ($sup && ! $sup->isOrganization()) ? $shellUser->modules() : [];
     $curMod = $mods ? $shellUser->currentModule() : null;
     if ($curMod) { $cfg = \App\Support\CompanyModules::nav($shellUser, $curMod, $b); }
     $emp = $shellUser->isEmployee();
@@ -98,7 +98,7 @@
   </aside>
   <div class="side-backdrop" id="sideBd"></div>
   <div class="dash-body">
-    <header class="dash-top"><button class="icon-btn menu-toggle" data-side-open aria-label="Open menu">{{ icon('menu') }}</button><div class="ttl grow">{{ $title ?? '' }}</div>@if($sup)<span class="working-as" title="{{ __('You are working in this company module') }}">{{ icon('store') }}<span class="ellipsis">{{ __('Working as :role', ['role' => $curMod ? __(\App\Support\CompanyModules::get($curMod)['label']) : \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles())]) }} · {{ $sup->name }}</span></span>@endif
+    <header class="dash-top"><button class="icon-btn menu-toggle" data-side-open aria-label="Open menu">{{ icon('menu') }}</button><div class="ttl grow">{{ $title ?? '' }}</div>@if($sup)<span class="working-as" title="{{ __('You are working in this company module') }}">{{ icon('store') }}<span class="ellipsis">{{ __('Working as :role', ['role' => $curMod ? __(\App\Support\CompanyModules::get($curMod)['label']) : \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles(), $sup)]) }} · {{ $sup->name }}</span></span>@endif
       @include('partials.notif-dropdown')
       @include('partials.profile-menu')
     </header>

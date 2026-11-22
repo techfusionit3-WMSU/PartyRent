@@ -96,7 +96,7 @@ class Events
             return $b;
         });
         $when = count($parts) > 1 ? count($parts).' parts from '.fmt_date($dates[0]).' to '.fmt_date(end($dates)) : fmt_date($dates[0]);
-        Notifier::notify($s->owner, 'supplier', 'New event inquiry · '.$b->code, $u->name.' asks about a '.$b->event_type.' ('.$when.') for '.$b->guests.' guests'.($pkg ? ' ('.$pkg->name.')' : '').'. Send a quotation.', route('business.bookings.show', $b, false));
+        EventRoles::notifyRole($s, 'desk', 'New event inquiry · '.$b->code, $u->name.' asks about a '.$b->event_type.' ('.$when.') for '.$b->guests.' guests'.($pkg ? ' ('.$pkg->name.')' : '').'. Send a quotation.', route('business.bookings.show', $b, false));
 
         return ['ok' => true, 'booking' => $b];
     }
@@ -196,7 +196,7 @@ class Events
             $noFee = ! collect($b->quote['schedule'])->contains('kind', 'reservation'); // 0% reservation fee: the date is held right away
             $b->update(['status' => $noFee ? 'confirmed' : 'booked', 'accepted_at' => now()] + ($noFee ? ['confirmed_at' => now()] : []));
         });
-        Notifier::notify($b->supplier->owner, 'supplier', 'Quotation accepted · '.$b->code, $u->name.' accepted '.money($b->total()).'. The date is held once the reservation fee is paid.', route('business.bookings.show', $b, false));
+        EventRoles::notifyBooking($b, 'Quotation accepted · '.$b->code, $u->name.' accepted '.money($b->total()).'. The date is held once the reservation fee is paid.', route('business.bookings.show', $b, false));
 
         return ['ok' => true];
     }
@@ -214,7 +214,7 @@ class Events
         $paid = $b->paid();
         $refundNote = $paid > 0 ? ' '.money($paid).' was already paid; refunds follow '.$b->supplier->name.'\'s cancellation policy.' : '';
         if ($who === 'customer') {
-            Notifier::notify($b->supplier->owner, 'supplier', 'Booking cancelled by the customer · '.$b->code, $by->name.' cancelled the '.$b->event_type.' on '.fmt_date($b->event_date->toDateString()).'.'.$refundNote, route('business.bookings.show', $b, false));
+            EventRoles::notifyBooking($b, 'Booking cancelled by the customer · '.$b->code, $by->name.' cancelled the '.$b->event_type.' on '.fmt_date($b->event_date->toDateString()).'.'.$refundNote, route('business.bookings.show', $b, false));
         } else {
             Notifier::notify($b->customer_id, 'customer', $b->supplier->name.' cancelled your booking', $b->code.($reason !== '' ? ': '.$reason : '.').$refundNote, route('events.show', $b, false));
         }
@@ -231,7 +231,7 @@ class Events
             return self::fail('This payment cannot be sent right now.');
         }
         $p->update(['status' => 'pending', 'method' => $v['method'], 'reference' => trim($v['reference']), 'proof_path' => $proof, 'submitted_at' => now(), 'reject_reason' => null]);
-        Notifier::notify($b->supplier->owner, 'supplier', 'Payment to confirm · '.$b->code, $u->name.' sent the '.mb_strtolower($p->label).' of '.money($p->amount).' (ref '.$p->reference.'). Check your account and confirm it.', route('business.bookings.show', $b, false));
+        EventRoles::notifyRole($b->supplier, 'cashier', 'Payment to confirm · '.$b->code, $u->name.' sent the '.mb_strtolower($p->label).' of '.money($p->amount).' (ref '.$p->reference.'). Check your account and confirm it.', route('business.bookings.show', $b, false));
 
         return ['ok' => true];
     }
@@ -266,7 +266,7 @@ class Events
             EventTeams::assign($b->fresh()); // every part gets a free team (businesses that use teams)
         }
         if (! $by) {
-            Notifier::notify($b->supplier->owner, 'supplier', 'Paid online · '.$b->code, $b->customer->name.' paid the '.mb_strtolower($p->label).' of '.money($p->amount).' online. PartyRent sends it to your payout account.', route('business.bookings.show', $b, false));
+            EventRoles::notifyRole($b->supplier, 'cashier', 'Paid online · '.$b->code, $b->customer->name.' paid the '.mb_strtolower($p->label).' of '.money($p->amount).' online. PartyRent sends it to your payout account.', route('business.bookings.show', $b, false));
         }
         Notifier::notify($b->customer_id, 'customer', 'Payment confirmed · '.$b->code, $b->supplier->name.' received your '.mb_strtolower($p->label).' of '.money($p->amount).'.'.($b->fresh()->status === 'confirmed' && $p->kind === 'reservation' ? ' Your date is booked! 🎉' : ''), route('events.show', $b, false));
 

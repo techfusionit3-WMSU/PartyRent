@@ -68,8 +68,52 @@ class CompanyModules
         ],
     ];
 
+    /**
+     * Modules of an event company (books whole events by quotation). Same company roles, event wording:
+     * Front Desk works as Event Coordinator, Cashier as Finance, Field Crew as Event Crew (no item stock).
+     * The Owner module is the full business workspace (App\Support\BusinessNav).
+     */
+    public const EVENT = [
+        'event_manage' => [
+            'label' => 'Owner', 'icon' => 'store', 'roles' => ['org_admin'], 'home' => 'business.dashboard',
+            'about' => 'Everything: event types, packages, bookings, payments, teams, settings and team members.',
+            'nav' => [], 'bottom' => [],
+        ],
+        'event_coord' => [
+            'label' => 'Event Coordinator', 'icon' => 'list', 'roles' => ['desk'], 'home' => 'business.coordinator',
+            'about' => 'Inquiries, quotations, clients and the events assigned to you.',
+            'nav' => [
+                ['Events'], ['coordinator', 'business.coordinator', 'grid', 'My Desk'], ['bookings', 'business.bookings', 'list', 'Event Bookings', 'inquiries', 'orders.view'],
+                ['calendar', 'business.calendar', 'calendar', 'Event Calendar', null, 'orders.view'], ['teams', 'business.teams', 'users', 'Teams', null, 'orders.view'],
+                ['Clients'], ['reviews', 'supplier.reviews', 'star', 'Reviews', null, 'orders.view'], ['notifications', 'notifications', 'bell', 'Notifications'],
+            ],
+            'bottom' => [['coordinator', 'business.coordinator', 'grid', 'Home'], ['bookings', 'business.bookings', 'list', 'Bookings', null, 'orders.view'], ['calendar', 'business.calendar', 'calendar', 'Calendar', null, 'orders.view']],
+        ],
+        'event_finance' => [
+            'label' => 'Finance', 'icon' => 'card', 'roles' => ['cashier'], 'home' => 'business.payments',
+            'about' => 'Reservation fees, deposits and balances: confirm payments, send reminders.',
+            'nav' => [
+                ['Money'], ['payments', 'business.payments', 'card', 'Event Payments', 'eventPayments', 'payments.view'], ['bookings', 'business.bookings', 'list', 'Event Bookings', null, 'orders.view'],
+                ['notifications', 'notifications', 'bell', 'Notifications'],
+            ],
+            'bottom' => [['payments', 'business.payments', 'card', 'Payments', null, 'payments.view'], ['bookings', 'business.bookings', 'list', 'Bookings', null, 'orders.view']],
+        ],
+        'event_crew' => [
+            'label' => 'Event Crew', 'icon' => 'truck', 'roles' => ['crew'], 'home' => 'business.crew',
+            'about' => 'The events your team works: when, where, who to call, and marking each part done.',
+            'nav' => [
+                ['My work'], ['crew', 'business.crew', 'truck', 'My Events'], ['calendar', 'business.calendar', 'calendar', 'Event Calendar', null, 'orders.view'], ['notifications', 'notifications', 'bell', 'Notifications'],
+            ],
+            'bottom' => [['crew', 'business.crew', 'truck', 'My Events'], ['calendar', 'business.calendar', 'calendar', 'Calendar', null, 'orders.view']],
+        ],
+    ];
+
     /** Pages that belong to a module even though they are not in its menu (e.g. a request opened from a list). */
     private const OWNS = [
+        'event_coord' => ['business.coordinator', 'business.bookings*', 'business.calendar', 'business.teams', 'supplier.reviews*'],
+        'event_finance' => ['business.payments*', 'business.bookings', 'business.bookings.show'],
+        'event_crew' => ['business.crew', 'business.calendar', 'business.bookings.part-done'],
+        'event_manage' => ['business.*', 'supplier.*'],
         'desk' => ['supplier.desk', 'supplier.requests*', 'supplier.schedule', 'supplier.calendar', 'supplier.shortfalls*', 'supplier.reviews*'],
         'cashier' => ['cashier.*'],
         'inventory' => ['supplier.stock', 'supplier.inventory*', 'supplier.locations*', 'supplier.products*', 'supplier.packages*', 'supplier.damages*', 'supplier.calendar'],
@@ -81,24 +125,31 @@ class CompanyModules
     public static function forUser(User $u): array
     {
         $shop = $u->shop();
-        if (! $shop || $shop->isOrganization()) {
-            return []; // event companies: business workspace (split into role modules in step 2)
+        if (! $shop) {
+            return [];
         }
+        $set = self::setFor($shop);
         $roles = $u->orgRoles();
         if (in_array('org_admin', $roles, true)) {
-            return array_keys(self::SHOP);
+            return array_keys($set);
         }
-        $keys = array_keys(array_filter(self::SHOP, fn ($m) => (bool) array_intersect($m['roles'], $roles)));
+        $keys = array_keys(array_filter($set, fn ($m) => (bool) array_intersect($m['roles'], $roles)));
         // keep the member's main role first so it is the default module
         usort($keys, fn ($a, $b) => self::rank($roles, $a) <=> self::rank($roles, $b));
 
         return $keys;
     }
 
+    /** The module set of a company: solo shops / rental companies, or event companies. */
+    public static function setFor(?\App\Models\Supplier $s): array
+    {
+        return $s && $s->isOrganization() ? self::EVENT : self::SHOP;
+    }
+
     private static function rank(array $roles, string $module): int
     {
         foreach ($roles as $i => $r) {
-            if (in_array($r, self::SHOP[$module]['roles'], true)) {
+            if (in_array($r, self::get($module)['roles'], true)) {
                 return $i;
             }
         }
@@ -117,7 +168,7 @@ class CompanyModules
 
     public static function get(string $key): array
     {
-        return self::SHOP[$key];
+        return self::SHOP[$key] ?? self::EVENT[$key];
     }
 
     /** Does this page belong to the module? */
@@ -155,10 +206,13 @@ class CompanyModules
     public static function nav(User $u, string $module, array $badges): array
     {
         $can = fn ($it) => empty($it[5]) || $u->orgCan($it[5]);
-        $m = self::SHOP[$module];
+        if ($module === 'event_manage') {
+            return array_replace(BusinessNav::config($u->shop()), ['tag' => 'Owner']);
+        }
+        $m = self::get($module);
         $items = array_map(fn ($it) => count($it) === 1 ? $it : [$it[0], $it[1], $it[2], $it[3], ! empty($it[4]) ? ($badges[$it[4]] ?? 0) : 0, $it[5] ?? null], $m['nav']);
         $items = array_values(array_filter($items, fn ($it) => count($it) === 1 || $can($it)));
-        if ($module !== 'manage' && ! $u->isShopOwner()) {
+        if (isset(self::SHOP[$module]) && $module !== 'manage' && ! $u->isShopOwner()) {
             $have = [];
             foreach (self::forUser($u) as $k) {
                 foreach (self::SHOP[$k]['nav'] as $it) {
@@ -189,10 +243,10 @@ class CompanyModules
     }
 
     /** RBAC matrix rows for documentation and the Team page: module => roles that open it. */
-    public static function matrix(): array
+    public static function matrix(?\App\Models\Supplier $s = null): array
     {
         $out = [];
-        foreach (self::SHOP as $k => $m) {
+        foreach (self::setFor($s) as $k => $m) {
             $out[$k] = ['label' => $m['label'], 'about' => $m['about'], 'roles' => array_merge(['org_admin'], array_diff($m['roles'], ['org_admin']))];
         }
 

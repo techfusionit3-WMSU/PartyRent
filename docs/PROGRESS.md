@@ -4,7 +4,7 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Event companies: what they can handle (user 2026-11-22, "build")**. Generic for every event type, not weddings only.
+**Event companies: what they can handle (user 2026-11-22, "build")** ALL 4 STEPS DONE (docs/SYSTEM_PROCESSES.md section 13). Generic for every event type, not weddings only.
 Order (commit after each): E1 event types + verified capability per type · E2 event parts (stages / multi-day) ·
 E3 teams + capacity · E4 event company roles (Coordinator / Finance / Crew) + job assignment.
 - [x] E1 Event types catalog (admin-managed `event_types`: name, typical guests, parts template, usual services, proof
@@ -15,7 +15,7 @@ E3 teams + capacity · E4 event company roles (Coordinator / Finance / Crew) + j
       Existing companies grandfathered from their packages (EventTypes::grandfather, migration + DemoSeeder).
 - [x] E2 Event parts (package parts from the type template, optional parts with extra price; booking parts with own date / time / venue in event_booking_parts; capacity on every part date; event_date = first part; calendar per part; parts marked done; EventPartsTest)
 - [x] E3 Teams + capacity (event_teams, part.event_team_id; window = setup + event + teardown, no times = all day; Events::dateFree uses teams when there are any, else events a day; confirmed bookings auto-assigned; owner moves parts; Teams page; EventTeamsTest)
-- [ ] E4 Roles
+- [x] E4 Roles: CompanyModules::EVENT (event_manage / event_coord / event_finance / event_crew), Front Desk = Event Coordinator, Cashier = Finance, Field Crew = Event Crew; My Desk (business.coordinator), My Events (business.crew); event_bookings.coordinator_id; EventRoles notifications by role; event company staff see only their own notifications. Demo: coordinator@ / finance@ / crew@grandfiesta.ph. EventRolesTest. 225 tests green
 
 (previous) **Feedback batch 3 (2026-11-22)**
 **Feedback batch 3 (2026-11-22)** ALL DONE (213 tests green; docs/SYSTEM_PROCESSES.md section 12): tester doc from Downloads (Fahad, Kevin, Zhanjianah; 13 screenshots). Order / status:

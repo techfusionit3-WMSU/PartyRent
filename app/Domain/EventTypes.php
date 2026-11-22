@@ -201,7 +201,7 @@ class EventTypes
     public static function heldOn(Supplier $s, string $type, string $date, ?int $except = null): int
     {
         return EventBooking::where('supplier_id', $s->id)->whereIn('status', ['booked', 'confirmed'])->where('event_type', $type)
-            ->whereDate('event_date', $date)->when($except, fn ($q) => $q->where('id', '!=', $except))->count();
+            ->whereHas('parts', fn ($q) => $q->whereDate('date', $date))->when($except, fn ($q) => $q->where('id', '!=', $except))->count();
     }
 
     /** Why a customer cannot ask for this event (null = fine): type not handled, too many guests, type full that day. */

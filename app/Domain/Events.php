@@ -36,7 +36,7 @@ class Events
     public static function heldOn(Supplier $s, string $date, ?int $except = null): int
     {
         return EventBooking::where('supplier_id', $s->id)->whereIn('status', ['booked', 'confirmed'])
-            ->whereDate('event_date', $date)->when($except, fn ($q) => $q->where('id', '!=', $except))->count();
+            ->whereHas('parts', fn ($q) => $q->whereDate('date', $date))->when($except, fn ($q) => $q->where('id', '!=', $except))->count();
     }
 
     public static function dateFree(Supplier $s, string $date, ?int $except = null): bool
@@ -57,25 +57,38 @@ class Events
         if ($pkg && $pkg->supplier_id !== $s->id) {
             return self::fail('That package belongs to another business.');
         }
+        // the parts of the event (one day, or several dates / stages) — each with its own date
+        $built = EventParts::build(EventParts::definitions($pkg, (string) $v['event_type']), (array) ($v['parts'] ?? []), $v);
+        if (! $built['ok']) {
+            return self::fail($built['error']);
+        }
+        $parts = $built['parts'];
+        $dates = EventParts::dates($parts);
         $set = $s->bizSettings();
         $min = today()->addDays((int) $set['minNoticeDays']);
-        if (Carbon::parse($v['event_date'])->lt($min)) {
-            return self::fail($s->name.' needs at least '.$set['minNoticeDays'].' days\' notice. Choose '.fmt_date($min->toDateString()).' or later.');
+        if (Carbon::parse($dates[0])->lt($min)) {
+            return self::fail($s->name.' needs at least '.$set['minNoticeDays'].' days\' notice before the first part. Choose '.fmt_date($min->toDateString()).' or later.');
         }
-        if (! self::dateFree($s, $v['event_date'])) {
-            return self::fail($s->name.' is fully booked on '.fmt_date($v['event_date']).'. Try another date.');
-        }
-        // only kinds of events PartyRent verified for this business, within its guest and per-day limits
-        if ($e = EventTypes::inquiryError($s, (string) $v['event_type'], (int) $v['guests'], $v['event_date'])) {
+        // every date free, and only kinds of events PartyRent verified for this business, within its limits
+        if ($e = EventParts::capacityError($s, (string) $v['event_type'], (int) $v['guests'], $dates)) {
             return self::fail($e);
         }
-        $b = EventBooking::create([
-            'code' => self::code('EVT', EventBooking::class), 'supplier_id' => $s->id, 'customer_id' => $u->id, 'event_package_id' => $pkg?->id,
-            'status' => 'inquiry', 'event_type' => $v['event_type'], 'event_date' => $v['event_date'],
-            'start_time' => $v['start_time'] ?? null, 'end_time' => $v['end_time'] ?? null, 'guests' => (int) $v['guests'],
-            'venue' => trim($v['venue']), 'city' => $v['city'] ?? null, 'budget' => $v['budget'] ?? null, 'notes' => trim((string) ($v['notes'] ?? '')),
-        ]);
-        Notifier::notify($s->owner, 'supplier', 'New event inquiry · '.$b->code, $u->name.' asks about a '.$b->event_type.' on '.fmt_date($v['event_date']).' for '.$b->guests.' guests'.($pkg ? ' ('.$pkg->name.')' : '').'. Send a quotation.', route('business.bookings.show', $b, false));
+        $first = $parts[0];
+        $b = DB::transaction(function () use ($s, $u, $pkg, $v, $parts, $first) {
+            $b = EventBooking::create([
+                'code' => self::code('EVT', EventBooking::class), 'supplier_id' => $s->id, 'customer_id' => $u->id, 'event_package_id' => $pkg?->id,
+                'status' => 'inquiry', 'event_type' => $v['event_type'], 'event_date' => $first['date'],
+                'start_time' => $first['start_time'], 'end_time' => $first['end_time'], 'guests' => (int) $v['guests'],
+                'venue' => trim($v['venue']), 'city' => $v['city'] ?? null, 'budget' => $v['budget'] ?? null, 'notes' => trim((string) ($v['notes'] ?? '')),
+            ]);
+            foreach ($parts as $p) {
+                $b->parts()->create($p);
+            }
+
+            return $b;
+        });
+        $when = count($parts) > 1 ? count($parts).' parts from '.fmt_date($dates[0]).' to '.fmt_date(end($dates)) : fmt_date($dates[0]);
+        Notifier::notify($s->owner, 'supplier', 'New event inquiry · '.$b->code, $u->name.' asks about a '.$b->event_type.' ('.$when.') for '.$b->guests.' guests'.($pkg ? ' ('.$pkg->name.')' : '').'. Send a quotation.', route('business.bookings.show', $b, false));
 
         return ['ok' => true, 'booking' => $b];
     }
@@ -161,11 +174,8 @@ class Events
 
             return self::fail('This quotation has expired. Ask the business for a new one.');
         }
-        if (! self::dateFree($b->supplier, $b->event_date->toDateString(), $b->id)) {
-            return self::fail('Sorry, '.$b->supplier->name.' was booked by someone else on that date in the meantime.');
-        }
-        if ($e = EventTypes::inquiryError($b->supplier, $b->event_type, (int) $b->guests, $b->event_date->toDateString(), $b->id)) {
-            return self::fail($e);
+        if ($e = EventParts::capacityError($b->supplier, $b->event_type, (int) $b->guests, EventParts::bookingDates($b), $b->id)) {
+            return self::fail('Sorry, it can no longer be booked: '.$e);
         }
         $hours = (int) $b->supplier->bizSettings()['reserveHours'];
         DB::transaction(function () use ($b, $hours) {
@@ -231,8 +241,12 @@ class Events
 
             return ['ok' => true];
         }
-        if ($p->kind === 'reservation' && $b->status === 'booked' && ! self::dateFree($b->supplier, $b->event_date->toDateString(), $b->id)) {
-            return self::fail('That date is already full. Cancel this booking or raise "events per day" in Business settings first.');
+        if ($p->kind === 'reservation' && $b->status === 'booked') {
+            foreach (EventParts::bookingDates($b) as $d) {
+                if (! self::dateFree($b->supplier, $d, $b->id)) {
+                    return self::fail(fmt_date($d).' is already full. Cancel this booking or raise "events per day" in Business settings first.');
+                }
+            }
         }
         DB::transaction(function () use ($p, $b, $by) {
             $p->update(['status' => 'paid', 'paid_at' => now(), 'confirmed_by' => $by?->id, 'receipt_no' => 'EOR-'.(10000 + (int) EventPayment::whereNotNull('receipt_no')->count() + 1)]);
@@ -271,10 +285,12 @@ class Events
         if ($b->status !== 'confirmed') {
             return self::fail('Only confirmed bookings can be completed.');
         }
-        if ($b->event_date->gt(today())) {
-            return self::fail('You can mark the event done on or after '.fmt_date($b->event_date->toDateString()).'.');
+        $last = $b->lastDate();
+        if ($last->gt(today())) {
+            return self::fail('You can mark the event done on or after its last part ('.fmt_date($last->toDateString()).').');
         }
         $b->update(['status' => 'completed', 'completed_at' => now()]);
+        $b->parts()->whereNull('done_at')->update(['done_at' => now()]);
         Notifier::notify($b->customer_id, 'customer', 'Thank you for booking '.$b->supplier->name, 'Your '.$b->event_type.' ('.$b->code.') is marked as done.', route('events.show', $b, false));
 
         return ['ok' => true];

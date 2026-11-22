@@ -21,6 +21,7 @@ Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'r
     Route::post('/bookings/{eventBooking}/decline', [BookingController::class, 'decline'])->name('bookings.decline');
     Route::post('/bookings/{eventBooking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');
     Route::post('/bookings/{eventBooking}/complete', [BookingController::class, 'complete'])->name('bookings.complete');
+    Route::post('/bookings/{eventBooking}/parts/{part}/done', [BookingController::class, 'partDone'])->whereNumber('part')->name('bookings.part-done');
     Route::get('/payments', [BookingController::class, 'payments'])->name('payments');
     Route::post('/payments/{eventPayment}/confirm', [BookingController::class, 'confirmPayment'])->name('payments.confirm');
     Route::get('/payments/{eventPayment}/proof', [BookingController::class, 'proof'])->name('payments.proof');

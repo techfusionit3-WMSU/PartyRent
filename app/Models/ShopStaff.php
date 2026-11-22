@@ -97,7 +97,7 @@ class ShopStaff extends Model
     /** Business (event company) workspace routes (after "business.") => permission; no match = any member. */
     public const BUSINESS_ROUTE_PERMS = [
         'dashboard' => null, 'calendar' => 'orders.view',
-        'bookings.quote' => 'orders.manage', 'bookings.decline' => 'orders.manage', 'bookings.cancel' => 'orders.manage', 'bookings.complete' => 'orders.manage',
+        'bookings.quote' => 'orders.manage', 'bookings.decline' => 'orders.manage', 'bookings.cancel' => 'orders.manage', 'bookings.complete' => 'orders.manage', 'bookings.part-done' => 'orders.manage',
         'bookings' => 'orders.view', 'bookings.*' => 'orders.view',
         'payments.remind' => 'payments.view', 'payments.proof' => 'payments.view', 'payments.*' => 'payments.verify', 'payments' => 'payments.view',
         'packages' => 'products.manage', 'packages.*' => 'products.manage',

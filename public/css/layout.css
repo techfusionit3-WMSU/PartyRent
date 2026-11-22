@@ -769,3 +769,6 @@
 .et-card .et-body { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .et-thumb { display: flex; flex-direction: column; gap: 4px; width: 96px; }
 .et-thumb img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; }
+/* Event parts schedule */
+.ev-sched { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.ev-sched li.done b { text-decoration: line-through; color: var(--muted); }

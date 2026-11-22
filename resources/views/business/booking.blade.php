@@ -6,14 +6,16 @@
     $manage = $u->orgCan('orders.manage');
     $verify = $u->orgCan('payments.verify');
     $q = $b->quote;
-    $lines = old('items', $q['items'] ?? ($b->package ? [['label' => $b->package->name.' ('.$b->package->guestsLabel().')', 'amount' => $b->package->price]] : [['label' => '', 'amount' => '']]));
+    // first quotation: the package, plus each optional part the customer chose that has a price
+    $extras = $b->parts->filter(fn ($pt) => $pt->price > 0)->map(fn ($pt) => ['label' => $pt->name.' ('.$pt->date->format('M j').')', 'amount' => $pt->price])->values()->all();
+    $lines = old('items', $q['items'] ?? ($b->package ? array_merge([['label' => $b->package->name.' ('.$b->package->guestsLabel().')', 'amount' => $b->package->price]], $extras) : [['label' => '', 'amount' => '']]));
     $sched = $q['schedule'] ?? [];
     $pctOf = fn ($k, $def) => old($k, collect($sched)->firstWhere('kind', $k === 'reservePct' ? 'reservation' : 'deposit')['pct'] ?? $def);
 @endphp
 <div class="crumbs"><a href="{{ route('business.bookings') }}">Event Bookings</a> / {{ $b->code }}</div>
-<div class="page-head"><div><h1>{{ $b->event_type }} · {{ $b->event_date->format('D, M j, Y') }}</h1><p>{{ $b->code }} · <span class="badge {{ $b->statusBadge() }}">{{ $b->statusLabel() }}</span>@if($b->close_reason) · {{ $b->close_reason }}@endif</p></div>
+<div class="page-head"><div><h1>{{ $b->event_type }} · {{ $b->whenLabel() }}</h1><p>{{ $b->code }} · <span class="badge {{ $b->statusBadge() }}">{{ $b->statusLabel() }}</span>@if($b->close_reason) · {{ $b->close_reason }}@endif</p></div>
   <div class="row wrap">
-    @if($manage && $b->status === 'confirmed' && $b->event_date->lte(today()))<form method="POST" action="{{ route('business.bookings.complete', $b) }}">@csrf<button class="btn btn-success">{{ icon('check') }}Mark event done</button></form>@endif
+    @if($manage && $b->status === 'confirmed' && $b->lastDate()->lte(today()))<form method="POST" action="{{ route('business.bookings.complete', $b) }}">@csrf<button class="btn btn-success">{{ icon('check') }}Mark event done</button></form>@endif
     @if($manage && in_array($b->status, ['inquiry', 'quoted'], true))<button class="btn btn-ghost" data-modal="declineM">Decline</button>@endif
     @if($manage && in_array($b->status, ['booked', 'confirmed'], true))<button class="btn btn-ghost" data-modal="cancelM">Cancel booking</button>@endif
   </div></div>
@@ -28,7 +30,7 @@
     <dl class="kv">
       <dt>Customer</dt><dd>{{ $b->customer->name }}<br><span class="small muted">{{ $b->customer->email }} · {{ $b->customer->phone }}</span></dd>
       <dt>Package</dt><dd>{{ $b->package ? $b->package->name.' · '.money($b->package->price) : 'Custom event (no package)' }}</dd>
-      <dt>Date & time</dt><dd>{{ $b->event_date->format('l, M j, Y') }}{{ $b->timeLabel() ? ' · '.$b->timeLabel() : '' }}</dd>
+      <dt>Schedule</dt><dd>@include('partials.event-parts', ['b' => $b, 'canMark' => $manage && $b->status === 'confirmed'])</dd>
       <dt>Guests</dt><dd>{{ $b->guests }}</dd>
       <dt>Venue</dt><dd>{{ $b->venue }}{{ $b->city ? ', '.$b->city : '' }}</dd>
       @if($b->budget)<dt>Budget</dt><dd>{{ money($b->budget) }}</dd>@endif

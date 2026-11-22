@@ -38,9 +38,23 @@ class DashboardController extends BusinessController
         $month = preg_match('/^\d{4}-\d{2}$/', (string) $request->query('m')) ? \Carbon\Carbon::parse($request->query('m').'-01') : today()->startOfMonth();
         $from = $month->copy()->startOfMonth()->startOfWeek(\Carbon\Carbon::SUNDAY);
         $to = $month->copy()->endOfMonth()->endOfWeek(\Carbon\Carbon::SATURDAY);
-        $list = EventBooking::where('supplier_id', $s->id)->whereIn('status', ['inquiry', 'quoted', 'booked', 'confirmed', 'completed'])
-            ->whereBetween('event_date', [$from->toDateString(), $to->toDateString()])->with('customer')->orderBy('start_time')->get()
-            ->groupBy(fn ($b) => $b->event_date->toDateString());
+        // every part of an event shows on its own date (a wedding's prenup shoot and reception, a fiesta's days)
+        $range = [$from->toDateString(), $to->toDateString()];
+        $list = collect();
+        EventBooking::where('supplier_id', $s->id)->whereIn('status', ['inquiry', 'quoted', 'booked', 'confirmed', 'completed'])
+            ->whereHas('parts', fn ($q) => $q->whereBetween('date', $range))->with(['customer', 'parts'])->get()
+            ->each(function ($b) use ($list, $range) {
+                foreach ($b->parts as $pt) {
+                    $d = $pt->date->toDateString();
+                    if ($d >= $range[0] && $d <= $range[1]) {
+                        $e = clone $b;
+                        $e->calPart = $b->parts->count() > 1 ? $pt->name : null;
+                        $e->calTime = $pt->start_time;
+                        $list->push([$d, $e]);
+                    }
+                }
+            });
+        $list = $list->sortBy(fn ($x) => $x[1]->calTime ?? '99')->groupBy(fn ($x) => $x[0])->map(fn ($g) => $g->map(fn ($x) => $x[1])->unique('id')->values());
 
         return view('business.calendar', ['s' => $s, 'month' => $month, 'from' => $from, 'to' => $to, 'byDay' => $list, 'max' => (int) $s->bizSettings()['maxEventsPerDay']]);
     }

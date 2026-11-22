@@ -69,6 +69,7 @@ class RecordStaffAction
         'business.bookings.decline' => 'Declined a booking',
         'business.bookings.cancel' => 'Cancelled a booking',
         'business.bookings.complete' => 'Completed a booking',
+        'business.bookings.part-done' => 'Marked a part of an event done',
         'business.payments.confirm' => 'Confirmed a payment',
         'business.event-types.apply' => 'Applied for event type :ref',
         'business.event-types.request' => 'Asked PartyRent to add an event type',

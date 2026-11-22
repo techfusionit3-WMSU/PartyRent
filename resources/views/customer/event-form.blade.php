@@ -22,8 +22,15 @@
   <div class="form-grid">
     <div class="field @error('event_type') invalid @enderror"><label for="ev-type">Type of event</label><select class="input" id="ev-type" name="event_type" required>@php($evSel = old('event_type', $pkg?->events[0] ?? ''))<option value="">Choose…</option>@foreach($types as $name => $vt)<option value="{{ $name }}" data-max="{{ $vt->max_guests }}" @selected($evSel === $name)>{{ $name }} · up to {{ number_format($vt->max_guests) }} guests</option>@endforeach</select>@error('event_type')<div class="error-text">{{ $message }}</div>@enderror<div class="hint">The kinds of events PartyRent verified {{ $s->name }} for.</div></div>
     <div class="field @error('guests') invalid @enderror"><label>Number of guests</label><input class="input" type="number" name="guests" min="1" required value="{{ old('guests', $pkg?->max_guests ?? $pkg?->min_guests) }}">@error('guests')<div class="error-text">{{ $message }}</div>@enderror</div>
-    <div class="field @error('event_date') invalid @enderror"><label>Event date</label><input class="input" type="date" name="event_date" required min="{{ today()->addDays((int) $set['minNoticeDays'])->toDateString() }}" value="{{ old('event_date') }}">@error('event_date')<div class="error-text">{{ $message }}</div>@enderror<div class="hint">At least {{ $set['minNoticeDays'] }} days from today.</div></div>
-    <div class="field"><label>Time <span class="muted small">(optional)</span></label><div class="row" style="gap:8px"><input class="input" type="time" name="start_time" value="{{ old('start_time') }}"><span class="muted">to</span><input class="input" type="time" name="end_time" value="{{ old('end_time') }}"></div></div>
+  </div>
+  {{-- When: one row per part of the event (from the package, else the event type's usual parts). Optional parts are ticked to include. --}}
+  <div class="field" id="evParts" data-defs='@json($defs)' data-old='@json(old('parts', []))' data-min="{{ today()->addDays((int) $set['minNoticeDays'])->toDateString() }}">
+    <label>When</label>
+    <div class="hint mb-1">Each part of your event gets its own date (and time or venue if different). The first part must be at least {{ $set['minNoticeDays'] }} days from today.</div>
+    <div class="stack-sm" data-rows></div>
+    @error('parts')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+    @error('parts.*.date')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+    <noscript><input class="input" type="date" name="event_date" required min="{{ today()->addDays((int) $set['minNoticeDays'])->toDateString() }}"></noscript>
   </div>
   <div class="field @error('venue') invalid @enderror"><label>Venue address</label><input class="input" name="venue" required minlength="5" maxlength="255" value="{{ old('venue') }}" placeholder="e.g. Grand Ballroom, Garden Orchid Hotel">@error('venue')<div class="error-text">{{ $message }}</div>@enderror</div>
   <div class="form-grid">
@@ -42,5 +49,37 @@
   </dl>
 </aside>
 </div>
+@push('scripts')
+<script>
+(function () {
+  var box = document.getElementById('evParts'); if (!box) return;
+  var defs = JSON.parse(box.dataset.defs), old = JSON.parse(box.dataset.old || '[]'), min = box.dataset.min, rows = box.querySelector('[data-rows]');
+  var form = box.closest('form'), type = form.querySelector('[name=event_type]');
+  var esc = function (t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+  var peso = function (n) { return '₱' + Number(n).toLocaleString('en-PH'); };
+  function current() {
+    var r = form.querySelector('[name=event_package_id]:checked');
+    if (r && r.value && defs.pkg[r.value]) return defs.pkg[r.value];
+    return defs.type[type.value] || [{ name: 'Event', optional: false, price: 0 }];
+  }
+  function draw() {
+    var keep = {}; rows.querySelectorAll('[data-part]').forEach(function (el) { keep[el.dataset.part] = { date: el.querySelector('[data-f=date]').value, start: el.querySelector('[data-f=start]').value, end: el.querySelector('[data-f=end]').value, venue: el.querySelector('[data-f=venue]').value, include: (el.querySelector('[data-f=include]') || {}).checked }; });
+    rows.innerHTML = current().map(function (p, i) {
+      var o = keep[p.name] || old[i] || {}, inc = !p.optional || !!o.include;
+      return '<div class="card card-flat ev-part" data-part="' + esc(p.name) + '" style="padding:10px 12px">' +
+        '<div class="row between wrap" style="gap:6px"><b>' + esc(p.name) + '</b>' + (p.optional ? '<label class="check small"><input type="checkbox" data-f="include" name="parts[' + i + '][include]" value="1"' + (inc ? ' checked' : '') + '> Include' + (p.price > 0 ? ' (+' + peso(p.price) + ')' : '') + '</label>' : '<span class="small muted">included</span>') + '</div>' +
+        '<div class="ev-part-f' + (inc ? '' : ' hidden') + '"><div class="form-grid mt-1">' +
+        '<div class="field mb-0"><label>Date</label><input class="input" type="date" data-f="date" name="parts[' + i + '][date]" min="' + min + '" value="' + esc(o.date || '') + '"' + (inc ? ' required' : '') + '></div>' +
+        '<div class="field mb-0"><label>Time <span class="muted small">(optional)</span></label><div class="row" style="gap:6px"><input class="input" type="time" data-f="start" name="parts[' + i + '][start]" value="' + esc(o.start || '') + '" aria-label="' + esc(p.name) + ' start"><span class="muted">to</span><input class="input" type="time" data-f="end" name="parts[' + i + '][end]" value="' + esc(o.end || '') + '" aria-label="' + esc(p.name) + ' end"></div></div></div>' +
+        '<div class="field mb-0 mt-1"><label>Venue <span class="muted small">(only if different from the main venue)</span></label><input class="input" data-f="venue" name="parts[' + i + '][venue]" maxlength="255" value="' + esc(o.venue || '') + '"></div></div></div>';
+    }).join('');
+    rows.querySelectorAll('[data-f=include]').forEach(function (c) { c.onchange = function () { var f = c.closest('.ev-part').querySelector('.ev-part-f'); f.classList.toggle('hidden', !c.checked); f.querySelector('[data-f=date]').required = c.checked; }; });
+  }
+  form.querySelectorAll('[name=event_package_id]').forEach(function (r) { r.addEventListener('change', draw); });
+  type.addEventListener('change', draw);
+  draw();
+})();
+</script>
+@endpush
 @push('head')<style>@media (max-width: 860px) { #evGrid { grid-template-columns: 1fr !important; } }</style>@endpush
 @endsection

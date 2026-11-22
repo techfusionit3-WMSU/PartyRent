@@ -25,7 +25,8 @@ class PackageController extends BusinessController
             return redirect()->route('business.event-types')->with('warn', 'Get an event type verified first: packages can only be offered for kinds of events PartyRent has checked.');
         }
 
-        return view('business.package-form', ['s' => $s, 'verified' => $verified, 'k' => new EventPackage(['active' => true, 'events' => [], 'inclusions' => [], 'photos' => []])]);
+        return view('business.package-form', ['s' => $s, 'verified' => $verified, 'k' => new EventPackage(['active' => true, 'events' => [], 'inclusions' => [], 'photos' => [],
+            'parts' => \App\Domain\EventParts::defaultFor($verified->keys()->first())])]);
     }
 
     public function edit(Request $request, EventPackage $eventPackage)
@@ -70,6 +71,7 @@ class PackageController extends BusinessController
             'min_guests' => 'nullable|integer|min:1|max:100000', 'max_guests' => 'nullable|integer|min:1|max:100000'.($request->filled('min_guests') ? '|gte:min_guests' : ''),
             'events' => 'required|array|min:1|max:15', 'events.*' => 'string|max:60',
             'inclusions' => 'required|array|min:1|max:40', 'inclusions.*' => 'string|max:120',
+            'parts' => 'nullable|array|max:'.\App\Domain\EventParts::MAX, 'parts.*.name' => 'nullable|string|max:60', 'parts.*.optional' => 'nullable|boolean', 'parts.*.price' => 'nullable|numeric|min:0|max:10000000',
             'photos' => 'nullable|array|max:6', 'photos.*' => 'image|max:8192',
             'photos_keep' => 'nullable|array', 'photos_keep.*' => 'string|max:255',
             'active' => 'nullable|boolean',
@@ -83,6 +85,14 @@ class PackageController extends BusinessController
         if ($e = \App\Domain\EventTypes::packageError($request->user()->shop(), $events, isset($v['max_guests']) ? (int) $v['max_guests'] : (isset($v['min_guests']) ? (int) $v['min_guests'] : null))) {
             throw \Illuminate\Validation\ValidationException::withMessages(['events' => $e]);
         }
+        // the parts of the event this package covers (stages / days); at least one is always included
+        $parts = \App\Domain\EventParts::fromForm((array) ($v['parts'] ?? []));
+        if (! $parts) {
+            $parts = \App\Domain\EventParts::defaultFor($events[0] ?? null);
+        }
+        if (! collect($parts)->contains(fn ($x) => ! $x['optional'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['parts' => 'At least one part must be included (not optional).']);
+        }
         $keep = array_values(array_intersect((array) ($k?->photos ?? []), (array) $request->input('photos_keep', [])));
         $new = array_map(fn ($f) => $f->store('event-packages/'.$request->user()->shop()->id, 'public'), (array) $request->file('photos', []));
         $photos = array_slice(array_merge($keep, $new), 0, 6);
@@ -90,7 +100,7 @@ class PackageController extends BusinessController
         return [
             'name' => trim($v['name']), 'description' => trim($v['description']), 'price' => round((float) $v['price'], 2),
             'min_guests' => $v['min_guests'] ?? null, 'max_guests' => $v['max_guests'] ?? null,
-            'events' => $events,
+            'events' => $events, 'parts' => $parts,
             'inclusions' => BusinessProfile::tags($v['inclusions'], [], 40),
             'photos' => $photos, 'active' => $request->boolean('active', true),
         ];

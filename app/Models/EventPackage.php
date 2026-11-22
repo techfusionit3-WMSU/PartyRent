@@ -12,7 +12,7 @@ class EventPackage extends Model
 
     protected function casts(): array
     {
-        return ['events' => 'array', 'inclusions' => 'array', 'photos' => 'array', 'price' => 'float', 'active' => 'boolean', 'min_guests' => 'integer', 'max_guests' => 'integer'];
+        return ['events' => 'array', 'inclusions' => 'array', 'parts' => 'array', 'photos' => 'array', 'price' => 'float', 'active' => 'boolean', 'min_guests' => 'integer', 'max_guests' => 'integer'];
     }
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }

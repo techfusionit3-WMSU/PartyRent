@@ -118,4 +118,21 @@ class BookingController extends BusinessController
 
         return Storage::disk('local')->response($eventPayment->proof_path);
     }
+
+    /** One part of the event is done (a prenup shoot, day 1…); the booking completes after the last part. */
+    public function partDone(Request $request, EventBooking $eventBooking, int $part)
+    {
+        $b = $this->own($request, $eventBooking);
+        $pt = $b->parts()->findOrFail($part);
+        if ($b->status !== 'confirmed') {
+            return back()->with('error', 'Only parts of a confirmed booking can be marked done.');
+        }
+        if ($pt->date->gt(today())) {
+            return back()->with('error', $pt->name.' is on '.fmt_date($pt->date->toDateString()).': mark it done on or after that day.');
+        }
+        $pt->update(['done_at' => now()]);
+        $left = $b->parts()->whereNull('done_at')->count();
+
+        return back()->with('success', $pt->name.' marked done.'.($left ? ' '.$left.' part'.($left > 1 ? 's' : '').' to go.' : ' All parts are done: you can now mark the event done.'));
+    }
 }

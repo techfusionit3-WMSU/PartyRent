@@ -45,7 +45,11 @@ class EventController extends Controller
         $packages = $supplier->eventPackages()->where('active', true)->get()->filter(fn ($k) => \App\Domain\EventTypes::offerable($k, $types))->values();
         $pkg = $request->query('package') ? $packages->firstWhere('id', (int) $request->query('package')) : null;
 
-        return view('customer.event-form', ['s' => $supplier, 'pkg' => $pkg, 'set' => $supplier->bizSettings(), 'packages' => $packages, 'types' => $types]);
+        // the parts each package / event type asks a date for (the form switches them when the choice changes)
+        $defs = ['pkg' => $packages->mapWithKeys(fn ($k) => [$k->id => \App\Domain\EventParts::definitions($k, $k->events[0] ?? null)])->all(),
+            'type' => $types->keys()->mapWithKeys(fn ($n) => [$n => \App\Domain\EventParts::definitions(null, $n)])->all()];
+
+        return view('customer.event-form', ['s' => $supplier, 'pkg' => $pkg, 'set' => $supplier->bizSettings(), 'packages' => $packages, 'types' => $types, 'defs' => $defs]);
     }
 
     public function store(Request $request, Supplier $supplier)
@@ -53,10 +57,13 @@ class EventController extends Controller
         abort_unless($supplier->isOrganization(), 404);
         $v = $request->validate([
             'event_package_id' => 'nullable|integer', 'event_type' => 'required|string|max:60',
-            'event_date' => 'required|date|after:today', 'start_time' => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'], 'end_time' => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            // the parts of the event (each with a date), or one event date for a single-day event
+            'parts' => 'nullable|array|max:'.\App\Domain\EventParts::MAX, 'parts.*.date' => 'nullable|date|after:today', 'parts.*.start' => 'nullable|string|max:5', 'parts.*.end' => 'nullable|string|max:5',
+            'parts.*.venue' => 'nullable|string|max:255', 'parts.*.include' => 'nullable|boolean',
+            'event_date' => 'required_without:parts|nullable|date|after:today', 'start_time' => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'], 'end_time' => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'guests' => 'required|integer|min:1|max:100000', 'venue' => 'required|string|min:5|max:255', 'city' => 'nullable|string|max:120',
             'budget' => 'nullable|numeric|min:0|max:100000000', 'notes' => 'nullable|string|max:2000',
-        ], ['venue.required' => 'Enter where the event will be held.']);
+        ], ['venue.required' => 'Enter where the event will be held.', 'parts.*.date.after' => 'Every part must be on a future date.', 'event_date.required_without' => 'Choose the event date.']);
         $pkg = ! empty($v['event_package_id']) ? EventPackage::where('supplier_id', $supplier->id)->where('active', true)->find($v['event_package_id']) : null;
         $res = Events::inquire($request->user(), $supplier, $v, $pkg);
         if (! $res['ok']) {

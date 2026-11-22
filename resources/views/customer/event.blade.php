@@ -11,7 +11,7 @@
     $myReview = \App\Models\Review::where('event_booking_id', $b->id)->first();
 @endphp
 <div class="crumbs"><a href="{{ route('events.index') }}">My Events</a> / {{ $b->code }}</div>
-<div class="page-head"><div><h1>{{ $b->event_type }} · {{ $b->event_date->format('D, M j, Y') }}</h1><p>with <a href="{{ route('suppliers.show', $s) }}">{{ $s->name }}</a> · {{ $b->code }} · <span class="badge {{ $b->statusBadge() }}">{{ $b->statusLabel() }}</span></p></div></div>
+<div class="page-head"><div><h1>{{ $b->event_type }} · {{ $b->whenLabel() }}</h1><p>with <a href="{{ route('suppliers.show', $s) }}">{{ $s->name }}</a> · {{ $b->code }} · <span class="badge {{ $b->statusBadge() }}">{{ $b->statusLabel() }}</span></p></div></div>
 @include('partials.next-step', ['ns' => \App\Domain\NextStep::event($b, 'customer')])
 
 @if($at !== false)
@@ -43,7 +43,7 @@
     <dl class="kv mt-2">
       <dt>Package</dt><dd>{{ $b->package?->name ?? 'Custom event' }}</dd>
       <dt>Guests</dt><dd>{{ $b->guests }}</dd>
-      <dt>When</dt><dd>{{ $b->event_date->format('l, M j, Y') }}{{ $b->timeLabel() ? ' · '.$b->timeLabel() : '' }}</dd>
+      <dt>When</dt><dd>@include('partials.event-parts', ['b' => $b, 'canMark' => false])</dd>
       <dt>Venue</dt><dd>{{ $b->venue }}{{ $b->city ? ', '.$b->city : '' }}</dd>
       @if($b->notes)<dt>Notes</dt><dd style="white-space:pre-line">{{ $b->notes }}</dd>@endif
     </dl>

@@ -35,6 +35,19 @@ class EventBooking extends Model
     public function customer(): BelongsTo { return $this->belongsTo(User::class, 'customer_id'); }
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
     public function payments(): HasMany { return $this->hasMany(EventPayment::class)->orderBy('due_date')->orderBy('id'); }
+    /** The parts of the event (stages / days), in date order (App\Domain\EventParts). */
+    public function parts(): HasMany { return $this->hasMany(EventBookingPart::class)->orderBy('date')->orderBy('sort'); }
+
+    public function lastDate(): \Carbon\Carbon { return $this->parts->max('date') ?? $this->event_date; }
+
+    /** "Sat, Dec 5, 2026" or "Oct 10 – Dec 5, 2026 · 3 parts". */
+    public function whenLabel(): string
+    {
+        $n = $this->parts->count();
+        $last = $this->lastDate();
+
+        return $n <= 1 || $last->isSameDay($this->event_date) ? $this->event_date->format('D, M j, Y').($n > 1 ? ' · '.$n.' parts' : '') : fmt_range($this->event_date->toDateString(), $last->toDateString()).' · '.$n.' parts';
+    }
 
     public function getRouteKeyName(): string { return 'code'; }
 

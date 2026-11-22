@@ -166,7 +166,10 @@ class DemoSeeder extends Seeder
         // before the checks); it has also applied for Graduation (waiting for PartyRent). Aquino Events is still pending.
         foreach (Supplier::where('type', 'organization')->get() as $org) {
             \App\Domain\EventTypes::grandfather($org);
+            \App\Domain\EventParts::backfill($org);
         }
+        // event parts: the garden wedding offers an optional prenup shoot for ₱15,000 on top of the ceremony and reception
+        $pk[1]->update(['parts' => [['name' => 'Prenup shoot', 'optional' => true, 'price' => 15000], ['name' => 'Ceremony', 'optional' => false, 'price' => 0], ['name' => 'Reception', 'optional' => false, 'price' => 0]]]);
         if ($grad = \App\Models\EventType::where('name', 'Graduation')->first()) {
             \App\Models\SupplierEventType::create(['supplier_id' => $s->id, 'event_type_id' => $grad->id, 'status' => 'pending', 'claimed_max_guests' => 200, 'claimed_per_day' => 1, 'past_events' => 6,
                 'note' => 'We styled six school graduation balls last season.', 'photos' => [], 'docs' => []]);

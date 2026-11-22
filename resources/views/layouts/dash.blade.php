@@ -53,6 +53,13 @@
     $same = array_filter($items, fn ($it) => count($it) > 1 && $it[0] === $nav);
     $activeRoute = (collect($same)->first(fn ($it) => explode('.', $it[1])[0] === $here) ?? collect($same)->first())[1] ?? null;
     $isActive = fn ($it) => $nav === $it[0] && (! $activeRoute || $it[1] === $activeRoute);
+    // sidebar groups: [label, items] (items before the first label form a group without a name)
+    $groups = [];
+    foreach ($items as $it) {
+        if (count($it) === 1) { $groups[] = ['label' => $it[0], 'items' => []]; continue; }
+        if (! $groups) { $groups[] = ['label' => null, 'items' => []]; }
+        $groups[count($groups) - 1]['items'][] = $it;
+    }
 @endphp
 
 @section('body')
@@ -71,12 +78,21 @@
         @endforeach
       </div>
     @endif
-    @foreach($items as $it)
-      @if(count($it) === 1)
-        <div class="nav-label">{{ __($it[0]) }}</div>
+    {{-- Menu groups fold open / closed (tap the group name); the group of the open page is always open. --}}
+    @foreach($groups as $grp)
+      @php($hasActive = collect($grp['items'])->contains(fn ($it) => $isActive($it)))
+      @php($cnt = collect($grp['items'])->sum(fn ($it) => (int) ($it[4] ?? 0)))
+      @if($grp['label'])
+        <div class="nav-group {{ $hasActive ? 'open has-active' : '' }}" data-nav-group="{{ $role }}:{{ $curMod }}:{{ \Illuminate\Support\Str::slug($grp['label']) }}">
+          <button type="button" class="nav-label nav-toggle" aria-expanded="{{ $hasActive ? 'true' : 'false' }}"><span>{{ __($grp['label']) }}</span>@if($cnt)<span class="cnt">{{ $cnt }}</span>@endif{{ icon('down') }}</button>
+          <div class="nav-items">
       @else
-        <a class="nav {{ $isActive($it) ? 'active' : '' }}" href="{{ route($it[1]) }}">{{ icon($it[2]) }}<span>{{ __($it[3]) }}</span>@if(! empty($it[4]))<span class="cnt">{{ $it[4] }}</span>@endif</a>
+        <div class="nav-group open"><div class="nav-items">
       @endif
+        @foreach($grp['items'] as $it)
+          <a class="nav {{ $isActive($it) ? 'active' : '' }}" href="{{ route($it[1]) }}" @if($isActive($it)) aria-current="page" @endif>{{ icon($it[2]) }}<span>{{ __($it[3]) }}</span>@if(! empty($it[4]))<span class="cnt">{{ $it[4] }}</span>@endif</a>
+        @endforeach
+        </div></div>
     @endforeach
     <div class="mb-1">@include('partials.lang-switch', ['dark' => true])</div>
     <div class="side-foot">{{ __('Signed in as') }} <b style="color:#fff">{{ $shellUser->name }}</b><br>{{ $shellUser->email }}</div>

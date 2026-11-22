@@ -22,7 +22,7 @@
 @if($type === 'item' && ! $item->isSale() && $item->max_rental_days)<div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">The supplier allows a maximum of <b>{{ $item->max_rental_days }} day{{ $item->max_rental_days > 1 ? 's' : '' }}</b> per booking for this item.</div></div>@endif
 
 <div class="row wrap between" style="gap:10px;align-items:flex-end">
-  <div id="qtyRow" class="{{ $custom ? 'hidden' : '' }}"><div class="label mb-1">{{ $type === 'package' ? 'Packages' : 'Quantity' }}<span class="md-on-txt"> per day</span></div><div class="qty" id="qbox"><button type="button" data-d aria-label="Decrease">−</button><input type="number" id="pq" min="1" value="{{ max(1, (int) $qty) }}" aria-label="Quantity"><button type="button" data-i aria-label="Increase">+</button></div></div>
+  <div id="qtyRow" class="{{ $custom ? 'hidden' : '' }}"><div class="label mb-1">{{ $type === 'package' ? 'Packages' : 'Quantity' }}<span class="md-on-txt"> per day</span></div><div class="qty" id="qbox"><button type="button" data-d aria-label="Decrease">−</button><input type="number" id="pq" min="1" value="{{ $qty === null ? '' : max(1, (int) $qty) }}" placeholder="–" aria-label="Quantity"><button type="button" data-i aria-label="Increase">+</button></div></div>
   <div class="right">@if(! empty($stockText))<div class="small muted">{{ $stockText }}</div>@endif<div id="availTxt"></div></div>
 </div>
 <div id="perDayWrap" class="mt-2 {{ $multi ? '' : 'hidden' }}">

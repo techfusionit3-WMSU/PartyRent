@@ -560,10 +560,11 @@ details.charges .sum-line > span:first-child { min-width: 0; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 .pay-when { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--line); }
 .notif .n-open { color: var(--brand); font-weight: 700; }
-.lang-switch { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; margin: 0; flex: none; }
+.lang-switch { display: inline-flex; border: 1px solid var(--brand-100); border-radius: 999px; overflow: hidden; margin: 0; flex: none; }
 .lang-switch button { border: 0; background: var(--surface); color: var(--muted); font: 700 .74rem var(--font); padding: 5px 9px; cursor: pointer; min-width: 36px; min-height: 30px; }
-.lang-switch button.on { background: var(--ink); color: #fff; }
+.lang-switch button.on { background: var(--grad); color: #fff; }
+.lang-switch button:not(.on):hover { color: var(--brand); background: var(--brand-50); }
 .lang-switch.dark { border-color: rgba(255, 255, 255, .2); }
 .lang-switch.dark button { background: transparent; color: #D9D0EA; }
-.lang-switch.dark button.on { background: rgba(255, 255, 255, .18); color: #fff; }
+.lang-switch.dark button.on { background: var(--grad); color: #fff; }
 main:focus { outline: none; }

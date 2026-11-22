@@ -5,6 +5,7 @@
 <p class="muted">We sent a 6-digit code to <b>{{ $p->email }}</b>. Your account is created once you enter it.</p>
 @if(session('success'))<div class="alert alert-success mt-2">{{ icon('check') }}<div>{{ session('success') }}</div></div>@endif
 @if(session('error'))<div class="alert alert-danger mt-2">{{ icon('alert') }}<div>{{ session('error') }}</div></div>@endif
+@if(session('dev_code'))<div class="alert alert-warn mt-2">{{ icon('info') }}<div><b>Email is not set up on this computer</b>, so the code is shown here: <b style="font-size:1.15rem;letter-spacing:.15em">{{ session('dev_code') }}</b>. To send real emails, put the team Gmail App Password in <code>MAIL_PASSWORD</code> in <code>.env</code> and run <code>php artisan config:clear</code>.</div></div>@endif
 <form method="POST" action="{{ route('register.verify.submit') }}" class="mt-2">
   @csrf
   <div class="field @error('code') invalid @enderror">

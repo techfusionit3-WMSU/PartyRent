@@ -39,7 +39,7 @@
     <div class="pdx-meta">@if($reviews->count())<span class="stars">{{ stars($p->rating) }}</span> <a href="#reviews">{{ number_format($p->rating, 1) }} ({{ $reviews->count() }})</a>@else<span>No reviews yet</span>@endif<span class="dotsep">{{ $p->rent_count }} rented</span></div>
     <div class="row wrap gap-sm mt-1">
       <span class="badge b-purple plain">{{ $cat->name }}</span><span class="badge b-gray plain">{{ \App\Domain\Damage::conditionLabel($p->condition) }}</span>
-      @if(! $p->isSale())<span class="badge {{ $p->max_rental_days ? 'b-purple' : 'b-gray' }} plain">{{ icon('clock', 'width:13px;height:13px') }} {{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '') : 'No Rental Duration Limit' }}</span>@endif
+      @if(! $p->isSale())<span class="badge {{ $p->max_rental_days ? 'b-purple' : 'b-gray' }} plain">{{ icon('clock', 'width:13px;height:13px') }} {{ $p->max_rental_days ? 'Maximum Rental: '.$p->max_rental_days.' Day'.($p->max_rental_days > 1 ? 's' : '') : 'No maximum days' }}</span>@if($p->min_hours > 0)<span class="badge b-gold plain">{{ icon('clock', 'width:13px;height:13px') }} {{ \App\Domain\Slots::hourLimitLabel($p) }}</span>@endif @endif
       @if($p->delivery && $sup->offersDelivery())<span class="badge b-sky plain">{{ icon('truck', 'width:13px;height:13px') }} Delivery</span>@endif
     </div>
 

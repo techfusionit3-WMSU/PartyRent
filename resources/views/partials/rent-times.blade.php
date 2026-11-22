@@ -12,13 +12,25 @@
 @else
   @php($lim = \App\Domain\Slots::hourLimitLabel($item))
   <div class="row wrap between mb-2" style="gap:6px"><span class="small">{{ icon('clock', 'width:14px;vertical-align:-2px') }} Total rental duration: <b id="durTxt">Select dates</b></span>@php($frame = \App\Domain\Slots::frameLabel($item))<span class="small muted">{{ $frame ? 'Item time frame '.$frame : 'Rental hours '.\App\Domain\Slots::fmt12($st['open']).' – '.\App\Domain\Slots::fmt12($st['close']) }}{{ $lim ? ' · '.$lim : '' }}</span></div>
+  @php($minH = (float) ($item->min_hours ?? 0))
+  @if($minH > 0)<p class="small muted mb-2" id="minHrsNote" data-min-hours="{{ $minH }}">{{ icon('info', 'width:14px;vertical-align:-2px') }} This shop rents it for at least <b>{{ rtrim(rtrim(number_format($minH, 1), '0'), '.') }} hours</b>. Only need it for less? Pick the shortest time; you may return it early, but the minimum is what you book and pay for.</p>@endif
   @push('scripts')
   <script>
   // Total rental duration (reference Slots.duration): start time on the first date → end time on the last.
   (function () {
     var g = function (id) { return document.getElementById(id); };
     var m = function (t) { var x = /^(\d{1,2}):(\d{2})$/.exec(t || ''); return x ? +x[1] * 60 + +x[2] : null; };
+    // End times that would be shorter than the item's minimum are not offered (same-day rentals).
+    var note = g('minHrsNote'), minM = note ? Math.round(+note.dataset.minHours * 60) : 0;
+    function limitEnd() {
+      if (!minM || !g('pst') || !g('pet')) return;
+      var md = g('mdToggle'), a = g('ps') && g('ps').value, b = (md && !md.checked) ? a : ((g('pe') && g('pe').value) || a);
+      var same = !b || a === b, s = m(g('pst').value), first = null;
+      Array.prototype.forEach.call(g('pet').options, function (o) { var ok = !same || m(o.value) - s >= minM; o.disabled = !ok; if (ok && first === null) first = o.value; });
+      if (same && m(g('pet').value) - s < minM && first !== null) { g('pet').value = first; g('pet').dispatchEvent(new Event('change', { bubbles: true })); }
+    }
     function draw() {
+      limitEnd();
       var out = g('durTxt'); if (!out || !g('ps')) return;
       var md = g('mdToggle'), a = g('ps').value, b = (md && !md.checked) ? a : ((g('pe') && g('pe').value) || a);
       if (!a) { out.textContent = 'Select dates'; return; }

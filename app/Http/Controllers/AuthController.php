@@ -80,10 +80,22 @@ class AuthController extends Controller
 
         return redirect()->route('register.verify')->with($sent ? 'success' : 'error', $sent
             ? 'We sent a 6-digit code to '.$email.'.'
-            : 'We could not send the code to '.$email.' right now. Please tap "Send a new code" in a minute.');
+            : 'We could not send the code to '.$email.' right now. Please tap "Send a new code" in a minute.')
+            ->with(self::devCode($sent, $code));
     }
 
     /* ---------- sign-up email code ---------- */
+
+    /**
+     * A local copy whose email is not set up (MAIL_MAILER=log / array, no Gmail App Password, or Gmail refused)
+     * shows the code on the page so sign-up can still be finished. Never on a live site.
+     */
+    private static function devCode(bool $sent, string $code): array
+    {
+        $noMail = in_array(config('mail.default'), ['log', 'array'], true) || (config('mail.default') === 'smtp' && ! config('mail.mailers.smtp.password'));
+
+        return app()->environment('local') && (! $sent || $noMail) ? ['dev_code' => $code] : [];
+    }
 
     private static function sendCode(PendingRegistration $p, string $code): bool
     {
@@ -168,9 +180,11 @@ class AuthController extends Controller
             return back()->with('error', 'Please wait '.$wait.' seconds before asking for a new code.');
         }
 
-        return self::sendCode($p, $p->newCode())
-            ? back()->with('success', 'New code sent to '.$p->email.'. Earlier codes no longer work.')
-            : back()->with('error', 'We could not send the email right now. Please try again in a minute.');
+        $code = $p->newCode();
+        $sent = self::sendCode($p, $code);
+
+        return back()->with($sent ? 'success' : 'error', $sent ? 'New code sent to '.$p->email.'. Earlier codes no longer work.' : 'We could not send the email right now. Please try again in a minute.')
+            ->with(self::devCode($sent, $code));
     }
 
     /* ---------- email verification ---------- */

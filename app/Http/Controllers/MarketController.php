@@ -230,13 +230,15 @@ class MarketController extends Controller
         $earliest = add_days($today, $product->isSale() ? (int) $product->lead_days : 0);
         $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : max(add_days($today, 7), $earliest);
         $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : $start;
-        $qty = max(1, (int) ($request->query('qty') ?: min(10, max(1, $product->total_stock))));
+        // The customer picks how many; only a quantity they already chose (browse filter, rental list) is filled in.
+        $qtyPicked = (int) $request->query('qty') > 0;
+        $qty = $qtyPicked ? (int) $request->query('qty') : 1;
         $live = $this->live();
         $u = $request->user();
 
         return view('market.product', [
             'p' => $product, 'sup' => $product->supplier, 'cat' => $product->category,
-            'start' => $start, 'end' => $end, 'qty' => $qty,
+            'start' => $start, 'end' => $end, 'qty' => $qtyPicked ? $qty : null,
             'days' => array_fill_keys(date_range($start, $end), $qty),
             'reviews' => $product->reviews()->visible()->with(['customer', 'product', 'supplier'])->latest()->get(),
             'related' => $live->where('supplier_id', $product->supplier_id)->where('id', '!=', $product->id)->take(4),

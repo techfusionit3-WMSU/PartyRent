@@ -14,15 +14,15 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [ ] G6 Security deposit: what it is for, whether it must be paid, when it comes back
 - [ ] G7 Supplier side: every change / confirmation records who and when (visible history on the rental)
 - [ ] G8 Owner: transaction records page, organized + printable reports
-- [ ] G9 Phone: market top tabs (Browse / Packages / ...) hidden; bottom island stays
+- [x] G9 Phone: market top tabs (Browse / Packages / ...) hidden; bottom island stays
 - [ ] G10 Speed pass (logic unchanged)
 - [ ] G11 Phone: buttons that disappear / break
 - [ ] G12 Revenue proposal (docs only, NOT built until the team chooses)
-- [ ] G13 Sign-up code email: .env.example uses the team Gmail SMTP; local log-mailer shows the code
-- [ ] G14 EN / FIL switch colors
+- [x] G13 Sign-up code email: .env.example uses the team Gmail SMTP; local log-mailer shows the code
+- [x] G14 EN / FIL switch colors
 - [x] G15 Admin complaints: giant icon; "Log an issue" visible first
-- [ ] G16 Sidebar groups collapse (dropdown per category) for supplier + admin + all dash roles
-- [ ] G17 Product page: quantity starts empty (customer picks); minimum hours explained before the error
+- [x] G16 Sidebar groups collapse (dropdown per category) for supplier + admin + all dash roles
+- [x] G17 Product page: quantity starts empty (customer picks); minimum hours explained before the error
 - [x] G18 Admin no longer verifies / rejects payments (PartyRent cashier does); admin only views records
       (User::CASHIER_ONLY; migration 2026_11_22_000100; PartyRent cashier cashier@partyrent.ph / demo123 seeded + in dev DB)
 

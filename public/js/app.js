@@ -116,6 +116,12 @@
     // sidebar
     if (e.target.closest('[data-side-open]')) { $('#side') && $('#side').classList.add('open'); $('#sideBd') && $('#sideBd').classList.add('open'); }
     if (e.target.closest('#sideBd')) { $('#side').classList.remove('open'); $('#sideBd').classList.remove('open'); }
+    // sidebar groups fold open / closed; the choice is remembered in this browser
+    const ng = e.target.closest('.nav-toggle');
+    if (ng) {
+      const g = ng.closest('.nav-group'); const open = g.classList.toggle('open'); ng.setAttribute('aria-expanded', open ? 'true' : 'false');
+      try { const s = JSON.parse(localStorage.getItem('pr-nav') || '{}'); s[g.dataset.navGroup] = open; localStorage.setItem('pr-nav', JSON.stringify(s)); } catch (err) { /* storage blocked */ }
+    }
     // tabs that filter rows client-side
     const tab = e.target.closest('[data-filter-tab]');
     if (tab) {
@@ -324,6 +330,8 @@
     const ps = $('#ps', box), pe = $('#pe', box), pq = $('#pq', box), md = $('#mdToggle', box);
     const pdT = $('#perDayToggle', box), pdWrap = $('#perDayWrap', box), pdBox = $('#perDay', box), qRow = $('#qtyRow', box);
     let start = ps.value, end = pe.value || ps.value, qty = pq ? Math.max(1, +pq.value || 1) : 1, picking = 'start';
+    // the customer sets the quantity themselves: until then availability is shown for 1 but nothing can be rented
+    let qtySet = !pq || pq.value !== '';
     const maxDays = +box.dataset.maxDays || 30;
     const multi = () => !!(md && md.checked);
     const perDay = () => !!(pdT && pdT.checked && start !== end);
@@ -365,6 +373,10 @@
         const est = $('#est', box); if (est) est.textContent = r.totalText + (dates.length > 1 ? ' · ' + dates.length + ' days' : '');
         $$('[data-tier]', box).forEach(t => { const min = +t.dataset.min, max = t.dataset.max ? +t.dataset.max : null; t.classList.toggle('on', vals.some(q => q >= min && (max == null || q <= max))); });
         $$('[data-rent-submit]', box).forEach(b => { b.disabled = !r.ok; });
+        if (!qtySet) {
+          if (est) est.textContent = '—';
+          if (at) at.innerHTML = '<span class="badge b-gold">Enter how many you need</span>' + (r.minAvailable != null ? '<div class="small muted">' + r.minAvailable + ' free</div>' : '');
+        }
         if (cal) cal.update({ month: (dates[0] || r.today).slice(0, 7), need: Math.max(1, ...vals, 1), selected: dates });
         const alt = $('#altBox', box);
         if (alt && window.PR.routes.alternatives) {
@@ -384,13 +396,16 @@
     box.addEventListener('multiday', onDates);
     if (pdT) pdT.addEventListener('change', () => {
       if (!pdT.checked) { const q = Math.max(1, ...Object.values(sch.state.days).map(Number), 1); qty = q; if (pq) pq.value = q; }
+      qtySet = true;
       ui(); sch.setDays(daysFor());
     });
     if (pq) {
-      const setQ = v => { qty = Math.max(1, Math.floor(v) || 1); pq.value = qty; Object.keys(sch.state.days).forEach(d => { sch.state.days[d] = qty; }); sch.refresh(); };
+      const f = box.closest('form') || box.querySelector('form');
+      if (f) f.addEventListener('submit', e => { if (!qtySet) { e.preventDefault(); e.stopImmediatePropagation(); toast('Enter how many you need first.', 'warn'); pq.focus(); } }, true);
+      const setQ = v => { qtySet = true; qty = Math.max(1, Math.floor(v) || 1); pq.value = qty; Object.keys(sch.state.days).forEach(d => { sch.state.days[d] = qty; }); sch.refresh(); };
       pq.addEventListener('change', () => setQ(+pq.value));
-      $('#qbox [data-d]', box).addEventListener('click', () => setQ(qty - 1));
-      $('#qbox [data-i]', box).addEventListener('click', () => setQ(qty + 1));
+      $('#qbox [data-d]', box).addEventListener('click', () => setQ(qtySet ? qty - 1 : 1));
+      $('#qbox [data-i]', box).addEventListener('click', () => setQ(qtySet ? qty + 1 : 1));
     }
     ui();
   }
@@ -507,6 +522,14 @@
     $$('[data-map-view]').forEach(MapView);
     $$('[data-rentbox]').forEach(RentBox);
     $$('[data-pkg-config]').forEach(PackageConfig);
+
+    // sidebar groups: open the ones this browser left open (the group of the open page is always open)
+    let navState = {}; try { navState = JSON.parse(localStorage.getItem('pr-nav') || '{}'); } catch (err) { /* storage blocked */ }
+    $$('.nav-group[data-nav-group]').forEach(g => {
+      const k = g.dataset.navGroup; if (g.classList.contains('has-active') || !(k in navState)) return;
+      g.classList.toggle('open', !!navState[k]);
+      const b = $('.nav-toggle', g); if (b) b.setAttribute('aria-expanded', navState[k] ? 'true' : 'false');
+    });
 
     // Show / hide password: an eye button inside every password field.
     var EYE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';

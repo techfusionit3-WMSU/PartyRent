@@ -721,3 +721,21 @@
 @media (max-width: 560px) { .shop-cover { height: 130px; } }
 .dash-top .working-as { max-width: 340px; }
 @media (max-width: 768px) { .dash-top .working-as { max-width: 46vw; font-size: .72rem; } .dash-top .ttl { display: none; } }
+
+/* =========================================================
+   Feedback batch 3 (2026-11-22)
+   ========================================================= */
+/* Sidebar groups fold open / closed */
+.side .nav-toggle { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; cursor: pointer; text-align: left; font-family: var(--font); border-radius: 8px; margin-top: 2px; }
+.side .nav-toggle:hover { color: #fff; }
+.side .nav-toggle span:first-child { flex: 1; }
+.side .nav-toggle .cnt { background: var(--brand); color: #fff; border-radius: 999px; padding: 0 7px; font-size: .68rem; letter-spacing: 0; }
+.side .nav-toggle svg { width: 15px; height: 15px; transition: transform .15s; }
+.side .nav-group.open .nav-toggle svg { transform: rotate(180deg); }
+.side .nav-group.open .nav-toggle .cnt { display: none; }
+.side .nav-group .nav-items { display: none; }
+.side .nav-group.open .nav-items { display: block; }
+/* Phone: the floating bottom bar is the main menu, so the top tabs are not repeated */
+@media (max-width: 768px) {
+  body:not(.pdx-page) .mk-nav { display: none; }
+}

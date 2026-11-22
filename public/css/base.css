@@ -568,3 +568,4 @@ details.charges .sum-line > span:first-child { min-width: 0; }
 .lang-switch.dark button { background: transparent; color: #D9D0EA; }
 .lang-switch.dark button.on { background: var(--grad); color: #fff; }
 main:focus { outline: none; }
+.btn.is-off { opacity: .55; }

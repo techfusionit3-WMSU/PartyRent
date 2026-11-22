@@ -332,6 +332,19 @@
     let start = ps.value, end = pe.value || ps.value, qty = pq ? Math.max(1, +pq.value || 1) : 1, picking = 'start';
     // the customer sets the quantity themselves: until then availability is shown for 1 but nothing can be rented
     let qtySet = !pq || pq.value !== '';
+    let lastCheck = null;
+    const rentForm = box.closest('form') || box.querySelector('form');
+    if (rentForm) rentForm.addEventListener('submit', async e => {
+      if (!lastCheck || lastCheck.ok || !qtySet) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const bad = lastCheck.bad || [];
+      const lines = bad.map(b => esc(b.date) + ': only ' + b.available + ' free').join(', ');
+      const most = bad.length ? Math.min(...bad.map(b => +b.available)) : 0;
+      const ok = await confirmDialog({ title: 'Not enough stock', message: 'You asked for more than the shop has free (' + lines + '). ' + (most > 0 ? 'Rent ' + most + ' instead, pick another date, or choose one of the suggested alternatives.' : 'Pick another date, or choose one of the suggested alternatives.'), ok: most > 0 ? 'Use ' + most : 'Pick another date' });
+      if (!ok) return;
+      if (most > 0 && pq && !perDay()) { qty = most; pq.value = most; Object.keys(sch.state.days).forEach(d => { sch.state.days[d] = most; }); sch.refresh(); }
+      else ps.focus();
+    }, true);
     const maxDays = +box.dataset.maxDays || 30;
     const multi = () => !!(md && md.checked);
     const perDay = () => !!(pdT && pdT.checked && start !== end);
@@ -372,7 +385,9 @@
         const qb = $('#qbox', box); if (qb) qb.classList.toggle('bad', !r.ok);
         const est = $('#est', box); if (est) est.textContent = r.totalText + (dates.length > 1 ? ' · ' + dates.length + ' days' : '');
         $$('[data-tier]', box).forEach(t => { const min = +t.dataset.min, max = t.dataset.max ? +t.dataset.max : null; t.classList.toggle('on', vals.some(q => q >= min && (max == null || q <= max))); });
-        $$('[data-rent-submit]', box).forEach(b => { b.disabled = !r.ok; });
+        // not enough stock: the buttons look off but still answer a click with why (and a fix), never silently
+        lastCheck = r;
+        $$('[data-rent-submit]', box).forEach(b => { b.disabled = false; b.classList.toggle('is-off', !r.ok); });
         if (!qtySet) {
           if (est) est.textContent = '—';
           if (at) at.innerHTML = '<span class="badge b-gold">Enter how many you need</span>' + (r.minAvailable != null ? '<div class="small muted">' + r.minAvailable + ' free</div>' : '');

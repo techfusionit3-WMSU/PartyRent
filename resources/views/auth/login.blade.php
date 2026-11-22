@@ -17,12 +17,18 @@
 
 @unless(app()->isProduction())
 @php
+  // Every demo account (DemoSeeder). Only the PartyRent accounts exist after a plain seed; the rest need SEED_DEMO=true.
   $demoGroups = [
-    'Platform' => [['Mark · Admin', 'admin@partyrent.ph'], ['Paolo · Admin (limited)', 'paolo.admin@partyrent.ph'], ['Patricia · Super admin', 'super@partyrent.ph']],
+    'Customers' => [['Maria Santos', 'maria@demo.ph'], ['Jose Garcia', 'jose@demo.ph'], ['Kristine Aquino', 'kristine@demo.ph'], ['Bea Mendoza', 'bea@demo.ph'], ['Miguel Torres · suspended', 'miguel@demo.ph']],
+    'Shop owners' => [['Juan · Happy Moments', 'juan@demo.ph'], ['Ana · Celebration Hub', 'ana@demo.ph'], ['Carlo · Dream Events', 'carlo@demo.ph'], ['Liza · Elegant Occasion', 'liza@demo.ph'], ['Ramon · Party Essentials', 'ramon@demo.ph']],
+    'Elegant Occasion team' => [['Leah · Front Desk', 'desk@elegantoccasion.ph'], ['Grace · Cashier', 'cashier@elegantoccasion.ph'], ['Rico · Inventory + Field Crew', 'inventory@elegantoccasion.ph'], ['Joy · Field Crew', 'staff@elegantoccasion.ph']],
+    'Event companies' => [['Marco · Grand Fiesta Events', 'events@demo.ph']],
+    'Pending applications' => [['Kristine · Aquino Events Corp.', 'kristine@demo.ph'], ['Bea · Bea\'s Balloon Corner', 'bea@demo.ph']],
+    'PartyRent' => [['Rosa · Cashier', 'cashier@partyrent.ph'], ['Mark · Admin', 'admin@partyrent.ph'], ['Paolo · Admin (limited)', 'paolo.admin@partyrent.ph'], ['Patricia · Super admin', 'super@partyrent.ph']],
   ];
 @endphp
 <div class="card card-flat mt-2" style="padding:14px">
-  <div class="strong mb-1">Admin accounts <span class="muted small">— password <code>demo123</code></span></div>
+  <div class="strong mb-1">Demo accounts <span class="muted small">— password <code>demo123</code></span></div>
   <p class="muted small" style="margin:0 0 8px">Click one to fill the form, then press Log in.</p>
   @foreach($demoGroups as $group => $accounts)
     <div class="small muted" style="margin:8px 0 4px">{{ $group }}</div>

@@ -1,7 +1,7 @@
 @extends('layouts.dash', ['title' => 'Financial Reports', 'nav' => 'reports'])
 
 @section('content')
-<div class="page-head"><div><h1>Financial reports</h1><p>{{ fmt_range($rg['from'], $rg['to']) }} · verified payments only, by payment date.</p></div>@include('partials.range-picker', ['route' => 'cashier.reports', 'csvRoute' => 'cashier.reports.csv'])</div>
+<div class="page-head"><div><h1>Financial reports</h1><p>{{ fmt_range($rg['from'], $rg['to']) }} · <b>Money only</b>: confirmed payments, refunds and deposits by payment date.@if(auth()->user()->shop() && auth()->user()->orgCan('reports.view')) Rentals, best-selling items and stock use are in <a href="{{ route('supplier.reports') }}">Business Reports</a>.@endif</p></div>@include('partials.range-picker', ['route' => 'cashier.reports', 'csvRoute' => 'cashier.reports.csv'])</div>
 <div class="stats mb-3">
   @include('partials.stat', ['label' => 'Rental payments collected', 'value' => money_short($collected), 'sub' => $count.' verified transactions', 'icon' => 'check', 'color' => 'teal'])
   @include('partials.stat', ['label' => 'Rental refunds', 'value' => money_short($refunds), 'sub' => 'net '.money_short($collected - $refunds), 'icon' => 'cash', 'color' => 'purple'])

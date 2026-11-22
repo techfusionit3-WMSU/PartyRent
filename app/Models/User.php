@@ -28,11 +28,12 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         'categories.manage' => 'Manage categories',
         'transactions.view' => 'View transactions & reservations',
         'payouts.manage' => 'Release & send supplier payouts',
-        'payments.verify' => 'Verify customer bank / debit transfers',
-        'payments.record' => 'Record payments & refunds PartyRent sends',
         'complaints.manage' => 'Handle complaints',
         'reports.view' => 'View reports',
     ];
+
+    /** Money actions only a cashier (PartyRent's or a shop's) performs, never an admin. */
+    public const CASHIER_ONLY = ['payments.verify', 'payments.record'];
 
     public const CASHIER_PERMS = [
         'payments.view' => 'View payments',
@@ -259,6 +260,11 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
             return true;
         }
         if ($this->hasRole('admin')) {
+            // Checking, rejecting and recording payments is PartyRent's cashier's job; admins only see the records.
+            if (in_array($perm, self::CASHIER_ONLY, true)) {
+                return false;
+            }
+
             return in_array($perm, $this->admin_perms ?? Settings::get('permissions.admin', array_keys(self::ADMIN_PERMS)), true);
         }
         if ($this->hasRole('cashier')) {

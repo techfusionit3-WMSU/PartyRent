@@ -35,13 +35,16 @@ class CashierController extends Controller implements \Illuminate\Routing\Contro
         return Payment::query()->when($this->shopId($request), fn ($q, $sid) => $q->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $sid)));
     }
 
-    /** Admins come here only to check transfers and record refunds (payments.verify); the rest is for cashiers. */
+    /**
+     * Admins only look at the payment records (waiting and history) to keep track; checking, rejecting and
+     * recording payments is the cashier's job.
+     */
     public static function middleware(): array
     {
         return [function ($request, $next) {
             $u = $request->user();
             if ($u && $u->activeRole(session('mode')) === 'admin') {
-                abort_unless($u->hasPerm('payments.verify') && $request->routeIs('cashier.verification', 'cashier.verify', 'cashier.reject', 'cashier.record', 'cashier.record.store'), 403, 'You do not have permission for this page.');
+                abort_unless($u->hasPerm('transactions.view') && $request->routeIs('cashier.verification', 'cashier.history'), 403, "Payments are checked and recorded by PartyRent's cashier. Admins can view the records only.");
             }
 
             return $next($request);

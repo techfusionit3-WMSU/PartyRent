@@ -35,16 +35,24 @@ class SupplierPaymentsTest extends TestCase
         $this->post(route('supplier.payments.verify', $pending))->assertSessionHas('error', fn ($e) => str_contains($e, 'PartyRent checks'));
         $this->assertSame('pending', $pending->fresh()->status);
 
-        // PartyRent's admin verifies it from the verification page
+        // PartyRent's admin only sees it (records), never verifies or records money
         $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();
-        $this->actingAs($admin)->withSession(['mode' => 'admin'])->get('/cashier/verification')->assertOk()->assertSee($pending->code);
+        $this->actingAs($admin)->withSession(['mode' => 'admin'])->get('/cashier/verification')->assertOk()->assertSee($pending->code)->assertSee('View only')->assertDontSee('action="'.route('cashier.verify', $pending).'"', false);
+        $this->get('/cashier/history')->assertOk();
+        $this->post("/cashier/payments/{$pending->code}/verify")->assertForbidden();
+        $this->post("/cashier/payments/{$pending->code}/reject", ['reason' => 'x'])->assertForbidden();
+        $this->get('/cashier/record')->assertForbidden();
+        $this->get('/cashier/balances')->assertForbidden();
+        $this->assertSame('pending', $pending->fresh()->status);
+
+        // PartyRent's cashier verifies it
+        $cashier = User::where('email', 'cashier@partyrent.ph')->firstOrFail();
+        $this->actingAs($cashier)->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertOk()->assertSee($pending->code);
         $this->post("/cashier/payments/{$pending->code}/verify")->assertSessionHas('success');
         $pending->refresh();
         $this->assertSame('verified', $pending->status);
         $this->assertNotNull($pending->receipt_no);
-        $this->assertSame($admin->id, $pending->verified_by);
-        // other cashier pages stay closed to admins
-        $this->get('/cashier/balances')->assertForbidden();
+        $this->assertSame($cashier->id, $pending->verified_by);
     }
 
     public function test_shop_owner_confirms_cash_it_received(): void

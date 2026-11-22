@@ -167,7 +167,15 @@ class CompanyModules
                     }
                 }
             }
-            $extra = array_filter(self::SHOP['manage']['nav'], fn ($it) => count($it) > 1 && ! isset($have[$it[1]]) && ! empty($it[5]) && $can($it));
+            // A page for a permission this module already covers (e.g. the cashier's own Payments / Financial Reports)
+            // would only repeat it under another name, so it is left out.
+            $covered = [];
+            foreach ($m['nav'] as $it) {
+                if (count($it) > 1 && ! empty($it[5])) {
+                    $covered[$it[5]] = true;
+                }
+            }
+            $extra = array_filter(self::SHOP['manage']['nav'], fn ($it) => count($it) > 1 && ! isset($have[$it[1]]) && ! empty($it[5]) && ! isset($covered[$it[5]]) && $can($it));
             if ($extra) {
                 $items[] = ['Also allowed'];
                 foreach ($extra as $it) {

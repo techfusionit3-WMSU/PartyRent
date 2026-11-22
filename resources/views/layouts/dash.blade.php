@@ -17,7 +17,7 @@
         ], 'bottom' => [['dashboard', 'cashier.dashboard', 'grid', 'Home'], ['verification', 'cashier.verification', 'check', 'Verify'], ['record', 'cashier.record', 'cash', 'Record'], ['history', 'cashier.history', 'list', 'History']]],
         'admin' => ['tag' => 'Admin', 'items' => [
             ['Operations'], ['dashboard', 'admin.dashboard', 'grid', 'Dashboard'], ['users', 'admin.users', 'users', 'Customers & Suppliers'], ['applications', 'admin.applications', 'file', 'Supplier Applications', $b['applications'] ?? 0], ['listings', 'admin.listings', 'box', 'Listings & Packages'], ['categories', 'admin.categories', 'tag', 'Categories'],
-            ['Money'], ['verification', 'cashier.verification', 'check', 'Payment Verification', $b['verification'] ?? 0, 'payments.verify'], ['payouts', 'admin.payouts', 'cash', 'Supplier Payouts', $b['payouts'] ?? 0, 'payouts.manage'],
+            ['Money'], ['verification', 'cashier.verification', 'check', 'Payments Waiting', $b['verification'] ?? 0, 'transactions.view'], ['history', 'cashier.history', 'list', 'Payment Records', 0, 'transactions.view'], ['payouts', 'admin.payouts', 'cash', 'Supplier Payouts', $b['payouts'] ?? 0, 'payouts.manage'],
             ['Monitoring'], ['transactions', 'admin.transactions', 'activity', 'Rentals & Transactions'], ['events', 'admin.events', 'calendar', 'Event Bookings', 0, 'transactions.view'], ['complaints', 'admin.complaints', 'flag', 'Complaints & Issues', $b['complaints'] ?? 0], ['cases', 'admin.cases', 'alert', 'Shortfall Cases', $b['cases'] ?? 0], ['disputes', 'admin.disputes', 'flag', 'Damage Disputes', $b['disputes'] ?? 0], ['activity', 'admin.activity', 'clock', 'Activity Log'], ['reports', 'admin.reports', 'bars', 'Reports'], ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [['dashboard', 'admin.dashboard', 'grid', 'Home'], ['users', 'admin.users', 'users', 'Users'], ['applications', 'admin.applications', 'file', 'Apps'], ['transactions', 'admin.transactions', 'activity', 'Rentals']]],
         'superadmin' => ['tag' => 'Superadmin', 'items' => [
@@ -47,6 +47,12 @@
     $bottom = array_filter($cfg['bottom'], fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && ($curMod || $role !== 'supplier' || empty($it[4]) || $shellUser->orgCan($it[4])));
     $tag = $curMod ? $cfg['tag'] : ($role === 'supplier' && $emp ? \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles()) : ($role === 'supplier' && $sup && $sup->type === 'organization' ? 'Owner' : $cfg['tag']));
     $nav = $nav ?? '';
+    // Two menu items can share a key (the cashier's Financial Reports and the shop's Business Reports are both
+    // "reports"): only the one in the same area as the open page lights up.
+    $here = explode('.', (string) \Illuminate\Support\Facades\Route::currentRouteName())[0];
+    $same = array_filter($items, fn ($it) => count($it) > 1 && $it[0] === $nav);
+    $activeRoute = (collect($same)->first(fn ($it) => explode('.', $it[1])[0] === $here) ?? collect($same)->first())[1] ?? null;
+    $isActive = fn ($it) => $nav === $it[0] && (! $activeRoute || $it[1] === $activeRoute);
 @endphp
 
 @section('body')
@@ -69,7 +75,7 @@
       @if(count($it) === 1)
         <div class="nav-label">{{ __($it[0]) }}</div>
       @else
-        <a class="nav {{ $nav === $it[0] ? 'active' : '' }}" href="{{ route($it[1]) }}">{{ icon($it[2]) }}<span>{{ __($it[3]) }}</span>@if(! empty($it[4]))<span class="cnt">{{ $it[4] }}</span>@endif</a>
+        <a class="nav {{ $isActive($it) ? 'active' : '' }}" href="{{ route($it[1]) }}">{{ icon($it[2]) }}<span>{{ __($it[3]) }}</span>@if(! empty($it[4]))<span class="cnt">{{ $it[4] }}</span>@endif</a>
       @endif
     @endforeach
     <div class="mb-1">@include('partials.lang-switch', ['dark' => true])</div>
@@ -77,7 +83,10 @@
   </aside>
   <div class="side-backdrop" id="sideBd"></div>
   <div class="dash-body">
-    <header class="dash-top"><button class="icon-btn menu-toggle" data-side-open aria-label="Open menu">{{ icon('menu') }}</button><div class="ttl grow">{{ $title ?? '' }}</div>@if($sup)<span class="working-as" title="{{ __('You are working in this company module') }}">{{ icon('store') }}<span class="ellipsis">{{ __('Working as :role', ['role' => $curMod ? __(\App\Support\CompanyModules::get($curMod)['label']) : \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles())]) }} · {{ $sup->name }}</span></span>@endif@include('partials.notif-dropdown')@include('partials.profile-menu')</header>
+    <header class="dash-top"><button class="icon-btn menu-toggle" data-side-open aria-label="Open menu">{{ icon('menu') }}</button><div class="ttl grow">{{ $title ?? '' }}</div>@if($sup)<span class="working-as" title="{{ __('You are working in this company module') }}">{{ icon('store') }}<span class="ellipsis">{{ __('Working as :role', ['role' => $curMod ? __(\App\Support\CompanyModules::get($curMod)['label']) : \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles())]) }} · {{ $sup->name }}</span></span>@endif
+      @include('partials.notif-dropdown')
+      @include('partials.profile-menu')
+    </header>
     <main class="dash-main" id="main" tabindex="-1">
       @yield('content')
     </main>

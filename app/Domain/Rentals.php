@@ -1401,7 +1401,6 @@ class Rentals
         } else {
             // the money went to PartyRent's account, so PartyRent checks it (not the shop)
             Notifier::notify('cashier', 'cashier', 'Verify '.$cust->firstName().'\'s '.money($p->amount).' '.$p->methodLabel().' payment', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
-            Notifier::notify('admin', 'admin', 'Verify '.$cust->firstName().'\'s '.money($p->amount).' '.$p->methodLabel().' payment', $cust->name.' · '.money($p->amount).' ('.$p->methodLabel().') for '.$r->code.' · '.$r->supplier->name.'.', self::link('cashier.verification'));
             Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment submitted', $cust->name.' sent '.money($p->amount).' ('.$p->typeLabel().') for '.$r->code.'. PartyRent is checking it; you will be told once it is confirmed.', self::link('supplier.requests.show', $r));
         }
         if ($source === 'supplier') {

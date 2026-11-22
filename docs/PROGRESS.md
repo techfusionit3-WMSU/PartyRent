@@ -4,7 +4,29 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Company role modules + event-focused rentals** (user 2026-11-19; professor: roles live inside the company,
+**Feedback batch 3 (2026-11-22)**: tester doc from Downloads (Fahad, Kevin, Zhanjianah; 13 screenshots). Order / status:
+- [x] G1 Notification bell prints `@include('partials.notif-dropdown')` in the dash header (`@endif@include` not compiled)
+- [x] G2 Cashier: "Also allowed" repeats Payments / Business Reports (same perms as own pages); Financial + Business Reports both
+      light up (same nav key). Clarify what each money page is for
+- [ ] G3 "Could not update the prices. Check your connection." toast on checkout: find the real cause
+- [ ] G4 Checkout rental period prefilled from the dates set on the item; changeable on the page with stock errors
+- [ ] G5 One date everywhere: changing it updates the cart lines / browse bar / checkout together
+- [ ] G6 Security deposit: what it is for, whether it must be paid, when it comes back
+- [ ] G7 Supplier side: every change / confirmation records who and when (visible history on the rental)
+- [ ] G8 Owner: transaction records page, organized + printable reports
+- [ ] G9 Phone: market top tabs (Browse / Packages / ...) hidden; bottom island stays
+- [ ] G10 Speed pass (logic unchanged)
+- [ ] G11 Phone: buttons that disappear / break
+- [ ] G12 Revenue proposal (docs only, NOT built until the team chooses)
+- [ ] G13 Sign-up code email: .env.example uses the team Gmail SMTP; local log-mailer shows the code
+- [ ] G14 EN / FIL switch colors
+- [x] G15 Admin complaints: giant icon; "Log an issue" visible first
+- [ ] G16 Sidebar groups collapse (dropdown per category) for supplier + admin + all dash roles
+- [ ] G17 Product page: quantity starts empty (customer picks); minimum hours explained before the error
+- [x] G18 Admin no longer verifies / rejects payments (PartyRent cashier does); admin only views records
+      (User::CASHIER_ONLY; migration 2026_11_22_000100; PartyRent cashier cashier@partyrent.ph / demo123 seeded + in dev DB)
+
+(previous) **Company role modules + event-focused rentals** (user 2026-11-19; professor: roles live inside the company,
 each role its own module). Plan + decisions: `docs/ROLE_MODULES_PLAN.md`. Stay inside the title (party & event
 rental): add Event venues + Event equipment, any event (not only weddings). Fixed roles + per-member tweaks,
 several roles per member with a module switcher.

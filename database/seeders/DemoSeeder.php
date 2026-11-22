@@ -179,7 +179,7 @@ class DemoSeeder extends Seeder
         foreach (Settings::DEFAULTS as $k => $v) {
             Setting::create(['key' => $k, 'value' => $v]);
         }
-        Setting::create(['key' => 'permissions.admin', 'value' => ['customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'applications.review', 'listings.view', 'listings.manage', 'categories.manage', 'transactions.view', 'payouts.manage', 'payments.verify', 'payments.record', 'complaints.manage', 'reports.view']]);
+        Setting::create(['key' => 'permissions.admin', 'value' => ['customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'applications.review', 'listings.view', 'listings.manage', 'categories.manage', 'transactions.view', 'payouts.manage', 'complaints.manage', 'reports.view']]);
         Setting::create(['key' => 'permissions.cashier', 'value' => array_keys(User::CASHIER_PERMS)]);
         foreach (['seq.request' => 13, 'seq.payment' => 25, 'seq.receipt' => 10025, 'seq.complaint' => 3] as $k => $v) {
             Setting::create(['key' => $k, 'value' => $v]);
@@ -226,9 +226,10 @@ class DemoSeeder extends Seeder
             ['u11', 'Mark Reyes', 'admin@partyrent.ph', '0917 800 1111', $HQ, ['admin'], 'active', -340],
             ['u13', 'Paolo Cruz', 'paolo.admin@partyrent.ph', '0917 800 1313', $HQ, ['admin'], 'active', -100],
             ['u12', 'Patricia Lim', 'super@partyrent.ph', '0917 800 1212', $HQ, ['superadmin'], 'active', -365],
+            ['u18', 'Rosa Dizon', 'cashier@partyrent.ph', '0917 800 1818', $HQ, ['cashier'], 'active', -330], // PartyRent's cashier: checks transfers
         ];
         if ($this->staffOnly) {
-            $rows = array_filter($rows, fn ($r) => (bool) array_intersect(['admin', 'superadmin'], $r[5]));
+            $rows = array_filter($rows, fn ($r) => (bool) array_intersect(['admin', 'superadmin', 'cashier'], $r[5]));
         }
         foreach ($rows as [$key, $name, $email, $phone, $addr, $roles, $status, $d]) {
             $u = new User(array_merge(['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => $roles, 'status' => $status, 'password' => $pw], is_array($addr) ? $this->addr($addr) : ['address' => $addr]));

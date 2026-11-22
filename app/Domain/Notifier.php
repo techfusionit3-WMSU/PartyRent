@@ -50,10 +50,10 @@ class Notifier
     }
 
     /** Money PartyRent itself must handle (refunds of money it holds, transfers to check): its cashiers and admins. */
+    /** Money to check, send or record on PartyRent's side: PartyRent's cashier does it (admins only see records). */
     public static function platformFinance(string $title, string $body, string $link = ''): void
     {
         self::notify('cashier', 'cashier', $title, $body, $link);
-        self::notify('admin', 'admin', $title, $body, $link);
     }
 
     /** Notifications visible to a user in their current mode (superadmin also sees admin alerts). */

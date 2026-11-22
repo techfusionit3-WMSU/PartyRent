@@ -98,7 +98,7 @@
           <div class="table-wrap"><table class="table cards"><thead><tr><th>Installment</th><th>Due</th><th class="num">Amount</th></tr></thead><tbody>
             @foreach($ip['items'] as $i => $x)<tr><td data-label="Installment">Installment {{ $i + 1 }} of {{ count($ip['items']) }}</td><td data-label="Due">{{ fmt_date($x['due']) }}@if($x['due'] > $r->event_date) <span class="badge b-red">after event</span>@endif</td><td data-label="Amount" class="num"><b>{{ money($x['amount']) }}</b></td></tr>@endforeach
           </tbody></table></div>
-          <p class="small muted mt-1">Installment balance {{ money($r->pricing['finalBalance']) }} (after the {{ $r->pricing['terms']['downPct'] ?? 0 }}% down payment@if(($r->pricing['reservationFee'] ?? 0) > 0) and {{ $r->pricing['terms']['resPct'] ?? 0 }}% reservation fee@endif) · last allowed due date {{ fmt_date($r->event_date) }}.</p>
+          <p class="small muted mt-1">Installment balance {{ money($r->pricing['finalBalance']) }} (after the {{ $r->pricing['terms']['downPct'] ?? 0 }}% down payment{{ '' }}@if(($r->pricing['reservationFee'] ?? 0) > 0) and {{ $r->pricing['terms']['resPct'] ?? 0 }}% reservation fee{{ '' }}@endif) · last allowed due date {{ fmt_date($r->event_date) }}.</p>
           @if($ip['status'] === 'rejected')<div class="alert alert-danger">{{ icon('x') }}<div class="small">Rejected: {{ $ip['reason'] ?? '' }} — waiting for the customer to propose a new schedule.</div></div>@endif
           @if($ip['status'] === 'proposed' && auth()->user()->orgCan('orders.manage') && ! in_array($r->status, ['declined', 'cancelled', 'completed'], true))
             <div class="btn-group mt-1"><button class="btn btn-danger btn-sm" data-modal="ipRejModal">{{ icon('x') }}Reject schedule</button>

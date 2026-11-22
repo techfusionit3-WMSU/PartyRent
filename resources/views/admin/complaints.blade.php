@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="page-head"><div><h1>Complaints & issues</h1><p>Reports from customers. Every update is sent to the customer and logged.</p></div></div>
-<details class="card mb-3" @if($errors->any()) open @endif>
+<details class="card mb-3" open>
   <summary class="strong" style="cursor:pointer">{{ icon('plus') }} Log an issue</summary>
   <form method="POST" action="{{ route('admin.complaints.store') }}" class="mt-2">@csrf
     <div class="grid grid-2">

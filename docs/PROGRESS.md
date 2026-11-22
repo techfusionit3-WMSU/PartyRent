@@ -4,7 +4,7 @@ Source of truth for in-flight work. Resume with `/pickup`; save with `/checkpoin
 Phase 2 is finished; its history is in `docs/PHASE2.md`.
 
 ## Current task
-**Feedback batch 3 (2026-11-22)**: tester doc from Downloads (Fahad, Kevin, Zhanjianah; 13 screenshots). Order / status:
+**Feedback batch 3 (2026-11-22)** ALL DONE (213 tests green; docs/SYSTEM_PROCESSES.md section 12): tester doc from Downloads (Fahad, Kevin, Zhanjianah; 13 screenshots). Order / status:
 - [x] G1 Notification bell prints `@include('partials.notif-dropdown')` in the dash header (`@endif@include` not compiled)
 - [x] G2 Cashier: "Also allowed" repeats Payments / Business Reports (same perms as own pages); Financial + Business Reports both
       light up (same nav key). Clarify what each money page is for
@@ -23,7 +23,8 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
       use XAMPP Apache for team testing
 - [x] G11 Phone: buttons that disappear / break: .tabs and .seg scrolled sideways with a hidden scrollbar (tabs past the edge
       looked gone); they wrap on phones now. Phone scan of 35 pages (4 roles): no overflow / cut / covered buttons
-- [ ] G12 Revenue proposal (docs only, NOT built until the team chooses)
+- [x] G12 Revenue proposal (docs only, NOT built until the team chooses): Claude Doc "PartyRent Revenue Proposal"
+      https://claude.ai/artifact/BokRR36JhTZMkssMDo7QhN (keep 5% commission -> 8%, featured listings next, optional Pro plan later)
 - [x] G13 Sign-up code email: .env.example uses the team Gmail SMTP; local log-mailer shows the code
 - [x] G14 EN / FIL switch colors
 - [x] G15 Admin complaints: giant icon; "Log an issue" visible first

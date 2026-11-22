@@ -185,7 +185,22 @@ delivery today → Field Crew) are **(planned)**.
 | English / Filipino | EN / FIL switch in the header, sign-in page and sidebar | Menus, guidance, tips, empty pages and the new screens are translated (`lang/fil.json`); older pages are still English |
 | Accessibility | Everywhere | "Skip to content" link, `main` landmark, visible keyboard focus, labels tied to inputs, `lang` attribute, reduced motion respected |
 
-## 12. Planned (from docs/ROLE_MODULES_PLAN.md)
+## 12. Tester feedback batch 3 (built 2026-11-22)
+
+| Change | Where | What happens |
+| --- | --- | --- |
+| Rental period on checkout | Checkout, top bar | Shows the dates of the items being booked; **Change dates** moves every item (one day or several), checks stock, maximum days and lead time first and changes nothing if an item does not fit; prices update in place |
+| One date everywhere | Item / package pages, Rental List, checkout | The first dates added (or changed on checkout) become the rental period; item and package pages open on it |
+| Security deposit explained | Checkout | Required, not a rental charge, covers damaged or missing items, paid by the rental start date, held by PartyRent, returned after the return check minus agreed damage charges |
+| Who did what, when | Rental page (Activity), owner's **Activity Log** | Every staff action (accept, steps, payments confirmed / rejected, cash, inspection, reminders, notes, cases, product / stock / team changes) is recorded with the person and time; customers see status steps only |
+| Transaction Records | Owner > Money & reports | Rentals by month with totals, paid / owed, accepted by and last change by; filters, **Print**, CSV. Business Reports can be printed too |
+| Admin only views payments | Admin > Payments Waiting / Payment Records | Checking, rejecting and recording payments is the cashier's job (PartyRent cashier for transfers, the shop's cashier for cash) |
+| Menus | Every dashboard sidebar | Groups fold open / closed; the cashier menu no longer repeats Payments / Business Reports under Also allowed |
+| Phone | Market + dashboards | Bottom bar is the menu (top tabs hidden); tab rows and button groups wrap instead of hiding buttons off-screen |
+| Product page | Rent box | Quantity starts empty (the customer sets it); end times shorter than the item minimum are not offered, with a note why |
+| Sign-up code | Register | Sent from the team Gmail (.env.example); a local copy without mail shows the code on the page |
+
+## 13. Planned (from docs/ROLE_MODULES_PLAN.md)
 
 2. Event company role modules + assigning a booking to a crew member / coordinator.
 3. Business picks Rental company and/or Event company.

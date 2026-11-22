@@ -22,10 +22,10 @@ class Discounts
     /** Discounts of a shop that are running on $at (Y-m-d). */
     public static function running(int $supplierId, string $at): Collection
     {
-        return Discount::where('supplier_id', $supplierId)->where('active', true)
+        return inv()->runningDiscounts($supplierId, $at, fn () => Discount::where('supplier_id', $supplierId)->where('active', true)
             ->where(fn ($q) => $q->whereNull('starts_on')->orWhere('starts_on', '<=', $at))
             ->where(fn ($q) => $q->whereNull('ends_on')->orWhere('ends_on', '>=', $at))
-            ->orderBy('id')->get();
+            ->orderBy('id')->get());
     }
 
     /**

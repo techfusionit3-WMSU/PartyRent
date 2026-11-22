@@ -756,3 +756,10 @@
   .printable a { color: inherit; text-decoration: none; }
   .printable .table td, .printable .table th { padding: 4px 6px; font-size: 11px; }
 }
+/* Phone: tab rows and segmented buttons wrap instead of scrolling sideways with a hidden scrollbar
+   (buttons past the edge looked like they had disappeared) */
+@media (max-width: 640px) {
+  .tabs { flex-wrap: wrap; overflow-x: visible; row-gap: 2px; }
+  .seg { flex-wrap: wrap; overflow-x: visible; border-radius: 16px; display: flex; }
+  .seg button, .seg a { flex: 1 1 auto; text-align: center; }
+}

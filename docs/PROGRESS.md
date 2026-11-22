@@ -17,8 +17,12 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [x] G7 Supplier side: every change / confirmation records who and when (visible history on the rental)
 - [x] G8 Owner: transaction records page, organized + printable reports
 - [x] G9 Phone: market top tabs (Browse / Packages / ...) hidden; bottom island stays
-- [ ] G10 Speed pass (logic unchanged)
-- [ ] G11 Phone: buttons that disappear / break
+- [x] G10 Speed pass (logic unchanged): request memo also keeps shops + running discounts, a product miss loads its whole shop
+      in one query, memo reset per request (FreshRequestCaches) and on product/package/shop/discount save. Rental List 73 -> 38
+      queries (195 -> 101 ms), test suite 115 s -> 40 s. Dev server note: php artisan serve is one request at a time on Windows;
+      use XAMPP Apache for team testing
+- [x] G11 Phone: buttons that disappear / break: .tabs and .seg scrolled sideways with a hidden scrollbar (tabs past the edge
+      looked gone); they wrap on phones now. Phone scan of 35 pages (4 roles): no overflow / cut / covered buttons
 - [ ] G12 Revenue proposal (docs only, NOT built until the team chooses)
 - [x] G13 Sign-up code email: .env.example uses the team Gmail SMTP; local log-mailer shows the code
 - [x] G14 EN / FIL switch colors

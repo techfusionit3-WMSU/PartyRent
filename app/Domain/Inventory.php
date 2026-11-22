@@ -54,9 +54,15 @@ class Inventory
 
     private array $locStock = [];
 
+    /** Shops whose products are all loaded (product()). */
+    private array $shopsPrimed = [];
+
+    /** Running discounts per shop and day (Discounts::running). */
+    private array $disc = [];
+
     public function flush(): void
     {
-        $this->products = $this->packages = $this->suppliers = $this->caps = $this->locStock = [];
+        $this->products = $this->packages = $this->suppliers = $this->caps = $this->locStock = $this->disc = $this->shopsPrimed = [];
         $this->holds = $this->demands = $this->ivIndex = null;
         $this->bd = [];
     }
@@ -71,6 +77,15 @@ class Inventory
         $id = (int) $id;
         if (! array_key_exists($id, $this->products)) {
             $this->products[$id] = Product::find($id);
+            // pages look at many items of the same shop (lines, packages, dashboards): load the rest of that shop in
+            // one query instead of one query per item
+            $sid = $this->products[$id]?->supplier_id;
+            if ($sid && ! isset($this->shopsPrimed[$sid])) {
+                $this->shopsPrimed[$sid] = true;
+                foreach (Product::where('supplier_id', $sid)->where('id', '!=', $id)->get() as $p) {
+                    $this->products[$p->id] ??= $p;
+                }
+            }
         }
 
         return $this->products[$id];
@@ -94,6 +109,18 @@ class Inventory
         }
 
         return $this->packages[$id];
+    }
+
+    /** A shop, memoized for this request. */
+    public function shop(?int $id): ?Supplier
+    {
+        return $this->supplier($id);
+    }
+
+    /** Discounts of a shop running on $at, memoized for this request (a cart / checkout asks once per line). */
+    public function runningDiscounts(int $supplierId, string $at, \Closure $load): \Illuminate\Support\Collection
+    {
+        return $this->disc[$supplierId.'|'.$at] ??= $load();
     }
 
     private function supplier(?int $id): ?Supplier

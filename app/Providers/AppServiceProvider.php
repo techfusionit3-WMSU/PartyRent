@@ -23,6 +23,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // The request memo (Inventory) never outlives a change to what it remembers.
+        foreach ([\App\Models\Product::class, \App\Models\Package::class, \App\Models\Supplier::class, \App\Models\Discount::class] as $m) {
+            $m::saved(fn () => inv()->flush());
+            $m::deleted(fn () => inv()->flush());
+        }
+
         // Event companies (Organization suppliers) don't rent single items: their item listings and item packages never go live.
         \App\Models\Product::saving(function ($p) {
             if ($p->status === 'active' && \App\Models\Supplier::whereKey($p->supplier_id)->value('type') === 'organization') {

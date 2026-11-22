@@ -45,7 +45,7 @@ class Rentals
     /** Booking name built from its lines, e.g. "Monobloc Chair rental" or "Kiddie Party Package + 2 more". */
     public static function autoName(array $lines): string
     {
-        $names = collect($lines)->map(fn ($l) => ($l['type'] ?? 'item') === 'package' ? Package::find($l['ref_id'])?->name : Product::find($l['ref_id'])?->name)
+        $names = collect($lines)->map(fn ($l) => ($l['type'] ?? 'item') === 'package' ? inv()->package($l['ref_id'])?->name : inv()->product($l['ref_id'])?->name)
             ->filter()->unique()->values();
         if ($names->isEmpty()) {
             return 'Rental';

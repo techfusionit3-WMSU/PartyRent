@@ -226,14 +226,14 @@ class Slots
     /** Time issues of a line: rental hours, end after start, min/max rental hours. */
     public static function validateLine(array $line): array
     {
-        $item = ($line['type'] ?? 'item') === 'package' ? Package::find($line['ref_id']) : Product::find($line['ref_id']);
+        $item = ($line['type'] ?? 'item') === 'package' ? inv()->package($line['ref_id']) : inv()->product($line['ref_id']);
         $time = self::time($line);
         if (! $item || ! $time) {
             return [];
         }
         $out = [];
         $name = $item->name;
-        $st = self::settings($item->supplier);
+        $st = self::settings(inv()->shop($item->supplier_id));
         $a = self::toMin($time['start']);
         $b = self::toMin($time['end']);
         if ($a === null || $b === null) {

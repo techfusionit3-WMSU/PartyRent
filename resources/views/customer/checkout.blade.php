@@ -15,7 +15,22 @@
 <div class="crumbs"><a href="{{ route('cart') }}">Rental List</a> / Checkout</div>
 <div class="page-head"><div><h1>Checkout</h1><p>{{ collect($orders)->sum(fn ($o) => count($o['lines'])) }} selected item(s) from your Rental List, <b>{{ count($orders) }} shop{{ count($orders) > 1 ? 's' : '' }}</b>. Each shop gets its own rental order, payment plan and payment schedule.</p></div></div>
 @endif
-@include('partials.period-banner')
+{{-- Rental period = the dates of the items being checked out; changing it here moves every item (stock checked first). --}}
+@php($pMulti = $period && $period['end'] > $period['start'])
+<div class="card date-bar mb-2 co-dates" id="coDates" data-url="{{ route('checkout.dates') }}" data-today="{{ today_iso() }}">
+  <span class="db-label">{{ icon('calendar') }}Your rental period</span>
+  <div class="db-summary"><span data-plabel>{{ $period ? ($pMulti ? fmt_range($period['start'], $period['end']) : fmt_date($period['start'])) : '—' }}</span><span class="db-sep">|</span><span class="badge b-purple plain" data-pdays>{{ $period ? \App\Support\RentalPeriod::durationLabel(diff_days($period['start'], $period['end']) + 1) : '' }}</span></div>
+  <button type="button" class="btn btn-sm" data-pedit>{{ icon('edit') }}Change dates</button>
+  @unless($sameDates)<p class="small muted mb-0 full">Your items have different dates. Changing the period puts every item on the new dates.</p>@endunless
+  <div class="co-dates-form hidden" data-pform>
+    <label class="switch"><input type="checkbox" data-pmulti @checked($pMulti)><span class="sw"></span>Multiple days</label>
+    <div class="field mb-0"><label for="co-ps"><span data-plbl-one @if($pMulti) hidden @endif>Date</span><span data-plbl-many @unless($pMulti) hidden @endunless>Start date</span></label><input class="input" type="date" id="co-ps" data-pstart min="{{ today_iso() }}" value="{{ $period['start'] ?? '' }}"></div>
+    <div class="field mb-0" data-pendwrap @unless($pMulti) hidden @endunless><label for="co-pe">End date</label><input class="input" type="date" id="co-pe" data-pend min="{{ today_iso() }}" value="{{ $period['end'] ?? '' }}"></div>
+    <div class="row" style="gap:6px"><button type="button" class="btn btn-primary btn-sm" data-papply>Apply dates</button><button type="button" class="btn btn-ghost btn-sm" data-pcancel>Cancel</button></div>
+    <p class="small muted mb-0 full">Quantities stay the same for each day. We check the stock for the new dates first; if something is not available, nothing changes.</p>
+    <div class="alert alert-danger full hidden" data-perr role="alert"></div>
+  </div>
+</div>
 @php($state = ['orders' => $orders, 'shared' => ['contactName' => $u->name, 'contactPhone' => $u->phone, 'instructions' => '']])
 <form id="cf" novalidate class="grid grid-side"
   data-checkout='@json($state)'

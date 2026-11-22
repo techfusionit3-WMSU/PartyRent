@@ -228,8 +228,10 @@ class MarketController extends Controller
         abort_unless($product->status === 'active' && ! $product->package_only && $product->supplier->status === 'approved', 404);
         $today = today_iso();
         $earliest = add_days($today, $product->isSale() ? (int) $product->lead_days : 0);
-        $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : max(add_days($today, 7), $earliest);
-        $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : $start;
+        // dates from the link, else the rental period the customer already chose (browse bar / checkout), else a week ahead
+        $rp = rental_period();
+        $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : ($rp && $rp['start'] >= $earliest ? $rp['start'] : max(add_days($today, 7), $earliest));
+        $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : (! $request->query('start') && $rp && $rp['start'] === $start ? $rp['end'] : $start);
         // The customer picks how many; only a quantity they already chose (browse filter, rental list) is filled in.
         $qtyPicked = (int) $request->query('qty') > 0;
         $qty = $qtyPicked ? (int) $request->query('qty') : 1;
@@ -277,8 +279,10 @@ class MarketController extends Controller
         $lead = \App\Domain\Packages::leadDays($def, $pp['sel']);
         $today = today_iso();
         $earliest = add_days($today, $lead);
-        $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : max(add_days($today, 7), $earliest);
-        $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : $start;
+        // dates from the link, else the rental period the customer already chose (browse bar / checkout), else a week ahead
+        $rp = rental_period();
+        $start = $request->query('start') && $request->query('start') >= $earliest ? $request->query('start') : ($rp && $rp['start'] >= $earliest ? $rp['start'] : max(add_days($today, 7), $earliest));
+        $end = $request->query('end') && $request->query('end') >= $start ? $request->query('end') : (! $request->query('start') && $rp && $rp['start'] === $start ? $rp['end'] : $start);
         $u = $request->user();
 
         return view('market.package', [

@@ -73,6 +73,10 @@ class CartController extends Controller
         $time = ($data['start'] ?? $data['from'] ?? null) ? ['start' => $data['start'] ?? $data['from'], 'end' => $data['end'] ?? $data['to'] ?? ''] : null;
         $direct = ($data['then'] ?? 'list') === 'checkout' && ! $request->expectsJson();
         $res = Rentals::addToCart($request->user(), $data['type'], (int) $data['ref_id'], (array) json_decode($data['days'], true), is_array($sel) ? $sel : null, $time, $direct);
+        // the first dates the customer picks become their rental period (browse bar, other items, checkout)
+        if ($res['ok'] && ! rental_period() && ($ds = array_keys(Rentals::cleanDays((array) json_decode($data['days'], true))))) {
+            \App\Support\RentalPeriod::set(min($ds), max($ds));
+        }
         if ($request->expectsJson()) {
             return response()->json($res, $res['ok'] ? 200 : 422);
         }
@@ -148,18 +152,16 @@ class CartController extends Controller
             if ($s->owner_id === $u->id) {
                 return redirect()->route('cart')->with('warn', 'You cannot rent from your own shop. Untick or remove those items in your Rental List.');
             }
-            $dates = collect($chosen)->flatMap(fn ($l) => array_keys(Rentals::cleanDays($l['days'])))->unique()->sort()->values();
-            if ($dates->isEmpty()) {
+            $part = self::orderDates($s, $chosen);
+            if (! $part) {
                 continue;
             }
             $st = Slots::settings($s);
             $cfg = Finance::planConfig($s);
-            $orders[] = [
-                'supplier_id' => $s->id, 'cart_line_ids' => array_column($chosen, 'id'), 'first' => $dates->first(), 'last' => $dates->last(), 'range' => fmt_range($dates->first(), $dates->last()), 'eventDate' => $dates->first(),
+            $orders[] = $part + [
+                'cart_line_ids' => array_column($chosen, 'id'),
                 'fulfillment' => $s->fulfillment === 'pickup' ? 'pickup' : 'delivery', 'plan' => self::firstPlan($s), 'method' => 'online', 'services' => [],
                 'destinations' => [['id' => 'd1', 'label' => 'Event venue', 'address' => $u->address ?: '', 'zoneId' => '', 'deliveryTime' => $st['open'], 'contactName' => '', 'contactPhone' => '']],
-                'lines' => array_map(fn ($l) => ['cart_id' => $l['id'], 'name' => inv()->itemName($l), 'type' => $l['type'], 'days' => Rentals::cleanDays($l['days']),
-                    'time' => Slots::time($l) ?? Slots::defaultTime($s, $l['type'] === 'package' ? null : inv()->product($l['ref_id'])), 'destId' => 'd1', 'group' => $l['id']], $chosen),
                 'inst' => ['n' => min(3, (int) $cfg['installment']['maxInstallments']), 'items' => [], 'auto' => true],
                 'damage' => self::damageTerms($chosen),
                 // static shop info for the page
@@ -171,7 +173,80 @@ class CartController extends Controller
                 ],
             ];
         }
-        return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'direct' => (bool) $direct]);
+        // The rental period shown on top is the dates of the items being checked out (the same everywhere).
+        $all = collect($orders)->flatMap(fn ($o) => [$o['first'], $o['last']])->sort()->values();
+        $period = $all->isNotEmpty() ? ['start' => $all->first(), 'end' => $all->last()] : null;
+        $sameDates = collect($orders)->flatMap(fn ($o) => array_map(fn ($l) => implode(',', array_keys($l['days'])), $o['lines']))->unique()->count() <= 1;
+
+        return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'direct' => (bool) $direct, 'period' => $period, 'sameDates' => $sameDates]);
+    }
+
+    /** The date part of one shop's checkout order: first / last day, range label, event date and the lines. */
+    private static function orderDates(Supplier $s, array $chosen): ?array
+    {
+        $dates = collect($chosen)->flatMap(fn ($l) => array_keys(Rentals::cleanDays($l['days'])))->unique()->sort()->values();
+        if ($dates->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'supplier_id' => $s->id, 'first' => $dates->first(), 'last' => $dates->last(), 'range' => fmt_range($dates->first(), $dates->last()), 'eventDate' => $dates->first(),
+            'lines' => array_map(fn ($l) => ['cart_id' => $l['id'], 'name' => inv()->itemName($l), 'type' => $l['type'], 'days' => Rentals::cleanDays($l['days']),
+                'time' => Slots::time($l) ?? Slots::defaultTime($s, $l['type'] === 'package' ? null : inv()->product($l['ref_id'])), 'destId' => 'd1', 'group' => $l['id']], $chosen),
+        ];
+    }
+
+    /**
+     * Change the rental dates right on the checkout page: every item in it moves to the new dates (same quantity
+     * per day). Checked first (stock for the rental times, the shop's maximum days, ordering lead time); nothing
+     * changes when an item does not fit. The new dates become the rental period used on the browse and item pages.
+     */
+    public function dates(Request $request)
+    {
+        $data = $request->validate(['cart_ids' => 'required|array|min:1|max:200', 'cart_ids.*' => 'integer', 'start' => 'required|date_format:Y-m-d', 'end' => 'required|date_format:Y-m-d']);
+        if ($e = \App\Support\RentalPeriod::validate($data['start'], $data['end'])) {
+            return response()->json(['ok' => false, 'error' => $e], 422);
+        }
+        $u = $request->user();
+        $rows = CartLine::where('user_id', $u->id)->whereIn('id', $data['cart_ids'])->get();
+        if ($rows->count() !== count(array_unique($data['cart_ids']))) {
+            return response()->json(['ok' => false, 'error' => 'An item is no longer in your Rental List. Reload the page.'], 404);
+        }
+        $range = date_range($data['start'], $data['end']);
+        $new = [];
+        foreach ($rows as $row) {
+            $cur = $row->toLine();
+            $q = max(array_values(Rentals::cleanDays($cur['days'])) ?: [1]);
+            $new[$row->id] = array_merge($cur, ['days' => array_fill_keys($range, $q)]);
+        }
+        $lines = array_values($new);
+        foreach ($lines as $l) {
+            if ($e = Rentals::leadTimeError($l)) {
+                return response()->json(['ok' => false, 'error' => $e], 422);
+            }
+        }
+        if ($issues = Rentals::durationIssues($lines)) {
+            return response()->json(['ok' => false, 'error' => $issues[0]['message']], 422);
+        }
+        inv()->flush();
+        $chk = inv()->check($lines);
+        if (! $chk['ok']) {
+            return response()->json(['ok' => false, 'error' => self::stockMessage($chk).' Your dates were not changed.'], 422);
+        }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($u, $rows, $new) {
+            foreach ($rows as $row) {
+                Rentals::updateCartLine($u, $row, $new[$row->id]['days']);
+            }
+        });
+        \App\Support\RentalPeriod::set($data['start'], $data['end']);
+        $orders = [];
+        foreach ($rows->groupBy('supplier_id') as $sid => $group) {
+            $s = Supplier::find($sid);
+            $orders[] = self::orderDates($s, $group->map(fn ($r) => $r->fresh()->toLine())->all());
+        }
+
+        return response()->json(['ok' => true, 'orders' => $orders, 'label' => $data['start'] === $data['end'] ? fmt_date($data['start']) : fmt_range($data['start'], $data['end']),
+            'duration' => \App\Support\RentalPeriod::durationLabel(count($range))]);
     }
 
     /** Damage terms of the rental items in these lines (packages expand into their items), individual shops only. */

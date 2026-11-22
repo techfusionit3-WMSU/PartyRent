@@ -13,9 +13,9 @@
     <div class="pay-when mt-1">
       <div class="sum-line"><span><b>{{ __('Pay first') }}</b><div class="small muted">{{ __('after the shop accepts') }}</div></span><b>{{ money($first) }}</b></div>
       @if($q['plan'] !== 'full' && $q['finalBalance'] > 0)<div class="sum-line"><span><b>{{ __('Pay later') }}</b><div class="small muted">{{ $q['plan'] === 'installment' ? __('in installments, by the event date') : __('by the event date') }}</div></span><b>{{ money($q['finalBalance']) }}</b></div>@endif
-      @if(($q['deposit'] ?? 0) > 0)<div class="sum-line"><span>{{ __('Security deposit') }}{{ term('security_deposit') }}<div class="small muted">{{ __('refundable, collected separately') }}</div></span><span>{{ money($q['deposit']) }}</span></div>@endif
+      @if(($q['deposit'] ?? 0) > 0)<div class="sum-line"><span>{{ __('Security deposit') }}{{ term('security_deposit') }}<div class="small muted">{{ __('required · paid by your rental date · comes back after the return check') }}</div></span><span>{{ money($q['deposit']) }}</span></div>@endif
     </div>
   </div>
 @endforeach
 @if(count($orders) > 1)<div class="sum-line total"><span>Combined total</span><span class="price">{{ money($total) }}</span></div>@endif
-<p class="small muted mb-0">{{ __('Nothing is charged until the shop accepts. Each shop's down payment and balance come from its own order total.') }}</p>
+<p class="small muted mb-0">{{ __("Nothing is charged until the shop accepts. Each shop's down payment and balance come from its own order total.") }}</p>

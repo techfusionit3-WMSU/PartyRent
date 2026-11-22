@@ -350,5 +350,42 @@
     btn.disabled = false; btn.textContent = label;
   };
 
+  /* ---------- rental period: change the dates of every item without leaving the page ---------- */
+  const pd = $('#coDates');
+  if (pd) {
+    const f = $('[data-pform]', pd), err = $('[data-perr]', pd), ps = $('[data-pstart]', pd), pe = $('[data-pend]', pd), mm = $('[data-pmulti]', pd);
+    const multiUi = () => { const on = mm.checked; $('[data-pendwrap]', pd).hidden = !on; $('[data-plbl-one]', pd).hidden = on; $('[data-plbl-many]', pd).hidden = !on; if (!on) pe.value = ps.value; else if (pe.value < ps.value) pe.value = ps.value; pe.min = ps.value || pd.dataset.today; };
+    const showErr = m => { err.textContent = m; err.classList.toggle('hidden', !m); };
+    $('[data-pedit]', pd).onclick = () => { f.classList.toggle('hidden'); showErr(''); if (!f.classList.contains('hidden')) ps.focus(); };
+    $('[data-pcancel]', pd).onclick = () => { f.classList.add('hidden'); showErr(''); };
+    mm.onchange = multiUi; ps.onchange = multiUi;
+    $('[data-papply]', pd).onclick = async () => {
+      const start = ps.value, end = mm.checked ? pe.value : ps.value;
+      if (!start) return showErr('Pick a date.');
+      if (end < start) return showErr('The end date must be on or after the start date.');
+      const btn = $('[data-papply]', pd); btn.disabled = true; showErr('');
+      let data = {}, res = null;
+      try {
+        res = await fetch(pd.dataset.url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify({ cart_ids: [...new Set(orders.flatMap(o => o.lines.map(l => l.cart_id)))], start, end }) });
+        data = await res.json().catch(() => ({}));
+      } catch (e) { data = { error: 'Could not reach PartyRent. Check your connection and try again.' }; }
+      btn.disabled = false;
+      if (!res || !res.ok || !data.ok) { const m = data.error || (data.errors ? Object.values(data.errors)[0][0] : data.message) || 'Could not change the dates.'; showErr(m); return; }
+      data.orders.forEach(r => {
+        const o = orders.find(x => x.supplier_id === r.supplier_id); if (!o) return;
+        // each item keeps its rental time and first location; a split between locations starts over
+        const keep = {}; o.lines.forEach(l => { if (!keep[l.cart_id]) keep[l.cart_id] = l; });
+        o.lines = r.lines.map(l => Object.assign({}, l, keep[l.cart_id] ? { time: keep[l.cart_id].time, destId: keep[l.cart_id].destId } : {}));
+        Object.assign(o, { first: r.first, last: r.last, range: r.range, eventDate: r.eventDate });
+        o.inst.auto = true;
+      });
+      Object.keys(qtyErr).forEach(k => delete qtyErr[k]);
+      $('[data-plabel]', pd).textContent = data.label; $('[data-pdays]', pd).textContent = data.duration;
+      f.classList.add('hidden');
+      draw(); requote(true);
+      toast('Dates changed to ' + data.label + '. Prices updated.', 'success');
+    };
+  }
+
   draw(); requote(true);
 })();

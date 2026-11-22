@@ -14,7 +14,7 @@ class Glossary
         'reservation_fee' => ['Reservation fee', 'A small first payment that holds your booking. It is deducted from the total and usually not refundable.'],
         'full_payment' => ['Full payment', 'You pay the whole price in one payment after the shop accepts.'],
         'installment' => ['Installment', 'Paying the rest in smaller parts on dates you propose. The shop must approve the schedule, and the last part is due by the event date.'],
-        'security_deposit' => ['Security deposit', 'A refundable amount held while you have the items. It comes back after the return check, minus any damage charges.'],
+        'security_deposit' => ['Security deposit', 'Required, on top of the rental charges. It protects the shop in case items come back damaged or missing. Pay it on or before your rental start date; PartyRent holds it (the shop never gets it) and returns it in full after the shop checks the returned items, minus only damage charges you agreed to or PartyRent decided.'],
         'reserved' => ['Reserved', 'The items are set aside for you on your dates and nobody else can book them.'],
         'credited' => ['Credited', 'This payment counts toward the total; it is not an extra charge.'],
         'replacement_value' => ['Replacement value', 'What it costs to replace one unit if it is lost or cannot be repaired. Damage charges are based on it.'],

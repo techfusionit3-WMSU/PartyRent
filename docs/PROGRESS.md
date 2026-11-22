@@ -8,10 +8,12 @@ Phase 2 is finished; its history is in `docs/PHASE2.md`.
 - [x] G1 Notification bell prints `@include('partials.notif-dropdown')` in the dash header (`@endif@include` not compiled)
 - [x] G2 Cashier: "Also allowed" repeats Payments / Business Reports (same perms as own pages); Financial + Business Reports both
       light up (same nav key). Clarify what each money page is for
-- [ ] G3 "Could not update the prices. Check your connection." toast on checkout: find the real cause
-- [ ] G4 Checkout rental period prefilled from the dates set on the item; changeable on the page with stock errors
-- [ ] G5 One date everywhere: changing it updates the cart lines / browse bar / checkout together
-- [ ] G6 Security deposit: what it is for, whether it must be paid, when it comes back
+- [x] G3 "Could not update the prices. Check your connection." toast on checkout: find the real cause
+      (cause: _checkout-summary had shop's inside __('...') = 500 on every quote; tests/Unit/ViewsCompileTest now lints every view)
+- [x] G4 Checkout rental period prefilled from the dates set on the item; changeable on the page with stock errors
+      (POST checkout.dates moves every line, checks lead time / max days / stock first; CheckoutDatesTest)
+- [x] G5 One date everywhere: changing it updates the cart lines / browse bar / checkout together
+- [x] G6 Security deposit: what it is for, whether it must be paid, when it comes back
 - [ ] G7 Supplier side: every change / confirmation records who and when (visible history on the rental)
 - [ ] G8 Owner: transaction records page, organized + printable reports
 - [x] G9 Phone: market top tabs (Browse / Packages / ...) hidden; bottom island stays

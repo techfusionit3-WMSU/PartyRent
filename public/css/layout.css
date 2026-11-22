@@ -739,3 +739,10 @@
 @media (max-width: 768px) {
   body:not(.pdx-page) .mk-nav { display: none; }
 }
+/* Checkout: change the rental dates in place */
+.co-dates .full { flex-basis: 100%; }
+.co-dates [data-pedit] { margin-left: auto; }
+.co-dates-form { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.co-dates-form .field .input { width: 180px; max-width: 100%; }
+.co-dates-form .alert { margin: 0; }
+@media (max-width: 560px) { .co-dates [data-pedit] { margin-left: 0; } .co-dates-form .field { flex: 1 1 140px; } .co-dates-form .field .input { width: 100%; } }

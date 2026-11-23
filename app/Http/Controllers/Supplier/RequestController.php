@@ -146,8 +146,18 @@ class RequestController extends Controller
             $photos[] = $file->store('inspections', 'public');
         }
         $res = Rentals::recordInspection($r, ['returnDate' => $request->input('returnDate'), 'notes' => $request->input('notes'), 'items' => (array) $request->input('items', []), 'photos' => $photos, 'confirmed' => $request->boolean('confirmed')]);
+        if (! $res['ok'] && $photos) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($photos); // nothing was saved: don't keep the uploads
+        }
+        if (! $res['ok']) {
+            return back()->with('error', $res['error']);
+        }
+        $r = $r->fresh();
+        $charge = (float) ($r->inspection['compensation'] ?? $r->fin()['compensationDue'] ?? 0);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Inspection confirmed. Inventory updated by condition.' : $res['error']);
+        return back()->with('success', $charge > 0
+            ? 'Inspection saved. '.$r->customer->firstName().' has 48 hours to accept or dispute the '.money($charge).' charge; damaged units are kept out of your stock until fixed.'
+            : 'Inspection saved. Everything came back fine; you can settle the deposit now.');
     }
 
     public function settle(Request $request, RentalRequest $rentalRequest)

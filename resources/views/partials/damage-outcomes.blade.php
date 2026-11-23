@@ -45,7 +45,7 @@
       @if($d && $d['state'] === 'resolved')<p class="small mb-0 mt-1"><b>PartyRent decision:</b> {{ money($d['amount']) }} (the shop charged {{ money($it['total']) }}){{ ! empty($d['note']) ? '. '.$d['note'] : '' }}</p>@endif
       @if($canAnswer && $d)
         <div class="row wrap gap-sm mt-1" data-answer>
-          <label class="check"><input type="radio" name="answers[{{ $pid }}][action]" value="accept" checked> Accept {{ money($it['total']) }}</label>
+          <label class="check"><input type="radio" name="answers[{{ $pid }}][action]" value="accept" required> Accept {{ money($it['total']) }}</label>
           <label class="check"><input type="radio" name="answers[{{ $pid }}][action]" value="dispute"> Dispute</label>
         </div>
         <textarea class="input mt-1" name="answers[{{ $pid }}][reason]" rows="2" maxlength="1000" placeholder="Why do you dispute it? e.g. The scratch was already there in the release photos." hidden data-reason></textarea>

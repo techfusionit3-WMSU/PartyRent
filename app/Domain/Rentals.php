@@ -1192,7 +1192,7 @@ class Rentals
             self::history($r, 'inspection', $comp > 0 ? 'Damage assessment confirmed: '.money($comp).' compensation' : 'All items returned in good condition');
         });
         self::changed($r);
-        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? 'Damage report' : 'Return inspection done', $comp > 0 ? 'The supplier confirmed damaged or missing items for '.$r->code.'. Compensation: '.money($comp).'. Open the rental to see the breakdown and evidence.'.($outcomes ? ' You have '.Damage::REVIEW_HOURS.' hours to accept or dispute it; with no answer it is accepted.' : '') : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
+        Notifier::notify($r->customer_id, 'customer', $comp > 0 ? ($outcomes ? 'Accept or dispute a '.money($comp).' damage charge · '.$r->code : 'Damage report · '.$r->code) : 'Return inspection done', $comp > 0 ? 'The supplier confirmed damaged or missing items for '.$r->code.'. Compensation: '.money($comp).'. Open the rental to see the breakdown and evidence.'.($outcomes ? ' You have '.Damage::REVIEW_HOURS.' hours to accept or dispute it; with no answer it is accepted.' : '') : 'All items for '.$r->code.' passed inspection.', self::link('rentals.show', $r));
         if ($comp > 0 && $r->supplier) {
             Notifier::finance($r->supplier, 'Damage compensation due', $r->code.': '.money($comp).' compensation recorded.', route('cashier.balances'));
         }

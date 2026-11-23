@@ -2,7 +2,16 @@
 
 @php
     $settleDisabled = $r->inspection && ($r->inspection['settlement'] ?? '') !== 'pending' && $f['depositHeld'] <= 0;
-    $hints = ['accepted' => 'Prepare the items once payments are in order.', 'in_progress' => $r->fulfillment === 'delivery' ? 'Send the items out for delivery.' : 'Notify the customer that items are ready for pickup.', 'ready_pickup' => 'Record who picked up the items.', 'out_delivery' => 'Record who received the delivery.', 'ongoing' => 'Mark the rental for return after the event ('.fmt_date($r->end_date).').', 'return_pending' => 'Count and inspect returned items.', 'inspection' => $settleDisabled ? 'The deposit is settled. Complete the rental to close it.' : 'Settle the security deposit, then complete the rental.'];
+    // damage charge still open: the customer has not answered (pending) or PartyRent is deciding (disputed)
+    $dmgReview = $r->status === 'inspection' ? \App\Domain\Damage::reviewStatus($r) : null;
+    $canComplete = $r->status === 'inspection' && collect(\App\Domain\Rentals::completionChecklist($r))->every(fn ($c) => $c['ok']);
+    $inspHint = match (true) {
+        $dmgReview === 'pending' => 'Wait for '.$r->customer->firstName().' to accept or dispute the damage charge (until '.fmt_datetime($r->inspection['review']['deadline'] ?? null).'). You can also drop the charge and settle the deposit now.',
+        $dmgReview === 'disputed' => $r->customer->firstName().' disputed the damage charge. PartyRent decides it and you are notified; then settle the deposit.',
+        $settleDisabled => 'The deposit is settled. Complete the rental to close it.',
+        default => 'Settle the security deposit, then complete the rental.',
+    };
+    $hints = ['accepted' => 'Prepare the items once payments are in order.', 'in_progress' => $r->fulfillment === 'delivery' ? 'Send the items out for delivery.' : 'Notify the customer that items are ready for pickup.', 'ready_pickup' => 'Record who picked up the items.', 'out_delivery' => 'Record who received the delivery.', 'ongoing' => 'Mark the rental for return after the event ('.fmt_date($r->end_date).').', 'return_pending' => 'Count and inspect returned items.', 'inspection' => $inspHint];
     $showAvail = in_array($r->status, ['pending', 'accepted', 'in_progress'], true);
 @endphp
 
@@ -28,8 +37,9 @@
         <button class="btn btn-danger" data-modal="declineModal">{{ icon('x') }}Decline</button>
         @if(auth()->user()->orgCan('orders.manage'))<button class="btn btn-success" data-modal="acceptModal" @if($conflicts) title="Not enough stock" @endif>{{ icon('check') }}Accept request</button>@else<span class="small muted">Only the Organization Admin can accept or decline.</span>@endif
       @elseif($r->status === 'inspection')
-        @unless($settleDisabled)<button class="btn btn-primary" data-modal="settleModal">{{ icon('shield') }}Settle deposit</button>@endunless
-        <form method="POST" action="{{ route('supplier.requests.complete', $r) }}" data-confirm="Close {{ $r->code }} as completed? Make sure the inspection and deposit are settled. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Complete rental?" data-confirm-ok="Complete rental">@csrf<button class="btn btn-primary">Complete rental</button></form>
+        @if($dmgReview === 'pending')<button class="btn" data-modal="settleModal">{{ icon('shield') }}Drop the charge & settle</button>
+        @elseif(! $settleDisabled && $dmgReview !== 'disputed')<button class="btn btn-primary" data-modal="settleModal">{{ icon('shield') }}Settle deposit</button>@endif
+        @if($canComplete)<form method="POST" action="{{ route('supplier.requests.complete', $r) }}" data-confirm="Close {{ $r->code }} as completed? Make sure the inspection and deposit are settled. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Complete rental?" data-confirm-ok="Complete rental">@csrf<button class="btn btn-primary">Complete rental</button></form>@endif
       @else
         @foreach($next as $st)
           @php($why = \App\Domain\Rentals::stepBlockers($r, $st))
@@ -250,7 +260,7 @@
     <div class="sum-line"><span>Deposit held</span><b>{{ money($f['depositHeld']) }}</b></div><div class="sum-line"><span>Compensation assessed</span><b>{{ money($f['compensation']) }}</b></div><div class="sum-line"><span>Compensation already paid</span><b>{{ money($f['compPaidDirect']) }}</b></div><hr>
     @if($f['compensation'] > 0)
       <div class="stack-sm">@foreach([['deducted', 'Deduct compensation from the deposit', 'Refund '.money(max(0, $f['depositHeld'] - min($f['compensation'], $f['depositPaid']))).($f['compensation'] > $f['depositPaid'] ? '; customer still owes '.money($f['compensation'] - $f['depositPaid']) : '')], ['paid', 'Customer paid compensation separately', 'Refund full deposit '.money($f['depositHeld'])], ['waived', 'Waive compensation', 'Refund full deposit '.money($f['depositHeld'])]] as $i => [$v, $l, $d])
-        <label class="card card-flat row" style="padding:12px;cursor:pointer"><input type="radio" name="mode" value="{{ $v }}" @checked($i === 0) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $d }}</div></div></label>
+        <label class="card card-flat row" style="padding:12px;cursor:pointer"><input type="radio" name="mode" value="{{ $v }}" @checked($dmgReview === 'pending' ? $v === 'waived' : $i === 0) @disabled(($dmgReview === 'pending' && $v !== 'waived') || ($v === 'paid' && $f['compensationDue'] > 0)) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $d }}</div></div></label>
       @endforeach</div>
     @else
       <input type="hidden" name="mode" value="settled"><p>No damages — the full deposit of <b>{{ money($f['depositHeld']) }}</b> will be refunded.</p>

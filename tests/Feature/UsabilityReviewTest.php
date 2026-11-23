@@ -59,8 +59,11 @@ class UsabilityReviewTest extends TestCase
         $s = NextStep::rental($r, 'supplier');
         $this->assertStringContainsString('Complete the rental', $s['text']);
         $this->assertStringNotContainsString('settle the deposit', $s['text']);
-        $this->actingAs($r->supplier->owner)->withSession(['mode' => 'supplier'])->get(route('supplier.requests.show', $r))
-            ->assertOk()->assertSee('Complete rental')->assertDontSee('data-modal="settleModal"', false);
+        $page = $this->actingAs($r->supplier->owner)->withSession(['mode' => 'supplier'])->get(route('supplier.requests.show', $r))
+            ->assertOk()->assertDontSee('data-modal="settleModal"', false);
+        // "Complete rental" is offered only when every check passes (here the balance is still open)
+        $ready = collect(\App\Domain\Rentals::completionChecklist($r))->every(fn ($c) => $c['ok']);
+        $ready ? $page->assertSee(route('supplier.requests.complete', $r), false) : $page->assertDontSee(route('supplier.requests.complete', $r), false);
     }
 
     public function test_shop_payment_settings_offer_cash_only_besides_online(): void

@@ -172,6 +172,29 @@ class DamageOutcomesTest extends TestCase
         $this->assertTrue(Rentals::settleDeposit($r->fresh(), 'deducted')['ok']);
     }
 
+    /** Usability review 2026-11-24: the damage charge is easy to find and answer, and nobody is sent to a dead end. */
+    public function test_damage_charge_flow_is_clear_for_both_sides(): void
+    {
+        [$r, $pid, $q, $peak] = $this->returnPending();
+        $this->assertTrue($this->inspect($r, $peak, $pid, ['repairable' => 1, 'repairCost' => 150, 'description' => 'cracked leg'])['ok']);
+        $r->refresh();
+
+        // customer: a jump button next to "Your turn", and nothing pre-chosen (an answer is a decision)
+        $this->actingAs($r->customer)->withSession(['mode' => 'customer'])->get(route('rentals.show', $r))->assertOk()
+            ->assertSee('Review the charge')->assertSee('id="damage"', false)->assertDontSee('value="accept" checked', false);
+        // shop: told to wait (or drop the charge); completing is not offered yet
+        $this->actingAs($r->supplier->owner)->withSession(['mode' => 'supplier'])->get(route('supplier.requests.show', $r))->assertOk()
+            ->assertSee('Wait for')->assertSee('Drop the charge')->assertDontSee(route('supplier.requests.complete', $r), false);
+
+        // disputed: both sides are told PartyRent decides; the shop has nothing to press
+        $this->actingAs($r->customer)->post(route('rentals.damage', $r), ['answers' => [$pid => ['action' => 'dispute', 'reason' => 'It was loose at delivery.']]])->assertSessionHas('success');
+        $r = $r->fresh();
+        $this->assertStringContainsString('PartyRent', \App\Domain\NextStep::rental($r, 'customer')['text']);
+        $this->assertStringContainsString('PartyRent is deciding', \App\Domain\NextStep::rental($r, 'supplier')['text']);
+        $this->actingAs($r->supplier->owner)->withSession(['mode' => 'supplier'])->get(route('supplier.requests.show', $r))->assertOk()
+            ->assertSee('disputed the damage charge')->assertDontSee('data-modal="settleModal"', false);
+    }
+
     public function test_dispute_goes_to_admin_who_sets_the_final_amount(): void
     {
         [$r, $pid, $q, $peak] = $this->returnPending();

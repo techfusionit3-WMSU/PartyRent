@@ -97,6 +97,9 @@ class NextStep
                 if (Damage::reviewStatus($r) === 'pending') {
                     return $c ? self::you('Your turn: review the damage charge and accept or dispute it.') : self::them('Waiting for :name to answer the damage charge.', $p);
                 }
+                if (Damage::reviewStatus($r) === 'disputed') {
+                    return $c ? self::them('PartyRent is reviewing the damage charge you disputed. You will be told the decision.', $p) : self::them(':name disputed the damage charge. PartyRent is deciding it.', $p);
+                }
 
                 // once the deposit is settled (none held, inspection not waiting) only closing the rental is left
                 $settled = ($r->inspection['settlement'] ?? '') !== 'pending' && $r->fin()['depositHeld'] <= 0;

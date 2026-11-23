@@ -46,7 +46,7 @@
     <div><h4>Account</h4><ul>@auth<li><a href="{{ route('rentals.index') }}">My rentals</a></li><li><a href="{{ route('events.index') }}">My events</a></li><li><a href="{{ route('notifications') }}">Notifications</a></li>@else<li><a href="{{ route('login') }}">Log in</a></li><li><a href="{{ route('register') }}">Create an account</a></li>@endauth</ul></div>
   </div>
   <hr style="border-color:rgba(255,255,255,.1)">
-  <div class="small">© {{ date('Y') }} {{ setting('platformName', 'PartyRent') }} · Payments are verified by PartyRent cashiers. PartyRent Assist suggests items but never books, prices or reserves anything.</div>
+  <div class="small">© {{ date('Y') }} {{ setting('platformName', 'PartyRent') }} · Online payments are confirmed automatically by the payment gateway. PartyRent Assist suggests items but never books, prices or reserves anything.</div>
 </div></footer>
 
 <nav class="bottom-nav" aria-label="Main">

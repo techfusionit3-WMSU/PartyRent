@@ -869,3 +869,10 @@ html:has(.auth) { background: linear-gradient(90deg, #E11D74 0, #9333EA 50%, var
 /* login: the card sits in the middle of the first screen; the demo accounts follow below it */
 .auth-center { min-height: 100vh; margin-top: -56px; display: flex; flex-direction: column; justify-content: center; } /* one screen tall from the window top (the column has 56px padding) */
 @media (max-width: 1024px) { .auth-center { min-height: 0; margin-top: 0; display: block; } }
+
+/* What shows when a touchpad or phone pulls the page past its top or bottom ("bounce"): the colour of the
+   edge that moved, instead of a pale strip. Shop pages: white header on top, dark footer below.
+   Dashboards: dark sidebar on the left, page colour beside it. */
+html:has(.mk-footer) { background: linear-gradient(to bottom, #fff 50%, #1E1433 50%); }
+html:has(.dash) { background: linear-gradient(90deg, #1E1433 260px, var(--bg, #FAF7FD) 260px); }
+@media (max-width: 1024px) { html:has(.dash) { background: var(--bg, #FAF7FD); } }

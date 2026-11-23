@@ -133,7 +133,7 @@ class ShopStaff extends Model
     ];
 
     /** Supplier pages a business still uses (the rest are for solo item-rental shops). */
-    public const BUSINESS_KEEPS = ['supplier.team', 'supplier.team.*', 'supplier.shop', 'supplier.shop.*', 'supplier.business', 'supplier.reviews', 'supplier.reviews.*'];
+    public const BUSINESS_KEEPS = ['supplier.team', 'supplier.team.*', 'supplier.shop', 'supplier.shop.*', 'supplier.business', 'supplier.reviews', 'supplier.reviews.*', 'supplier.activity'];
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }

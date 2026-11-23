@@ -73,7 +73,7 @@
 {{-- ================= browse ================= --}}
 @unless($landing)@include('market._browse-bar')@endunless
 @if($forDates)@include('market._for-dates')@endif
-<div class="page-head mt-2" id="{{ $forDates ? 'all-results' : 'results' }}"><div><h1>{{ $landing ? 'Browse party supplies' : $heading }}</h1><p>{{ $list->count() }} {{ $st['view'] === 'packages' ? 'packages' : 'items' }}{{ $dates ? ' · availability for '.fmt_range($dates[0], end($dates)).($st['qty'] ? ' (need '.$st['qty'].'/day)' : '') : ' · select a rental date to see available stock' }}</p></div></div>
+<div class="page-head mt-2" id="{{ $forDates ? 'all-results' : 'results' }}"><div>@if($landing)<h2 class="h1">Browse party supplies</h2>@else<h1>{{ $heading }}</h1>@endif<p>{{ $list->count() }} {{ $st['view'] === 'packages' ? 'packages' : 'items' }}{{ $dates ? ' · availability for '.fmt_range($dates[0], end($dates)).($st['qty'] ? ' (need '.$st['qty'].'/day)' : '') : ' · select a rental date to see available stock' }}</p></div></div>
 <div class="row wrap mb-2" style="gap:6px">
   @foreach($labels as $k => $l)
     @if($st[$k] !== '')

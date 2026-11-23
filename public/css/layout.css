@@ -42,7 +42,7 @@
 
 .mk-main { padding: 24px 0 60px; min-height: calc(100vh - var(--header-h)); }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-.page-head h1 { margin: 0; }
+.page-head h1, .page-head .h1 { margin: 0; }
 .page-head p { margin: 4px 0 0; color: var(--muted); }
 .crumbs { font-size: .82rem; color: var(--muted); margin-bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 .crumbs a { color: var(--muted); }
@@ -238,7 +238,7 @@
 
 /* charts */
 .chart { width: 100%; }
-.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart svg { width: 100%; max-width: 100%; height: auto; display: block; overflow: hidden; }
 .chart .tt { position: fixed; pointer-events: none; background: var(--ink); color: #fff; font-size: .78rem; padding: 6px 10px; border-radius: 8px; z-index: 3000; white-space: nowrap; display: none; box-shadow: var(--shadow); }
 .hbar { display: grid; grid-template-columns: minmax(90px, 160px) 1fr 70px; gap: 10px; align-items: center; font-size: .82rem; margin-bottom: 8px; }
 .hbar .tr { height: 12px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
@@ -876,3 +876,26 @@ html:has(.auth) { background: linear-gradient(90deg, #E11D74 0, #9333EA 50%, var
 html:has(.mk-footer) { background: linear-gradient(to bottom, #fff 50%, #1E1433 50%); }
 html:has(.dash) { background: linear-gradient(90deg, #1E1433 260px, var(--bg, #FAF7FD) 260px); }
 @media (max-width: 1024px) { html:has(.dash) { background: var(--bg, #FAF7FD); } }
+
+/* ---------- headers keep the same layout on every screen (UI audit) ----------
+   Shop header: row 1 = logo … bell, cart, profile (always on the right); row 2 = search + AI, full width.
+   Before, the search could squeeze into row 1 at tablet widths and push the profile to the LEFT. */
+@media (max-width: 1180px) {
+  .mk-header .bar > .brand { order: 1; }
+  .mk-actions { order: 2; margin-left: auto; }
+  .mk-header .bar::after { content: ''; order: 3; flex-basis: 100%; height: 0; } /* line break: search starts row 2 */
+  .mk-search { order: 4; flex: 1 1 0; min-width: 0; max-width: none; }
+  .ai-square { order: 5; }
+}
+/* Dashboard header: the page title is hidden on small screens but still takes the free space, so the
+   bell and profile stay in the right corner (they drifted to the middle when the title disappeared). */
+@media (max-width: 768px) { .dash-top .ttl { display: block; flex: 1 1 auto; min-width: 0; visibility: hidden; } }
+/* phone "card" tables: an expandable details block gets its own full-width line instead of running off-screen */
+@media (max-width: 768px) {
+  table.table.cards td { flex-wrap: wrap; }
+  table.table.cards td > details { flex-basis: 100%; text-align: left; }
+}
+/* payout breakdown rows: the label wraps, the amount stays whole and on screen */
+.payout-bd .row { gap: 10px; flex-wrap: nowrap; align-items: flex-start; }
+.payout-bd .row > span:first-child { flex: 1 1 auto; min-width: 0; }
+.payout-bd .row > .num { flex: none; white-space: nowrap; }

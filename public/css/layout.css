@@ -899,3 +899,10 @@ html:has(.dash) { background: linear-gradient(90deg, #1E1433 260px, var(--bg, #F
 .payout-bd .row { gap: 10px; flex-wrap: nowrap; align-items: flex-start; }
 .payout-bd .row > span:first-child { flex: 1 1 auto; min-width: 0; }
 .payout-bd .row > .num { flex: none; white-space: nowrap; }
+
+/* Item and package cards: the whole card opens the item, not only the photo and the name. The name's link is
+   stretched over the card (one link for keyboards and screen readers); Compare stays clickable on top. */
+.p-card { cursor: pointer; }
+.p-card .p-name::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+.p-card .p-compare { z-index: 3; }
+.p-card:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-100, #FFD9E8); }

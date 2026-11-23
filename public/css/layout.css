@@ -860,3 +860,8 @@
 
 /* jump links (e.g. "Review the charge"): land below the sticky header */
 #damage, [id].card { scroll-margin-top: 90px; }
+
+/* Login / sign-up pages: scrolling past the top on a touchpad used to pull the page down and show a blank
+   strip above the pink panel. No bounce here, and anything behind the page is the brand colour. */
+html:has(.auth), html:has(.auth) body { overscroll-behavior-y: none; }
+html:has(.auth) { background: linear-gradient(90deg, #E11D74 0, #9333EA 50%, var(--bg, #FAF7FD) 50%); }

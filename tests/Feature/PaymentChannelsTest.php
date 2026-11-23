@@ -292,7 +292,7 @@ class PaymentChannelsTest extends TestCase
         $this->as('jose@demo.ph', 'customer')->post('/rentals/PR-0003/payments', ['type' => 'down', 'amount' => $amt, 'method' => 'online']);
         $p = Payment::where('gateway', 'paymongo')->firstOrFail();
 
-        $this->paymongo($this->paid($amt - 5)); // PayMongo reports a different amount
+        $this->paymongo($this->paid($amt + 5)); // PayMongo reports more than was due: an exception
         $this->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('success', fn ($m) => str_contains($m, 'cashier'));
         $p->refresh();
         $this->assertSame('pending', $p->status);

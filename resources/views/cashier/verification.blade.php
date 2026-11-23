@@ -1,11 +1,11 @@
-@extends('layouts.dash', ['title' => 'Payment Verification', 'nav' => 'verification'])
+@extends('layouts.dash', ['title' => auth()->user()->isShopCashier() ? 'Payments to Confirm' : 'Payment Exceptions', 'nav' => 'verification'])
 
 @section('content')
 @php($shopCashier = auth()->user()->isShopCashier())
 <div class="page-head"><div>@php($adminView = auth()->user()->activeRole(session('mode')) === 'admin')
-<h1>{{ $shopCashier ? 'Payments to confirm' : ($adminView ? 'Payments waiting for the cashier' : 'Payment verification') }}</h1><p>@if($shopCashier)Confirm <b>cash</b> once you have it in hand. Bank and debit transfers go to PartyRent's account, so PartyRent checks them; they are listed here so you know what is coming.@else Check each bank or debit transfer against PartyRent's account statement. Online payments are confirmed automatically. A payment only reduces the balance once it is verified.@endif</p></div></div>
+<h1>{{ $shopCashier ? 'Payments to confirm' : 'Payment exceptions' }}</h1><p>@if($shopCashier)Confirm <b>cash</b> once you have it in hand. Bank and debit transfers go to PartyRent's account, so PartyRent checks them; they are listed here so you know what is coming.@else Online payments are verified automatically by the gateway and PartyRent's system: nobody approves them by hand, and they never appear here. This list only holds exceptions: an online payment the gateway reported with more than was due, and transfers sent before automatic payments. Watch every payment on <a href="{{ route('admin.payment-monitor') }}">Online Payments</a>.@endif</p></div></div>
 @if($list->isEmpty())
-  <div class="card">@include('partials.empty', ['emoji' => '✅', 'title' => 'All caught up', 'text' => 'No payments are waiting for verification.'])</div>
+  <div class="card">@include('partials.empty', ['emoji' => '✅', 'title' => 'All caught up', 'text' => $shopCashier ? 'No cash payments are waiting for you.' : 'No exceptions. Every online payment was verified automatically.'])</div>
 @else
   <div class="stack">
     @foreach($list as $p)

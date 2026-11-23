@@ -113,7 +113,17 @@ class OnlinePay
                 'notes' => trim(($p->notes ? $p->notes.' · ' : '').'Paid online'.($via ? ' via '.$via : '')),
             ])->save();
 
-            $why = abs($received - $p->amount) > 0.009 ? $name.' received '.money($received).' instead of '.money($p->amount).'.' : null;
+            $why = null;
+            if (abs($received - $p->amount) > 0.009) {
+                if ($received > 0.009 && $received < $p->amount) {
+                    // paid less than asked: count what actually arrived (the rest stays due), no one has to approve it
+                    $p->notes = trim($p->notes.' · '.$name.' received '.money($received).' of '.money($p->amount).'; the rest stays due.');
+                    $p->amount = r2($received);
+                    $p->save();
+                } else {
+                    $why = $name.' received '.money($received).' instead of '.money($p->amount).'.';
+                }
+            }
             $tx = ['gateway_payment_id' => mb_substr($gatewayPaymentId, 0, 80), 'amount' => $received, 'fee' => $fee, 'channel' => $via ? mb_substr($via, 0, 40) : null];
             if (! $why) {
                 $res = Rentals::confirmPayment($p, null);

@@ -36,6 +36,39 @@ class PaymentChecks
     /** Who is talking to the gateway right now (webhook | return | auto_check | manual_check | checkout). */
     private static string $source = 'checkout';
 
+    /** The webhook event being handled; stored on the first transaction it writes (idempotency key). */
+    private static ?string $eventId = null;
+
+    /** Has this gateway event already been processed? (webhook idempotency) */
+    public static function seen(string $eventId): bool
+    {
+        return PaymentTransaction::where('event_id', $eventId)->exists();
+    }
+
+    /**
+     * Handle one webhook event exactly once. A repeat of an event already processed returns 'duplicate' and
+     * changes nothing; the event id is stored (unique) on the transaction it writes.
+     */
+    public static function once(string $eventId, callable $fn): mixed
+    {
+        $eventId = mb_substr($eventId, 0, 120);
+        if ($eventId !== '' && self::seen($eventId)) {
+            return 'duplicate';
+        }
+        $prev = self::$eventId;
+        self::$eventId = $eventId !== '' ? $eventId : null;
+        try {
+            $res = $fn();
+            if (self::$eventId && ! self::seen(self::$eventId)) { // nothing was logged (e.g. still unpaid): remember the event anyway
+                self::log(['result' => 'ignored', 'message' => 'Webhook received: '.(is_string($res) ? $res : 'handled').'.']);
+            }
+
+            return $res;
+        } finally {
+            self::$eventId = $prev;
+        }
+    }
+
     /** Run $fn with $source recorded on every transaction it logs. */
     public static function via(string $source, callable $fn): mixed
     {
@@ -57,7 +90,13 @@ class PaymentChecks
     public static function log(array $row): ?PaymentTransaction
     {
         try {
-            return PaymentTransaction::create($row + ['source' => self::$source, 'verified' => true]);
+            $row += ['source' => self::$source, 'verified' => true];
+            if (self::$eventId && ! isset($row['event_id'])) { // the first row of a webhook carries its event id
+                $row['event_id'] = self::$eventId;
+                self::$eventId = null;
+            }
+
+            return PaymentTransaction::create($row);
         } catch (\Throwable $e) {
             Log::warning('Could not record payment transaction: '.$e->getMessage());
 

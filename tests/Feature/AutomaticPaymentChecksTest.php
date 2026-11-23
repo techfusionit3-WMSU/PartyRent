@@ -132,13 +132,49 @@ class AutomaticPaymentChecksTest extends TestCase
         $this->assertSame(0, PaymentTransaction::count());
     }
 
-    public function test_a_different_amount_goes_to_the_cashier_not_verified(): void
+    public function test_a_smaller_amount_is_verified_for_what_arrived_without_anyone_approving(): void
     {
         [, $p] = $this->startCheckout();
-        PayMongo::practiceUpdate($p->gateway_ref, ['status' => 'paid', 'method' => 'card', 'paidAmount' => $p->amount - 50, 'payId' => 'pay_short']);
+        $due = $p->amount;
+        PayMongo::practiceUpdate($p->gateway_ref, ['status' => 'paid', 'method' => 'card', 'paidAmount' => $due - 50, 'payId' => 'pay_short']);
+        PaymentChecks::run();
+        $p->refresh();
+        $this->assertSame('verified', $p->status);
+        $this->assertEqualsWithDelta($due - 50, $p->amount, 0.001, 'only what arrived counts; the rest stays due');
+        $this->assertNull($p->verified_by);
+    }
+
+    public function test_more_than_was_due_is_an_exception_not_paid(): void
+    {
+        [, $p] = $this->startCheckout();
+        PayMongo::practiceUpdate($p->gateway_ref, ['status' => 'paid', 'method' => 'card', 'paidAmount' => $p->amount + 50, 'payId' => 'pay_over']);
         PaymentChecks::run();
         $this->assertSame('pending', $p->fresh()->status);
         $this->assertSame('review', PaymentTransaction::where('payment_id', $p->id)->value('result'));
+        $this->as('cashier@partyrent.ph', 'cashier')->get('/cashier/verification')->assertSee('Payment exceptions')->assertSee($p->code);
+    }
+
+    public function test_the_same_webhook_event_is_processed_only_once(): void
+    {
+        [, $p] = $this->startCheckout();
+        PayMongo::practiceUpdate($p->gateway_ref, ['status' => 'paid', 'method' => 'gcash', 'paidAmount' => $p->amount, 'payId' => 'pay_1']);
+        $body = json_encode(['data' => ['id' => 'evt_same', 'attributes' => ['type' => 'checkout_session.payment.paid', 'data' => ['id' => $p->gateway_ref, 'attributes' => PayMongo::practiceAttributes(PayMongo::practiceSession($p->gateway_ref))]]]]);
+        $send = fn () => $this->call('POST', '/webhooks/paymongo', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_PAYMONGO_SIGNATURE' => PaymentChecks::practiceSignature($body)], $body);
+
+        $send()->assertOk()->assertJson(['result' => 'verified']);
+        $send()->assertOk()->assertJson(['result' => 'duplicate']);
+        $this->assertSame(1, PaymentTransaction::where('event_id', 'paymongo:evt_same')->count());
+        $this->assertSame(1, Payment::where('rental_request_id', $p->rental_request_id)->whereNotNull('receipt_no')->where('gateway', 'paymongo')->count());
+    }
+
+    public function test_customers_cannot_send_a_manual_transfer_while_online_payment_is_on(): void
+    {
+        $r = RentalRequest::where('code', 'PR-0003')->firstOrFail();
+        $this->as('jose@demo.ph', 'customer')->get('/rentals/PR-0003')->assertDontSee('<option value="bank"', false);
+        $res = \App\Domain\Rentals::submitPayment($r, ['type' => 'down', 'amount' => 100, 'method' => 'bank', 'reference' => 'BDO-1'], 'customer');
+        $this->assertFalse($res['ok']);
+        $this->assertStringContainsString('Pay online', $res['error']);
+        $this->assertSame(0, Payment::where('rental_request_id', $r->id)->where('method', 'bank')->where('status', 'pending')->where('reference', 'BDO-1')->count());
     }
 
     public function test_admin_sees_the_monitor_and_can_check_now(): void

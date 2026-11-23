@@ -110,13 +110,13 @@ class XenditTest extends TestCase
         $this->postJson('/webhooks/xendit', $body, ['x-callback-token' => 'cb_tok'])->assertOk()->assertJson(['result' => 'verified']);
         $this->assertSame('verified', $p->fresh()->status);
         // Xendit retries callbacks; a repeat changes nothing
-        $this->postJson('/webhooks/xendit', $body, ['x-callback-token' => 'cb_tok'])->assertJson(['result' => 'done']);
+        $this->postJson('/webhooks/xendit', $body, ['x-callback-token' => 'cb_tok'])->assertJson(['result' => 'duplicate']);
     }
 
     public function test_different_amount_goes_to_the_cashier(): void
     {
         [, $p, $amt] = $this->startPayment();
-        $this->invoice = $this->paid($p->code, $amt - 5);
+        $this->invoice = $this->paid($p->code, $amt + 5); // more than was due: an exception
         $this->get("/rentals/PR-0003/payments/{$p->code}/online")->assertSessionHas('success', fn ($m) => str_contains($m, 'cashier'));
         $this->assertSame('pending', $p->fresh()->status);
         $this->actingAs($this->shopCashier('PR-0003'))->withSession(['mode' => 'cashier'])->get('/cashier/verification')->assertSee($p->code)->assertSee('Paid online through Xendit');

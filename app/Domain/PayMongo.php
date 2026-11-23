@@ -246,7 +246,9 @@ class PayMongo
             return null;
         }
 
-        return PaymentChecks::via('webhook', fn () => self::handleEvent((array) json_decode($body, true)));
+        $event = (array) json_decode($body, true);
+
+        return PaymentChecks::via('webhook', fn () => PaymentChecks::once('paymongo:'.($event['data']['id'] ?? ''), fn () => self::handleEvent($event)));
     }
 
     /** Check the Paymongo-Signature header: "t=<unix>,te=<test sig>,li=<live sig>", HMAC-SHA256 of "t.body". */

@@ -1355,6 +1355,11 @@ class Rentals
         if (! in_array($data['type'], array_merge(Finance::RENTAL_TYPES, ['deposit', 'compensation']), true)) {
             return self::fail('Choose what you are paying for.');
         }
+        // Payments are verified automatically by the gateway: while it is on, customers pay online (or cash to the shop),
+        // never by a transfer someone at PartyRent would have to check by hand.
+        if ($source === 'customer' && in_array($data['method'] ?? '', ['bank', 'debit'], true) && OnlinePay::enabled()) {
+            return self::fail('Please use "Pay online" (GCash, Maya or card). It is confirmed automatically, so no receipt upload is needed.');
+        }
         if ($err = self::validatePayment($r, $data)) {
             return self::fail($err);
         }

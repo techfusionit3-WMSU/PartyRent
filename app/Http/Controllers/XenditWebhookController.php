@@ -27,7 +27,8 @@ class XenditWebhookController extends Controller
         $result = PaymentChecks::via('webhook', fn () => match (true) {
             str_starts_with($event, 'payout.') => \App\Domain\XenditPayouts::handleCallback($body),
             str_starts_with($event, 'refund.') => \App\Domain\Refunds::handleCallback($body),
-            default => Xendit::handleCallback($body),
+            // Xendit sends an invoice callback per status change: the invoice id + status is the event
+            default => PaymentChecks::once('xendit:'.($body['id'] ?? '').':'.($body['status'] ?? ''), fn () => Xendit::handleCallback($body)),
         });
 
         return response()->json(['result' => $result]);

@@ -916,4 +916,13 @@ html:has(.dash) { background: var(--bg, #FAF7FD) linear-gradient(#1E1433, #1E143
 @media (max-width: 1024px) {
   .pd > .pd-left { display: contents; }
   .pd > .pd-left > .pd-cal { order: 3; }
+  .pd > .pd-left > .pd-shop { order: 4; } /* the shop card comes after the availability calendar */
 }
+/* Phones only: the shop card moves below the availability calendar (desktop keeps it under the photo).
+   Item page: two copies, one per screen size. Package page: reordered (see .pd-shop above). */
+.pdx-shop-phone { display: none; }
+@media (max-width: 768px) {
+  .pdx-stagecol > .pdx-shop { display: none; }
+  .pdx-shop-phone { display: flex; margin: 0; }
+}
+@media (max-width: 1024px) { .pd > .pd-left > .pd-shop { margin-top: 0 !important; } }

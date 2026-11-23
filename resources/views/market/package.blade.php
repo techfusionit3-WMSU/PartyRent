@@ -5,7 +5,7 @@
 <div class="pd">
   <div class="pd-left">
     <div class="pd-gallery"><div class="main">@include('partials.img', ['item' => $k])</div></div>
-    <a class="card pdx-shop" style="margin-top:12px" href="{{ route('suppliers.show', $sup) }}">
+    <a class="card pdx-shop pd-shop" style="margin-top:12px" href="{{ route('suppliers.show', $sup) }}">
       <div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div>
       <div class="grow" style="min-width:0"><div class="strong ellipsis">{{ $sup->name }}</div><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }} · {{ $sup->fulfillmentLabel() }}</div></div>
       <span class="btn btn-sm">View Supplier Profile</span>

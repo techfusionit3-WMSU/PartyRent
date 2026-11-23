@@ -142,6 +142,11 @@
   </section>
 
   <section class="card"><h3>Availability calendar</h3><div data-calendar data-kind="item" data-id="{{ $p->id }}" data-month="{{ substr($start, 0, 7) }}" data-need="{{ $qty }}"></div></section>
+  <a class="card pdx-shop pdx-shop-phone" href="{{ route('suppliers.show', $sup) }}">
+  <div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div>
+  <div class="grow" style="min-width:0"><div class="strong ellipsis">{{ $sup->name }}</div><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }}</div></div>
+  <span class="btn btn-sm">View Supplier Profile</span>
+</a>
 
 </div>
 

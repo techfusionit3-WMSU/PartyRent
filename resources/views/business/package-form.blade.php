@@ -34,7 +34,7 @@
     @if($k->photos)<div class="bp-grid mb-1">@foreach($k->photos as $ph)<label class="bp-thumb"><img src="{{ asset('storage/'.$ph) }}" alt=""><span class="check small"><input type="checkbox" name="photos_keep[]" value="{{ $ph }}" checked> Keep</span></label>@endforeach</div>@endif
     <input class="input" type="file" name="photos[]" accept="image/*" multiple>@error('photos.*')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
   <label class="check mb-2"><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" @checked(old('active', $k->active ?? true))> Visible to customers</label>
-  <div class="row gap-sm"><button class="btn btn-primary">{{ icon('check') }}Save package</button><a class="btn" href="{{ route('business.packages') }}">Cancel</a></div>
+  <div class="row gap-sm form-actionbar"><button class="btn btn-primary">{{ icon('check') }}{{ $k->exists ? 'Save changes' : 'Create package' }}</button><a class="btn" href="{{ route('business.packages') }}">Cancel</a></div>
 </form>
 <script>
 /* Saving asks first, with a summary of what customers will see (the package is created only after "Save package"). */

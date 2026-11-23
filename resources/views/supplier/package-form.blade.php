@@ -3,6 +3,10 @@
 @php($oldDef = old('def') ? json_decode(old('def'), true) : null)
 @php($startDef = is_array($oldDef) ? $oldDef : ['pricing' => $def['pricing'], 'components' => $def['components'], 'minGuests' => $def['minGuests'], 'maxGuests' => $def['maxGuests'], 'stages' => $def['stages'] ?? []])
 @php($biz = $sup->isBusiness())
+@php($live = $k->exists && ! $k->is_draft)
+@php($mainLabel = $live ? 'Save changes' : ($k->exists ? 'Publish package' : 'Create package'))
+@php($mainTitle = $live ? 'Save changes to this package?' : ($k->exists ? 'Publish this package?' : 'Create this package?'))
+@php($draftLabel = $live ? 'Unpublish & save as draft' : 'Save as draft')
 @php($groups = \App\Models\Package::where('supplier_id', $k->supplier_id ?? auth()->user()->shop()->id)->whereNotNull('tier_group')->distinct()->pluck('tier_group'))
 @section('content')
 <div class="crumbs"><a href="{{ route('supplier.packages') }}">Packages</a> / {{ $k->exists ? $k->name : 'New package' }}</div>
@@ -52,7 +56,6 @@
           <span class="small muted">Not in your listings: customers can only get it with this package.</span></div>
       @endunless
     </div>
-    </div>
 
     <div class="card"><h3>Inventory</h3>
       <p class="small muted">Reserving a package deducts each included item from your inventory. Figures use the default options.</p>
@@ -85,10 +88,14 @@
     <div class="field" data-mode="sum_discount"><label for="pDisc">Discount (%)</label><input class="input" type="number" min="0" max="90" step="0.5" id="pDisc"><div class="hint">Taken off the sum of everything included. Add-ons are not discounted.</div></div>
     <div class="card card-flat mb-2" style="padding:12px" id="priceBox"><div class="small muted">Add components to see the price.</div></div>
     <div id="pkgMsgs"></div>
-    <button class="btn btn-primary btn-block btn-lg" name="draft" value="0">{{ $k->exists && ! $k->is_draft ? 'Save changes' : 'Publish package' }}</button>
-    <button class="btn btn-block mt-1" name="draft" value="1" formnovalidate>{{ $k->exists && ! $k->is_draft ? 'Unpublish & save as draft' : 'Save as draft' }}</button>
+    <button class="btn btn-primary btn-block btn-lg" name="draft" value="0">{{ icon('check') }}{{ $mainLabel }}</button>
+    <button class="btn btn-block mt-1" name="draft" value="1" formnovalidate>{{ $draftLabel }}</button>
     <button type="button" class="btn btn-block btn-ghost mt-1" id="previewBtn" data-modal="pkgPreview">{{ icon('eye') }}Preview as customer</button>
   </aside>
+  <div class="form-actionbar form-actionbar-narrow" role="group" aria-label="Save this package">
+    <button class="btn" name="draft" value="1" formnovalidate>{{ $draftLabel }}</button>
+    <button class="btn btn-primary grow" name="draft" value="0">{{ icon('check') }}{{ $mainLabel }}</button>
+  </div>
 </form>
 
 <div class="modal-backdrop hidden" id="pkgPreview"><div class="modal lg" role="dialog" aria-modal="true" aria-label="Customer preview"><div class="modal-head"><h3>Customer preview</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div><div class="modal-body pad-0" id="previewBody"></div></div></div>
@@ -251,7 +258,7 @@
       '<div class="small muted">' + (evs.length ? esc(evs.join(', ')) : 'No event tags') + (def.maxGuests ? ' · up to ' + esc(def.maxGuests) + ' guests' : '') + '</div>' +
       '<div class="small strong mt-1">What&#39;s inside</div>' + inside +
       '<div class="row between mt-1"><span class="strong">Customer pays</span><b class="price">' + esc(lastPrice && lastPrice.packageText ? lastPrice.packageText : '—') + '</b></div></div>';
-    window.PRUI.confirmDialog({ title: @json($k->exists && ! $k->is_draft ? 'Save changes to this package?' : 'Publish this package?'), html: html, ok: @json($k->exists && ! $k->is_draft ? 'Save changes' : 'Publish package') }).then(function (ok) {
+    window.PRUI.confirmDialog({ title: @json($mainTitle), html: html, ok: @json($mainLabel) }).then(function (ok) {
       if (!ok) return;
       publishOk = true;
       if (form.requestSubmit) form.requestSubmit(btn); else { var h = document.createElement('input'); h.type = 'hidden'; h.name = 'draft'; h.value = '0'; form.appendChild(h); form.submit(); }

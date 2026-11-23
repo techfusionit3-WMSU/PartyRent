@@ -873,8 +873,12 @@ html:has(.auth) { background: linear-gradient(90deg, #E11D74 0, #9333EA 50%, var
 /* What shows when a touchpad or phone pulls the page past its top or bottom ("bounce"): the colour of the
    edge that moved, instead of a pale strip. Shop pages: white header on top, dark footer below.
    Dashboards: dark sidebar on the left, page colour beside it. */
-html:has(.mk-footer) { background: linear-gradient(to bottom, #fff 50%, #1E1433 50%); }
-html:has(.dash) { background: linear-gradient(90deg, #1E1433 260px, var(--bg, #FAF7FD) 260px); }
+/* 1) no bounce on any page: the page can't be pulled past its top or bottom, so no strip can appear */
+html, body { overscroll-behavior-y: none; }
+/* 2) backup for browsers that still bounce: the colour below the page is the footer's, above it the header's
+   (no-repeat: a repeating gradient brought the white back below the footer) */
+html:has(.mk-footer) { background: #1E1433 linear-gradient(#fff, #fff) top / 100% 50% no-repeat; }
+html:has(.dash) { background: var(--bg, #FAF7FD) linear-gradient(#1E1433, #1E1433) left top / 260px 100% repeat-y; }
 @media (max-width: 1024px) { html:has(.dash) { background: var(--bg, #FAF7FD); } }
 
 /* ---------- headers keep the same layout on every screen (UI audit) ----------

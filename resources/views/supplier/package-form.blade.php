@@ -211,12 +211,14 @@
   }
 
   var timer = null;
+  var lastPrice = null; // the latest price check, shown again in the publish confirmation
   function changed() {
     document.getElementById('defInput').value = JSON.stringify(def);
     clearTimeout(timer);
     timer = setTimeout(function () {
       if (!def.components.length) { $('#priceBox').innerHTML = '<div class="small muted">Add components to see the price.</div>'; $('#pkgMsgs').innerHTML = ''; $('#stockBox').innerHTML = '<span class="small muted">Add rental items or consumables to see how many packages your stock covers.</span>'; return; }
       post(@json(route('supplier.packages.price')), { def: def }).then(function (r) {
+        lastPrice = r;
         var rows = r.rows.map(function (x) { return '<div class="row between small"><span>' + x.qty + '× ' + esc(x.name) + (x.group !== 'included' ? ' <span class="muted">(' + x.group + ')</span>' : '') + '</span><span class="muted">' + esc(x.cost) + '</span></div>'; }).join('');
         $('#priceBox').innerHTML = '<div class="row between"><span class="strong">Customer pays</span><b class="price">' + esc(r.packageText) + '</b></div>' +
           '<div class="small muted mb-1">' + esc(r.perDayText) + ' per day + ' + esc(r.onceText) + ' once · default options' + (r.usesGuests ? ', ' + r.guests + ' guests' : '') + '</div>' + rows +
@@ -230,6 +232,31 @@
   }
 
   var form = document.getElementById('pkgForm');
+
+  // Publishing (or saving a live package) asks first, with a summary of what customers will see.
+  // Drafts stay one click: customers cannot see them.
+  var publishOk = false;
+  form.addEventListener('submit', function (e) {
+    var btn = e.submitter;
+    if (publishOk || !btn || btn.name !== 'draft' || btn.value !== '0') return;
+    e.preventDefault();
+    var name = ($('#pkName') && $('#pkName').value.trim()) || 'This package';
+    var evs = Array.prototype.map.call(document.querySelectorAll('#evTags input[name="events[]"]'), function (i) { return i.value; });
+    var rows = lastPrice && lastPrice.rows ? lastPrice.rows : [];
+    var inside = rows.length ? '<ul class="small" style="margin:4px 0 0;padding-left:18px">' + rows.map(function (x) {
+      return '<li>' + x.qty + '× ' + esc(x.name) + (x.group !== 'included' ? ' <span class="muted">(' + esc(x.group) + ')</span>' : '') + '</li>'; }).join('') + '</ul>'
+      : '<div class="small" style="color:var(--red)">Nothing inside yet. Add at least one item or service.</div>';
+    var html = '<p style="margin:0 0 10px">' + (@json($k->exists && ! $k->is_draft) ? 'Customers will see these changes right away. Requests already booked keep the version they were booked with.' : 'Customers will be able to find and book it right away.') + '</p>' +
+      '<div class="card card-flat" style="padding:12px"><div class="strong">' + esc(($('#pkEmoji') ? $('#pkEmoji').value : '') + ' ' + name) + '</div>' +
+      '<div class="small muted">' + (evs.length ? esc(evs.join(', ')) : 'No event tags') + (def.maxGuests ? ' · up to ' + esc(def.maxGuests) + ' guests' : '') + '</div>' +
+      '<div class="small strong mt-1">What&#39;s inside</div>' + inside +
+      '<div class="row between mt-1"><span class="strong">Customer pays</span><b class="price">' + esc(lastPrice && lastPrice.packageText ? lastPrice.packageText : '—') + '</b></div></div>';
+    window.PRUI.confirmDialog({ title: @json($k->exists && ! $k->is_draft ? 'Save changes to this package?' : 'Publish this package?'), html: html, ok: @json($k->exists && ! $k->is_draft ? 'Save changes' : 'Publish package') }).then(function (ok) {
+      if (!ok) return;
+      publishOk = true;
+      if (form.requestSubmit) form.requestSubmit(btn); else { var h = document.createElement('input'); h.type = 'hidden'; h.name = 'draft'; h.value = '0'; form.appendChild(h); form.submit(); }
+    });
+  });
   form.addEventListener('input', function (e) {
     var t = e.target, k = t.getAttribute('data-k'), st = t.getAttribute('data-st');
     if (st) { var sp = st.split('.'); def.stages[+sp[0]][sp[1]] = t.value; changed(); return; }

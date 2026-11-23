@@ -8,7 +8,7 @@
 @endphp
 <div class="crumbs"><a href="{{ route('business.packages') }}">Event Packages</a> / {{ $k->exists ? $k->name : 'New' }}</div>
 <div class="page-head"><div><h1>{{ $k->exists ? 'Edit event package' : 'New event package' }}</h1><p>Keep it simple: what the customer gets, for how many guests, and the starting price.</p></div></div>
-<form class="card" method="POST" enctype="multipart/form-data" action="{{ $k->exists ? route('business.packages.update', $k) : route('business.packages.store') }}" style="max-width:820px">
+<form class="card" method="POST" enctype="multipart/form-data" action="{{ $k->exists ? route('business.packages.update', $k) : route('business.packages.store') }}" style="max-width:820px" id="evPkgForm">
   @csrf @if($k->exists) @method('PUT') @endif
   <div class="field @error('name') invalid @enderror"><label>Package name</label><input class="input" name="name" required minlength="3" maxlength="120" value="{{ old('name', $k->name) }}" placeholder="e.g. Classic Debut Package">@error('name')<div class="error-text">{{ $message }}</div>@enderror</div>
   <div class="field @error('description') invalid @enderror"><label>Description</label><textarea class="input" name="description" required minlength="20" placeholder="The look, the feel, and how the day runs.">{{ old('description', $k->description) }}</textarea>@error('description')<div class="error-text">{{ $message }}</div>@enderror</div>
@@ -36,4 +36,36 @@
   <label class="check mb-2"><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" @checked(old('active', $k->active ?? true))> Visible to customers</label>
   <div class="row gap-sm"><button class="btn btn-primary">{{ icon('check') }}Save package</button><a class="btn" href="{{ route('business.packages') }}">Cancel</a></div>
 </form>
+<script>
+/* Saving asks first, with a summary of what customers will see (the package is created only after "Save package"). */
+(function () {
+  var form = document.getElementById('evPkgForm'), ok = false;
+  var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var vals = function (sel) { return Array.prototype.map.call(form.querySelectorAll(sel), function (i) { return i.value.trim(); }).filter(Boolean); };
+  form.addEventListener('submit', function (e) {
+    if (ok) return;
+    e.preventDefault();
+    var f = function (n) { var el = form.elements[n]; return el ? String(el.value).trim() : ''; };
+    var price = +f('price') || 0, gMin = f('min_guests'), gMax = f('max_guests');
+    var parts = Array.prototype.filter.call(form.querySelectorAll('input[name$="[name]"]'), function (i) { return i.value.trim(); }).map(function (i) {
+      var row = i.closest('.row'), opt = row.querySelector('input[type=checkbox]').checked, extra = +row.querySelector('input[type=number]').value || 0;
+      return esc(i.value.trim()) + (opt ? ' <span class="muted">(optional' + (extra ? ', +₱' + extra.toLocaleString() : '') + ')</span>' : '');
+    });
+    var inc = vals('input[name="inclusions[]"]'), evs = vals('input[name="events[]"]:checked');
+    var visible = form.querySelector('input[type=checkbox][name="active"]').checked;
+    var list = function (items, empty) { return items.length ? '<ul class="small" style="margin:4px 0 0;padding-left:18px">' + items.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>' : '<div class="small muted">' + empty + '</div>'; };
+    var html = '<p style="margin:0 0 10px">' + (visible ? 'Customers will see it and can ask for a quotation right away.' : 'It is saved hidden: customers will not see it until you make it visible.') + '</p>' +
+      '<div class="card card-flat" style="padding:12px"><div class="strong">' + esc(f('name') || 'This package') + '</div>' +
+      '<div class="small muted">' + (evs.length ? esc(evs.join(', ')) : 'No event type ticked') + (gMin || gMax ? ' · ' + esc(gMin || '?') + '–' + esc(gMax || '?') + ' guests' : '') + '</div>' +
+      '<div class="small strong mt-1">Parts</div>' + list(parts, 'One part: the event itself') +
+      '<div class="small strong mt-1">What&#39;s included</div>' + list(inc.map(esc), 'Nothing listed yet') +
+      '<div class="row between mt-1"><span class="strong">Starting price</span><b class="price">from ₱' + price.toLocaleString() + '</b></div></div>';
+    window.PRUI.confirmDialog({ title: @json($k->exists ? 'Save changes to this package?' : 'Create this package?'), html: html, ok: @json($k->exists ? 'Save changes' : 'Create package') }).then(function (yes) {
+      if (!yes) return;
+      ok = true;
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    });
+  });
+})();
+</script>
 @endsection

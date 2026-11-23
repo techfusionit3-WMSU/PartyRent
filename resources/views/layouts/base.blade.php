@@ -13,8 +13,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/base.css') }}">
-<link rel="stylesheet" href="{{ asset('css/layout.css') }}">
+<link rel="stylesheet" href="{{ asset('css/base.css') }}?v={{ @filemtime(public_path('css/base.css')) }}">
+<link rel="stylesheet" href="{{ asset('css/layout.css') }}?v={{ @filemtime(public_path('css/layout.css')) }}">
 @php
     $iconSet = array_intersect_key((require app_path('Support/icons.php'))['icons'], array_flip(['check', 'alert', 'info', 'x', 'trash', 'plus', 'left', 'right', 'send']));
     $prRoutes = ['schedule' => route('api.schedule'), 'calendar' => route('api.calendar'), 'locations' => route('api.locations'),'chat' => route('ai.chat'), 'alternatives' => $alternativesUrl ?? null];
@@ -32,8 +32,8 @@ window.PR = {
   flash: @json($flash)
 };
 </script>
-<script src="{{ asset('js/app.js') }}" defer></script>
-<script src="{{ asset('js/charts.js') }}" defer></script>
+<script src="{{ asset('js/app.js') }}?v={{ @filemtime(public_path('js/app.js')) }}" defer></script>
+<script src="{{ asset('js/charts.js') }}?v={{ @filemtime(public_path('js/charts.js')) }}" defer></script>
 @stack('head')
 </head>
 <body @if(! empty($bodyClass)) class="{{ $bodyClass }}" @endif>

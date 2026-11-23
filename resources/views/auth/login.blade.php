@@ -1,6 +1,7 @@
 @extends('layouts.auth', ['title' => 'Log in'])
 
 @section('content')
+<div class="auth-center">
 <a class="brand auth-mobile-brand" href="{{ route('home') }}"><span class="brand-mark">{{ icon('party') }}</span><span>Party<b>Rent</b></span></a>
 <div class="auth-card">
 <h1 class="auth-title">Welcome back</h1>
@@ -16,6 +17,7 @@
 <p class="center mt-2 small" style="margin-bottom:0">New to PartyRent? <a href="{{ route('register') }}" class="strong">Create an account</a></p>
 </div>
 
+</div>
 <p class="center mt-2"><a href="{{ route('home') }}" class="small muted">← Continue browsing without logging in</a></p>
 
 @unless(app()->isProduction())

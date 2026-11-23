@@ -62,13 +62,13 @@ class Chat
         $snippet = mb_strimwidth(str_replace("\n", ' ', $body), 0, 120, '…');
         if ($side === 'customer') {
             $title = 'New message on '.$r->code;
-            $link = route('supplier.requests.show', $r, false).'#chat';
+            $link = route('supplier.requests.chat', $r, false);
             if (! self::recentlyNotified($r->supplier->owner_id, 'supplier', $title)) {
                 Notifier::notify($r->supplier->owner_id, 'supplier', $title, $by->name.': '.$snippet, $link);
             }
         } else {
             $title = 'New message from '.$r->supplier->name;
-            $link = route('rentals.show', $r, false).'#chat';
+            $link = route('rentals.chat', $r, false);
             if (! self::recentlyNotified($r->customer_id, 'customer', $title.' · '.$r->code)) {
                 Notifier::notify($r->customer_id, 'customer', $title.' · '.$r->code, $snippet, $link);
             }

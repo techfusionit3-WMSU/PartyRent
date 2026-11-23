@@ -112,6 +112,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/rentals', [RentalController::class, 'index'])->name('rentals.index');
     Route::get('/rentals/{rentalRequest}', [RentalController::class, 'show'])->name('rentals.show');
     Route::get('/rentals/{rentalRequest}/submitted', [RentalController::class, 'confirmation'])->name('rentals.confirmation');
+    Route::get('/rentals/{rentalRequest}/chat', [RentalController::class, 'chatPage'])->name('rentals.chat');
     Route::get('/rentals/{rentalRequest}/messages', [RentalController::class, 'messages'])->name('rentals.messages');
     Route::post('/rentals/{rentalRequest}/messages', [RentalController::class, 'sendMessage'])->middleware('throttle:30,1')->name('rentals.messages.send');
     Route::post('/rentals/{rentalRequest}/problem', [CaseController::class, 'customerReport'])->middleware('throttle:10,1')->name('rentals.problem');
@@ -162,6 +163,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
 
     Route::get('/requests', [SupplierRequestController::class, 'index'])->name('requests');
     Route::get('/requests/{rentalRequest}', [SupplierRequestController::class, 'show'])->name('requests.show');
+    Route::get('/requests/{rentalRequest}/chat', [SupplierRequestController::class, 'chatPage'])->name('requests.chat');
     Route::get('/requests/{rentalRequest}/messages', [SupplierRequestController::class, 'messages'])->name('requests.messages');
     Route::post('/requests/{rentalRequest}/messages', [SupplierRequestController::class, 'sendMessage'])->middleware('throttle:30,1')->name('requests.messages.send');
     Route::post('/requests/{rentalRequest}/accept', [SupplierRequestController::class, 'accept'])->name('requests.accept');

@@ -35,8 +35,11 @@ class RequestChatTest extends TestCase
         $this->assertSame(1, AppNotification::where('user_id', $owner->id)->where('title', 'New message on '.$r->code)->count());
 
         // the shop sees both, with an unread count, and answers (plain form post works too)
+        // the rental page has a "Message the customer" button with the unread count; the messages have their own page
         $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get('/supplier/requests/'.$r->code)
-            ->assertOk()->assertSee('Can you deliver before 8 AM?')->assertSee('2 new');
+            ->assertOk()->assertSee('Message the customer')->assertSee('<span class="count-pill">2</span>', false)->assertDontSee('data-chat ', false); // no chat box in the middle of the rental page
+        $this->get('/supplier/requests/'.$r->code.'/chat')->assertOk()->assertSee('Messages with')->assertSee('Can you deliver before 8 AM?');
+        $this->get('/supplier/requests/'.$r->code)->assertDontSee('<span class="count-pill">', false); // opening the messages marks them read
         $this->actingAs($owner)->post('/supplier/requests/'.$r->code.'/messages', ['body' => 'Yes, 7 AM works.'])->assertRedirect();
         $this->assertSame('supplier', RequestMessage::latest('id')->first()->side);
         $this->assertSame(1, AppNotification::where('user_id', $customer->id)->where('scope', 'customer')->where('title', 'like', 'New message from%')->count());

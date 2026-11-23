@@ -79,6 +79,16 @@ class RentalController extends Controller
 
 
     /** Chat with the shop: new messages as JSON (polling), or post one (JSON from the page, form fallback). */
+    /** Messages with the shop about this rental, on their own page. */
+    public function chatPage(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $chat = ['rows' => \App\Domain\Chat::rows($r, 'customer'), 'unread' => \App\Domain\Chat::unread($r, 'customer')];
+        \App\Domain\Chat::markSeen($r, 'customer');
+
+        return view('customer.rental-messages', ['r' => $r, 'chat' => $chat]);
+    }
+
     public function messages(Request $request, RentalRequest $rentalRequest)
     {
         $r = $this->own($request, $rentalRequest);

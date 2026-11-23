@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\PaymentChecks;
 use App\Domain\Xendit;
 use Illuminate\Http\Request;
 
@@ -10,17 +11,24 @@ class XenditWebhookController extends Controller
 {
     public function __invoke(Request $request)
     {
+        $body = (array) $request->json()->all();
+        // the callback token is checked before anything changes; a refused call is recorded for the admins
         if (! Xendit::validToken((string) $request->header('x-callback-token'))) {
+            PaymentChecks::via('webhook', fn () => PaymentChecks::log([
+                'gateway' => 'xendit', 'result' => 'rejected', 'verified' => false,
+                'gateway_ref' => mb_substr((string) ($body['id'] ?? ''), 0, 80) ?: null,
+                'message' => 'Callback refused: the x-callback-token did not match.',
+            ]));
+
             return response()->json(['error' => 'invalid token'], 401);
         }
 
-        $body = (array) $request->json()->all();
         $event = (string) ($body['event'] ?? '');
-        $result = match (true) {
+        $result = PaymentChecks::via('webhook', fn () => match (true) {
             str_starts_with($event, 'payout.') => \App\Domain\XenditPayouts::handleCallback($body),
             str_starts_with($event, 'refund.') => \App\Domain\Refunds::handleCallback($body),
             default => Xendit::handleCallback($body),
-        };
+        });
 
         return response()->json(['result' => $result]);
     }

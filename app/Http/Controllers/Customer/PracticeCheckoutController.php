@@ -52,6 +52,8 @@ class PracticeCheckoutController extends Controller
         }
         if ($s['status'] !== 'paid') {
             PayMongo::practiceUpdate($ref, ['status' => 'paid', 'method' => $data['method'] ?? 'gcash', 'paidAmount' => $s['amount'], 'payId' => 'pay_practice_'.Str::lower(Str::random(14))]);
+            // the practice gateway notifies PartyRent with a signed webhook, verified before the payment counts
+            PayMongo::practiceNotify($ref);
         }
 
         return $return();

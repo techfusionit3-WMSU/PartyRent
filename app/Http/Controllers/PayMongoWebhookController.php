@@ -10,11 +10,9 @@ class PayMongoWebhookController extends Controller
 {
     public function __invoke(Request $request)
     {
-        $body = $request->getContent();
-        if (! PayMongo::validSignature($body, (string) $request->header('Paymongo-Signature'))) {
-            return response()->json(['error' => 'invalid signature'], 401);
-        }
+        // the signature is checked before anything changes; refused and accepted calls are both recorded
+        $result = PayMongo::receiveWebhook($request->getContent(), (string) $request->header('Paymongo-Signature'));
 
-        return response()->json(['result' => PayMongo::handleEvent((array) json_decode($body, true))]);
+        return $result === null ? response()->json(['error' => 'invalid signature'], 401) : response()->json(['result' => $result]);
     }
 }

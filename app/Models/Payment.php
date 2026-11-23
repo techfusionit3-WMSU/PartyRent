@@ -66,6 +66,7 @@ class Payment extends Model
             'gateway_fee' => 'float',
             'verified_at' => 'datetime',
             'submitted_at' => 'datetime',
+            'checked_at' => 'datetime',
         ];
     }
 

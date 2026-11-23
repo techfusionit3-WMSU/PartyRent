@@ -212,9 +212,16 @@ class Xendit
         }
         $p = Payment::where('gateway', 'xendit')->where('gateway_ref', $inv['id'])->first();
         if (! $p) { // an event company's installment (EventOnlinePay) has its own table
-            return EventOnlinePay::handleCallback($inv) ?? 'unknown';
+            $res = EventOnlinePay::handleCallback($inv);
+            if ($res === null) {
+                PaymentChecks::log(['gateway' => 'xendit', 'result' => 'ignored', 'gateway_ref' => mb_substr((string) $inv['id'], 0, 80), 'message' => "Invoice is not one of PartyRent's open payments."]);
+            }
+
+            return $res ?? 'unknown';
         }
         if (($inv['external_id'] ?? $p->code) !== $p->code) {
+            PaymentChecks::logRental($p, 'ignored', ['verified' => false, 'message' => 'Invoice reference does not match '.$p->code.'.']);
+
             return 'unknown';
         }
 

@@ -25,6 +25,7 @@ class SuperController extends Controller
     public function dashboard()
     {
         \App\Domain\Rentals::scanOverdue();
+        \App\Domain\PaymentChecks::runIfDue(); // automatic payment checking
         $users = User::all();
         $reqs = RentalRequest::with('payments')->get();
         $ver = Payment::where('status', 'verified')->get();

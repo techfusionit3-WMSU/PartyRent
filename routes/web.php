@@ -258,6 +258,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
+    // automatic payment checking: gateway set-up, open checkouts, webhook / check log, "Check now"
+    Route::get('/online-payments', [\App\Http\Controllers\Admin\PaymentMonitorController::class, 'index'])->name('payment-monitor');
+    Route::post('/online-payments/check', [\App\Http\Controllers\Admin\PaymentMonitorController::class, 'check'])->middleware('throttle:20,1')->name('payment-monitor.check');
     Route::get('/payouts', [\App\Http\Controllers\Admin\PayoutController::class, 'index'])->name('payouts');
     Route::post('/payouts/release/{rentalRequest}', [\App\Http\Controllers\Admin\PayoutController::class, 'release'])->name('payouts.release');
     Route::post('/payouts/{payout}/pay', [\App\Http\Controllers\Admin\PayoutController::class, 'pay'])->name('payouts.pay');

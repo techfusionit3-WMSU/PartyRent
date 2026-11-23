@@ -60,6 +60,7 @@ class CashierController extends Controller implements \Illuminate\Routing\Contro
     {
         // Reference CS.dashboard: 8 stats, pending verifications, overdue accounts, payments by method, recent receipts.
         Rentals::scanOverdue();
+        \App\Domain\PaymentChecks::runIfDue(); // automatic payment checking
         $T = today_iso();
         $active = $this->requests($request)->whereIn('status', Finance::ACTIVE)->with(['payments', 'customer', 'supplier'])->get();
         $verified = $this->payments($request)->where('status', 'verified')->get();
@@ -141,6 +142,7 @@ class CashierController extends Controller implements \Illuminate\Routing\Contro
     public function balances(Request $request)
     {
         Rentals::scanOverdue();
+        \App\Domain\PaymentChecks::runIfDue(); // automatic payment checking
         $active = $this->requests($request)->whereIn('status', Finance::ACTIVE)->with(['payments', 'customer'])->orderBy('start_date')->get();
 
         return view('cashier.balances', [

@@ -114,13 +114,17 @@ class OnlinePay
             ])->save();
 
             $why = abs($received - $p->amount) > 0.009 ? $name.' received '.money($received).' instead of '.money($p->amount).'.' : null;
+            $tx = ['gateway_payment_id' => mb_substr($gatewayPaymentId, 0, 80), 'amount' => $received, 'fee' => $fee, 'channel' => $via ? mb_substr($via, 0, 40) : null];
             if (! $why) {
                 $res = Rentals::confirmPayment($p, null);
                 if ($res['ok']) {
+                    PaymentChecks::logRental($p, 'paid', $tx + ['message' => 'Verified automatically · receipt '.$p->fresh()->receipt_no.' · order '.$p->rentalRequest->fresh()->fin()['status'].'.']);
+
                     return 'verified';
                 }
                 $why = $res['error'];
             }
+            PaymentChecks::logRental($p, 'review', $tx + ['message' => mb_substr('Sent to the cashier: '.$why, 0, 255)]);
             // Money was taken but the payment can't count as-is: hand it to the cashier.
             $p->update(['status' => 'pending', 'notes' => $p->notes.' · Needs review: '.$why]);
             $r = $p->rentalRequest;

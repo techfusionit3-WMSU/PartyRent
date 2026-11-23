@@ -191,7 +191,7 @@ class RentalController extends Controller
     {
         $r = $this->own($request, $rentalRequest);
         abort_unless($payment->rental_request_id === $r->id && $payment->gateway !== null, 404);
-        $state = OnlinePay::sync($payment);
+        $state = \App\Domain\PaymentChecks::via('return', fn () => OnlinePay::sync($payment));
         $back = redirect()->route('rentals.show', $r);
         if ($state === 'unpaid' && $request->boolean('cancelled')) {
             OnlinePay::discard($payment);

@@ -20,6 +20,23 @@ Artisan::command('partyrent:escalate-cases', function () {
 
 Schedule::command('partyrent:escalate-cases')->everyFifteenMinutes();
 
+/* Automatic payment checking: ask the gateway about every online checkout still open (in case a webhook was
+   lost or cannot reach this server), settle the paid ones and close the ones unpaid after 24 hours.
+   Also runs when admin and cashier pages load, and from Admin → Online Payments → "Check now". */
+Artisan::command('partyrent:check-payments', function () {
+    $n = \App\Domain\PaymentChecks::run('auto_check');
+    $this->info($n['checked'].' open checkout(s) checked: '.$n['paid'].' paid, '.$n['review'].' to review, '.$n['expired'].' expired, '.$n['error'].' unreachable.');
+})->purpose('Check open online payments with the gateway and settle the paid ones');
+
+Schedule::command('partyrent:check-payments')->everyMinute()->withoutOverlapping();
+
+/* Demo accounts: add the login page's demo people missing from an older database, keeping everything else.
+   (A clean demo start is `php artisan migrate:fresh --seed` with SEED_DEMO=true, which erases the database.) */
+Artisan::command('partyrent:demo-accounts', function () {
+    $added = (new \Database\Seeders\DemoSeeder)->topUp();
+    $this->info($added ? 'Added '.count($added).' demo account(s): '.implode(', ', $added).' (password demo123).' : 'Every demo account is already there.');
+})->purpose('Add missing demo accounts without erasing data');
+
 /* Scheduled supplier payouts: when a shop's period (15 days or a month) ends, its earnings become one payout. */
 Artisan::command('partyrent:payouts', function () {
     $this->info(\App\Domain\Payouts::closeDue().' payout(s) prepared.');

@@ -28,6 +28,7 @@ class AdminController extends Controller
     {
         // Reference AD.dashboard: 10 stats, requests per month, status donut (5 groups), activity, pending applications.
         Rentals::scanOverdue();
+        \App\Domain\PaymentChecks::runIfDue(); // automatic payment checking
         $reqs = RentalRequest::get(['id', 'status', 'created_at']);
         $customers = User::whereJsonContains('roles', 'customer')->get(['id', 'status']);
         $sups = Supplier::with('owner:id,name,status')->get();

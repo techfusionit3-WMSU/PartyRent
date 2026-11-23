@@ -27,6 +27,7 @@ use App\Models\User;
 use App\Support\AddressInput;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -109,6 +110,53 @@ class DemoSeeder extends Seeder
         $this->cart();
         $this->eventCompany();
     }
+
+    /**
+     * Add the demo accounts that are missing from an existing database, without touching anything else
+     * (`php artisan partyrent:demo-accounts`). For databases seeded before newer demo people were added:
+     * Leah (Front Desk), PartyRent's cashier, and the Grand Fiesta event company with its team.
+     * Returns the emails that were added.
+     */
+    public function topUp(): array
+    {
+        $before = User::pluck('email')->all();
+        $ids = User::pluck('id', 'email');
+        DB::transaction(function () use ($ids) {
+            $pw = Hash::make('demo123');
+            foreach (self::TOPUP_USERS as $key => [$name, $email, $phone, $addr, $roles]) {
+                if (isset($ids[$email])) {
+                    $this->U[$key] = $ids[$email];
+                    continue;
+                }
+                $u = new User(['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => $roles, 'status' => 'active', 'password' => $pw, 'address' => $addr]);
+                $u->email_verified_at = now();
+                $u->save();
+                $this->U[$key] = $u->id;
+            }
+            // Leah works the Front Desk at Elegant Occasion
+            $eo = Supplier::where('name', 'Elegant Occasion Rentals')->first();
+            $leah = $this->U['u17'] ?? null;
+            if ($eo && $leah && ! ShopStaff::where('user_id', $leah)->exists()) {
+                ShopStaff::create(['supplier_id' => $eo->id, 'user_id' => $leah, 'role' => 'desk', 'roles' => ['desk'], 'status' => 'active', 'added_by' => $eo->owner_id]);
+            }
+            // the event company and its team; its demo bookings belong to Maria and Jose
+            $this->U['u1'] = $ids['maria@demo.ph'] ?? null;
+            $this->U['u7'] = $ids['jose@demo.ph'] ?? null;
+            $free = ! \App\Models\EventBooking::whereIn('code', ['EVT-10001', 'EVT-10002', 'EVT-10003'])->exists()
+                && ! \App\Models\EventPayment::where('code', 'like', 'EVP-1000%')->exists();
+            if (! isset($ids['events@demo.ph']) && $this->U['u1'] && $this->U['u7'] && $free) {
+                $this->eventCompany();
+            }
+        });
+
+        return array_values(array_diff(User::pluck('email')->all(), $before));
+    }
+
+    /** People topUp() adds when they are missing: [key => [name, email, phone, address, roles]]. */
+    private const TOPUP_USERS = [
+        'u17' => ['Leah Cruz', 'desk@elegantoccasion.ph', '0917 800 1717', '5th Ave., Bonifacio Global City, Taguig', ['customer']],
+        'u18' => ['Rosa Dizon', 'cashier@partyrent.ph', '0917 800 1818', 'PartyRent HQ, Ortigas Center, Pasig', ['cashier']],
+    ];
 
     /**
      * App-only: an approved event company (Organization supplier, books whole events by quotation) with event

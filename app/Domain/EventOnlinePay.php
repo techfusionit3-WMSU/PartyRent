@@ -81,6 +81,30 @@ class EventOnlinePay
         return ['ok' => true, 'url' => $p->gateway_url];
     }
 
+    /**
+     * Practice gateway for event payments: sends the same kind of signed notification a real gateway does,
+     * verifies the signature, and only then marks the installment paid.
+     */
+    public static function practiceNotify(EventPayment $p): string
+    {
+        $body = json_encode(['event' => 'event_payment.paid', 'external_id' => $p->code, 'id' => $p->gateway_ref, 'paid_amount' => (float) $p->amount, 'payment_channel' => 'practice checkout']);
+        $header = PaymentChecks::practiceSignature($body);
+
+        return PaymentChecks::via('webhook', function () use ($p, $body, $header) {
+            if (! PayMongo::validSignature($body, $header)) {
+                PaymentChecks::logEvent($p, 'rejected', ['verified' => false, 'message' => 'Practice notification refused: bad signature.']);
+
+                return 'rejected';
+            }
+            $n = (array) json_decode($body, true);
+            if (($n['external_id'] ?? '') !== $p->code) {
+                return 'unknown';
+            }
+
+            return self::settle($p, (string) $n['id'], (float) $n['paid_amount'], (string) $n['payment_channel']);
+        });
+    }
+
     /** Ask Xendit whether the open invoice was paid. Returns paid | unpaid | done | error. */
     public static function sync(EventPayment $p): string
     {
@@ -138,10 +162,13 @@ class EventOnlinePay
 
             return 'paid';
         });
+        $tx = ['gateway_payment_id' => mb_substr($ref, 0, 80), 'amount' => $received, 'channel' => mb_substr($via, 0, 40)];
         if ($res === 'paid') {
             $p->refresh()->update(['status' => 'pending']); // confirmPayment() expects a pending payment
             Events::confirmPayment($p, null, true);
+            PaymentChecks::logEvent($p->fresh(), 'paid', $tx + ['message' => 'Verified automatically · '.$p->booking->code.'.']);
         } elseif ($res === 'review') {
+            PaymentChecks::logEvent($p->fresh(), 'review', $tx + ['message' => 'Amount differs from '.money($p->amount).'; the business checks it.']);
             Notifier::notify($p->booking->supplier->owner, 'supplier', 'Online payment to check · '.$p->booking->code, 'An online payment of '.money($received).' came in for the '.mb_strtolower($p->label).' of '.money($p->amount).'. Please check it.', route('business.bookings.show', $p->booking, false));
         }
 

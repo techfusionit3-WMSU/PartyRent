@@ -132,11 +132,7 @@ class PayMongo
                 return 'unpaid';
             }
 
-            // the same shape PayMongo returns for a paid checkout session
-            return self::settle($p, ['payments' => [['id' => $s['payId'], 'attributes' => [
-                'status' => 'paid', 'amount' => (int) round($s['paidAmount'] * 100), 'fee' => (int) round($s['paidAmount'] * 2.5),
-                'source' => ['type' => $s['method']],
-            ]]]]);
+            return self::settle($p, self::practiceAttributes($s));
         }
         try {
             $res = self::http()->get('/checkout_sessions/'.$p->gateway_ref);
@@ -195,10 +191,68 @@ class PayMongo
         $p->delete();
     }
 
+    /** The same shape PayMongo returns for a paid checkout session, from a practice session. */
+    public static function practiceAttributes(array $s): array
+    {
+        return ['payments' => [['id' => $s['payId'], 'attributes' => [
+            'status' => 'paid', 'amount' => (int) round($s['paidAmount'] * 100), 'fee' => (int) round($s['paidAmount'] * 2.5),
+            'source' => ['type' => $s['method']],
+        ]]]];
+    }
+
+    /**
+     * The practice gateway's webhook: once the customer pays on the practice page it sends PartyRent the same
+     * signed checkout_session.payment.paid event PayMongo would, and it goes through the same verification.
+     */
+    public static function practiceNotify(string $ref): string
+    {
+        $s = self::practiceSession($ref);
+        if (! $s || $s['status'] !== 'paid') {
+            return 'unpaid';
+        }
+        $body = json_encode(['data' => ['id' => 'evt_practice_'.Str::lower(Str::random(12)), 'attributes' => [
+            'type' => 'checkout_session.payment.paid', 'livemode' => false,
+            'data' => ['id' => $ref, 'type' => 'checkout_session', 'attributes' => self::practiceAttributes($s)],
+        ]]]);
+
+        return self::receiveWebhook($body, PaymentChecks::practiceSignature($body)) ?? 'rejected';
+    }
+
+    /** Secret the webhook signature is checked with. Practice mode signs with a local secret instead. */
+    public static function webhookSecret(): string
+    {
+        $secret = (string) config('services.paymongo.webhook_secret');
+        if ($secret === '' && self::practice()) {
+            $secret = 'whsk_practice_'.substr(hash('sha256', (string) config('app.key')), 0, 24);
+        }
+
+        return $secret;
+    }
+
+    /**
+     * A webhook arrived: verify the signature first, and only then let it change a payment.
+     * Returns the result (verified | review | done | unpaid | unknown | ignored) or null when the signature is wrong.
+     */
+    public static function receiveWebhook(string $body, string $header): ?string
+    {
+        if (! self::validSignature($body, $header)) {
+            $event = (array) json_decode($body, true);
+            PaymentChecks::via('webhook', fn () => PaymentChecks::log([
+                'gateway' => 'paymongo', 'result' => 'rejected', 'verified' => false,
+                'gateway_ref' => mb_substr((string) ($event['data']['attributes']['data']['id'] ?? ''), 0, 80) ?: null,
+                'message' => 'Webhook refused: the Paymongo-Signature did not match.',
+            ]));
+
+            return null;
+        }
+
+        return PaymentChecks::via('webhook', fn () => self::handleEvent((array) json_decode($body, true)));
+    }
+
     /** Check the Paymongo-Signature header: "t=<unix>,te=<test sig>,li=<live sig>", HMAC-SHA256 of "t.body". */
     public static function validSignature(string $body, string $header): bool
     {
-        $secret = (string) config('services.paymongo.webhook_secret');
+        $secret = self::webhookSecret();
         if ($secret === '' || $header === '') {
             return false;
         }
@@ -225,7 +279,12 @@ class PayMongo
             return 'ignored';
         }
         $p = Payment::where('gateway', 'paymongo')->where('gateway_ref', $session['id'])->first();
+        if (! $p) {
+            PaymentChecks::log(['gateway' => 'paymongo', 'result' => 'ignored', 'gateway_ref' => mb_substr((string) $session['id'], 0, 80), 'message' => "Paid checkout session is not one of PartyRent's open payments."]);
 
-        return $p ? self::settle($p, (array) ($session['attributes'] ?? [])) : 'unknown';
+            return 'unknown';
+        }
+
+        return self::settle($p, (array) ($session['attributes'] ?? []));
     }
 }

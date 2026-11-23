@@ -128,7 +128,7 @@ class EventController extends Controller
         if ($request->boolean('cancelled')) {
             return redirect()->route('events.show', $eventBooking)->with('error', 'The online payment was not completed. You can try again or pay by transfer.');
         }
-        $r = \App\Domain\EventOnlinePay::sync($p);
+        $r = \App\Domain\PaymentChecks::via('return', fn () => \App\Domain\EventOnlinePay::sync($p));
 
         return redirect()->route('events.show', $eventBooking)->with(in_array($r, ['paid', 'done'], true) ? 'success' : 'error', match ($r) {
             'paid', 'done' => 'Payment received. Thank you!',
@@ -153,7 +153,7 @@ class EventController extends Controller
         if ($request->input('result') === 'fail') {
             return redirect()->route('events.show', $eventBooking)->with('error', 'Practice payment failed (nothing was charged). Try again or pay by transfer.');
         }
-        \App\Domain\EventOnlinePay::settle($p, $p->gateway_ref, $p->amount, 'practice checkout');
+        \App\Domain\EventOnlinePay::practiceNotify($p); // signed notification, verified before the installment is marked paid
 
         return redirect()->route('events.show', $eventBooking)->with('success', 'Practice payment received (no real money).');
     }

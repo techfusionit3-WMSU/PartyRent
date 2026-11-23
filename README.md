@@ -35,18 +35,33 @@ Reset the demo data at any time with `php artisan migrate:fresh --seed`.
 
 ### Demo accounts (password `demo123`)
 
+`SEED_DEMO=true` (the default in `.env.example`) seeds every account on the login page. An older database that
+is missing some of them: `php artisan partyrent:demo-accounts` adds only the missing ones and erases nothing.
+
 | Account | Role |
 |---|---|
-| maria@demo.ph | Customer |
-| juan@demo.ph | Customer + approved Supplier (Happy Moments) — switch modes from the profile menu |
-| bea@demo.ph | Customer with a pending supplier application |
-| tess@demo.ph | Customer in Cebu City (try checking out from a Metro Manila shop: delivery is refused, pickup works) |
-| dodong@demo.ph | Supplier in Cebu City (Sugbo Fiesta Rentals, distance-based delivery) |
-| liezl@demo.ph · nestor@demo.ph · marites@demo.ph | Suppliers in Davao City, Pampanga and Iloilo City |
-| cashier@partyrent.ph | Cashier |
+| maria@demo.ph · jose@demo.ph | Customers |
+| kristine@demo.ph · bea@demo.ph | Customers with a pending business application |
+| miguel@demo.ph | Suspended customer (sign-in is refused) |
+| liza@demo.ph | Owner, Elegant Occasion Rentals (shop with a full team) |
+| desk@ · cashier@ · inventory@ · staff@elegantoccasion.ph | Elegant Occasion's Front Desk, Cashier, Inventory + Field Crew, Field Crew |
+| juan@ · ana@ · carlo@ · ramon@demo.ph | Owners of Happy Moments, Celebration Hub, Dream Events, Party Essentials (no team) |
+| events@demo.ph | Owner, Grand Fiesta Events Co. (event company) |
+| coordinator@ · finance@ · crew@grandfiesta.ph | Grand Fiesta's Event Coordinator, Finance, Event Crew |
+| cashier@partyrent.ph | PartyRent cashier (checks transfers) |
 | admin@partyrent.ph | Admin (all permissions) |
 | paolo.admin@partyrent.ph | Admin with restricted permissions |
 | super@partyrent.ph | Superadmin |
+
+### Payments (automatic checking)
+
+Customer pays online (GCash, Maya, card) → the gateway (PayMongo or Xendit) processes it → PartyRent verifies the
+signed webhook, marks the payment verified, issues the receipt and updates the order (Partially / Fully Paid) →
+the money stays with PartyRent and the shop is paid on its payout schedule after commission. Every gateway
+message is recorded in `payment_transactions` and shown on **Admin → Online Payments**. Open checkouts are also
+checked every minute (`php artisan partyrent:check-payments`, scheduled), so a lost webhook doesn't leave a
+payment hanging. Without gateway keys, `PAYMONGO_FAKE=true` (local only) runs a practice gateway through the same
+verified-webhook path. Details and the audit: `docs/SYSTEM_AUDIT_2026-11-23.md`.
 
 The demo-account buttons on the login page are hidden when `APP_ENV=production`.
 

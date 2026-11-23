@@ -30,7 +30,7 @@ class DemoAccountsTest extends TestCase
     {
         $emails = $this->loginPageEmails();
         $this->assertGreaterThanOrEqual(20, count($emails));
-        $this->get('/login')->assertOk()->assertSee('Demo accounts');
+        $this->get('/login')->assertOk()->assertSee('Try a demo account');
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class); // 22 sign-ins in a row
 
         foreach ($emails as $email) {

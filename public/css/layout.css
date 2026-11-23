@@ -780,3 +780,40 @@
 .form-actionbar-narrow { display: none; grid-column: 1 / -1; }
 @media (max-width: 1024px) { .form-actionbar-narrow { display: flex; } }
 @media (max-width: 768px) { .form-actionbar { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Sidebar: same width in every state. A scrollbar only appears when open menu groups make it taller than
+   the window, which used to narrow the menu (260 -> 245px) and shift it between pages. The space is now
+   always reserved and the bar is slim and dark. */
+.side { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .18) transparent; }
+.side::-webkit-scrollbar { width: 6px; }
+.side::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .18); border-radius: 6px; }
+.side::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- login page ---------- */
+.auth-art { position: sticky; top: 0; height: 100vh; }
+.auth-form { align-items: flex-start; padding: 56px 24px; background: var(--bg, #FAF7FD); }
+.auth-form .box { max-width: 460px; }
+.auth-card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 28px; box-shadow: 0 14px 40px rgba(30, 20, 51, .08); }
+.auth-title { font-size: 1.75rem; letter-spacing: -.02em; margin: 0; }
+.auth-mobile-brand { display: none; margin-bottom: 18px; }
+.demo-panel { margin-top: 18px; background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.demo-panel > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; padding: 14px 16px; font-weight: 700; }
+.demo-panel > summary::-webkit-details-marker { display: none; }
+.demo-panel > summary > span:first-child { display: inline-flex; align-items: center; gap: 8px; }
+.demo-panel > summary svg { width: 18px; height: 18px; color: var(--brand); }
+.demo-panel[open] > summary { border-bottom: 1px solid var(--line); }
+.demo-body { padding: 6px 16px 14px; }
+.demo-group { padding-top: 10px; }
+.demo-group-name { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+.demo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.demo-login { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 5px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: 600 .8rem var(--font); color: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.demo-login:hover { border-color: var(--brand); background: #FDF2F8; }
+.demo-login.on { border-color: var(--brand); background: #FCE7F3; }
+.demo-login:disabled:not(.on) { opacity: .5; cursor: default; }
+.demo-ava { width: 22px; height: 22px; border-radius: 50%; background: var(--grad); color: #fff; display: grid; place-items: center; font-size: .7rem; font-weight: 800; flex: none; }
+@media (max-width: 1024px) {
+  .auth-art { position: static; height: auto; }
+  .auth-form { padding: 28px 16px; }
+  .auth-card { padding: 22px; }
+}
+@media (max-width: 768px) { .auth-mobile-brand { display: inline-flex; } }

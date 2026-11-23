@@ -1,19 +1,22 @@
 @extends('layouts.auth', ['title' => 'Log in'])
 
 @section('content')
-<h1>Welcome back</h1>
-<p class="muted">Log in to manage your rentals.</p>
+<a class="brand auth-mobile-brand" href="{{ route('home') }}"><span class="brand-mark">{{ icon('party') }}</span><span>Party<b>Rent</b></span></a>
+<div class="auth-card">
+<h1 class="auth-title">Welcome back</h1>
+<p class="muted" style="margin-top:4px">Log in to manage your rentals, bookings and payments.</p>
 <form method="POST" action="{{ route('login') }}" class="mt-2" id="loginForm">
   @csrf
   <div class="field @error('email') invalid @enderror"><label for="email">Email address</label><input class="input" id="email" name="email" type="email" required autocomplete="email" placeholder="you@email.com" value="{{ old('email') }}">@error('email')<div class="error-text">{{ $message }}</div>@enderror</div>
   <div class="field"><label for="password">Password</label><input class="input" id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••"></div>
   <div class="row between mb-2"><label class="check"><input type="checkbox" name="remember" value="1" checked> Remember me</label><a href="{{ route('password.request') }}" class="small strong">Forgot password?</a></div>
   @if(session('error'))<div class="alert alert-danger mb-2">{{ icon('alert') }}<div>{{ session('error') }}</div></div>@endif
-  <button class="btn btn-primary btn-block btn-lg">Log in</button>
+  <button class="btn btn-primary btn-block btn-lg" id="loginBtn" data-busy="Logging in…" type="submit">Log in</button>
 </form>
-<p class="center mt-2 small">New to PartyRent? <a href="{{ route('register') }}" class="strong">Create an account</a></p>
+<p class="center mt-2 small" style="margin-bottom:0">New to PartyRent? <a href="{{ route('register') }}" class="strong">Create an account</a></p>
+</div>
 
-<p class="center mt-2"><a href="{{ route('home') }}" class="small">← Continue browsing without logging in</a></p>
+<p class="center mt-2"><a href="{{ route('home') }}" class="small muted">← Continue browsing without logging in</a></p>
 
 @unless(app()->isProduction())
 @php
@@ -31,24 +34,31 @@
     'PartyRent' => [['Rosa · Cashier', 'cashier@partyrent.ph'], ['Mark · Admin', 'admin@partyrent.ph'], ['Paolo · Admin (limited)', 'paolo.admin@partyrent.ph'], ['Patricia · Super admin', 'super@partyrent.ph']],
   ];
 @endphp
-<div class="card card-flat mt-2" style="padding:14px">
-  <div class="strong mb-1">Demo accounts <span class="muted small">— password <code>demo123</code></span></div>
-  <p class="muted small" style="margin:0 0 8px">Click one to fill the form, then press Log in.</p>
+<details class="demo-panel" open>
+  <summary><span>{{ icon('users') }} Try a demo account</span><span class="muted small">one click logs you in · password <code>demo123</code></span></summary>
+  <div class="demo-body">
   @foreach($demoGroups as $group => $accounts)
-    <div class="small muted" style="margin:8px 0 4px">{{ $group }}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px">
-      @foreach($accounts as [$label, $email])
-        <button type="button" class="chip demo-login" data-email="{{ $email }}" title="{{ $email }}" style="padding:5px 10px;font-size:.78rem">{{ $label }}</button>
-      @endforeach
+    <div class="demo-group">
+      <div class="demo-group-name">{{ $group }}</div>
+      <div class="demo-chips">
+        @foreach($accounts as [$label, $email])
+          <button type="button" class="demo-login" data-email="{{ $email }}" title="Log in as {{ $email }}"><span class="demo-ava">{{ mb_strtoupper(mb_substr($label, 0, 1)) }}</span>{{ $label }}</button>
+        @endforeach
+      </div>
     </div>
   @endforeach
-</div>
+  </div>
+</details>
 <script>
+  // one click: fill the form and log in (the button shows it is working)
   document.querySelectorAll('.demo-login').forEach(function (b) {
     b.addEventListener('click', function () {
+      document.querySelectorAll('.demo-login').forEach(function (x) { x.classList.remove('on'); x.disabled = true; });
+      b.classList.add('on');
       document.getElementById('email').value = b.dataset.email;
       document.getElementById('password').value = 'demo123';
-      document.getElementById('password').focus();
+      var f = document.getElementById('loginForm'), btn = document.getElementById('loginBtn');
+      if (f.requestSubmit) f.requestSubmit(btn); else f.submit();
     });
   });
 </script>

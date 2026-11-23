@@ -181,7 +181,7 @@ class PayoutsTest extends TestCase
             'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'MINE-REF-1', 'status' => 'pending']);
 
         $this->as('cashier@elegantoccasion.ph', 'supplier');
-        $this->get('/cashier/verification')->assertOk()->assertSee('PAY-MINE1')->assertSee('PartyRent is checking')->assertDontSee('PAY-OTHER1');
+        $this->get('/cashier/verification')->assertOk()->assertSee('PAY-MINE1')->assertSee('PartyRent settles it')->assertDontSee('PAY-OTHER1');
         $this->get('/cashier')->assertOk()->assertDontSee('PAY-OTHER1');
         $this->get('/cashier/history?q=PAY-OTHER1')->assertOk()->assertDontSee('OTHER-REF-1');
         $this->get('/cashier/balances')->assertOk()->assertDontSee($other->code);

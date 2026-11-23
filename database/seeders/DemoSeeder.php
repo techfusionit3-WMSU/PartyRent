@@ -628,7 +628,6 @@ class DemoSeeder extends Seeder
         };
         $st = fn ($k) => ['stage' => $k];
         $pay('TXN-10002', 'PR-0001', 'down', 'bank', null, -3, 'verified', 'BDO-884377', $st('down'));
-        $pay('TXN-10003', 'PR-0001', 'balance', 'bank', 1000, 0, 'pending', 'BPI-551093', ['proof_name' => 'bpi-transfer-receipt.jpg', 'notes' => 'Partial final balance payment']);
         $pay('TXN-10004', 'PR-0002', 'full', 'debit', null, -9, 'verified', 'DC-7781-0021', $st('full'));
         $pay('TXN-10005', 'PR-0002', 'deposit', 'debit', 1000, -9, 'verified', 'DC-7781-0022');
         $pay('TXN-10024', 'PR-0006', 'down', 'cash', null, -30, 'verified', 'CASH-0931', $st('down'));
@@ -645,7 +644,6 @@ class DemoSeeder extends Seeder
         $pay('TXN-10016', 'PR-0010', 'deposit', 'cash', 2000, -1, 'verified', 'CASH-0999');
         $pay('TXN-10017', 'PR-0011', 'full', 'bank', null, -12, 'verified', 'GCASH-BANK-77810', $st('full'));
         $pay('TXN-10018', 'PR-0011', 'deposit', 'bank', 1000, -12, 'verified', 'GCASH-BANK-77811');
-        $pay('TXN-10019', 'PR-0013', 'full', 'bank', null, -1, 'pending', 'BDO-901233', $st('full') + ['proof_name' => 'bdo-online-receipt.png']);
         $pay('TXN-10020', 'PR-0012', 'full', 'cash', null, -7, 'verified', 'CASH-0977', $st('full'));
         $pay('TXN-10021', 'PR-0012', 'refund', 'cash', null, -5, 'verified', 'RF-0035', $st('full') + ['notes' => 'Cancelled within free cancellation window']);
     }

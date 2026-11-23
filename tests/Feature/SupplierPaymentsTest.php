@@ -22,7 +22,10 @@ class SupplierPaymentsTest extends TestCase
     public function test_shop_sees_transfers_but_partyrent_verifies_them(): void
     {
         $juan = User::where('email', 'juan@demo.ph')->firstOrFail();
-        $pending = Payment::whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $juan->supplier->id))->where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->firstOrFail();
+        // an old-style transfer (sent before automatic payments) still waiting for PartyRent
+        $req = \App\Models\RentalRequest::where('supplier_id', $juan->supplier->id)->whereIn('status', \App\Domain\Finance::ACTIVE)->firstOrFail();
+        $pending = Payment::create(['code' => 'TXN-OLD01', 'rental_request_id' => $req->id, 'type' => 'balance', 'method' => 'bank', 'amount' => 100,
+            'date' => today_iso(), 'submitted_at' => now(), 'reference' => 'BPI-OLD-1', 'status' => 'pending', 'recorded_by' => 'customer']);
 
         // another shop's owner cannot touch it
         $ana = User::where('email', 'ana@demo.ph')->firstOrFail();

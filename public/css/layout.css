@@ -910,3 +910,10 @@ html:has(.dash) { background: var(--bg, #FAF7FD) linear-gradient(#1E1433, #1E143
 .p-card .p-name::after { content: ''; position: absolute; inset: 0; z-index: 1; }
 .p-card .p-compare { z-index: 3; }
 .p-card:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-100, #FFD9E8); }
+
+/* Package page on phones/tablets: same order as an item page (photo, shop, price, name, contents, booking);
+   the availability calendar moves below instead of sitting before the package's name and price */
+@media (max-width: 1024px) {
+  .pd > .pd-left { display: contents; }
+  .pd > .pd-left > .pd-cal { order: 3; }
+}

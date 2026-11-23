@@ -3,25 +3,25 @@
 @section('content')
 <div class="crumbs"><a href="{{ route('packages.index') }}">Packages</a> / {{ $k->name }}</div>
 <div class="pd">
-  <div>
+  <div class="pd-left">
     <div class="pd-gallery"><div class="main">@include('partials.img', ['item' => $k])</div></div>
     <a class="card pdx-shop" style="margin-top:12px" href="{{ route('suppliers.show', $sup) }}">
       <div class="logo-tile" style="background:{{ $sup->color }}1a">{{ $sup->logo }}</div>
       <div class="grow" style="min-width:0"><div class="strong ellipsis">{{ $sup->name }}</div><div class="small muted">{{ $sup->city }} · ★ {{ rating_text($sup) }} · {{ $sup->fulfillmentLabel() }}</div></div>
       <span class="btn btn-sm">View Supplier Profile</span>
     </a>
-    <div class="card mt-2"><h3>Package availability</h3><p class="small muted">Based on the stock of every included item.</p><div data-calendar data-kind="package" data-id="{{ $k->id }}" data-month="{{ substr($start, 0, 7) }}" data-need="1"></div></div>
+    <div class="card mt-2 pd-cal"><h3>Package availability</h3><p class="small muted">Based on the stock of every included item.</p><div data-calendar data-kind="package" data-id="{{ $k->id }}" data-month="{{ substr($start, 0, 7) }}" data-need="1"></div></div>
   </div>
   <div data-rentbox data-type="package" data-max-days="{{ setting('maxRentalDays', 30) }}">
     <span class="badge b-pink plain">{{ $k->emoji }} Package</span>@foreach($k->events ?? [] as $e) <span class="badge b-gray plain">{{ $e }}</span>@endforeach
-    <h1 class="mt-1">{{ $k->name }}</h1>
+    <div class="pdx-price mt-1"><div><span class="pdx-amt" data-pkg-headline>{{ money($pp['package']) }}</span> <span class="pdx-unit">/ package{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : ' / day' }}</span></div>@if($pp['savings'] > 0)<div class="pdx-bulk">{{ icon('tag', 'width:14px;height:14px;vertical-align:-2px') }} Save {{ money($pp['savings']) }} vs. renting each item separately</div>@endif</div>
+    <h1 class="pdx-title">{{ $k->name }}</h1>
     @if($k->tier_group)
       @php($tiers = \App\Models\Package::where('supplier_id', $k->supplier_id)->where('tier_group', $k->tier_group)->where('active', true)->where('is_draft', false)->get()->sortBy(fn ($t) => \App\Domain\Packages::headlinePrice(\App\Domain\Packages::def($t))))
       @if($tiers->count() > 1)<div class="tabs mb-1" aria-label="{{ $k->tier_group }} tiers">@foreach($tiers as $t)<a class="tab {{ $t->id === $k->id ? 'active' : '' }}" href="{{ route('packages.show', $t) }}">{{ $t->tier_label ?: $t->name }}<span class="count">{{ money_short(\App\Domain\Packages::headlinePrice(\App\Domain\Packages::def($t))) }}</span></a>@endforeach</div>@endif
     @endif
     <p>{{ $k->description }}</p>
     @if($k->max_guests)<p class="small">{{ icon('users') }} Good for up to <b>{{ $k->max_guests }}</b> guests</p>@endif
-    <div><span class="price-lg" data-pkg-headline>{{ money($pp['package']) }}</span> <span class="muted">/ package{{ $pp['once'] > 0 && $pp['perDay'] <= 0 ? '' : ' / day' }}</span>@if($pp['savings'] > 0) <span class="badge b-gold">Save {{ money($pp['savings']) }} vs. getting it separately</span>@endif</div>
     @if($lead)<div class="alert alert-info mt-1">{{ icon('info') }}<div>Contains made-to-order items: book at least <b data-pkg-lead>{{ $lead }}</b> day(s) before your event.</div></div>@endif
     <div class="card mt-2 pad-0" data-pkg-config data-package="{{ $k->id }}" data-quote="{{ route('api.package-quote') }}">
       <div style="padding:14px 16px;border-bottom:1px solid var(--line)" class="strong">{{ ! array_filter($pp['rows'], fn ($r) => $r['group'] !== 'included') && ! collect($def['components'])->contains(fn ($c) => in_array($c['kind'], ['choice', 'addon'], true)) && empty($def['minGuests']) ? 'Included items' : "What's in the package" }}</div>

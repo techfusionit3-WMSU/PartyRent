@@ -1,9 +1,9 @@
 @extends('layouts.dash', ['title' => 'Request Details', 'nav' => 'requests'])
 
 @php
-    $hints = ['accepted' => 'Prepare the items once payments are in order.', 'in_progress' => $r->fulfillment === 'delivery' ? 'Send the items out for delivery.' : 'Notify the customer that items are ready for pickup.', 'ready_pickup' => 'Record who picked up the items.', 'out_delivery' => 'Record who received the delivery.', 'ongoing' => 'Mark the rental for return after the event ('.fmt_date($r->end_date).').', 'return_pending' => 'Count and inspect returned items.', 'inspection' => 'Settle the security deposit and complete the rental.'];
-    $showAvail = in_array($r->status, ['pending', 'accepted', 'in_progress'], true);
     $settleDisabled = $r->inspection && ($r->inspection['settlement'] ?? '') !== 'pending' && $f['depositHeld'] <= 0;
+    $hints = ['accepted' => 'Prepare the items once payments are in order.', 'in_progress' => $r->fulfillment === 'delivery' ? 'Send the items out for delivery.' : 'Notify the customer that items are ready for pickup.', 'ready_pickup' => 'Record who picked up the items.', 'out_delivery' => 'Record who received the delivery.', 'ongoing' => 'Mark the rental for return after the event ('.fmt_date($r->end_date).').', 'return_pending' => 'Count and inspect returned items.', 'inspection' => $settleDisabled ? 'The deposit is settled. Complete the rental to close it.' : 'Settle the security deposit, then complete the rental.'];
+    $showAvail = in_array($r->status, ['pending', 'accepted', 'in_progress'], true);
 @endphp
 
 @section('content')
@@ -28,7 +28,7 @@
         <button class="btn btn-danger" data-modal="declineModal">{{ icon('x') }}Decline</button>
         @if(auth()->user()->orgCan('orders.manage'))<button class="btn btn-success" data-modal="acceptModal" @if($conflicts) title="Not enough stock" @endif>{{ icon('check') }}Accept request</button>@else<span class="small muted">Only the Organization Admin can accept or decline.</span>@endif
       @elseif($r->status === 'inspection')
-        <button class="btn" data-modal="settleModal" @disabled($settleDisabled)>{{ icon('shield') }}Settle deposit</button>
+        @unless($settleDisabled)<button class="btn btn-primary" data-modal="settleModal">{{ icon('shield') }}Settle deposit</button>@endunless
         <form method="POST" action="{{ route('supplier.requests.complete', $r) }}" data-confirm="Close {{ $r->code }} as completed? Make sure the inspection and deposit are settled. This can't be undone: the request can't go back to an earlier step." data-confirm-title="Complete rental?" data-confirm-ok="Complete rental">@csrf<button class="btn btn-primary">Complete rental</button></form>
       @else
         @foreach($next as $st)
@@ -142,7 +142,8 @@
 {{-- ===== modals ===== --}}
 @if($review)
 <div class="modal-backdrop hidden" id="acceptModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Accept {{ $r->code }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-  <form method="POST" action="{{ route('supplier.requests.accept', $r) }}" data-confirm="The customer then has 24 hours to pay the first payment. The stock is reserved only once that payment is verified; if another customer pays first for the same items and time, this request is declined automatically. This can't be undone." data-confirm-title="Accept {{ $r->code }}?" data-confirm-ok="Accept">@csrf<div class="modal-body"><div class="stack-sm">
+  {{-- this dialog is the confirmation: its button accepts (no second "are you sure?" box on top of it) --}}
+  <form method="POST" action="{{ route('supplier.requests.accept', $r) }}">@csrf<div class="modal-body"><div class="stack-sm">
     <div class="row">{{ $review['check']['ok'] ? '✅' : '❌' }}<b>1. Inventory re-checked for {{ count(date_range($r->start_date, $r->end_date)) }} date(s)</b></div>
     @if($review['check']['ok'])<div class="small muted" style="padding-left:28px">All quantities fit within available stock.</div>
     @else<div class="alert alert-danger">{{ icon('alert') }}<div>{!! collect($review['check']['bad'])->map(fn ($b) => e(fmt_date($b['date']).': '.$b['name'].' needs '.$b['requested'].', only '.$b['available'].' available'))->implode('<br>') !!}<br><b>Acceptance is blocked to prevent double-booking.</b> Decline, or ask the customer to change quantities.</div></div>@endif
@@ -151,7 +152,7 @@
     @if($review['durationNotes'])<div class="row">⚠️<b>Rental duration</b></div><div class="small muted" style="padding-left:28px">{{ collect($review['durationNotes'])->pluck('message')->implode(' ') }} (It complied when submitted, so you may still accept.)</div>@endif
     @php($probe = (clone $r)->forceFill(['accepted_at' => today_iso(), 'pay_by' => now()->addHours(\App\Domain\Rentals::PAY_HOURS)]))
     <div class="row">📅<b>4. Payment schedule from today</b></div><div style="padding-left:28px">@foreach(\App\Domain\Finance::schedule($probe) as $x)<div class="sum-line small"><span>{{ $x['label'] }} · due {{ isset($x['dueAt']) ? fmt_datetime($x['dueAt']) : fmt_date($x['due']) }}</span><b>{{ money($x['amount']) }}</b></div>@endforeach</div>
-    <div class="alert alert-info mt-1">{{ icon('info') }}<div class="small"><b>The stock is reserved when the first payment is verified,</b> not when you accept. The customer has {{ \App\Domain\Rentals::PAY_HOURS }} hours to pay it, or the request is cancelled. If another customer pays first for the same items, day and time, and your stock can't cover both, this request is declined automatically.</div></div>
+    <div class="alert alert-info mt-1">{{ icon('info') }}<div class="small"><b>The stock is reserved when the first payment is verified,</b> not when you accept. The customer has {{ \App\Domain\Rentals::PAY_HOURS }} hours to pay it, or the request is cancelled. If another customer pays first for the same items, day and time, and your stock can't cover both, this request is declined automatically. Accepting can't be undone.</div></div>
   </div><div class="field mt-2"><label>Note to customer (optional)</label><textarea class="input" name="note" placeholder="e.g. We will deliver at 8 AM.">{{ $r->supplier_notes }}</textarea></div></div>
   <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-success" @disabled(! $review['canAccept'])>{{ icon('check') }}Accept request</button></div></form>
 </div></div>
@@ -315,7 +316,7 @@
       if (minor + rep + nw + bey + lost > 0 && !el('description').value.trim()) errs.push('describe what happened.');
       c.querySelector('[data-calc]').textContent = [minor ? minor + ' minor × ' + peso(fee) : '', rep ? 'repair ' + peso(a.rep) : '', nw ? nw + ' not working' + (misuse ? ' (misuse) ' + peso(a.nw) : ' — free') : '', bey ? bey + ' beyond repair × ' + peso(v) : '', lost ? lost + ' lost × ' + peso(v) : ''].filter(Boolean).join(' + ') || 'No problems';
       c.querySelector('[data-amt]').textContent = peso(t);
-      var er = c.querySelector('[data-err]'); er.textContent = errs.join(' '); er.style.display = errs.length ? 'block' : 'none';
+      var er = c.querySelector('[data-err]'); er.textContent = errs.map(function (e) { return e.charAt(0).toUpperCase() + e.slice(1); }).join(' '); er.style.display = errs.length ? 'block' : 'none';
       errs.forEach(function (e) { errors.push(name + ': ' + e); });
     });
     document.getElementById('outT').textContent = peso(total);
@@ -353,7 +354,7 @@
       c.querySelector('[data-k=lost]').value = it.lost;
       c.querySelector('[data-amt]').textContent = peso(it.total);
       c.querySelector('[data-calc]').textContent = [it.repairable ? it.repairable + ' × ' + peso(v) + ' × ' + pc.repairable + '%' : '', it.nonRepairable ? it.nonRepairable + ' × ' + peso(v) + ' × ' + pc.nonRepairable + '%' : '', it.lost ? it.lost + ' lost × ' + peso(v) + ' × ' + pc.lost + '%' : ''].filter(Boolean).join(' + ') || 'No damage or loss';
-      var er = c.querySelector('[data-err]'); er.textContent = errs.join(' '); er.style.display = errs.length ? 'block' : 'none';
+      var er = c.querySelector('[data-err]'); er.textContent = errs.map(function (e) { return e.charAt(0).toUpperCase() + e.slice(1); }).join(' '); er.style.display = errs.length ? 'block' : 'none';
       errs.forEach(function (e) { errors.push(name + ': ' + e); });
       items.push(it);
     });

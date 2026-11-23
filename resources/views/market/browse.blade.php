@@ -24,6 +24,17 @@
     </div>
     <div class="hero-art">🎉<div style="font-size:3.4rem;margin-top:-10px">🎈🪑🎪</div></div>
   </section>
+  @if(! auth()->check() || ! \App\Models\RentalRequest::where('customer_id', auth()->id())->exists())
+  <section class="how-it-works" aria-labelledby="howTitle">
+    <h2 id="howTitle">How renting works</h2>
+    <ol>
+      <li><b>Pick items and dates</b><span>Add what you need to your Rental List. You see the price and how many are free on your dates.</span></li>
+      <li><b>Send a request</b><span>The shop checks and accepts it. <b>Nothing is charged yet.</b></span></li>
+      <li><b>Pay to reserve</b><span>Pay online with GCash, Maya or a card within 24 hours. It is confirmed right away.</span></li>
+      <li><b>Party, then return</b><span>Items are delivered or picked up. After your event the shop checks them and returns your deposit.</span></li>
+    </ol>
+  </section>
+  @endif
 
   @if($active->isNotEmpty() || $notifs->isNotEmpty())
   <section class="section grid grid-2">

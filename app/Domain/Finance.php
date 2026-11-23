@@ -30,7 +30,7 @@ class Finance
         'compensation' => 'Damage Compensation',
     ];
 
-    public const METHOD_LABEL = ['cash' => 'Cash', 'cod' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit Card', 'online' => 'Online payment (Xendit)'];
+    public const METHOD_LABEL = ['cash' => 'Cash', 'cod' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit Card', 'online' => 'Online (GCash, Maya, card)'];
 
     public const PLANS = ['standard', 'full', 'installment'];
 
@@ -115,7 +115,8 @@ class Finance
     public static function planSummary(?Supplier $s, string $plan): string
     {
         $c = self::planConfig($s)[$plan];
-        $dd = fn ($n) => (int) $n === 0 ? 'right after acceptance' : 'within '.$n.' day'.($n > 1 ? 's' : '').' of acceptance';
+        // the payment that reserves the items is due within Rentals::PAY_HOURS of acceptance (unpaid requests are cancelled then)
+        $dd = fn ($n) => 'within '.Rentals::PAY_HOURS.' hours of acceptance';
         if ($plan === 'full') {
             return 'Pay 100% of the total in one payment '.$dd($c['days']).'. Paying it reserves your booking.';
         }
@@ -210,18 +211,21 @@ class Finance
 
             return $d > $E ? $E : $d;
         };
+        // the first payment reserves the items and must come within Rentals::PAY_HOURS (24 h) of acceptance, whatever
+        // the shop's older "due within N days" setting says, or the request is cancelled; show that date
+        $first = fn ($days) => $due(min((int) $days, intdiv(Rentals::PAY_HOURS + 23, 24)));
         $t = $p['terms'] ?? [];
         $plan = $p['plan'] ?? 'full';
         $items = [];
         if ($plan === 'full') {
-            $items[] = ['key' => 'full', 'type' => 'full', 'label' => 'Full Payment', 'due' => $due($t['days'] ?? 0), 'amount' => (float) $p['total']];
+            $items[] = ['key' => 'full', 'type' => 'full', 'label' => 'Full Payment', 'due' => $first($t['days'] ?? 0), 'amount' => (float) $p['total']];
         } else {
             // Bookings quoted before the reservation fee was dropped keep their stage.
             if (($p['reservationFee'] ?? 0) > 0) {
-                $items[] = ['key' => 'res', 'type' => 'reservation', 'label' => 'Reservation Fee ('.($t['resPct'] ?? 0).'%)', 'due' => $due($t['resDays'] ?? 0), 'amount' => (float) $p['reservationFee']];
+                $items[] = ['key' => 'res', 'type' => 'reservation', 'label' => 'Reservation Fee ('.($t['resPct'] ?? 0).'%)', 'due' => $first($t['resDays'] ?? 0), 'amount' => (float) $p['reservationFee']];
             }
             if (($p['downPayment'] ?? 0) > 0) {
-                $items[] = ['key' => 'down', 'type' => 'down', 'label' => 'Down Payment ('.($t['downPct'] ?? 0).'%)', 'due' => $due($t['downDays'] ?? 0), 'amount' => (float) $p['downPayment']];
+                $items[] = ['key' => 'down', 'type' => 'down', 'label' => 'Down Payment ('.($t['downPct'] ?? 0).'%)', 'due' => ($p['reservationFee'] ?? 0) > 0 ? $due($t['downDays'] ?? 0) : $first($t['downDays'] ?? 0), 'amount' => (float) $p['downPayment']];
             }
             if ($plan === 'installment') {
                 $ip = $req->installment_plan;

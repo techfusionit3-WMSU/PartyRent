@@ -257,7 +257,7 @@ class BusinessRulesTest extends TestCase
         $sched = Finance::schedule($r);
         $this->assertSame(['down', 'bal'], array_column($sched, 'key'));
         $this->assertSame([375.0, 875.0], array_column($sched, 'amount'));
-        $this->assertSame(add_days(today_iso(), 10), $sched[0]['due']);
+        $this->assertSame(add_days(today_iso(), 1), $sched[0]['due']); // the reserving payment: within Rentals::PAY_HOURS (24 h) of acceptance
         $this->assertSame($ev, $sched[1]['due']);
 
         $pay = fn ($amt, $type, $status) => Payment::create(['code' => 'TXN-'.(++$this->seq), 'rental_request_id' => $r->id, 'type' => $type, 'method' => 'bank', 'amount' => $amt, 'date' => today_iso(), 'status' => $status, 'submitted_at' => now()->addSeconds($this->seq)]);

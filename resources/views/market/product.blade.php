@@ -113,7 +113,7 @@
       @else
         <div class="row wrap mt-1 pdx-cta"><a class="btn btn-lg pdx-cta-shop" href="{{ route('suppliers.show', $sup) }}" aria-label="Visit {{ $sup->name }}">{{ icon('store') }}<span>Shop</span></a><button class="btn btn-outline btn-lg grow" name="then" value="list" data-rent-submit>{{ icon('cart') }}Add to Rental List</button><button class="btn btn-primary btn-lg grow" name="then" value="checkout" data-rent-submit>Request Rental</button></div>
       @endif
-      <p class="small muted mt-1 mb-0">Submitting a request does not reserve the items until the supplier accepts it.</p>
+      <p class="small muted mt-1 mb-0">Nothing is charged when you send a request. Once the shop accepts, you pay within 24 hours to reserve the items.</p>
     </form>
     @endif
   </div>

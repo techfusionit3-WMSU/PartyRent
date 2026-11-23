@@ -18,7 +18,9 @@
   const today = form.dataset.today;
   const csrf = (document.querySelector('meta[name=csrf-token]') || {}).content;
   const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  // date-only math in UTC: local midnight + toISOString() moved the date back a day in UTC+ zones (Philippines),
+  // so "next day" stayed on the same day (the event-day list repeated one date 400 times)
+  const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
   const fmt12 = t => { const [h, m] = t.split(':').map(Number); if (h >= 24) return '12:00 AM (midnight)'; return ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM'); };
   const svg = n => (window.PRUI.icon ? window.PRUI.icon(n) : '');
   const sel = (o, value, attrs) => { const opts = o.shop.times.slice(); if (value && !opts.includes(value)) opts.push(value); opts.sort(); return '<select class="input input-sm" ' + attrs + '>' + opts.map(t => '<option value="' + t + '"' + (t === value ? ' selected' : '') + '>' + fmt12(t) + '</option>').join('') + '</select>'; };
@@ -34,7 +36,12 @@
 
   const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fmtDay = iso => { const d = new Date(iso + 'T00:00:00'); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); };
-  const rentalDays = o => { const out = []; let d = o.first; while (d <= o.last && out.length < 400) { out.push(d); d = addDays(d, 1); } return out; };
+  // the days something is actually rented (the main event day is one of them), else every day of the period
+  const rentalDays = o => {
+    const used = [...new Set(o.lines.flatMap(l => Object.entries(l.days || {}).filter(([, q]) => Number(q) > 0).map(([d]) => d)))].sort();
+    if (used.length) return used;
+    const out = []; let d = o.first; while (d <= o.last && out.length < 400) { out.push(d); d = addDays(d, 1); } return out;
+  };
   const multiLoc = o => o.fulfillment === 'delivery' && (o.multiLoc || o.destinations.length > 1);
 
   /** Event date: one rental day = that day (fixed); several days = pick the main event day among them. */
@@ -153,8 +160,19 @@
     draw(); requote();
   }
 
+  /** The shop's delivery zone that names the address's city (e.g. "Quezon City"), or '' (standard rate). */
+  function zoneFor(sh, address) {
+    const a = ' ' + String(address || '').toLowerCase().replace(/metro manila/g, ' ') + ' ';
+    const hit = (sh.zones || []).find(z => String(z.name).toLowerCase().split('/').map(x => x.trim()).filter(Boolean)
+      .some(part => new RegExp('[^a-z]' + part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^a-z]').test(a)));
+    return hit ? hit.id : '';
+  }
+  /** Until the customer picks a zone, follow the address (they used to get "Other areas" and pay the standard rate). */
+  function autoZone(o, d) { if (!d.zonePicked && d.address) d.zoneId = zoneFor(o.shop, d.address); return d.zoneId; }
+
   function destCard(o, d, i) {
     const sh = o.shop;
+    autoZone(o, d);
     const zoneOpts = selz => sh.zones.map(z => '<option value="' + esc(z.id) + '"' + (z.id === selz ? ' selected' : '') + '>' + esc(z.name) + ' — ' + money(z.fee) + '</option>').join('') + '<option value=""' + (!selz ? ' selected' : '') + '>Other areas (standard rate) — ' + money(sh.deliveryFee) + '</option>';
     const multi = multiLoc(o);
     const pinned = d.lat != null && d.lat !== '' && d.lng != null && d.lng !== '';
@@ -171,7 +189,7 @@
     const q = lastQuote[sid] || {};
     const multi = multiLoc(o);
     return '<div class="card" data-shop="' + sid + '"><div class="row between mb-1"><div class="row" style="min-width:0"><div class="logo-tile" style="width:42px;height:42px;font-size:1.3rem;background:' + sh.color + '1a">' + esc(sh.logo) + '</div><div style="min-width:0"><div class="label">Order ' + (idx + 1) + ' of ' + orders.length + '</div><h3 class="mb-0">' + esc(sh.name) + '</h3><div class="small muted">' + esc(o.range) + '</div></div></div></div>' +
-      '<div class="form-grid">' + eventField(o) + '<div class="field"><label>Payment</label><div class="input" style="display:flex;align-items:center;gap:8px;background:var(--surface-2)">' + svg('card') + 'Online payment through PartyRent (Xendit)</div><div class="hint">You pay after the supplier accepts. Each payment is confirmed automatically.</div></div></div>' +
+      '<div class="form-grid">' + eventField(o) + '<div class="field"><label>Payment</label><div class="input" style="display:flex;align-items:center;gap:8px;background:var(--surface-2)">' + svg('card') + 'Online: GCash, Maya or card, through PartyRent</div><div class="hint">Nothing is charged now. You pay after the shop accepts, and each payment is confirmed automatically.</div></div></div>' +
       '<div class="label mt-2 mb-1">Items &amp; rental times</div><div class="stack-sm">' + itemsBlock(o) + '</div>' +
       '<div class="label mt-2 mb-1">Delivery or pickup</div><div class="row wrap gap-sm mb-2">' + ['delivery', 'pickup'].map(f => { const ok = sh.fulfillment === 'both' || sh.fulfillment === f; return '<label class="chip ' + (o.fulfillment === f ? 'active' : '') + '" style="' + (ok ? '' : 'opacity:.45;pointer-events:none') + '"><input type="radio" name="ful_' + sid + '" value="' + f + '" data-ful hidden' + (o.fulfillment === f ? ' checked' : '') + (ok ? '' : ' disabled') + '>' + svg(f === 'delivery' ? 'truck' : 'store') + (f === 'delivery' ? 'Delivery' : 'Pickup at shop') + '</label>'; }).join('') + '</div>' +
       (o.fulfillment === 'delivery'
@@ -284,7 +302,12 @@
       $$('[data-k]', box).forEach(el => el.onchange = () => { o[el.dataset.k] = el.value; o.inst.auto = true; requote(true); });
       // Delivery ↔ Pickup keeps every line (and its per-location split) as it is.
       $$('[data-ful]', box).forEach(el => el.onchange = () => { o.fulfillment = el.value; draw(); requote(); });
-      $$('[data-dest]', box).forEach(card => $$('[data-d]', card).forEach(el => el.oninput = el.onchange = () => { const d = o.destinations.find(x => x.id === card.dataset.dest); d[el.dataset.d] = el.value; requote(); }));
+      $$('[data-dest]', box).forEach(card => $$('[data-d]', card).forEach(el => el.oninput = el.onchange = () => {
+        const d = o.destinations.find(x => x.id === card.dataset.dest); d[el.dataset.d] = el.value;
+        if (el.dataset.d === 'zoneId') d.zonePicked = true; // the customer chose it: stop following the address
+        if (el.dataset.d === 'address' && !d.zonePicked) { const zs = $('[data-d="zoneId"]', card); const before = d.zoneId; autoZone(o, d); if (zs && before !== d.zoneId) zs.value = d.zoneId; }
+        requote();
+      }));
       const ml = $('[data-multiloc]', box); if (ml) ml.onchange = async () => {
         if (ml.checked) { if (!await enableMultiLoc(o)) { ml.checked = false; return; } }
         else {
@@ -330,16 +353,21 @@
 
   $$('[data-s]', form).forEach(el => el.oninput = el.onchange = () => { shared[el.dataset.s] = el.value; el.closest('.field').classList.remove('invalid'); requote(); });
   $('#submitBtn').onclick = async () => {
-    let bad = false;
-    $$('[data-s][required]', form).forEach(el => { const ok = el.value.trim().length >= (+el.getAttribute('minlength') || 1); el.closest('.field').classList.toggle('invalid', !ok); if (!ok) bad = true; });
-    if (bad) return toast('Please complete the event details.', 'error');
+    let bad = null;
+    $$('[data-s][required]', form).forEach(el => { const ok = el.value.trim().length >= (+el.getAttribute('minlength') || 1); el.closest('.field').classList.toggle('invalid', !ok); if (!ok && !bad) bad = el; });
+    if (bad) {
+      // say which field, and take the customer there
+      const name = ((bad.closest('.field').querySelector('label') || {}).textContent || 'this field').replace(/\s*\(optional\)\s*/i, '').trim();
+      bad.scrollIntoView({ behavior: 'smooth', block: 'center' }); bad.focus({ preventScroll: true });
+      return toast('Please fill in "' + name + '" so the shop can reach you about this rental.', 'error');
+    }
     if (Object.keys(qtyBusy).length) return toast('Checking the new quantity… try again in a moment.', 'info');
     const qe = Object.keys(qtyErr)[0]; if (qe) { const c = $('[data-item="' + qe + '"]'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast('Fix the quantity first: ' + qtyErr[qe].msg, 'error'); }
-    if (!$('#agree').checked) return toast('Please accept the shops\' policies.', 'warn');
+    if (!$('#agree').checked) { $('#agree').scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast('Please read and tick "I agree" to the shop\'s rental policies first.', 'warn'); }
     const notOk = orders.find(o => lastQuote[o.supplier_id] && !lastQuote[o.supplier_id].ok);
     if (notOk) { $('[data-shop="' + notOk.supplier_id + '"]').scrollIntoView({ behavior: 'smooth' }); return toast(notOk.shop.name + ': ' + lastQuote[notOk.supplier_id].error, 'error'); }
     const list = orders.map(o => o.shop.name + ' — ' + money((lastQuote[o.supplier_id] || {}).total)).join(' · ');
-    if (!await confirmDialog({ title: 'Submit ' + (orders.length > 1 ? orders.length + ' rental requests' : 'rental request') + '?', message: 'Nothing is reserved until a supplier accepts. ' + list, ok: 'Submit' })) return;
+    if (!await confirmDialog({ title: 'Submit ' + (orders.length > 1 ? orders.length + ' rental requests' : 'rental request') + '?', message: 'Nothing is charged now. The shop checks your request first; once it accepts, you have 24 hours to pay the first payment, which reserves the items. ' + list, ok: 'Send request' })) return;
     const btn = $('#submitBtn'); const label = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:18px;height:18px;border-width:2px;border-top-color:#fff"></span> Submitting…';
     try {
       const res = await fetch(form.dataset.submit, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify(Object.assign(payload(), { agree: 1 })) });

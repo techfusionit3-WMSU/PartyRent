@@ -85,11 +85,18 @@
       <div class="alert alert-info">{{ icon('info') }}<div class="small">Example with your settings: a 6:00 AM – 11:00 AM booking blocks the units from {{ \App\Domain\Slots::fmt12(max(0, 360 - (int) round($ts['prepHours'] * 60))) }} to {{ \App\Domain\Slots::fmt12(660 + (int) round($ts['recoveryHours'] * 60)) }}. Minimum / maximum hours per booking are set on each product or package.</div></div>
       @break
     @case('plans')
-      <div class="field"><label>Accepted payment methods</label>@foreach(['cash' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $v => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $v }}" @checked(in_array($v, old('methods', $s->methods ?? []), true))> {{ $l }}</label> @endforeach</div>
-      <p class="small muted">Payment deadlines count from the day you accept a request and never go past the event date. There is no separate reservation fee: once the down payment is paid, the booking is reserved and marked Partially Paid. The down payment is always credited to the order total.</p>
-      @foreach(['standard' => [['downPct', 'Down payment (%)', 'min="0.5" max="100" step="0.5"'], ['downDays', 'Down payment due within (days)', 'min="0"']],
-                'full' => [['days', 'Full payment due within (days)', 'min="0"']],
-                'installment' => [['downPct', 'Down payment (%)', 'min="0.5" max="99.5" step="0.5"'], ['downDays', 'Down payment due within (days)', 'min="0"'], ['minMonths', 'Minimum months before the event', 'min="1" max="24"'], ['maxInstallments', 'Maximum number of installments', 'min="1" max="24"']]] as $k => $fields)
+      @if(\App\Domain\OnlinePay::enabled())
+        <div class="field"><label>How customers pay</label><div class="small">Customers pay online through PartyRent (GCash, Maya or card); each payment is confirmed automatically.</div>
+          <label class="check mt-1"><input type="checkbox" name="methods[]" value="cash" @checked(in_array('cash', old('methods', $s->methods ?? []), true))> Also accept <b>cash</b> handed to us at delivery or pickup (you confirm it in the app)</label></div>
+      @else
+        <div class="field"><label>Accepted payment methods</label>@foreach(['cash' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $v => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $v }}" @checked(in_array($v, old('methods', $s->methods ?? []), true))> {{ $l }}</label> @endforeach</div>
+      @endif
+      <p class="small muted">The first payment (down payment or full payment) is due within <b>{{ \App\Domain\Rentals::PAY_HOURS }} hours</b> of accepting a request: it reserves the items, and an unpaid request is cancelled after that so the stock is free again. Later payments are due by the event date. The down payment is always credited to the order total.</p>
+      {{-- the "due within N days" settings no longer apply (first payment: 24 h); kept as hidden values so saving still validates --}}
+      @foreach(['standard' => ['downDays'], 'full' => ['days'], 'installment' => ['downDays']] as $k => $hid)@foreach($hid as $n)<input type="hidden" name="plans[{{ $k }}][{{ $n }}]" value="{{ $cfg[$k][$n] }}">@endforeach @endforeach
+      @foreach(['standard' => [['downPct', 'Down payment (%)', 'min="0.5" max="100" step="0.5"']],
+                'full' => [],
+                'installment' => [['downPct', 'Down payment (%)', 'min="0.5" max="99.5" step="0.5"'], ['minMonths', 'Minimum months before the event', 'min="1" max="24"'], ['maxInstallments', 'Maximum number of installments', 'min="1" max="24"']]] as $k => $fields)
         <div class="card card-flat mb-2" style="padding:14px"><label class="check"><input type="checkbox" name="plans[{{ $k }}][enabled]" value="1" @checked($cfg[$k]['enabled'])> <b>{{ \App\Domain\Finance::PLAN_LABEL[$k] }}</b></label>
           <div class="form-grid mt-1">@foreach($fields as [$n, $label, $attrs]){!! $pf($k, $n, $label, $cfg[$k][$n], $attrs) !!}@endforeach</div><div class="small muted">{{ $ex($k) }}</div></div>
       @endforeach

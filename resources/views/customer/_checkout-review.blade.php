@@ -1,7 +1,7 @@
 {{-- One shop's review in the checkout (reference C.checkout refresh()). $q quote, $o order, $prep prepareOrder result --}}
 @php
     $t = $q['terms'];
-    $dd = fn ($n) => $n ? 'within '.$n.' day'.($n > 1 ? 's' : '').' after acceptance' : 'right after acceptance';
+    $dd = fn ($n) => 'within '.\App\Domain\Rentals::PAY_HOURS.' hours after acceptance (reserves your items)';
     $ev = $o['eventDate'] ?? null;
     $firstDay = collect($o['lines'] ?? [])->flatMap(fn ($l) => array_keys(array_filter((array) ($l['days'] ?? []))))->min();
 @endphp

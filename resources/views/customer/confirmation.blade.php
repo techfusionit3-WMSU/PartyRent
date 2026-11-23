@@ -13,8 +13,8 @@
     @endforeach
   </div>
   <div class="card card-flat soft mt-2" style="text-align:left"><b>What happens next</b><ol class="small mb-0" style="padding-left:18px">
-    <li>Each supplier reviews availability and its inventory allocation (status stays <b>Pending</b>).</li>
-    <li>Once accepted, that order's payment schedule appears in <b>My Rentals</b> — down payment first (or the full payment), which reserves your booking.</li>
+    <li>The shop checks that it has everything for your dates. Until then your request shows as <b>Pending</b>, and nothing is charged.</li>
+    <li>We notify you when the shop accepts. Then pay the first payment (down payment or full payment) in <b>My Rentals</b> within <b>{{ \App\Domain\Rentals::PAY_HOURS }} hours</b>. That reserves your items; if it isn't paid in time, the request is cancelled and the items go back on sale.</li>
     @if($list->contains(fn ($r) => $r->plan === 'installment'))<li>Installment schedules are approved by the supplier before they take effect.</li>@endif
     <li>You pay online through PartyRent; each payment is confirmed automatically. Everything is due on or before the event date.</li>
   </ol></div>

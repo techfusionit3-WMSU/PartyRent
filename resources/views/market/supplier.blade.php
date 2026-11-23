@@ -82,7 +82,7 @@
   @if($pkgs->count())<div class="product-grid">@foreach($pkgs as $k)@include('partials.package-card', ['k' => $k])@endforeach</div>@else @include('partials.empty', ['emoji' => '📦', 'title' => 'No packages yet', 'text' => '']) @endif
 @elseif($tab === 'policies')
   <div class="grid grid-2">
-    <div class="card"><h3>Payment plans</h3><dl class="kv"><dt>Accepted methods</dt><dd>Online payment through PartyRent (Xendit)</dd>
+    <div class="card"><h3>Payment plans</h3><dl class="kv"><dt>Accepted methods</dt><dd>Online: GCash, Maya or card, through PartyRent</dd>
       @foreach(\App\Domain\Finance::plansOf($s) as $k)<dt>{{ \App\Domain\Finance::PLAN_LABEL[$k] }}</dt><dd>{{ \App\Domain\Finance::planSummary($s, $k) }}</dd>@endforeach
       <dt>Security deposit{{ term('security_deposit') }}</dt><dd>{{ ($pol['depositType'] ?? 'fixed') === 'percent' ? ($pol['depositValue'] ?? 0).'% of rental items' : money($pol['depositValue'] ?? 0) }} (refundable)</dd></dl>
       <p class="small muted mb-0">Paying the down payment (or the full payment) reserves your booking, and it is always credited to the total. Nothing may stay unpaid after the event date.</p></div>

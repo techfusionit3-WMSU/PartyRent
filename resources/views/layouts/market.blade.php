@@ -17,7 +17,7 @@
         <a class="icon-btn" href="{{ route('cart') }}" aria-label="Rental list">{{ icon('cart') }}@if($shellCart)<span class="dot-count">{{ $shellCart }}</span>@endif</a>
         @include('partials.profile-menu')
       @else
-        <a class="btn btn-ghost btn-sm hide-xs" href="{{ route('login') }}">{{ __('Log in') }}</a>
+        <a class="btn btn-ghost btn-sm" href="{{ route('login') }}">{{ __('Log in') }}</a>
         <a class="btn btn-primary btn-sm" href="{{ route('register') }}">{{ __('Sign up') }}</a>
       @endauth
     </div>

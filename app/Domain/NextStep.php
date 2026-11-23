@@ -98,7 +98,12 @@ class NextStep
                     return $c ? self::you('Your turn: review the damage charge and accept or dispute it.') : self::them('Waiting for :name to answer the damage charge.', $p);
                 }
 
-                return $c ? self::them(':shop is settling your deposit and closing the rental.', $p) : self::you('Your turn: settle the deposit and complete the rental.');
+                // once the deposit is settled (none held, inspection not waiting) only closing the rental is left
+                $settled = ($r->inspection['settlement'] ?? '') !== 'pending' && $r->fin()['depositHeld'] <= 0;
+
+                return $settled
+                    ? ($c ? self::them(':shop is closing the rental.', $p) : self::you('Your turn: everything is settled. Complete the rental to close it.'))
+                    : ($c ? self::them(':shop is settling your deposit and closing the rental.', $p) : self::you('Your turn: settle the deposit, then complete the rental.'));
         }
 
         return self::done(RentalRequest::statusLabel($r->status));

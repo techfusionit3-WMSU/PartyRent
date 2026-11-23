@@ -1,7 +1,7 @@
 @extends('layouts.dash', ['title' => 'Team & Roles', 'nav' => 'team'])
 @php($R = \App\Models\ShopStaff::labels($s))
 @php($P = \App\Models\ShopStaff::ORG_PERM_LIST)
-@php($solo = $s->type !== 'organization')
+@php($solo = ! $s->isOrganization())
 @section('content')
 <div class="page-head"><div><h1>Team & Roles</h1><p>Roles belong to <b>{{ $s->name }}</b>, not to PartyRent. Each person uses their own PartyRent account, switches to <b>Business Mode</b> and works only in the modules of their roles.@if($solo) A team is <b>optional</b>: as the owner you can run every module yourself.@endif</p></div><button class="btn btn-primary" data-modal="empAdd">{{ icon('plus') }}Add employee</button></div>
 

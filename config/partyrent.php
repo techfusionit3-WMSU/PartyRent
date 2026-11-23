@@ -29,4 +29,12 @@ return [
         // A shop pin farther than this from the centre of its chosen city is probably a mistake.
         'max_km_from_city' => 60,
     ],
+
+    /*
+     * Event-company module (whole-event quotations, coordinators, crews, event parts and venues).
+     * PartyRent rents decorations and party items; it does not book or manage events, so this is OFF.
+     * Off: companies run as ordinary rental shops, the event-booking pages are closed and their links hidden.
+     * The code and data stay (true switches it back on).
+     */
+    'event_companies' => (bool) env('PARTYRENT_EVENT_COMPANIES', false),
 ];

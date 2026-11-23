@@ -99,7 +99,7 @@ class StartSellingController extends Controller
             $request->merge(['location_type' => 'shop']);
         }
         $rules = [
-            'app.type' => 'required|in:individual,organization',
+            'app.type' => 'required|in:'.(\App\Models\Supplier::eventCompanies() ? 'individual,organization' : 'individual'),
             'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
             'phone' => $phone, 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',
             'location_type' => 'required|in:shop,home,none',

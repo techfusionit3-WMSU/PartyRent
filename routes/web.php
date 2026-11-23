@@ -248,13 +248,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/applications/{supplier}/business-doc', [AdminController::class, 'businessDoc'])->name('business.doc');
     Route::get('/applications/{supplier}/doc/{key}', [AdminController::class, 'applicationDoc'])->name('applications.doc');
     // what event companies can handle: catalog of event types + per-business review
-    Route::get('/event-types', [\App\Http\Controllers\Admin\EventTypeController::class, 'index'])->name('event-types');
-    Route::post('/event-types', [\App\Http\Controllers\Admin\EventTypeController::class, 'save'])->name('event-types.store');
-    Route::post('/event-types/{eventType}', [\App\Http\Controllers\Admin\EventTypeController::class, 'save'])->name('event-types.update');
-    Route::post('/event-types/{eventType}/decide', [\App\Http\Controllers\Admin\EventTypeController::class, 'decide'])->name('event-types.decide');
-    Route::post('/event-types/business/{row}/review', [\App\Http\Controllers\Admin\EventTypeController::class, 'review'])->name('event-types.review');
-    Route::post('/event-types/business/{row}/pause', [\App\Http\Controllers\Admin\EventTypeController::class, 'pause'])->name('event-types.pause');
-    Route::get('/event-types/business/{row}/{which}/{i}', [\App\Http\Controllers\Admin\EventTypeController::class, 'file'])->whereIn('which', ['photo', 'doc'])->whereNumber('i')->name('event-types.file');
+    Route::get('/event-types', [\App\Http\Controllers\Admin\EventTypeController::class, 'index'])->middleware('event.module')->name('event-types');
+    Route::post('/event-types', [\App\Http\Controllers\Admin\EventTypeController::class, 'save'])->middleware('event.module')->name('event-types.store');
+    Route::post('/event-types/{eventType}', [\App\Http\Controllers\Admin\EventTypeController::class, 'save'])->middleware('event.module')->name('event-types.update');
+    Route::post('/event-types/{eventType}/decide', [\App\Http\Controllers\Admin\EventTypeController::class, 'decide'])->middleware('event.module')->name('event-types.decide');
+    Route::post('/event-types/business/{row}/review', [\App\Http\Controllers\Admin\EventTypeController::class, 'review'])->middleware('event.module')->name('event-types.review');
+    Route::post('/event-types/business/{row}/pause', [\App\Http\Controllers\Admin\EventTypeController::class, 'pause'])->middleware('event.module')->name('event-types.pause');
+    Route::get('/event-types/business/{row}/{which}/{i}', [\App\Http\Controllers\Admin\EventTypeController::class, 'file'])->whereIn('which', ['photo', 'doc'])->whereNumber('i')->middleware('event.module')->name('event-types.file');
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');

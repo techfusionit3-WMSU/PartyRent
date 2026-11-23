@@ -57,9 +57,11 @@
       <label class="type-card {{ $type === 'individual' ? 'on' : '' }}"><input type="radio" name="app[type]" value="individual" @checked($type === 'individual') hidden data-type>
         <div style="font-size:2rem">🧑‍💼</div><h3 class="mt-1">Individual Supplier</h3><p class="small muted">For individual owners and small rental businesses — even if you have a few helpers.</p>
         <ul class="small"><li>Valid government ID (+ selfie)</li><li>Personal and business information</li><li>DTI, barangay or mayor's permit <i>if applicable</i></li></ul><span class="badge b-pink">Single owner account</span></label>
+      @if(\App\Models\Supplier::eventCompanies())
       <label class="type-card {{ $type === 'organization' ? 'on' : '' }}"><input type="radio" name="app[type]" value="organization" @checked($type === 'organization') hidden data-type>
         <div style="font-size:2rem">🏢</div><h3 class="mt-1">Organization / Company Supplier</h3><p class="small muted">For corporations, partnerships, cooperatives and companies with employees or branches.</p>
         <ul class="small"><li>Company registration documents (SEC / DTI / CDA)</li><li>BIR registration and business permits</li><li>Authorized representative's ID and proof of authority</li></ul><span class="badge b-purple">Multiple employee accounts</span></label>
+      @endif
     </div>
     {!! $err('app.type') !!}
     <p class="small muted mt-2 mb-0">Applications are subject to PartyRent administrator verification. Employees (cashier, inventory staff) are added after approval — not during the application.</p>

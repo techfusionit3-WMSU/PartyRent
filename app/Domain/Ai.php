@@ -453,7 +453,7 @@ class Ai
             return $reply("Renting on PartyRent:<br>1. Find items or a package and pick dates & quantities (you can set a different quantity per day).<br>2. Add to your Rental List and submit a request.<br>3. The supplier reviews and accepts (it stays <b>Pending</b> until then).<br>4. Pay according to the supplier's payment policy — payments count once verified by our cashier.<br>5. Receive the items, enjoy, then return them for inspection.");
         }
         if (preg_match('/(plan|planning|prepare|help me|tulungan|mag-?organize).*(party|event|wedding|debut|birthday|kasal|binyag|reunion)|\d+\s*(guests|bisita|pax)/', $t)) {
-            return $reply('Let me build a checklist from real listings. '.self::a(route('ai', ['q' => $message]), 'Open the AI Event Planner with your description →'));
+            return $reply('Let me build a checklist from real listings. '.self::a(route('ai', ['q' => $message]), 'Open the AI Rental Planner with your description →'));
         }
 
         // product / supplier lookup

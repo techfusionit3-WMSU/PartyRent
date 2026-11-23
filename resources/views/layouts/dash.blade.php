@@ -35,7 +35,8 @@
     if ($curMod) { $cfg = \App\Support\CompanyModules::nav($shellUser, $curMod, $b); }
     $emp = $shellUser->isEmployee();
     // Supplier employees only see the sections their organization role allows; a group label shows only before a visible item.
-    $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && (empty($it[5]) || ($curMod || $role === 'supplier' ? $shellUser->orgCan($it[5]) : ($role !== 'admin' || $shellUser->hasPerm($it[5]))));
+    // with the event-company module off, its admin pages (Event Bookings, Event Types) are not in the menu
+    $allowed = fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && (\App\Models\Supplier::eventCompanies() || ! str_starts_with($it[1], 'admin.event')) && (empty($it[5]) || ($curMod || $role === 'supplier' ? $shellUser->orgCan($it[5]) : ($role !== 'admin' || $shellUser->hasPerm($it[5]))));
     $items = [];
     $label = null;
     foreach ($cfg['items'] as $it) {
@@ -45,7 +46,7 @@
         $items[] = $it;
     }
     $bottom = array_filter($cfg['bottom'], fn ($it) => \Illuminate\Support\Facades\Route::has($it[1]) && ($curMod || $role !== 'supplier' || empty($it[4]) || $shellUser->orgCan($it[4])));
-    $tag = $curMod ? $cfg['tag'] : ($role === 'supplier' && $emp ? \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles()) : ($role === 'supplier' && $sup && $sup->type === 'organization' ? 'Owner' : $cfg['tag']));
+    $tag = $curMod ? $cfg['tag'] : ($role === 'supplier' && $emp ? \App\Models\ShopStaff::rolesLabel($shellUser->orgRoles()) : ($role === 'supplier' && $sup && $sup->isOrganization() ? 'Owner' : $cfg['tag']));
     $nav = $nav ?? '';
     // Two menu items can share a key (the cashier's Financial Reports and the shop's Business Reports are both
     // "reports"): only the one in the same area as the open page lights up.

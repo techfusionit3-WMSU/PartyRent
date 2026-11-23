@@ -12,7 +12,7 @@ use App\Http\Controllers\Business\SettingsController;
 use App\Http\Controllers\Customer\EventController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'role:supplier'])->group(function () {
+Route::prefix('business')->name('business.')->middleware(['event.module', 'auth', 'verified', 'role:supplier'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/calendar', [DashboardController::class, 'calendar'])->name('calendar');
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
@@ -48,13 +48,13 @@ Route::prefix('business')->name('business.')->middleware(['auth', 'verified', 'r
 });
 
 /* PartyRent admins: all event bookings, and online event payments to send on to the businesses */
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadmin'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['event.module', 'auth', 'role:admin,superadmin'])->group(function () {
     Route::get('/events', [\App\Http\Controllers\Admin\EventBookingController::class, 'index'])->name('events');
     Route::post('/events/payments/{eventPayment}/sent', [\App\Http\Controllers\Admin\EventBookingController::class, 'remit'])->name('events.remit');
 });
 
 /* customers booking a business */
-Route::middleware('auth')->group(function () {
+Route::middleware(['event.module', 'auth'])->group(function () {
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
     Route::get('/events/{eventBooking}', [EventController::class, 'show'])->name('events.show');
     Route::get('/suppliers/{supplier}/book', [EventController::class, 'create'])->name('events.create');

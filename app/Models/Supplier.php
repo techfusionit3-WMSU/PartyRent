@@ -44,7 +44,10 @@ class Supplier extends Model
      * physical workplace, no 1-to-1 item rentals. Not the same as isBusiness(): a solo item-rental shop can
      * verify its business papers (account_type business) and stay a rental shop.
      */
-    public function isOrganization(): bool { return $this->type === 'organization'; }
+    public function isOrganization(): bool { return $this->type === 'organization' && self::eventCompanies(); }
+
+    /** Is the event-company module on? (config partyrent.event_companies; off: PartyRent only rents items) */
+    public static function eventCompanies(): bool { return (bool) config('partyrent.event_companies'); }
 
     /** "What your business offers" (business suppliers). */
     public const EVENT_SIZES = ['up_to_50' => 'Up to 50 guests', '50_150' => '50–150 guests', '150_300' => '150–300 guests', '300_plus' => '300+ guests'];

@@ -1,10 +1,10 @@
 @extends('layouts.market', ['title' => 'Party suppliers', 'nav' => 'suppliers'])
 
 @section('content')
-<div class="page-head"><div><h1>{{ $type === 'business' ? 'Event companies' : 'Party suppliers' }}</h1><p>{{ $type === 'business' ? 'Companies that handle your whole event: send an inquiry and get a quotation.' : 'Verified local rental shops and event companies on PartyRent.' }}</p></div>
+<div class="page-head"><div><h1>{{ $type === 'business' && \App\Models\Supplier::eventCompanies() ? 'Event companies' : 'Rental shops' }}</h1><p>{{ $type === 'business' && \App\Models\Supplier::eventCompanies() ? 'Companies that handle your whole event: send an inquiry and get a quotation.' : (\App\Models\Supplier::eventCompanies() ? 'Verified local rental shops and event companies on PartyRent.' : 'Verified local shops that rent decorations and party items for your event.') }}</p></div>
   <form class="row wrap" method="GET"><input type="hidden" name="type" value="{{ $type }}"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search suppliers or city" style="width:220px" aria-label="Search suppliers"><select class="input input-sm" name="f" style="width:auto" aria-label="Fulfillment" data-autosubmit><option value="">All fulfillment</option><option value="delivery" @selected($f === 'delivery')>Offers delivery</option><option value="pickup" @selected($f === 'pickup')>Offers pickup</option></select></form>
 </div>
-<div class="tabs mb-2">@foreach(['' => 'All', 'shops' => 'Rental shops', 'business' => 'Event companies'] as $k => $l)<a class="tab {{ $type === $k ? 'active' : '' }}" href="{{ route('suppliers.index', array_filter(['type' => $k, 'q' => $q])) }}">{{ $l }}</a>@endforeach</div>
+@if(\App\Models\Supplier::eventCompanies())<div class="tabs mb-2">@foreach(['' => 'All', 'shops' => 'Rental shops', 'business' => 'Event companies'] as $k => $l)<a class="tab {{ $type === $k ? 'active' : '' }}" href="{{ route('suppliers.index', array_filter(['type' => $k, 'q' => $q])) }}">{{ $l }}</a>@endforeach</div>@endif
 <div class="grid grid-2">
   @forelse($list as $s)
     @if($s->isOrganization())

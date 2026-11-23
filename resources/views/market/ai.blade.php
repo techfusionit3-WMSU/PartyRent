@@ -1,8 +1,8 @@
-@extends('layouts.market', ['title' => 'AI Event Planner', 'nav' => 'ai'])
+@extends('layouts.market', ['title' => 'AI Rental Planner', 'nav' => 'ai'])
 
 @section('content')
 <div class="ai-hero">
-  <div><span class="ai-badge">{{ icon('sparkle') }}PartyRent Assist</span><h1 class="mt-1 mb-0">AI Event Planner & Search</h1><p class="muted mt-1">Describe your event in English or Filipino. The assistant turns it into filters you can edit, then suggests items that are <b>actually listed and available</b> on PartyRent.</p></div>
+  <div><span class="ai-badge">{{ icon('sparkle') }}PartyRent Assist</span><h1 class="mt-1 mb-0">AI Rental Planner &amp; Search</h1><p class="muted mt-1">Describe your event in English or Filipino. The assistant turns it into filters you can edit, then suggests items that are <b>actually listed and available</b> on PartyRent.</p></div>
   <form method="GET" action="{{ route('ai') }}">
     <div class="field mt-2"><label for="aiq" class="sr-only">Describe your event</label><textarea class="input" id="aiq" name="q" rows="3" maxlength="1000" placeholder="e.g. Debut for 120 guests, pink and white, need Tiffany chairs, backdrop and lights…">{{ $q }}</textarea></div>
     <div class="row wrap"><button class="btn btn-primary btn-lg">{{ icon('sparkle') }}Interpret my event</button><span class="small muted">Try:</span>

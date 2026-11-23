@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Payment;
 use App\Models\RentalRequest;
 use App\Models\RequestEvent;
+use App\Support\ChangeRecorder;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -77,6 +78,22 @@ class RecordStaffAction
         'business.payments.confirm' => 'Confirmed a payment',
         'business.event-types.apply' => 'Applied for event type :ref',
         'business.event-types.request' => 'Asked PartyRent to add an event type',
+        'business.packages.store' => 'Added an event package',
+        'business.packages.update' => 'Edited event package :ref',
+        'business.packages.toggle' => 'Showed / hid event package :ref',
+        'business.payments.remind' => 'Sent a payment reminder',
+        'business.settings.update' => 'Changed the booking & payment settings',
+        'supplier.packages.duplicate' => 'Duplicated package :ref',
+        'supplier.packages.move' => 'Changed the order of packages',
+        'supplier.packages.item' => 'Added an item just for packages',
+        'supplier.discounts.active' => 'Turned a discount on / off',
+        'supplier.discounts.bulk' => 'Changed several discounts',
+        'supplier.locations.store' => 'Added an inventory location',
+        'supplier.locations.update' => 'Edited inventory location :ref',
+        'supplier.locations.delete' => 'Removed inventory location :ref',
+        'supplier.team.cancel' => 'Cancelled a team invitation',
+        'supplier.team.resend' => 'Resent a team invitation',
+        'supplier.settings.update' => 'Changed the store settings',
     ];
 
     /** Not worth a log line (chat keeps its own record; switches and lookups change nothing). */
@@ -90,10 +107,15 @@ class RecordStaffAction
             return $next($request);
         }
         $before = RequestEvent::max('id') ?? 0;
-        $response = $next($request);
+        ChangeRecorder::start(); // old → new values of every row the action actually saves
+        try {
+            $response = $next($request);
+        } finally {
+            $changes = ChangeRecorder::stop();
+        }
         try {
             if ($this->succeeded($request, $response)) {
-                $this->record($request, $name, $before);
+                $this->record($request, $name, $before, $changes);
             }
         } catch (\Throwable $e) {
             report($e); // never break the action because the log failed
@@ -120,7 +142,55 @@ class RecordStaffAction
         return true;
     }
 
-    private function record(Request $request, string $name, int $before): void
+    /** Route name → kind of action (Created, Updated, Approved…). */
+    public static function typeOf(string $name): string
+    {
+        $last = substr($name, strrpos($name, '.') + 1);
+
+        return match (true) {
+            in_array($last, ['store', 'request', 'apply', 'duplicate', 'item', 'transfer', 'hold'], true) => 'created',
+            in_array($last, ['delete', 'destroy'], true) => 'deleted',
+            in_array($last, ['accept', 'verify', 'confirm'], true) => 'approved',
+            in_array($last, ['decline', 'reject'], true) => 'rejected',
+            in_array($last, ['cancel'], true) => 'cancelled',
+            in_array($last, ['complete', 'settle', 'part-done', 'inspection'], true) => 'completed',
+            in_array($last, ['cash'], true) || $name === 'cashier.record.store' => 'payment',
+            in_array($last, ['remind', 'quote', 'reply', 'propose', 'respond'], true) => 'sent',
+            default => 'updated',
+        };
+    }
+
+    /** Route name → part of the store it touched. */
+    public static function categoryOf(string $name): string
+    {
+        return match (true) {
+            str_contains($name, '.requests.cash') || str_starts_with($name, 'cashier.') || str_contains($name, '.payments.') => 'payments',
+            str_contains($name, '.requests.') => 'rentals',
+            str_contains($name, '.bookings.') => 'events',
+            str_contains($name, '.products.') => 'products',
+            str_contains($name, '.packages.') => 'packages',
+            str_contains($name, '.inventory.') || str_contains($name, '.locations.') => 'inventory',
+            str_contains($name, '.discounts.') => 'pricing',
+            str_contains($name, '.payouts.') => 'payouts',
+            str_contains($name, '.team') || str_contains($name, '.teams.') || str_contains($name, '.staff') => 'team',
+            str_contains($name, 'shortfalls') || str_starts_with($name, 'cases.') || str_contains($name, '.damages') => 'cases',
+            str_contains($name, '.reviews.') => 'reviews',
+            default => 'settings',
+        };
+    }
+
+    /** The person's role in the shop: "Owner", "Cashier", "Front Desk + Field Crew"; PartyRent staff by their role. */
+    public static function roleLabel(\App\Models\User $u): string
+    {
+        $roles = $u->orgRoles();
+        if ($roles) {
+            return mb_substr(\App\Models\ShopStaff::rolesLabel($roles, $u->shop()), 0, 60);
+        }
+
+        return 'PartyRent '.ucfirst((string) $u->activeRole(session('mode')));
+    }
+
+    private function record(Request $request, string $name, int $before, array $changes = []): void
     {
         $u = $request->user();
         if (! $u) {
@@ -156,10 +226,15 @@ class RecordStaffAction
         }
         $shopId = $rental?->supplier_id ?? $u->shop()?->id;
 
+        // the name of a record created by this action ("Added a product" → which one)
+        if (! $ref && ($first = $changes[0] ?? null) && $first['action'] === 'created' && $first['name'] !== '') {
+            $ref = $first['name'];
+        }
         AuditLog::create([
             'actor_id' => $u->id, 'supplier_id' => $shopId, 'role' => mb_substr((string) $u->activeRole(session('mode')), 0, 12),
+            'role_label' => self::roleLabel($u), 'type' => self::typeOf($name), 'category' => self::categoryOf($name),
             'action' => $label, 'ref' => $rental?->code ?? ($ref ? mb_substr((string) $ref, 0, 80) : null),
-            'details' => trim(($rental ? $rental->code.' · ' : '').$label), 'created_at' => now(),
+            'details' => trim(($rental ? $rental->code.' · ' : '').$label), 'changes' => $changes ?: null, 'created_at' => now(),
         ]);
         // the rental's own timeline, unless the action already wrote a step with this person's name
         if ($rental && ! RequestEvent::where('rental_request_id', $rental->id)->where('id', '>', $before)->where('user_id', $u->id)->exists()) {

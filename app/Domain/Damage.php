@@ -397,7 +397,7 @@ class Damage
         $msg = $r->code.': the damage dispute was decided. Final compensation: '.money($insp['compensation']).'.';
         Notifier::notify($r->customer_id, 'customer', 'Damage dispute decided', $msg, route('rentals.show', $r, false));
         Notifier::notify($r->supplier?->owner_id, 'supplier', 'Damage dispute decided', $msg.' You can settle the deposit now.', route('supplier.requests.show', $r, false));
-        Notifier::audit('Decided damage dispute', $r->code.' · '.money($insp['compensation']));
+        Notifier::audit('PartyRent decided the damage dispute', $r->code.' · '.money($insp['compensation']), null, ['supplier_id' => $r->supplier_id, 'type' => 'completed', 'category' => 'cases', 'ref' => $r->code]);
 
         return ['ok' => true, 'compensation' => $insp['compensation']];
     }

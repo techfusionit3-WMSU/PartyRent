@@ -569,3 +569,8 @@ details.charges .sum-line > span:first-child { min-width: 0; }
 .lang-switch.dark button.on { background: var(--grad); color: #fff; }
 main:focus { outline: none; }
 .btn.is-off { opacity: .55; }
+
+/* Phones: header dropdowns (account, notifications) span the screen instead of hanging off the left edge */
+@media (max-width: 640px) {
+  .dropdown .menu { position: fixed; left: 12px; right: 12px; top: calc(var(--dd-top, 64px) + 6px); min-width: 0; width: auto; max-height: calc(100vh - var(--dd-top, 64px) - 24px); overflow-y: auto; }
+}

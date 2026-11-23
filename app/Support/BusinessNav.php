@@ -25,7 +25,7 @@ class BusinessNav
             ['reviews', 'supplier.reviews', 'star', 'Reviews', 0, 'orders.view'],
             ['What you offer'], ['event-types', 'business.event-types', 'shield', 'Event Types', $types, 'shop.manage'], ['packages', 'business.packages', 'package', 'Event Packages', 0, 'products.manage'],
             ['Business'], ['settings', 'business.settings', 'settings', 'Bookings & Payment Settings', 0, 'shop.manage'],
-            ['shop', 'supplier.shop', 'store', 'Business Profile', 0, 'shop.manage'], ['team', 'supplier.team', 'users', 'Team & Roles', 0, 'team.manage'],
+            ['shop', 'supplier.shop', 'store', 'Business Profile', 0, 'shop.manage'], ['team', 'supplier.team', 'users', 'Team & Roles', 0, 'team.manage'], ['activity', 'supplier.activity', 'clock', 'Store History', 0, 'team.manage'],
             ['notifications', 'notifications', 'bell', 'Notifications'],
         ], 'bottom' => [
             ['dashboard', 'business.dashboard', 'grid', 'Home'], ['bookings', 'business.bookings', 'calendar', 'Bookings', 'orders.view'],

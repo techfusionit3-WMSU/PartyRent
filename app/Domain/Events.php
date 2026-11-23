@@ -341,7 +341,7 @@ class Events
         $p->update(['remitted_at' => now(), 'remitted_by' => $by->id]);
         $b = $p->booking;
         Notifier::notify($b->supplier->owner, 'supplier', 'Payment sent to you · '.$b->code, 'PartyRent sent '.money($p->amount).' ('.$p->label.', paid online) to your payout account.', route('business.payments', [], false));
-        Notifier::audit('Sent event payment to business', $b->code.' · '.$p->code.' · '.money($p->amount), $by);
+        Notifier::audit('PartyRent sent an online event payment', $b->code.' · '.$p->code.' · '.money($p->amount), $by, ['supplier_id' => $b->supplier_id, 'type' => 'payment', 'category' => 'payouts', 'ref' => $b->code]);
 
         return ['ok' => true];
     }

@@ -817,3 +817,32 @@
   .auth-card { padding: 22px; }
 }
 @media (max-width: 768px) { .auth-mobile-brand { display: inline-flex; } }
+
+/* ---------- Store History (supplier) ---------- */
+.hist-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hist-filters input[type=search] { flex: 1 1 220px; min-width: 0; }
+.hist-filters select { width: auto; }
+.hist-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.hist-cats .chip { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.hist-cats .chip svg { width: 15px; height: 15px; }
+.hist-day { font-weight: 800; margin: 18px 2px 8px; font-size: .95rem; }
+.hist-list { padding: 4px 0; }
+.hist-row { display: flex; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.hist-row:last-child { border-bottom: 0; }
+.hist-ico { width: 36px; height: 36px; border-radius: 10px; background: #F5F0FC; color: var(--purple, #7C3AED); display: grid; place-items: center; flex: none; }
+.hist-ico svg { width: 18px; height: 18px; }
+.hist-main { min-width: 0; flex: 1; }
+.hist-what { line-height: 1.45; overflow-wrap: anywhere; }
+.hist-role { display: inline-block; margin: 0 6px; padding: 1px 8px; border-radius: 999px; background: #F3F4F6; font-size: .72rem; font-weight: 700; color: var(--muted); vertical-align: 1px; }
+.hist-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 4px; font-size: .78rem; color: var(--muted); }
+.hist-meta time { font-variant-numeric: tabular-nums; }
+.hist-more { margin-top: 8px; }
+.hist-more > summary { cursor: pointer; font-size: .8rem; font-weight: 700; color: var(--brand); }
+.hist-rec { margin-top: 8px; font-size: .86rem; }
+.hist-diff { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: .82rem; }
+.hist-diff th { text-align: left; font-weight: 700; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; padding: 4px 8px; }
+.hist-diff td { padding: 5px 8px; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.hist-diff td.old { color: #B91C1C; text-decoration: line-through; text-decoration-color: rgba(185, 28, 28, .35); }
+.hist-diff td.new { color: #047857; font-weight: 600; }
+@media (max-width: 640px) { .hist-row { padding: 12px; } .hist-diff th:first-child, .hist-diff td:first-child { width: 34%; } }
+@media print { .hist-more { display: block; } .hist-more > summary { display: none; } }

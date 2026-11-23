@@ -172,7 +172,7 @@ class Payouts
             ? money($b['net']).' from '.$r->code.' was added to your next payout ('.$when.').'.($b['cashKept'] > 0 ? ' The '.money($b['cashKept']).' you collected in cash is already yours and was taken off.' : '')
             : 'You collected '.money($b['cashKept']).' in cash for '.$r->code.' and keep it. PartyRent\'s share of '.money(-$b['net']).' will be taken from your next payout ('.$when.').';
         self::tellShop($s, 'Earnings added', $msg);
-        Notifier::audit('Earnings added', $r->code.' · '.money($b['earned']).' earned · '.money($b['cashKept']).' cash kept · '.money($b['net']).' to pay');
+        Notifier::audit('Earnings added to the next payout', $r->code.' · '.money($b['earned']).' earned · '.money($b['cashKept']).' cash kept · '.money($b['net']).' to pay', null, ['supplier_id' => $r->supplier_id, 'type' => 'system', 'category' => 'payouts', 'ref' => $r->code, 'auto' => true]);
 
         return ['ok' => true, 'payout' => $p];
     }
@@ -251,10 +251,10 @@ class Payouts
                 ? 'PartyRent sends it to your '.$s->payoutAccountLabel().' within 2 business days.'
                 : 'Add your GCash or bank account on the Payouts page so PartyRent can send it.'));
             Notifier::notify('admin', 'admin', 'Payout to send', $s->name.' · '.money($b->net).' for '.$period.' ('.$b->code.').', route('admin.payouts', [], false));
-            Notifier::audit('Payout prepared', $b->code.' · '.$s->name.' · '.money($b->net).' · '.$period);
+            Notifier::audit('Payout prepared', $b->code.' · '.$s->name.' · '.money($b->net).' · '.$period, null, ['supplier_id' => $s->id, 'type' => 'system', 'category' => 'payouts', 'ref' => $b->code, 'auto' => true]);
         } elseif ($b->isOwed()) {
             self::tellShop($s, 'No payout this time', 'For '.$period.' you collected '.money($b->cash_kept).' in cash, more than PartyRent owed you. The difference, '.money(-$b->net).', will be taken from your next payout.');
-            Notifier::audit('Payout carried (shop owes)', $b->code.' · '.$s->name.' · '.money($b->net));
+            Notifier::audit('Payout carried over (shop owes)', $b->code.' · '.$s->name.' · '.money($b->net), null, ['supplier_id' => $s->id, 'type' => 'system', 'category' => 'payouts', 'ref' => $b->code, 'auto' => true]);
         } else {
             self::tellShop($s, 'No payout this time', 'For '.$period.' the cash you collected covered your earnings exactly, so there is nothing to send.');
         }
@@ -300,7 +300,7 @@ class Payouts
         $p->update(['status' => 'paid', 'failure' => null, 'method' => $data['method'], 'reference' => trim($data['reference']), 'notes' => $data['notes'] ?? null, 'paid_at' => now(), 'paid_by' => $by->id]);
         self::markLinesPaid($p);
         self::tellShop($p->supplier, 'Payout sent 💸', money($p->net).' for '.$p->periodLabel().' was sent to your '.$p->methodLabel().' account. Reference '.$p->reference.' ('.$p->code.').');
-        Notifier::audit('Paid payout', $p->code.' · '.$p->supplier->name.' · '.money($p->net).' · '.$p->reference, $by);
+        Notifier::audit('PartyRent sent the payout', $p->code.' · '.$p->supplier->name.' · '.money($p->net).' · '.$p->reference, $by, ['supplier_id' => $p->supplier_id, 'type' => 'payment', 'category' => 'payouts', 'ref' => $p->code]);
 
         return ['ok' => true];
     }

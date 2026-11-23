@@ -59,7 +59,7 @@ class StaffActivityTest extends TestCase
             ->assertOk()->assertSee('Transaction Records')->assertSee($r->code)->assertSee('Print')->assertSee('Processed by');
         $this->get(route('supplier.records', ['range' => 'custom', 'from' => '2020-01-01', 'to' => '2030-12-31', 'csv' => 1]))
             ->assertOk()->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-        $this->get(route('supplier.activity'))->assertOk()->assertSee('Updated the internal notes')->assertSee($juan->name);
+        $this->get(route('supplier.activity'))->assertOk()->assertSee('updated the internal notes')->assertSee($juan->name);
 
         // the activity log is the owner's; a front-desk employee cannot open it
         $desk = User::where('email', 'desk@elegantoccasion.ph')->firstOrFail();

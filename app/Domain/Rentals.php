@@ -795,7 +795,7 @@ class Rentals
         if ($fin['paidRental'] > 0) {
             Notifier::platformFinance('Refund review', $r->code.' ('.$r->supplier->name.') was cancelled by the customer with '.money($fin['paidRental']).' paid. Record any refund due (cash paid to the shop is refunded by the shop).', self::link('cashier.record', ['request' => $r->code]));
         }
-        Notifier::audit('Cancelled rental request', $r->code.' — '.($pol['free'] ? 'within free period' : 'after free period').($reason ? ' · '.$reason : ''));
+        Notifier::audit('Customer cancelled the rental', $r->code.' — '.($pol['free'] ? 'within free period' : 'after free period').($reason ? ' · '.$reason : ''), null, ['supplier_id' => $r->supplier_id, 'type' => 'cancelled', 'category' => 'rentals', 'ref' => $r->code]);
 
         return self::ok();
     }
@@ -936,7 +936,7 @@ class Rentals
         if ($paid > 0) {
             Notifier::platformFinance('Refund due', $r->code.' ('.$r->supplier->name.') could not be reserved. Refund the customer\'s '.money($paid).' in full.', self::link('cashier.record', ['request' => $r->code]));
         }
-        Notifier::audit($expired ? 'Cancelled unpaid request' : 'Declined request (items taken)', $r->code.' — '.$reason);
+        Notifier::audit($expired ? 'Cancelled: first payment not made in time' : 'Declined automatically: items taken by another customer', $r->code.' — '.$reason, null, ['supplier_id' => $r->supplier_id, 'type' => $expired ? 'cancelled' : 'rejected', 'category' => 'rentals', 'ref' => $r->code, 'auto' => true]);
     }
 
     /** Cancel accepted requests whose first payment was not made within 24 hours (one waiting for verification is kept). */
@@ -1479,7 +1479,8 @@ class Rentals
             $after = $r->fin();
             Notifier::notify($r->customer_id, 'customer', 'Payment verified ✅', money($p->amount).' for '.$r->code.' was verified. Receipt '.$p->receipt_no.'. Payment status: '.$after['status'].($after['balance'] > 0 ? ', balance '.money($after['balance']) : '').'.', self::link('rentals.show', $r));
             Notifier::notify($r->supplier->owner_id, 'supplier', 'Payment confirmed', money($p->amount).' for '.$r->code.' was confirmed by '.($by === null ? 'PartyRent (paid online)' : (Payouts::isCash($p->method) ? 'your shop (cash)' : 'PartyRent')).'. Status: '.$after['status'].'.', self::link('supplier.requests.show', $r));
-            Notifier::audit($by ? 'Verified payment' : 'Online payment confirmed by '.OnlinePay::name($p->gateway), $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by);
+            Notifier::audit($by ? 'Verified payment' : 'Online payment confirmed by '.OnlinePay::name($p->gateway), $p->code.' · '.money($p->amount).' · '.$r->code.' · '.$p->receipt_no, $by,
+                $by ? [] : ['supplier_id' => $r->supplier_id, 'type' => 'payment', 'category' => 'payments', 'ref' => $r->code, 'auto' => true]); // staff verifications are logged by RecordStaffAction
 
             return self::ok(['payment' => $p, 'request' => $r]);
         });
@@ -1679,7 +1680,7 @@ class Rentals
                     Notifier::finance($r->supplier, 'Overdue payment', $r->customer->name.': '.$msg, self::link('cashier.balances'));
                 }
                 Notifier::notify('admin', 'admin', 'Overdue payment', $r->customer->name.' · '.$msg, '');
-                Notifier::audit('Payment marked overdue', $r->code.' · '.$s['label'].' · '.money($f['overdueAmount']), null);
+                Notifier::audit('Payment marked overdue', $r->code.' · '.$s['label'].' · '.money($f['overdueAmount']), null, ['supplier_id' => $r->supplier_id, 'type' => 'system', 'category' => 'payments', 'ref' => $r->code, 'auto' => true]);
             }
             if ($flags !== ($r->overdue_flags ?? [])) {
                 $r->overdue_flags = $flags;

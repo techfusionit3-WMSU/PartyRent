@@ -105,7 +105,12 @@
     // dropdowns
     const tg = e.target.closest('[data-dropdown]');
     $$('.dropdown.open').forEach(d => { if (!tg || d !== tg.closest('.dropdown')) { if (!e.target.closest('.menu') || e.target.closest('a,button.menu-item')) d.classList.remove('open'); } });
-    if (tg) { e.preventDefault(); tg.closest('.dropdown').classList.toggle('open'); }
+    if (tg) {
+      e.preventDefault();
+      const dd = tg.closest('.dropdown'), mn = dd.querySelector('.menu');
+      if (mn) mn.style.setProperty('--dd-top', Math.round(tg.getBoundingClientRect().bottom) + 'px'); // phones: open right under the button
+      dd.classList.toggle('open');
+    }
     // modals
     const op = e.target.closest('[data-modal]');
     if (op) { e.preventDefault(); const m = document.getElementById(op.dataset.modal); if (m) openModal(m); }

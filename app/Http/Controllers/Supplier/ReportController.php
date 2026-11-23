@@ -122,17 +122,31 @@ class ReportController extends Controller
         ]);
     }
 
-    /** Activity log for the owner: every change the shop's people made, who and when (RecordStaffAction). Printable. */
+    /**
+     * Store History for the owner: everything that happened in the store, who did it (name + shop role) and when,
+     * with old → new values. Filter by person, category, kind of action, text; grouped by day. Read-only. Printable.
+     */
     public function activity(Request $request)
     {
         $sup = $request->user()->shop();
         $rg = Report::range($request);
-        $who = (int) $request->query('who');
+        $who = $request->query('who'); // user id, or "auto" for PartyRent (automatic)
+        $cat = array_key_exists($request->query('cat'), \App\Models\AuditLog::CATEGORIES) ? $request->query('cat') : '';
+        $type = array_key_exists($request->query('type'), \App\Models\AuditLog::TYPES) ? $request->query('type') : '';
+        $q = trim(mb_substr((string) $request->query('q', ''), 0, 80));
         $base = \App\Models\AuditLog::where('supplier_id', $sup->id)->whereBetween('created_at', [$rg['from'].' 00:00:00', $rg['to'].' 23:59:59']);
         $people = \App\Models\User::whereIn('id', (clone $base)->whereNotNull('actor_id')->distinct()->pluck('actor_id'))->orderBy('name')->get();
-        $list = $base->when($who, fn ($x) => $x->where('actor_id', $who))->with('actor')->orderByDesc('created_at')->orderByDesc('id')->paginate(100)->withQueryString();
+        $counts = (clone $base)->selectRaw('category, count(*) n')->groupBy('category')->pluck('n', 'category');
+        $list = $base
+            ->when($who === 'auto', fn ($x) => $x->whereNull('actor_id'))
+            ->when($who && $who !== 'auto', fn ($x) => $x->where('actor_id', (int) $who))
+            ->when($cat, fn ($x) => $x->where('category', $cat))
+            ->when($type, fn ($x) => $x->where('type', $type))
+            ->when($q !== '', fn ($x) => $x->where(fn ($w) => $w->where('action', 'like', '%'.$q.'%')->orWhere('ref', 'like', '%'.$q.'%')->orWhere('details', 'like', '%'.$q.'%')))
+            ->with('actor')->orderByDesc('created_at')->orderByDesc('id')->paginate(50)->withQueryString();
 
-        return view('supplier.activity', ['sup' => $sup, 'rg' => $rg, 'who' => $who, 'people' => $people, 'list' => $list]);
+        return view('supplier.activity', ['sup' => $sup, 'rg' => $rg, 'who' => (string) $who, 'cat' => $cat, 'type' => $type, 'q' => $q,
+            'people' => $people, 'counts' => $counts, 'list' => $list]);
     }
 
     private function data(Request $request): array

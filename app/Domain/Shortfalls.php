@@ -239,7 +239,7 @@ class Shortfalls
             RequestEvent::create(['rental_request_id' => $r->id, 'status' => 'shortfall', 'user_id' => $by->id, 'note' => $c->code.': customer reported '.mb_strtolower($label).' — '.$units.' × '.$p->name, 'created_at' => now()]);
             Notifier::notify($r->supplier->owner_id, 'supplier', 'Problem reported on '.$r->code,
                 $by->name.' reported: '.$label.' — '.$units.' × '.$p->name.'. "'.mb_strimwidth($details, 0, 160, '…').'" Propose a solution within '.self::DEFAULT_DEADLINE_HOURS.' hours or PartyRent support steps in.', self::link($c));
-            Notifier::audit('Customer reported a problem', $c->code.' · '.$r->code.' · '.$label.' · '.$units.' × '.$p->name, $by);
+            Notifier::audit('Customer reported a problem', $c->code.' · '.$r->code.' · '.$label.' · '.$units.' × '.$p->name, $by, ['supplier_id' => $r->supplier_id, 'type' => 'created', 'category' => 'cases', 'ref' => $r->code]);
 
             return self::ok(['case' => $c]);
         });
@@ -428,7 +428,7 @@ class Shortfalls
             Notifier::notify('admin', 'admin', 'Shortfall case escalated: '.$c->code, $c->supplier->name.' and '.$c->customer->name.' did not agree in time ('.$c->rentalRequest->code.').', self::link($c));
             Notifier::notify($c->customer_id, 'customer', 'PartyRent support is on '.$c->code, 'No agreement was reached in time, so PartyRent support will help settle it.', self::link($c));
             Notifier::notify($c->supplier->owner_id, 'supplier', 'PartyRent support is on '.$c->code, 'No agreement was reached in time, so PartyRent support will help settle it.', self::link($c));
-            Notifier::audit('Escalated shortfall case', $c->code, null);
+            Notifier::audit('Case sent to PartyRent support (no agreement in time)', $c->code, null, ['supplier_id' => $c->supplier_id, 'type' => 'system', 'category' => 'cases', 'ref' => $c->code, 'auto' => true]);
             $n++;
         }
 
@@ -444,7 +444,7 @@ class Shortfalls
         if (! $eventId) {
             self::event($c, 'admin', 'resolve', trim($note) ?: 'Closed by PartyRent support without changes.', null, $admin);
             $c->update(['status' => 'resolved', 'resolved_at' => now(), 'resolution' => ['type' => 'none', 'by' => 'admin'], 'proposal_id' => null, 'deadline_at' => null]);
-            Notifier::audit('Closed shortfall case', $c->code, $admin);
+            Notifier::audit('PartyRent support closed the case', $c->code, $admin, ['supplier_id' => $c->supplier_id, 'type' => 'completed', 'category' => 'cases', 'ref' => $c->code]);
 
             return self::ok();
         }

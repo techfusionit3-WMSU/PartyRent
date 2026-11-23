@@ -91,15 +91,30 @@ class Notifier
         }
     }
 
-    public static function audit(string $action, string $details, ?User $actor = null): void
+    /**
+     * Platform audit line. With $shop (['supplier_id', 'type', 'category', 'ref', 'auto']) it also goes into that
+     * store's history: for changes no one in the shop made (the gateway confirmed a payment, a payout was
+     * prepared, the customer cancelled, PartyRent support decided). 'auto' => true means no person did it.
+     * Shop staff actions are recorded by RecordStaffAction, so they never pass $shop (no duplicate lines).
+     */
+    public static function audit(string $action, string $details, ?User $actor = null, array $shop = []): void
     {
-        $actor ??= auth()->user();
-        AuditLog::create([
+        $auto = (bool) ($shop['auto'] ?? false);
+        $actor = $auto ? null : ($actor ?? auth()->user());
+        $row = [
             'actor_id' => $actor?->id,
             'role' => $actor ? $actor->activeRole(session('mode')) : 'system',
             'action' => $action,
             'details' => $details,
             'created_at' => now(),
-        ]);
+        ];
+        if (! empty($shop['supplier_id'])) {
+            $row += [
+                'supplier_id' => $shop['supplier_id'], 'type' => $shop['type'] ?? ($auto ? 'system' : 'updated'), 'category' => $shop['category'] ?? null,
+                'ref' => isset($shop['ref']) ? mb_substr((string) $shop['ref'], 0, 80) : null,
+                'role_label' => $actor ? ($actor->hasRole('admin') || $actor->hasRole('superadmin') || $actor->hasRole('cashier') && ! $actor->staffOf ? 'PartyRent '.ucfirst((string) $actor->activeRole(session('mode'))) : 'Customer') : 'PartyRent (automatic)',
+            ];
+        }
+        AuditLog::create($row);
     }
 }

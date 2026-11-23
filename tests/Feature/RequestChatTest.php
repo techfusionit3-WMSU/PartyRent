@@ -38,7 +38,10 @@ class RequestChatTest extends TestCase
         // the rental page has a "Message the customer" button with the unread count; the messages have their own page
         $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get('/supplier/requests/'.$r->code)
             ->assertOk()->assertSee('Message the customer')->assertSee('<span class="count-pill">2</span>', false)->assertDontSee('data-chat ', false); // no chat box in the middle of the rental page
-        $this->get('/supplier/requests/'.$r->code.'/chat')->assertOk()->assertSee('Messages with')->assertSee('Can you deliver before 8 AM?');
+        $this->get('/supplier/requests/'.$r->code.'/chat')->assertOk()->assertSee('Messages with')->assertSee('Can you deliver before 8 AM?')
+            ->assertSee('About this rental')->assertSee('Open the rental'); // the card with the rental's items beside the messages
+        $this->actingAs($customer)->withSession(['mode' => 'customer'])->get('/rentals/'.$r->code.'/chat')->assertOk()->assertSee('About this rental');
+        $this->actingAs($owner)->withSession(['mode' => 'supplier']);
         $this->get('/supplier/requests/'.$r->code)->assertDontSee('<span class="count-pill">', false); // opening the messages marks them read
         $this->actingAs($owner)->post('/supplier/requests/'.$r->code.'/messages', ['body' => 'Yes, 7 AM works.'])->assertRedirect();
         $this->assertSame('supplier', RequestMessage::latest('id')->first()->side);

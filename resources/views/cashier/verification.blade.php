@@ -3,7 +3,7 @@
 @section('content')
 @php($shopCashier = auth()->user()->isShopCashier())
 <div class="page-head"><div>@php($adminView = auth()->user()->activeRole(session('mode')) === 'admin')
-<h1>{{ $shopCashier ? 'Payments to confirm' : 'Payment exceptions' }}</h1><p>@if($shopCashier)Confirm <b>cash</b> once you have it in hand. Bank and debit transfers go to PartyRent's account, so PartyRent checks them; they are listed here so you know what is coming.@else Online payments are verified automatically by the gateway and PartyRent's system: nobody approves them by hand, and they never appear here. This list only holds exceptions: an online payment the gateway reported with more than was due, and transfers sent before automatic payments. Watch every payment on <a href="{{ route('admin.payment-monitor') }}">Online Payments</a>.@endif</p></div></div>
+<h1>{{ $shopCashier ? 'Payments to confirm' : 'Payment exceptions' }}</h1><p>@if($shopCashier)Confirm <b>cash</b> once you have it in hand. Online payments (GCash, Maya, card) are verified automatically and never wait here. Transfers sent before automatic payments are listed so you know they are still open.@else Online payments are verified automatically by the gateway and PartyRent's system: nobody approves them by hand, and they never appear here. This list only holds exceptions: an online payment the gateway reported with more than was due, and transfers sent before automatic payments. Watch every payment on <a href="{{ route('admin.payment-monitor') }}">Online Payments</a>.@endif</p></div></div>
 @if($list->isEmpty())
   <div class="card">@include('partials.empty', ['emoji' => '✅', 'title' => 'All caught up', 'text' => $shopCashier ? 'No cash payments are waiting for you.' : 'No exceptions. Every online payment was verified automatically.'])</div>
 @else
@@ -16,7 +16,7 @@
       @php($dupVerified = $dups->firstWhere('status', 'verified'))
       <div class="card" id="pay-{{ $p->id }}">
         <div class="row wrap between top">
-          <div><div class="row gap-sm"><b>{{ $p->code }}</b>@include('partials.badges', ['ver' => $p->status])<span class="badge b-gray plain">by {{ $p->recorded_by }}</span></div>
+          <div><div class="row gap-sm"><b>{{ $p->code }}</b>@include('partials.badges', ['ver' => $p->status])<span class="badge b-gray plain">by {{ $p->recorded_by }}</span>@if(in_array($p->method, \App\Models\Payment::REF_CHECKED, true))<span class="badge b-gold">Old transfer · before automatic payments</span>@elseif($p->gateway)<span class="badge b-red">Gateway exception</span>@endif</div>
             <div class="small muted mt-1">{{ $r->code }} · {{ $r->event_name }} · {{ $r->customer->name }}</div></div>
           <div class="right"><div class="price-lg">{{ money($p->amount) }}</div><div class="small muted">{{ $p->typeLabel() }} · {{ $p->methodLabel() }}</div></div>
         </div>
@@ -31,7 +31,7 @@
         @if(auth()->user()->activeRole(session('mode')) === 'admin')
           <div class="alert alert-info mt-2">{{ icon('info') }}<div>View only. PartyRent's cashier checks this transfer and confirms or rejects it.</div></div>
         @elseif(! \App\Domain\Rentals::canVerify($p, auth()->user()))
-          <div class="alert alert-info mt-2">{{ icon('clock') }}<div>PartyRent is checking this transfer. You and the customer are notified as soon as it is confirmed.</div></div>
+          <div class="alert alert-info mt-2">{{ icon('clock') }}<div>An old transfer from before automatic payments: PartyRent settles it. New payments are confirmed automatically.</div></div>
         @else
         <div class="row wrap mt-2" style="justify-content:flex-end;gap:8px">
           <form method="POST" action="{{ route('cashier.reject', $p) }}" class="row" style="gap:6px">@csrf<input class="input input-sm" name="reason" required placeholder="Reason for rejection" style="width:260px" maxlength="500"><button class="btn btn-danger btn-sm">{{ icon('x') }}Reject</button></form>

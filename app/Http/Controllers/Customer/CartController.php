@@ -161,6 +161,7 @@ class CartController extends Controller
             $orders[] = $part + [
                 'cart_line_ids' => array_column($chosen, 'id'),
                 'fulfillment' => $s->fulfillment === 'pickup' ? 'pickup' : 'delivery', 'plan' => self::firstPlan($s), 'method' => 'online', 'services' => [],
+                'branch_id' => null, // null = the recommended branch (the customer can pick another eligible one)
                 'destinations' => [['id' => 'd1', 'label' => 'Event venue', 'address' => $u->address ?: '', 'zoneId' => '', 'deliveryTime' => $st['open'], 'contactName' => '', 'contactPhone' => '']],
                 'inst' => ['n' => min(3, (int) $cfg['installment']['maxInstallments']), 'items' => [], 'auto' => true],
                 'damage' => self::damageTerms($chosen),
@@ -326,8 +327,11 @@ class CartController extends Controller
         return $parts->isEmpty() ? 'Some quantities exceed the available stock. Please lower them.' : $parts->implode('. ').'. Lower the quantity or pick other dates.';
     }
 
-    /** Availability per selected item and date for the checkout hints: [cart_id => [date => [available, requested, ok]]]. */
-    private static function availability(int $userId, array $o): array
+    /**
+     * Availability per selected item and date for the checkout hints: [cart_id => [date => [available, requested, ok]]].
+     * With a branch: that branch's stock only.
+     */
+    private static function availability(int $userId, array $o, ?int $branchId = null): array
     {
         $byCart = [];
         foreach ((array) ($o['lines'] ?? []) as $l) {
@@ -338,10 +342,31 @@ class CartController extends Controller
         }
         $lines = [];
         foreach (CartLine::where('user_id', $userId)->whereIn('id', array_keys($byCart))->get() as $cl) {
-            $lines[] = array_merge($cl->toLine(), ['id' => (string) $cl->id, 'days' => $byCart[$cl->id]]);
+            $lines[] = array_merge($cl->toLine(), ['id' => (string) $cl->id, 'days' => $byCart[$cl->id]]) + ($branchId ? ['sourceId' => $branchId] : []);
         }
 
         return $lines ? inv()->check($lines)['byLine'] : [];
+    }
+
+    /** Branch options when the order could not be prepared (e.g. the address is missing): stock only, no delivery fees. */
+    private static function branchOptions(\App\Models\User $u, Supplier $s, array $o): array
+    {
+        $byId = CartLine::where('user_id', $u->id)->whereIn('id', array_map('intval', (array) ($o['cart_line_ids'] ?? [])))->get()->keyBy('id');
+        $lines = [];
+        foreach ((array) ($o['lines'] ?? []) as $i => $l) {
+            $cl = $byId[(int) ($l['cart_id'] ?? 0)] ?? null;
+            $days = Rentals::cleanDays((array) ($l['days'] ?? []));
+            if ($cl && $days) {
+                $lines[] = array_merge($cl->toLine(), ['id' => 'l'.$i, 'days' => $days] + (isset($l['time']) ? ['time' => $l['time']] : []));
+            }
+        }
+        if (! $lines) {
+            return [];
+        }
+        $ful = ($o['fulfillment'] ?? '') === 'pickup' ? 'pickup' : 'delivery';
+        $dests = array_values(array_filter((array) ($o['destinations'] ?? []), fn ($d) => isset($d['lat'], $d['lng']) && is_numeric($d['lat'])));
+
+        return \App\Domain\Branches::options($s, $lines, $ful, $ful === 'delivery' ? ($dests ?: [[]]) : []);
     }
 
     /** Validate + price the checkout state (no save): per shop the review HTML, plus the order summary. */
@@ -361,12 +386,17 @@ class CartController extends Controller
             $q = $prep['ok'] ? $prep['attrs']['pricing'] : Pricing::quoteOrder(['supplier' => $s, 'lines' => array_map(fn ($l) => ['type' => $l['type'] ?? 'item', 'ref_id' => CartLine::find($l['cart_id'] ?? 0)?->ref_id] + $l, $o['lines'] ?? []),
                 'fulfillment' => $o['fulfillment'] ?? 'pickup', 'destinations' => $o['destinations'] ?? [], 'plan' => $o['plan'] ?? 'full', 'services' => $o['services'] ?? []]);
             $total += $q['total'];
+            // the shop's branches for this order (best first) and the one that would fulfil it
+            $branches = $prep['branches'] ?? self::branchOptions($u, $s, $o);
+            $branchId = isset($prep['branch']) ? $prep['branch']->id
+                : (collect($branches)->firstWhere('id', (int) ($o['branch_id'] ?? 0))['id'] ?? collect($branches)->firstWhere('recommended', true)['id'] ?? null);
             $suggest = ($o['plan'] ?? '') === 'installment'
                 ? Finance::suggestInstallments($q['finalBalance'], max(1, (int) ($o['inst']['n'] ?? 3)), add_days(today_iso(), 1), $o['eventDate'] ?? today_iso()) : [];
             $elig = Finance::installmentEligibility($s, $o['eventDate'] ?? null);
             $out[] = [
                 'supplier_id' => $s->id, 'ok' => $prep['ok'], 'error' => $prep['error'] ?? null, 'total' => $q['total'], 'finalBalance' => $q['finalBalance'],
-                'avail' => self::availability($u->id, $o),
+                'avail' => self::availability($u->id, $o, $branchId),
+                'branches' => $branches, 'branchId' => $branchId,
                 'suggest' => $suggest, 'installmentOk' => $elig['ok'], 'installmentMsg' => $elig['message'] ?? '',
                 'html' => view('customer._checkout-review', ['q' => $q, 'o' => $o, 'prep' => $prep])->render(),
                 'summary' => ['name' => $s->name, 'plan' => Finance::PLAN_LABEL[$q['plan']], 'where' => ($o['fulfillment'] ?? '') === 'delivery' ? count($o['destinations'] ?? []).' location'.(count($o['destinations'] ?? []) > 1 ? 's' : '') : 'pickup', 'q' => $q],

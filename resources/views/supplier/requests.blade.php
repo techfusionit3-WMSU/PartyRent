@@ -2,9 +2,11 @@
 
 @section('content')
 <div class="page-head"><div><h1>Rentals</h1><p>Every rental from your customers, from new request to completed. Accepting re-checks stock for every date.</p></div>
-  <form method="GET"><input type="hidden" name="tab" value="{{ $tab }}"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search no., customer, event" style="width:240px" aria-label="Search"></form>
+  <form method="GET" class="row wrap" style="gap:8px"><input type="hidden" name="tab" value="{{ $tab }}">
+    @if($branches->count() > 1)<select class="input input-sm" name="branch" data-autosubmit aria-label="Branch" style="width:auto"><option value="">All branches</option>@foreach($branches as $b)<option value="{{ $b->id }}" @selected($branch?->id === $b->id)>{{ $b->name }}{{ $b->active ? '' : ' (deactivated)' }}</option>@endforeach</select>@endif
+    <input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search no., customer, event" style="width:240px" aria-label="Search"></form>
 </div>
-<div class="tabs">@foreach([['pending', 'Pending'], ['upcoming', 'Accepted / Upcoming'], ['active', 'Ongoing & Returns'], ['completed', 'Completed'], ['closed', 'Declined / Cancelled'], ['all', 'All']] as [$k, $l])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.requests', array_filter(['tab' => $k, 'q' => $q])) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
+<div class="tabs">@foreach([['pending', 'Pending'], ['upcoming', 'Accepted / Upcoming'], ['active', 'Ongoing & Returns'], ['completed', 'Completed'], ['closed', 'Declined / Cancelled'], ['all', 'All']] as [$k, $l])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.requests', array_filter(['tab' => $k, 'q' => $q, 'branch' => $branch?->id])) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
 <div class="card pad-0">
   @if($list->isEmpty())
     @include('partials.empty', ['emoji' => '📋', 'title' => __('No requests here yet'), 'text' => __('New requests from customers show up here. More customers find you when your shop has photos, clear prices and good reviews.'), 'action' => '<a class="btn" href="'.e(route('suppliers.show', auth()->user()->shop())).'">'.icon('store').e(__('See your shop page')).'</a>'])
@@ -13,7 +15,7 @@
       @foreach($list as $r)
         @php($conf = $r->status === 'pending' ? inv()->check($r->lines, $r->id)['bad'] : [])
         <tr>
-          <td data-label="Request"><a class="strong" href="{{ route('supplier.requests.show', $r) }}">{{ $r->code }}</a><div class="small muted">{{ $r->event_name }}</div></td>
+          <td data-label="Request"><a class="strong" href="{{ route('supplier.requests.show', $r) }}">{{ $r->code }}</a><div class="small muted">{{ $r->event_name }}</div>@if($branches->count() > 1 && $r->branch)<div class="small">{{ icon('store', 'width:12px;height:12px;vertical-align:-1px') }} {{ $r->branch->name }}</div>@endif</td>
           <td data-label="Customer">{{ $r->customer->name }}</td>
           <td data-label="Products"><div class="small" style="max-width:260px">{{ collect($r->lines)->map(fn ($l) => ($l['type'] === 'package' ? '📦 ' : '').inv()->itemName($l))->implode(', ') }}</div></td>
           <td data-label="Rental dates">{{ fmt_range($r->start_date, $r->end_date) }}<div class="small muted">{{ count($r->dates()) }} day(s) · {{ $r->totalUnits() }} units</div></td>

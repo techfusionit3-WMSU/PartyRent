@@ -69,6 +69,8 @@ class RentalRequest extends Model
 
     public function customer(): BelongsTo { return $this->belongsTo(User::class, 'customer_id'); }
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
+    /** The supplier's branch that fulfils this rental (its stock, its address as delivery origin / pickup place). */
+    public function branch(): BelongsTo { return $this->belongsTo(InventoryLocation::class, 'branch_id'); }
     public function payout(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(Payout::class); }
     public function messages(): HasMany { return $this->hasMany(RequestMessage::class)->orderBy('id'); }
     public function payments(): HasMany { return $this->hasMany(Payment::class)->orderBy('submitted_at')->orderBy('id'); }

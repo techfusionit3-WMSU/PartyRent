@@ -37,7 +37,8 @@ class Applications
     {
         $q = fn ($key, $label, $need, $group, $note = null) => compact('key', 'label', 'need', 'group', 'note');
         if ($type === 'organization') {
-            $reg = self::REGISTRATION[$companyType] ?? ['sec_certificate', 'Business registration document'];
+            // the company type is not asked any more: one registration document (older applications keep theirs)
+            $reg = self::REGISTRATION[$companyType] ?? ['business_registration', 'Business registration certificate (SEC, DTI or CDA)'];
 
             return [
                 $q($reg[0], $reg[1], 'required', 'Business registration'),
@@ -47,7 +48,7 @@ class Applications
                 $q('other_permits', 'Other operating permits and licenses', 'optional', 'Permits & tax'),
                 $q('rep_id', "Authorized representative's government ID", 'required', 'Authorized representative'),
                 $q('proof_of_authority', 'Proof of authority to represent the company', 'required', 'Authorized representative'),
-                $q('board_resolution', $companyType === 'corporation' ? "Board Resolution or Secretary's Certificate" : 'Special Power of Attorney (SPA) / authorization', 'conditional', 'Authorized representative', 'when applicable'),
+                $q('board_resolution', $companyType === 'corporation' ? "Board Resolution or Secretary's Certificate" : ($companyType ? 'Special Power of Attorney (SPA) / authorization' : "Board Resolution, Secretary's Certificate or SPA"), 'conditional', 'Authorized representative', 'when applicable'),
                 $q('establishment_photos', 'Photos of the establishment or rental inventory', 'recommended', 'Company verification'),
                 $q('address_proof', 'Proof of business address', 'optional', 'Company verification', 'if needed'),
             ];
@@ -65,7 +66,7 @@ class Applications
     /** Every document key any applicant can upload (for validation of the upload field names). */
     public static function allDocKeys(): array
     {
-        $keys = array_column(self::requirements('individual'), 'key');
+        $keys = array_merge(array_column(self::requirements('individual'), 'key'), array_column(self::requirements('organization'), 'key'));
         foreach (array_keys(self::COMPANY_TYPES) as $ct) {
             $keys = array_merge($keys, array_column(self::requirements('organization', $ct), 'key'));
         }
@@ -105,11 +106,12 @@ class Applications
                 return $e;
             }
         } else {
-            if ($e = $req($app['company'] ?? [], ['legalName', 'companyType', 'address', 'email', 'phone', 'natureOfBusiness'], 'Company information')) {
+            if ($e = $req($app['company'] ?? [], ['legalName', 'address', 'email', 'phone', 'natureOfBusiness'], 'Company information')) {
                 return $e;
             }
-            if (! isset(self::COMPANY_TYPES[$app['company']['companyType']])) {
-                return 'Choose the company type.';
+            $ct = $app['company']['companyType'] ?? null; // optional (no longer asked)
+            if ($ct !== null && $ct !== '' && ! isset(self::COMPANY_TYPES[$ct])) {
+                return 'Unknown company type.';
             }
             if ($e = $req($app['representative'] ?? [], ['name', 'position', 'idType', 'email', 'phone'], 'Authorized representative')) {
                 return $e;

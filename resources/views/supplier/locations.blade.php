@@ -1,27 +1,41 @@
-@extends('layouts.dash', ['title' => 'Inventory Locations', 'nav' => 'locations'])
+@extends('layouts.dash', ['title' => 'Branches', 'nav' => 'locations'])
 
 {{-- Reference SP.locations --}}
-@php($today = today_iso())
+@php($today = $date)
 @section('content')
-<div class="page-head"><div><h1>Inventory Locations</h1><p>Warehouses, branches and storage facilities. Each location keeps its own dedicated stock; the total inventory is the sum of all locations and stock is never duplicated.</p></div><button class="btn btn-primary" data-modal="locNew">{{ icon('plus') }}Add location</button></div>
+<div class="page-head"><div><h1>Branches</h1><p>The physical places {{ $s->name }} rents from. Customers see one {{ $s->name }} store; each rental is fulfilled by one branch, from that branch's own stock (branches never borrow from each other). Stock is moved between branches with a transfer.</p></div><a class="btn btn-primary" href="{{ route('supplier.locations.create') }}">{{ icon('plus') }}Add branch</a></div>
 
 <div class="grid grid-3 mb-3">
   @foreach($locs as $l)
-    <div class="card"><div class="row between"><b>{{ icon('map', 'width:16px;vertical-align:-3px') }} {{ $l->name }}</b><span class="badge b-purple">{{ $prods->sum(fn ($p) => inv()->stockAt($p->id, $l->id)) }} units</span></div>
-      <div class="small muted mt-1">{{ $l->address }}</div><div class="small mt-1">{{ $l->contact ?: '—' }}{{ $l->phone ? ' · '.$l->phone : '' }}</div>
-      <div class="btn-group mt-2"><button class="btn btn-xs" data-modal="loc{{ $l->id }}">{{ icon('edit') }}Edit</button>
-        <form method="POST" action="{{ route('supplier.locations.delete', $l) }}" data-confirm-title="Remove {{ $l->name }}?" data-confirm="Only empty locations without allocated bookings can be removed." data-confirm-ok="Remove" data-danger>@csrf @method('DELETE')<button class="btn btn-xs btn-ghost">{{ icon('trash') }}Remove</button></form></div>
+    @php($o = $open[$l->id] ?? ['pending' => 0, 'booked' => 0])
+    <div class="card branch-card {{ $l->active ? '' : 'is-off' }}">
+      <div class="row between" style="gap:8px;align-items:flex-start"><b>{{ icon('store', 'width:16px;vertical-align:-3px') }} {{ $l->name }}</b>
+        <div class="row wrap" style="gap:4px;justify-content:flex-end">@if($l->is_main)<span class="badge b-purple plain">Main</span>@endif<span class="badge {{ $l->active ? 'b-green' : 'b-gray' }} plain">{{ $l->active ? 'Active' : 'Deactivated' }}</span></div></div>
+      <div class="small muted mt-1">{{ $l->address }}</div>
+      <div class="small mt-1">{{ $l->contact ?: '—' }}{{ $l->phone ? ' · '.$l->phone : '' }}</div>
+      <div class="small mt-1">@if($l->hasPin()){{ icon('map', 'width:13px;vertical-align:-2px') }} Pinned on the map @else<span style="color:#B45309">{{ icon('alert', 'width:13px;vertical-align:-2px') }} No map pin: delivery distance uses its city</span>@endif</div>
+      <div class="branch-stats mt-2"><div><b>{{ $prods->sum(fn ($p) => inv()->stockAt($p->id, $l->id)) }}</b><span>units</span></div><div><b>{{ $o['pending'] }}</b><span>to review</span></div><div><b>{{ $o['booked'] }}</b><span>booked</span></div></div>
+      <div class="btn-group mt-2"><a class="btn btn-xs" href="{{ route('supplier.locations.edit', $l) }}">{{ icon('edit') }}Edit</a>
+        <a class="btn btn-xs" href="{{ route('supplier.requests', ['branch' => $l->id, 'tab' => 'all']) }}">{{ icon('list') }}Rentals</a>
+        @unless($l->is_main)<form method="POST" action="{{ route('supplier.locations.active', $l) }}" @if($l->active) data-confirm-title="Deactivate {{ $l->name }}?" data-confirm="Customers can no longer rent from it. Its stock stays recorded and you can reactivate it any time." data-confirm-ok="Deactivate" @endif>@csrf<button class="btn btn-xs btn-ghost">{{ $l->active ? 'Deactivate' : 'Reactivate' }}</button></form>
+        <form method="POST" action="{{ route('supplier.locations.delete', $l) }}" data-confirm-title="Remove {{ $l->name }}?" data-confirm="Only empty branches without rentals can be removed." data-confirm-ok="Remove" data-danger>@csrf @method('DELETE')<button class="btn btn-xs btn-ghost">{{ icon('trash') }}Remove</button></form>@endunless</div>
     </div>
   @endforeach
 </div>
 
-<div class="card pad-0 mb-3"><div class="card-head" style="padding:16px 18px 0"><h3>Stock by location</h3><span class="small muted">Available today per location (after bookings allocated there)</span></div>
+<div class="card pad-0 mb-3"><div class="card-head" style="padding:16px 18px 0"><h3>Stock by branch</h3><form method="GET" class="row" style="gap:6px"><label class="small muted" for="avDate">Available on</label><input class="input input-sm" type="date" id="avDate" name="date" value="{{ $date }}" min="{{ today_iso() }}" data-autosubmit style="width:auto"></form></div>
+  <p class="small muted" style="padding:0 18px">Units each branch still has free on {{ fmt_date($date) }}, after the rentals it fulfils. A package is only available where every one of its items is.</p>
   <div class="table-wrap"><table class="table cards"><thead><tr><th>Product</th>@foreach($locs as $l)<th class="num">{{ $l->name }}</th>@endforeach<th class="num">Total</th><th></th></tr></thead><tbody>
     @foreach($prods as $p)
       <tr><td data-label="Product"><div><b>{{ $p->name }}</b><div class="small muted">#{{ $p->id }}</div></div></td>
-        @foreach($locs as $l)@php($st = inv()->stockAt($p->id, $l->id))<td data-label="{{ $l->name }}" class="num">@if($st)<div><b>{{ $st }}</b><div class="small muted">{{ inv()->availableAtLocation($p->id, $l->id, $today) }} free today</div></div>@else<span class="muted">0</span>@endif</td>@endforeach
+        @foreach($locs as $l)@php($st = inv()->stockAt($p->id, $l->id))<td data-label="{{ $l->name }}" class="num">@if($st)<div><b>{{ $st }}</b><div class="small muted">{{ inv()->availableAtLocation($p->id, $l->id, $today) }} free{{ $today === today_iso() ? ' today' : '' }}</div></div>@else<span class="muted">0</span>@endif</td>@endforeach
         <td data-label="Total" class="num"><b>{{ $p->total_stock }}</b></td>
         <td>@if($locs->count() > 1)<button class="btn btn-xs" data-modal="tr{{ $p->id }}">Transfer</button>@endif</td></tr>
+    @endforeach
+    @foreach($pkgs as $k)
+      <tr><td data-label="Package"><div><b>📦 {{ $k->name }}</b><div class="small muted">package · every item from one branch</div></div></td>
+        @foreach($locs as $l)<td data-label="{{ $l->name }}" class="num">@php($pa = inv()->packageAvailableOn($k->id, $today, null, null, null, null, $l->id))<b>{{ $pa }}</b><div class="small muted">package{{ $pa === 1 ? '' : 's' }}</div></td>@endforeach
+        <td class="num">—</td><td></td></tr>
     @endforeach
   </tbody></table></div>
 </div>
@@ -39,16 +53,7 @@
   </tbody></table></div>@endif
 </div>
 
-@foreach($locs->prepend(null) as $l)
-  <div class="modal-backdrop hidden" id="{{ $l ? 'loc'.$l->id : 'locNew' }}"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>{{ $l ? 'Edit location' : 'Add inventory location' }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
-    <form method="POST" action="{{ $l ? route('supplier.locations.update', $l) : route('supplier.locations.store') }}">@csrf @if($l) @method('PUT') @endif<div class="modal-body">
-      <div class="field"><label>Location name</label><input class="input" name="name" required minlength="2" value="{{ $l?->name }}" placeholder="e.g. Main Warehouse, Branch A"></div>
-      <div class="field"><label>Complete address</label><input class="input" name="address" required minlength="8" value="{{ $l?->address }}"></div>
-      <div class="form-grid"><div class="field"><label>Contact person / representative</label><input class="input" name="contact" value="{{ $l?->contact }}"></div><div class="field"><label>Contact number</label><input class="input" name="phone" value="{{ $l?->phone }}"></div></div>
-    </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Save</button></div></form>
-  </div></div>
-@endforeach
-@php($locs->shift())
+
 @if($locs->count() > 1)
   @foreach($prods as $p)
     <div class="modal-backdrop hidden" id="tr{{ $p->id }}" @if($focus === $p->id) data-autoopen @endif><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Transfer stock · {{ $p->name }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>

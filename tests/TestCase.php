@@ -51,7 +51,8 @@ abstract class TestCase extends BaseTestCase
         return $this->postJson('/checkout', [
             'shared' => array_intersect_key($form, array_flip(['eventName', 'eventType', 'contactName', 'contactPhone', 'instructions'])),
             'orders' => [['supplier_id' => $supplierId, 'cart_line_ids' => $ids, 'eventDate' => $form['eventDate'] ?? null, 'fulfillment' => $form['fulfillment'] ?? 'pickup',
-                'plan' => $form['plan'] ?? $form['arrangement'] ?? 'full', 'method' => $form['method'] ?? 'bank', 'destinations' => $form['destinations'] ?? []]],
+                'plan' => $form['plan'] ?? $form['arrangement'] ?? 'full', 'method' => $form['method'] ?? 'bank', 'destinations' => $form['destinations'] ?? [],
+                'branch_id' => $form['branch_id'] ?? null]],
             'agree' => $form['agree'] ?? '1',
         ]);
     }

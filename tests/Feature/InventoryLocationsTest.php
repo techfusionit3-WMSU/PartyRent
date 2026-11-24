@@ -23,7 +23,7 @@ class InventoryLocationsTest extends TestCase
         $juan = User::where('email', 'juan@demo.ph')->firstOrFail();
         $s = $juan->supplier;
         $this->actingAs($juan)->withSession(['mode' => 'supplier']);
-        $this->get(route('supplier.locations'))->assertOk()->assertSee('Stock by location');
+        $this->get(route('supplier.locations'))->assertOk()->assertSee('Stock by branch'); // inventory locations are the shop's branches
 
         // add + duplicate name refused
         $this->post(route('supplier.locations.store'), ['name' => 'Branch B', 'address' => '12 Aurora Blvd., Cubao'])->assertSessionHas('success');

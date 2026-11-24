@@ -290,6 +290,32 @@ class Pricing
 
     /* ---------- delivery ---------- */
 
+    /**
+     * Delivery of one destination from the fulfilling branch (the origin; the supplier's own pin when no branch).
+     * Distance pricing (shop setting "By distance"): base fee + per km beyond the free km (both ways when the shop
+     * charges the round trip), refused beyond its maximum km. Other shops keep their delivery zones / standard rate.
+     * The distance is measured from the branch pin (or its city) to the address pin. Returns
+     * ['fee', 'km' (null when unknown), 'ok', 'basis' (distance|zone), 'note' (why not deliverable)].
+     */
+    public static function deliveryFor(?Supplier $s, ?\App\Models\InventoryLocation $branch, array $d): array
+    {
+        $set = array_merge(Supplier::DELIVERY_DEFAULTS, (array) ($s?->delivery ?? []));
+        $from = $branch?->point() ?? ($s && $s->lat !== null && $s->lng !== null ? [(float) $s->lat, (float) $s->lng] : null);
+        $to = isset($d['lat'], $d['lng']) && is_numeric($d['lat']) && is_numeric($d['lng']) ? [(float) $d['lat'], (float) $d['lng']] : null;
+        $km = $from && $to ? Locations::roadKm($from, $to) : null;
+        if (($set['mode'] ?? '') === 'distance' && (float) $set['perKm'] > 0 && $km !== null) {
+            if ((float) $set['maxKm'] > 0 && $km > (float) $set['maxKm']) {
+                return ['fee' => 0.0, 'km' => $km, 'ok' => false, 'basis' => 'distance',
+                    'note' => ($branch?->name ?? $s?->name ?? 'The shop').' delivers up to '.rtrim(rtrim(number_format((float) $set['maxKm'], 1), '0'), '.').' km (your address is about '.$km.' km away)'];
+            }
+            $billed = max(0, $km - (float) $set['freeKm']) * (! empty($set['roundTrip']) ? 2 : 1);
+
+            return ['fee' => r2((float) $set['baseFee'] + $billed * (float) $set['perKm']), 'km' => $km, 'ok' => true, 'basis' => 'distance', 'note' => null];
+        }
+
+        return ['fee' => self::zoneFee($s, $d['zoneId'] ?? null), 'km' => $km, 'ok' => true, 'basis' => 'zone', 'note' => null];
+    }
+
     public static function zones(?Supplier $s): array
     {
         return $s?->delivery_zones ?? [];
@@ -439,10 +465,17 @@ class Pricing
 
         $isDelivery = ($o['fulfillment'] ?? 'pickup') === 'delivery';
         $dests = $isDelivery ? (($o['destinations'] ?? []) ?: [['id' => 'd1', 'label' => 'Delivery address', 'zoneId' => '']]) : [];
-        $delivery = array_map(fn ($d) => [
-            'destId' => $d['id'], 'label' => ($d['label'] ?? '') ?: 'Delivery address', 'zoneId' => $d['zoneId'] ?? '',
-            'zone' => self::zoneName($s, $d['zoneId'] ?? null), 'fee' => self::zoneFee($s, $d['zoneId'] ?? null),
-        ], $dests);
+        // delivered from the fulfilling branch (multi-branch suppliers): its location decides distance-based fees
+        $branch = $o['branch'] ?? null;
+        $delivery = array_map(function ($d) use ($s, $branch) {
+            $f = self::deliveryFor($s, $branch, $d);
+
+            return [
+                'destId' => $d['id'], 'label' => ($d['label'] ?? '') ?: 'Delivery address', 'zoneId' => $d['zoneId'] ?? '',
+                'zone' => $f['basis'] === 'distance' ? $f['km'].' km from '.($branch?->name ?? $s?->name) : self::zoneName($s, $d['zoneId'] ?? null),
+                'fee' => $f['fee'], 'km' => $f['km'],
+            ];
+        }, $dests);
         $deliveryFee = r2(array_sum(array_column($delivery, 'fee')));
 
         $visits = self::serviceVisits($lines, $dests);
@@ -470,6 +503,7 @@ class Pricing
             'reservationFee' => $reservationFee, 'downPayment' => $downPayment, 'finalBalance' => r2($total - $reservationFee - $downPayment),
             'deposit' => $deposit, 'voucher' => 0.0, 'commissionExtraPct' => 0.0,
             'quotedAt' => now()->toIso8601String(),
+            'branch' => $branch ? ['id' => $branch->id, 'name' => $branch->name, 'address' => $branch->address] : null,
         ];
     }
 
@@ -485,7 +519,7 @@ class Pricing
         return self::quoteOrder([
             'supplier' => $r->supplier, 'lines' => $r->lines, 'fulfillment' => $r->fulfillment,
             'destinations' => $r->destinations ?? [], 'plan' => $r->plan ?? 'full', 'services' => $r->services ?? [],
-            'at' => $r->created_at?->format('Y-m-d'),
+            'at' => $r->created_at?->format('Y-m-d'), 'branch' => $r->branch_id ? $r->branch : null,
         ]);
     }
 

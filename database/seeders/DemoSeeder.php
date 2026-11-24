@@ -109,6 +109,8 @@ class DemoSeeder extends Seeder
         $this->audit();
         $this->cart();
         $this->eventCompany();
+        // every rental is fulfilled by one branch (the one its lines use, else the shop's main branch)
+        \App\Domain\Branches::backfillRequests();
     }
 
     /**
@@ -329,7 +331,7 @@ class DemoSeeder extends Seeder
         ];
         $A = self::ADDR;
         $DMG = fn (array $o = []) => array_replace_recursive(['repairable' => ['enabled' => true, 'pct' => 50], 'nonRepairable' => ['enabled' => true, 'pct' => 70], 'lost' => ['enabled' => true, 'brand_new' => 100, 'good_as_new' => 100, 'used' => 70], 'categories' => []], $o);
-        $loc = fn ($id, $name, $address, $contact, $phone) => compact('id', 'name', 'address', 'contact', 'phone');
+        $loc = fn ($id, $name, $address, $contact, $phone, $city = null, $lat = null, $lng = null) => compact('id', 'name', 'address', 'contact', 'phone', 'city', 'lat', 'lng');
         $plans = fn ($std, $full, $inst = null) => ['standard' => ['enabled' => true] + $std, 'full' => ['enabled' => true, 'days' => $full], 'installment' => $inst ? ['enabled' => true] + $inst : ['enabled' => false]];
         // key, owner, name, logo, color, description, address, phone, email, hours, fulfillment, deliveryFee (fallback), methods, policy, rating, status, applied, v4
         $rows = [
@@ -338,18 +340,18 @@ class DemoSeeder extends Seeder
                 'time_settings' => ['open' => '06:00', 'close' => '22:00', 'prepHours' => 1, 'recoveryHours' => 1],
                 'delivery_zones' => [['id' => 'z1', 'name' => 'Quezon City', 'fee' => 350], ['id' => 'z2', 'name' => 'Marikina / San Juan', 'fee' => 450], ['id' => 'z3', 'name' => 'Manila / Caloocan', 'fee' => 600]],
                 'services' => [['id' => 'sv1', 'name' => 'Setup and installation', 'description' => 'Our crew arranges the tables, chairs and décor at the venue.', 'amount' => 300, 'per' => 'location', 'required' => false], ['id' => 'sv2', 'name' => 'Dismantling and packing', 'description' => 'Pack-up and pickup right after the event.', 'amount' => 200, 'per' => 'location', 'required' => false]],
-                'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Main Warehouse', '88 Katipunan Ave., Loyola Heights, Quezon City', 'Juan Dela Cruz', '0918 555 0202'), $loc('L2', 'Branch A – Marikina', '7 Gil Fernando Ave., Marikina', 'Nestor Dela Cruz', '0918 555 0222')]]],
+                'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Main Warehouse', '88 Katipunan Ave., Loyola Heights, Quezon City', 'Juan Dela Cruz', '0918 555 0202', '137404000', 14.6400, 121.0750), $loc('L2', 'Branch A – Marikina', '7 Gil Fernando Ave., Marikina', 'Nestor Dela Cruz', '0918 555 0222', '137402000', 14.6260, 121.0950)]]],
             ['s2', 'u3', 'Celebration Hub Rentals', '✨', '#7C3AED', 'Elegant Tiffany chairs, lights, and floral backdrops for debuts, weddings and milestone events in Pasig and the east of Metro Manila.', $A['ana'], '0919 555 0303', 'book@celebrationhub.ph', 'Mon–Sat, 9:00 AM – 6:00 PM', 'delivery', 800, ['bank', 'debit'], ['depositType' => 'percent', 'depositValue' => 15, 'cancelDays' => 5, 'cancellation' => 'Free cancellation up to 5 days before the event. The down payment is non-refundable.'], 4.6, 'approved', -280, [
                 'type' => 'individual', 'payment_plans' => $plans(['downPct' => 40, 'downDays' => 7], 3),
                 'time_settings' => ['open' => '08:00', 'close' => '22:00', 'prepHours' => 2, 'recoveryHours' => 1],
                 'delivery_zones' => [['id' => 'z1', 'name' => 'Pasig', 'fee' => 500], ['id' => 'z2', 'name' => 'Mandaluyong / San Juan', 'fee' => 700]],
                 'services' => [['id' => 'sv1', 'name' => 'Equipment preparation', 'description' => 'Cleaning, cushion fitting and quality check before delivery.', 'amount' => 250, 'per' => 'order', 'required' => true], ['id' => 'sv2', 'name' => 'Styling and setup', 'description' => 'Arrangement of chairs, lights and backdrop by our stylist.', 'amount' => 800, 'per' => 'location', 'required' => false]],
-                'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Pasig Showroom', '12 Caruncho Ave., Pasig City', 'Ana Reyes', '0919 555 0303')]]],
+                'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Pasig Showroom', '12 Caruncho Ave., Pasig City', 'Ana Reyes', '0919 555 0303', '137403000', 14.5600, 121.0780)]]],
             ['s3', 'u4', 'Dream Events Supplies', '🎪', '#0D9488', 'High-volume tents, banquet tables and pro sound for corporate events and big gatherings. Warehouse pickup in Makati.', $A['carlo'], '0920 555 0404', 'ops@dreamevents.ph', 'Mon–Sat, 7:00 AM – 6:00 PM', 'pickup', 0, ['cash', 'bank'], ['depositType' => 'fixed', 'depositValue' => 2000, 'cancelDays' => 2], 4.5, 'approved', -260, [
                 'type' => 'individual', 'payment_plans' => $plans(['downPct' => 20, 'downDays' => 7], 7),
                 'time_settings' => ['open' => '07:00', 'close' => '21:00', 'prepHours' => 2, 'recoveryHours' => 2], 'delivery_zones' => [],
                 'services' => [['id' => 'sv1', 'name' => 'Tent assembly crew', 'description' => 'Two-person crew to assemble and dismantle tents at your venue.', 'amount' => 1500, 'per' => 'order', 'required' => false]],
-                'damage_policy' => $DMG(['repairable' => ['enabled' => true, 'pct' => 40]]), 'locations' => [$loc('L1', 'Makati Warehouse', '401 Chino Roces Ave., Makati City', 'Carlo Mendoza', '0920 555 0404')]]],
+                'damage_policy' => $DMG(['repairable' => ['enabled' => true, 'pct' => 40]]), 'locations' => [$loc('L1', 'Makati Warehouse', '401 Chino Roces Ave., Makati City', 'Carlo Mendoza', '0920 555 0404', '137602000', 14.5530, 121.0150)]]],
             ['s4', 'u5', 'Elegant Occasion Rentals', '💍', '#B45309', 'Premium chiavari chairs, gold-and-white backdrops and lounge furniture for weddings and formal receptions across BGC and the south.', $A['liza'], '0921 555 0505', 'events@elegantoccasion.ph', 'Tue–Sun, 10:00 AM – 7:00 PM', 'both', 1200, ['bank', 'debit'], ['depositType' => 'fixed', 'depositValue' => 3000, 'cancelDays' => 7, 'cancellation' => 'Free cancellation up to 7 days before the event. Later cancellations forfeit the down payment and 20% of payments made.'], 4.9, 'approved', -240, [
                 // a solo item-rental shop with staff (cashier, inventory, staff); event companies are 'organization' (see Aquino Events Corp.)
                 'type' => 'individual', 'payment_plans' => $plans(['downPct' => 30, 'downDays' => 14], 7, ['downPct' => 20, 'downDays' => 14, 'minMonths' => 2, 'maxInstallments' => 6]),
@@ -357,20 +359,20 @@ class DemoSeeder extends Seeder
                 'delivery_zones' => [['id' => 'z1', 'name' => 'BGC / Taguig', 'fee' => 500], ['id' => 'z2', 'name' => 'Makati / Pasig', 'fee' => 700]],
                 'services' => [['id' => 'sv1', 'name' => 'Setup and installation', 'description' => 'Styling crew sets up furniture, backdrop and décor at each venue.', 'amount' => 300, 'per' => 'location', 'required' => true], ['id' => 'sv2', 'name' => 'Dismantling and packing', 'description' => 'Crew dismantles and packs everything after the event.', 'amount' => 200, 'per' => 'location', 'required' => true], ['id' => 'sv3', 'name' => 'On-site coordinator', 'description' => 'A coordinator stays during the event for adjustments.', 'amount' => 1500, 'per' => 'order', 'required' => false]],
                 'damage_policy' => $DMG(['categories' => ['decorations' => ['repairable' => ['enabled' => true, 'pct' => 40], 'nonRepairable' => ['enabled' => true, 'pct' => 80], 'lost' => ['enabled' => true, 'brand_new' => 100, 'good_as_new' => 100, 'used' => 80]]]]),
-                'locations' => [$loc('L1', 'Main Warehouse', 'Lot 4, 32nd St., Bonifacio Global City, Taguig', 'Rico Santos', '0917 800 1515'), $loc('L2', 'Branch A – Pasig', 'Ortigas Ave. Ext., Pasig City', 'Joy Lim', '0917 800 1616'), $loc('L3', 'Branch B – Makati', 'Pasong Tamo Ext., Makati City', 'Liza Navarro', '0921 555 0505')],
+                'locations' => [$loc('L1', 'Main Warehouse', 'Lot 4, 32nd St., Bonifacio Global City, Taguig', 'Rico Santos', '0917 800 1515', '137607000', 14.5530, 121.0480), $loc('L2', 'Branch A – Pasig', 'Ortigas Ave. Ext., Pasig City', 'Joy Lim', '0917 800 1616', '137403000', 14.5850, 121.0900), $loc('L3', 'Branch B – Makati', 'Pasong Tamo Ext., Makati City', 'Liza Navarro', '0921 555 0505', '137602000', 14.5450, 121.0130)],
                 'company' => ['legalName' => 'Elegant Occasion Rentals Inc.', 'companyType' => 'corporation', 'natureOfBusiness' => 'Event furniture and décor rental', 'branches' => 3, 'representative' => 'Liza Navarro', 'position' => 'President']]],
             ['s5', 'u6', 'Party Essentials Shop', '🥳', '#2563EB', 'Affordable kiddie party must-haves in Manila: small chairs, kiddie tables, bubble machines, photo booth props and more.', $A['ramon'], '0922 555 0606', 'partyessentials@demo.ph', 'Mon–Sun, 8:00 AM – 8:00 PM', 'both', 350, ['cash', 'bank'], ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 1], 4.4, 'approved', -220, [
                 'type' => 'individual', 'payment_plans' => $plans(['downPct' => 50, 'downDays' => 5], 3),
                 'time_settings' => ['open' => '08:00', 'close' => '21:00', 'prepHours' => 1, 'recoveryHours' => 1], 'delivery_zones' => [['id' => 'z1', 'name' => 'Manila', 'fee' => 250]],
-                'services' => [], 'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Sta. Cruz Shop', '1530 Rizal Ave., Sta. Cruz, Manila', 'Ramon Bautista', '0922 555 0606')]]],
+                'services' => [], 'damage_policy' => $DMG(), 'locations' => [$loc('L1', 'Sta. Cruz Shop', '1530 Rizal Ave., Sta. Cruz, Manila', 'Ramon Bautista', '0922 555 0606', '133900000', 14.6170, 120.9840)]]],
             ['s6', 'u8', "Bea's Balloon Corner", '🎀', '#DB2777', 'Custom balloon garlands, arches and pastel party décor in Caloocan and nearby cities.', $A['bea'], '0924 555 0808', 'bea.balloons@demo.ph', 'Mon–Sat, 9:00 AM – 5:00 PM', 'both', 400, ['cash', 'bank'], ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3], 0, 'pending', -2, [
                 'type' => 'individual', 'payment_plans' => $plans(['downPct' => 40, 'downDays' => 7], 3),
                 'time_settings' => ['open' => '09:00', 'close' => '20:00', 'prepHours' => 1, 'recoveryHours' => 1], 'delivery_zones' => [], 'services' => [], 'damage_policy' => $DMG(),
-                'locations' => [$loc('L1', 'Home studio', '19 Rizal Ave. Ext., Grace Park, Caloocan', 'Bea Mendoza', '0924 555 0808')]]],
+                'locations' => [$loc('L1', 'Home studio', '19 Rizal Ave. Ext., Grace Park, Caloocan', 'Bea Mendoza', '0924 555 0808', '137501000', 14.6460, 120.9840)]]],
             ['s7', 'u9', 'Aquino Events Corp.', '🏢', '#0EA5E9', 'Corporate event production company with two warehouses, offering staging, tents, lights and furniture for company events in the south of Metro Manila.', $A['aquino'], '(02) 8820 1234', 'partners@aquinoevents.ph', 'Mon–Sat, 8:00 AM – 6:00 PM', 'both', 900, ['bank'], ['depositType' => 'fixed', 'depositValue' => 2000, 'cancelDays' => 7], 0, 'pending', -1, [
                 'type' => 'organization', 'payment_plans' => $plans(['downPct' => 30, 'downDays' => 14], 7),
                 'time_settings' => ['open' => '07:00', 'close' => '22:00', 'prepHours' => 2, 'recoveryHours' => 2], 'delivery_zones' => [], 'services' => [], 'damage_policy' => $DMG(),
-                'locations' => [$loc('L1', 'Parañaque Warehouse', '120 Dr. A. Santos Ave., Parañaque', 'Kristine Aquino', '0925 555 0909'), $loc('L2', 'Las Piñas Warehouse', 'Alabang–Zapote Rd., Las Piñas', 'Ben Aquino', '0925 555 0919')],
+                'locations' => [$loc('L1', 'Parañaque Warehouse', '120 Dr. A. Santos Ave., Parañaque', 'Kristine Aquino', '0925 555 0909', '137604000', 14.4790, 121.0190), $loc('L2', 'Las Piñas Warehouse', 'Alabang–Zapote Rd., Las Piñas', 'Ben Aquino', '0925 555 0919', null, 14.4480, 120.9900)],
                 'company' => ['legalName' => 'Aquino Events Corporation', 'companyType' => 'corporation', 'natureOfBusiness' => 'Corporate event production and equipment rental', 'branches' => 2, 'representative' => 'Kristine Aquino', 'position' => 'Operations Director']]],
         ];
         $docs = fn (array $keys) => array_combine($keys, array_map(fn ($k) => ['name' => str_replace('_', '-', $k).'.pdf', 'size' => 184000 + strlen($k) * 731, 'uploadedAt' => $this->ts(-2)->toIso8601String()], $keys));
@@ -400,8 +402,12 @@ class DemoSeeder extends Seeder
                 'company' => $company ? ['legalName' => $company['legalName'], 'companyType' => $company['companyType']] : null, 'application' => $application,
             ]));
             $this->S[$key] = $s->id;
+            if ($key === 's4') { // three branches, priced by distance from the branch that delivers
+                $s->update(['delivery' => array_merge(Supplier::DELIVERY_DEFAULTS, ['mode' => 'distance', 'baseFee' => 300, 'perKm' => 30, 'freeKm' => 3, 'maxKm' => 50, 'roundTrip' => false])]);
+            }
             foreach ($v4['locations'] as $l) {
-                $this->L[$key.'|'.$l['id']] = InventoryLocation::create(['supplier_id' => $s->id, 'name' => $l['name'], 'address' => $l['address'], 'contact' => $l['contact'], 'phone' => $l['phone']])->id;
+                $this->L[$key.'|'.$l['id']] = InventoryLocation::create(['supplier_id' => $s->id, 'name' => $l['name'], 'address' => $l['address'], 'contact' => $l['contact'], 'phone' => $l['phone'],
+                    'city_code' => $l['city'], 'lat' => $l['lat'], 'lng' => $l['lng'], 'active' => true, 'is_main' => $l['id'] === 'L1'])->id; // branches with map pins
             }
         }
         // Elegant Occasion's team: one member per company role; Rico holds two roles (module switcher)

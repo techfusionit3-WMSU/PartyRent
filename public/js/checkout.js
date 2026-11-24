@@ -184,6 +184,25 @@
       '<div class="field"><label>Deliver by</label>' + sel(o, d.deliveryTime || sh.times[0], 'data-d="deliveryTime"') + '</div><div class="field"><label>On-site contact (optional)</label><input class="input" data-d="contactName" value="' + esc(d.contactName) + '" placeholder="Name · number"></div></div></div>';
   }
 
+  /** The shop's branch that fulfils this order: the recommended one, or the customer's pick among eligible branches. */
+  const branchOf = o => { const q = lastQuote[o.supplier_id] || {}; return (q.branches || []).find(b => b.id === (o.branch_id || q.branchId)) || null; };
+  function branchBlock(o) {
+    const q = lastQuote[o.supplier_id] || {}, list = q.branches || [], chosen = o.branch_id || q.branchId;
+    if (list.length < 2) { const b = list[0]; return b ? '<div class="branch-one small">' + svg('store') + '<span>Rented from <b>' + esc(b.name) + '</b>' + (b.address ? ' · ' + esc(b.address) : '') + '</span></div>' : ''; }
+    const del = o.fulfillment === 'delivery', pinned = o.destinations.some(d => d.lat != null && d.lat !== '');
+    const opt = b => {
+      const ok = b.ok && b.deliverable, on = b.id === chosen;
+      const facts = ok ? [b.km != null ? b.km + ' km away' : null, del ? 'Delivery ' + money(b.fee) : 'Pick up here'].filter(Boolean).join(' · ')
+        : (!b.ok ? 'Not enough stock: ' + b.short.slice(0, 2).join('; ') : (b.note || 'Does not deliver to this address'));
+      return '<label class="branch-opt' + (on ? ' on' : '') + (ok ? '' : ' off') + '"><input type="radio" name="br_' + o.supplier_id + '" value="' + b.id + '" data-branch' + (on ? ' checked' : '') + (ok ? '' : ' disabled') + '>' +
+        '<div class="grow" style="min-width:0"><div class="branch-top"><b>' + esc(b.name) + '</b>' + (b.recommended ? '<span class="badge b-green plain">Recommended</span>' : '') + (b.main ? '<span class="badge b-gray plain">Main</span>' : '') + '</div>' +
+        '<div class="small muted">' + esc(b.address + (b.city && !String(b.address).toLowerCase().includes(String(b.city).split(',')[0].replace(/ city$/i, '').toLowerCase()) ? ', ' + b.city : '')) + '</div><div class="small ' + (ok ? '' : 'branch-bad') + '">' + esc(facts) + '</div></div></label>';
+    };
+    return '<div class="label mt-2 mb-1">Fulfilling branch</div><p class="small muted mt-0 mb-1">' + esc(o.shop.name) + ' has ' + list.length + ' branches; each rents from its own stock. ' +
+      (del && !pinned ? 'Pin your delivery address on the map to compare branches by distance.' : 'The recommended branch has everything for your dates' + (del ? ' at the lowest delivery fee.' : '.')) + '</p>' +
+      '<div class="branch-list">' + list.map(opt).join('') + '</div>' + (o.branch_id ? '<button type="button" class="link-btn small mt-1" data-branchauto>Use the recommended branch</button>' : '');
+  }
+
   function shopCard(o, idx) {
     const sh = o.shop; const sid = o.supplier_id;
     const q = lastQuote[sid] || {};
@@ -196,7 +215,8 @@
         ? '<label class="switch mb-1"><input type="checkbox" data-multiloc' + (multi ? ' checked' : '') + '><span class="sw"></span>Deliver to more than one location</label>' +
           '<div class="stack-sm">' + o.destinations.map((d, i) => destCard(o, d, i)).join('') + '</div>' +
           (multi ? '<button type="button" class="btn btn-sm mt-1" data-adddest>' + svg('plus') + 'Add another location</button><p class="small muted mt-1 mb-0">For each item above, choose its location — or use <b>Send some to another location</b> and type how many go there (the first location keeps the rest). Each location has its own delivery fee.</p>' : '')
-        : '<div class="alert alert-info">' + svg('map') + '<div>Pickup at <b>' + esc(sh.address) + '</b> · ' + esc(sh.hours) + '</div></div>') +
+        : '<div class="alert alert-info">' + svg('map') + '<div>Pickup at <b>' + esc(branchOf(o) ? branchOf(o).name + ', ' + branchOf(o).address : sh.address) + '</b> · ' + esc(sh.hours) + '</div></div>') +
+      branchBlock(o) +
       (sh.services.length ? '<div class="label mt-2 mb-1">Services</div>' + sh.services.map(x => '<label class="check"><input type="checkbox" data-svc="' + esc(x.id) + '"' + (x.required || o.services.includes(x.id) ? ' checked' : '') + (x.required ? ' disabled' : '') + '> <b>' + esc(x.name) + '</b> — ' + money(x.amount) + (x.per === 'location' ? ' per visit' : '') + (x.required ? ' <span class="badge b-gray plain">included</span>' : '') + '<div class="small muted">' + esc(x.description || '') + '</div></label>').join('') + '<p class="small muted mb-0">Per-visit services are charged once for consecutive days at the same location, and again for each location change or separate date block.</p>' : '') +
       '<div class="label mt-2 mb-1">Payment plan</div><div class="stack-sm">' + sh.plans.map(p => { const dis = p.key === 'installment' && q.installmentOk === false; return '<label class="card card-flat row" style="padding:12px 14px;cursor:pointer;' + (dis ? 'opacity:.55' : '') + '"><input type="radio" name="plan_' + sid + '" value="' + p.key + '" data-plan' + (p.key === o.plan ? ' checked' : '') + (dis ? ' disabled' : '') + ' style="accent-color:var(--brand);width:18px;height:18px"><div class="grow"><b>' + esc(p.label) + '</b><div class="small muted">' + esc(p.summary) + '</div>' + (dis ? '<div class="small" style="color:var(--red)">' + esc(q.installmentMsg) + '</div>' : '') + '</div></label>'; }).join('') + '</div>' +
       (o.plan === 'installment' ? '<div class="card card-flat soft mt-1" style="padding:14px" data-inst><div class="row between wrap"><b>Propose your installment schedule</b><label class="small row" style="gap:6px">Installments <select class="input input-sm" data-instn style="width:auto">' + Array.from({ length: sh.maxInstallments }, (_, i) => '<option' + (i + 1 === o.inst.n ? ' selected' : '') + '>' + (i + 1) + '</option>').join('') + '</select></label></div><p class="small muted">Divide the installment balance into payments of your choice. Every payment must be due on or before the event date. The supplier reviews and approves the schedule.</p><div data-instrows>' + o.inst.items.map((it, i) => '<div class="row mb-1" style="gap:8px" data-ir="' + i + '"><span class="small muted" style="width:26px">#' + (i + 1) + '</span><input class="input input-sm" type="date" data-f="due" value="' + it.due + '" min="' + addDays(today, 1) + '" max="' + o.eventDate + '" aria-label="Due date ' + (i + 1) + '" style="width:auto"><input class="input input-sm" type="number" step="0.01" min="1" data-f="amount" value="' + it.amount + '" aria-label="Amount ' + (i + 1) + '" style="width:130px"></div>').join('') + '</div><div class="row between mt-1"><button type="button" class="btn btn-xs" data-even>Divide evenly</button><span class="small" data-instsum></span></div></div>' : '') +
@@ -266,7 +286,7 @@
   }
 
   function payload() {
-    return { shared, orders: orders.map(o => ({ supplier_id: o.supplier_id, cart_line_ids: o.cart_line_ids, eventDate: o.eventDate, fulfillment: o.fulfillment, destinations: o.fulfillment === 'delivery' ? o.destinations : [], plan: o.plan, method: o.method, services: o.services, lines: o.lines.map(l => ({ cart_id: l.cart_id, type: l.type, days: l.days, time: l.time, destId: o.fulfillment === 'delivery' ? l.destId : null })), inst: o.inst })) };
+    return { shared, orders: orders.map(o => ({ supplier_id: o.supplier_id, cart_line_ids: o.cart_line_ids, eventDate: o.eventDate, fulfillment: o.fulfillment, destinations: o.fulfillment === 'delivery' ? o.destinations : [], branch_id: o.branch_id || null, plan: o.plan, method: o.method, services: o.services, lines: o.lines.map(l => ({ cart_id: l.cart_id, type: l.type, days: l.days, time: l.time, destId: o.fulfillment === 'delivery' ? l.destId : null })), inst: o.inst })) };
   }
 
   let qTimer = null, qSeq = 0;
@@ -279,6 +299,8 @@
         const data = await res.json(); if (seq !== qSeq) return;
         let needDraw = !!redraw;
         data.orders.forEach(r => {
+          const prev = lastQuote[r.supplier_id];
+          if (!prev || JSON.stringify(prev.branches) !== JSON.stringify(r.branches) || prev.branchId !== r.branchId) needDraw = true; // branch list / choice changed
           lastQuote[r.supplier_id] = r;
           const o = orders.find(x => x.supplier_id === r.supplier_id); if (!o) return;
           if (o.plan === 'installment' && o.inst.auto && JSON.stringify(o.inst.items) !== JSON.stringify(r.suggest)) { o.inst.items = r.suggest; needDraw = true; }
@@ -342,6 +364,8 @@
         $$('[data-pq]', row).forEach(inp => inp.onchange = () => setPart(o, g, k, inp.dataset.pq || null, parseInt(inp.value, 10)));
         const rm = $('[data-prm]', row); if (rm) rm.onclick = () => { g.dates.forEach(d => { g.parts[0].days[d] = (Number(g.parts[0].days[d]) || 0) + (Number(l.days[d]) || 0); }); o.lines.splice(i, 1); draw(); requote(); };
       });
+      $$('[data-branch]', box).forEach(r => r.onchange = () => { o.branch_id = +r.value; requote(true); });
+      const ba = $('[data-branchauto]', box); if (ba) ba.onclick = () => { o.branch_id = null; requote(true); };
       $$('[data-svc]', box).forEach(c => c.onchange = () => { o.services = $$('[data-svc]:checked:not([disabled])', box).map(x => x.dataset.svc); o.inst.auto = true; requote(); });
       $$('[data-plan]', box).forEach(r => r.onchange = () => { o.plan = r.value; o.inst.auto = true; o.inst.items = []; requote(true); });
       const n = $('[data-instn]', box); if (n) n.onchange = () => { o.inst.n = +n.value; o.inst.auto = true; requote(true); };

@@ -78,27 +78,21 @@
       </div>
     @endif
     @if($locs->count())
-      @php($alloc = $r->allocation['status'] ?? 'proposed')
-      <div class="card"><div class="card-head"><h3>Inventory allocation</h3><span class="badge {{ $alloc === 'approved' ? 'b-green' : 'b-gold' }}">{{ $alloc === 'approved' ? 'Approved' : 'Proposed — review before accepting' }}</span></div>
-        <p class="small muted">Each line uses stock from one inventory location. PartyRent proposed the sources below; {{ $canAlloc ? 'change them if another location is closer or has the stock.' : 'they can be changed before the items are released.' }}</p>
-        <div class="table-wrap"><table class="table cards"><thead><tr><th>Item</th><th>Deliver to</th><th>Qty / dates</th><th>Inventory source</th></tr></thead><tbody>
-        @foreach($r->lines as $l)
-          @php($ld = array_keys($l['days']))
-          @php(sort($ld))
-          @php($dest = collect($r->destinations ?? [])->firstWhere('id', $l['destId'] ?? null))
-          <tr><td data-label="Item"><b>{{ inv()->itemName($l) }}</b><div class="small muted">{{ \App\Domain\Slots::rangeLabel(\App\Domain\Slots::time($l)) }}{{ \App\Domain\Slots::time($l) ? ' · '.\App\Domain\Slots::duration($l)['label'] : '' }}</div></td>
-            <td data-label="Deliver to">{{ $dest['label'] ?? ($r->fulfillment === 'pickup' ? 'Pickup' : '—') }}</td>
-            <td data-label="Qty / dates">{{ max($l['days']) }}× · {{ fmt_range($ld[0], end($ld)) }}</td>
-            <td data-label="Inventory source">@if($canAlloc)
-              <form method="POST" action="{{ route('supplier.requests.source', $r) }}">@csrf<input type="hidden" name="line" value="{{ $l['id'] }}"><select class="input input-sm" name="location" data-autosubmit aria-label="Inventory source">
-                @foreach($locs as $loc)
-                  @php($av = $l['type'] === 'item' ? inv()->availableAtLocation((int) $l['ref_id'], $loc->id, $ld[0], $r->id, inv()->lineWindow($l, $ld[0])) : null)
-                  <option value="{{ $loc->id }}" @selected((int) ($l['sourceId'] ?? 0) === $loc->id)>{{ $loc->name }}{{ $av !== null ? ' ('.$av.' free)' : '' }}</option>
-                @endforeach
-              </select></form>
-            @else{{ $locs->firstWhere('id', (int) ($l['sourceId'] ?? 0))?->name ?? '—' }}@endif</td></tr>
-        @endforeach
-        </tbody></table></div>
+      {{-- one branch fulfils the whole rental: its stock, its address as delivery origin / pickup place --}}
+      @php($br = $r->branch)
+      <div class="card"><div class="card-head"><h3>{{ icon('store') }} Fulfilling branch</h3>@if($br)<span class="badge b-purple plain">{{ $br->name }}</span>@endif</div>
+        @if($br)<p class="small mb-1"><b>{{ $br->name }}</b> · {{ $br->address }}{{ $br->phone ? ' · '.$br->phone : '' }}</p>@endif
+        <p class="small muted">Every item in {{ $r->code }} comes from this branch's own stock{{ $r->fulfillment === 'delivery' ? ' and is delivered from it' : ' and is picked up there' }}. {{ $canAlloc && $locs->where('active', true)->count() > 1 ? 'Move it to another branch only if that branch has everything for these dates; the quoted price stays the same.' : '' }}</p>
+        @if($canAlloc && $locs->where('active', true)->count() > 1)
+          @php($ld0 = collect($r->lines)->flatMap(fn ($l) => array_keys($l['days']))->min())
+          <form method="POST" action="{{ route('supplier.requests.source', $r) }}" class="row wrap" style="gap:8px">@csrf<input type="hidden" name="line" value="{{ $r->lines[0]['id'] ?? 'l1' }}">
+            <select class="input input-sm" name="location" aria-label="Fulfilling branch" style="max-width:340px">
+              @foreach($locs->where('active', true) as $loc)
+                @php($fit = \App\Domain\Branches::check($r->lines, $loc, $r->id))
+                <option value="{{ $loc->id }}" @selected($r->branch_id === $loc->id)>{{ $loc->name }}{{ $r->branch_id === $loc->id ? ' (current)' : ($fit['ok'] ? ' — has everything' : ' — short: '.($fit['short'][0] ?? '')) }}</option>
+              @endforeach
+            </select><button class="btn btn-sm">Move to this branch</button></form>
+        @endif
       </div>
     @endif
     @if($r->plan === 'installment')
@@ -138,7 +132,7 @@
       <dl class="kv"><dt>Requested by</dt><dd>{{ $c->name }} <span class="muted">(account)</span><br>{{ $c->email }}@if($c->phone)<br>{{ $c->phone }}@endif</dd><dt>Contact on the day</dt><dd>{{ $r->contact_name ?: $c->name }}@if($r->contact_name && $r->contact_name !== $c->name) <span class="badge b-gray">not the account holder</span>@endif<br>{{ $r->contact_phone }}</dd><dt>Payment</dt><dd>{{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }} · {{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</dd></dl>
       @if($r->instructions)<div class="alert alert-info mt-1">{{ icon('message') }}<div class="small"><b>Instructions:</b> {{ $r->instructions }}</div></div>@endif
     </div>
-    <div class="card"><h3>{{ $r->fulfillment === 'delivery' ? (count($r->destinations ?? []) > 1 ? count($r->destinations).' delivery locations' : 'Delivery location') : 'Pickup' }}</h3>@if($r->fulfillment === 'delivery')@include('partials.destinations')@else<div class="small">Pickup at <b>{{ $r->supplier->address }}</b><div class="muted">{{ $r->supplier->hours }}</div></div>@endif</div>
+    <div class="card"><h3>{{ $r->fulfillment === 'delivery' ? (count($r->destinations ?? []) > 1 ? count($r->destinations).' delivery locations' : 'Delivery location') : 'Pickup' }}</h3>@if($r->fulfillment === 'delivery')@include('partials.destinations')@else<div class="small">Pickup at <b>{{ $r->branch ? $r->branch->name.', '.$r->branch->address : $r->supplier->address }}</b><div class="muted">{{ $r->supplier->hours }}</div></div>@endif</div>
     <div class="card">@include('partials.payment-summary')</div>
     <div class="card"><h3>Supplier notes</h3><p class="small">@if($r->supplier_notes){{ $r->supplier_notes }}@else<span class="muted">No notes yet. Notes are visible to the customer.</span>@endif</p>@if(auth()->user()->orgCan('orders.manage'))<button class="btn btn-sm" data-modal="notesModal">{{ icon('edit') }}Edit notes</button>@endif</div>
     <div class="modal-backdrop hidden" id="notesModal"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Supplier notes</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div><form method="POST" action="{{ route('supplier.requests.notes', $r) }}">@csrf<div class="modal-body"><div class="field"><label for="sn">Notes for this rental (visible to customer)</label><textarea class="input" id="sn" name="notes" rows="4">{{ $r->supplier_notes }}</textarea></div></div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Save notes</button></div></form></div></div>

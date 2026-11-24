@@ -73,6 +73,8 @@ class Supplier extends Model
     public function accountLabel(): string { return $this->isBusiness() ? 'Business' : 'Personal'; }
     public function products(): HasMany { return $this->hasMany(Product::class); }
     public function locations(): HasMany { return $this->hasMany(InventoryLocation::class)->orderBy('id'); }
+    /** Branches (same rows as locations): the main branch first. */
+    public function branches(): HasMany { return $this->hasMany(InventoryLocation::class)->orderByDesc('is_main')->orderBy('id'); }
     public function payouts(): HasMany { return $this->hasMany(Payout::class); }
     public function payoutBatches(): HasMany { return $this->hasMany(PayoutBatch::class); }
 

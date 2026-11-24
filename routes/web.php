@@ -213,6 +213,9 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/inventory/{product}/stock', [CatalogController::class, 'locationStock'])->name('inventory.stock');
     Route::get('/locations', [\App\Http\Controllers\Supplier\LocationController::class, 'index'])->name('locations');
     Route::post('/locations', [\App\Http\Controllers\Supplier\LocationController::class, 'store'])->name('locations.store');
+    Route::get('/locations/new', [\App\Http\Controllers\Supplier\LocationController::class, 'create'])->name('locations.create');
+    Route::get('/locations/{location}/edit', [\App\Http\Controllers\Supplier\LocationController::class, 'edit'])->name('locations.edit');
+    Route::post('/locations/{location}/active', [\App\Http\Controllers\Supplier\LocationController::class, 'active'])->name('locations.active');
     Route::put('/locations/{location}', [\App\Http\Controllers\Supplier\LocationController::class, 'update'])->name('locations.update');
     Route::delete('/locations/{location}', [\App\Http\Controllers\Supplier\LocationController::class, 'destroy'])->name('locations.delete');
     Route::post('/locations/transfer/{product}', [\App\Http\Controllers\Supplier\LocationController::class, 'transfer'])->name('locations.transfer');

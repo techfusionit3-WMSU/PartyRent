@@ -6,6 +6,7 @@
     $firstDay = collect($o['lines'] ?? [])->flatMap(fn ($l) => array_keys(array_filter((array) ($l['days'] ?? []))))->min();
 @endphp
 @unless($prep['ok'])<div class="alert alert-danger mb-1">{{ icon('alert') }}<div>{{ $prep['error'] }}@if(! empty($prep['check']) || ! empty($prep['durationIssues']) || ! empty($prep['timeIssues'])) <a href="{{ route('cart') }}">Edit in Rental List</a>@endif</div></div>@endunless
+@if($prep['ok'] && ! empty($q['branch']))<div class="sum-line"><span>Fulfilled by<div class="small muted">{{ $q['branch']['address'] }}</div></span><b>{{ $q['branch']['name'] }}</b></div>@endif
 <div class="label mt-1 mb-1">{{ \App\Domain\Finance::PLAN_LABEL[$q['plan']] }}</div>
 @if($q['plan'] === 'full')
   <div class="sum-line"><span>Full Payment (100%){{ term('full_payment') }}<div class="small muted">{{ $dd($t['days'] ?? 0) }}</div></span><b>{{ money($q['total']) }}</b></div>

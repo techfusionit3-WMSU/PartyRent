@@ -311,7 +311,7 @@ class Rentals
     }
 
     /** Lock the product rows behind some lines (packages expand) so concurrent bookings serialize. */
-    private static function lockProducts(array $lines): void
+    public static function lockProducts(array $lines): void
     {
         $ids = [];
         foreach ($lines as $l) {
@@ -330,97 +330,6 @@ class Rentals
     }
 
     /* ================= RENTAL REQUESTS ================= */
-
-    /**
-     * Inventory source allocation (multi-location): each line is assigned to ONE location; a single location is
-     * preferred, otherwise the line is split by quantity across locations. The supplier reviews it before accepting.
-     */
-    public static function autoAllocate(array $lines, Supplier $s, ?int $excludeId = null): array
-    {
-        $locs = $s->locations()->pluck('id')->all();
-        if (! $locs) {
-            return self::ok(['lines' => array_map(fn ($l) => array_merge($l, ['sourceId' => null]), $lines)]);
-        }
-        $used = [];
-        $perUnit = function (array $l) {
-            if ($l['type'] === 'package') {
-                $def = inv()->lineDef($l);
-
-                return $def ? Packages::units($def, $l['sel'] ?? null)['rent'] : [];
-            }
-
-            return inv()->product($l['ref_id'])?->isSale() ? [] : [(int) $l['ref_id'] => 1];
-        };
-        $freeAt = function (array $l, int $loc, string $d) use (&$used, $perUnit, $excludeId) {
-            $win = inv()->lineWindow($l, $d);
-            $min = PHP_INT_MAX;
-            foreach ($perUnit($l) as $pid => $k) {
-                $min = min($min, intdiv(inv()->availableAtLocation($pid, $loc, $d, $excludeId, $win) - ($used[$pid.'|'.$loc.'|'.$d] ?? 0), max(1, $k)));
-            }
-
-            return $min;
-        };
-        $take = function (array $l, int $loc, string $d, int $q) use (&$used, $perUnit) {
-            foreach ($perUnit($l) as $pid => $k) {
-                $used[$pid.'|'.$loc.'|'.$d] = ($used[$pid.'|'.$loc.'|'.$d] ?? 0) + $q * $k;
-            }
-        };
-        $out = [];
-        foreach ($lines as $l) {
-            $dates = array_keys(array_filter($l['days'], fn ($q) => (int) $q > 0));
-            sort($dates);
-            if (! $perUnit($l)) { // sale-only line: no location needed
-                $out[] = array_merge($l, ['sourceId' => null]);
-
-                continue;
-            }
-            $fits = [];
-            foreach ($locs as $loc) {
-                $slack = min(array_map(fn ($d) => $freeAt($l, $loc, $d) - (int) $l['days'][$d], $dates));
-                if ($slack >= 0) {
-                    $fits[] = ['loc' => $loc, 'slack' => $slack];
-                }
-            }
-            usort($fits, fn ($a, $b) => $b['slack'] <=> $a['slack']);
-            $pref = ! empty($l['sourceId']) ? collect($fits)->firstWhere('loc', (int) $l['sourceId']) : null;
-            if ($fits) {
-                $loc = ($pref ?? $fits[0])['loc'];
-                foreach ($dates as $d) {
-                    $take($l, $loc, $d, (int) $l['days'][$d]);
-                }
-                $out[] = array_merge($l, ['sourceId' => $loc]);
-
-                continue;
-            }
-            $parts = [];
-            foreach ($dates as $d) {
-                $rest = (int) $l['days'][$d];
-                $order = array_map(fn ($loc) => ['id' => $loc, 'free' => $freeAt($l, $loc, $d)], $locs);
-                usort($order, fn ($a, $b) => $b['free'] <=> $a['free']);
-                foreach ($order as $o) {
-                    if ($rest <= 0) {
-                        break;
-                    }
-                    $q = min($rest, max(0, $o['free']));
-                    if ($q > 0) {
-                        $parts[$o['id']][$d] = $q;
-                        $take($l, $o['id'], $d, $q);
-                        $rest -= $q;
-                    }
-                }
-                if ($rest > 0) {
-                    return self::fail('Not enough '.inv()->itemName($l).' across the supplier\'s inventory locations on '.fmt_date($d).'.');
-                }
-            }
-            $i = 0;
-            foreach ($parts as $loc => $pdays) {
-                $out[] = array_merge($l, ['id' => $l['id'].($i ? '-'.($i + 1) : ''), 'days' => $pdays, 'sourceId' => $loc, 'splitFrom' => $l['id']]);
-                $i++;
-            }
-        }
-
-        return self::ok(['lines' => $out]);
-    }
 
     /** Quantities per item and date — proves the checkout did not change what was in the Rental List. */
     private static function qtyFingerprint(array $lines): array
@@ -559,6 +468,14 @@ class Rentals
             }
             unset($l);
         }
+        // fulfilling branch: the customer's pick, or the recommended one; it must have every item for the dates
+        // (its own stock only) and deliver to every address
+        $pick = Branches::choose($s, $lines, $fulfillment, $destinations, ! empty($o['branch_id']) ? (int) $o['branch_id'] : null);
+        if (! $pick['ok']) {
+            return self::fail($s->name.': '.$pick['error'], ['branches' => $pick['options']]);
+        }
+        $branch = $pick['branch'];
+        $lines = Branches::onBranch($lines, $branch->id);
         // payment plan & method
         $plans = Finance::plansOf($s);
         $plan = in_array($o['plan'] ?? null, $plans, true) ? $o['plan'] : null;
@@ -577,7 +494,7 @@ class Rentals
         $eventName = trim((string) ($o['eventName'] ?? '')) ?: self::autoName($lines);
         $services = array_values(array_intersect($o['services'] ?? [], array_column($s->services ?? [], 'id')));
         $attrs = [
-            'customer_id' => $u->id, 'supplier_id' => $s->id, 'event_name' => $eventName, 'event_type' => ($o['eventType'] ?? '') ?: 'Other', 'event_date' => $eventDate,
+            'customer_id' => $u->id, 'supplier_id' => $s->id, 'branch_id' => $branch->id, 'event_name' => $eventName, 'event_type' => ($o['eventType'] ?? '') ?: 'Other', 'event_date' => $eventDate,
             'start_date' => $allDates[0], 'end_date' => end($allDates), 'fulfillment' => $fulfillment, 'destinations' => $destinations,
             'address' => $destinations[0]['address'] ?? '', 'contact_name' => $o['contactName'] ?? $u->name, 'contact_phone' => $o['contactPhone'] ?? $u->phone,
             'instructions' => $o['instructions'] ?? '', 'lines' => $lines, 'plan' => $plan, 'arrangement' => $plan, 'method' => $method, 'services' => $services,
@@ -585,6 +502,7 @@ class Rentals
         ];
         $probe = new RentalRequest($attrs);
         $probe->setRelation('supplier', $s);
+        $probe->setRelation('branch', $branch);
         $pricing = Pricing::quoteRequest($probe);
         if ($plan === 'installment') {
             $el = Finance::installmentEligibility($s, $eventDate);
@@ -597,15 +515,11 @@ class Rentals
             }
             $attrs['installment_plan'] = ['status' => 'proposed', 'items' => $items, 'proposedAt' => now()->toIso8601String()];
         }
-        $alloc = self::autoAllocate($lines, $s);
-        if (! $alloc['ok']) {
-            return $alloc;
-        }
-        $attrs['lines'] = $alloc['lines'];
+        // every line rents from the fulfilling branch (no split across branches)
         $attrs['allocation'] = ['status' => 'proposed'];
         $attrs['pricing'] = $pricing;
 
-        return self::ok(['attrs' => $attrs, 'supplier' => $s, 'sourceIds' => array_column($src, 'id')]);
+        return self::ok(['attrs' => $attrs, 'supplier' => $s, 'sourceIds' => array_column($src, 'id'), 'branch' => $branch, 'branches' => $pick['options']]);
     }
 
     /**
@@ -669,36 +583,18 @@ class Rentals
         return self::submitOrders($u, [array_merge($form, ['supplier_id' => $s->id, 'cart_line_ids' => $ids])]);
     }
 
-    /** Supplier changes the inventory source of one line (before the items are released). */
+    /**
+     * Supplier moves a rental to another of its branches (before the items are released). A rental is fulfilled by
+     * ONE branch, so every line moves; $lineId is kept for the old per-line form.
+     */
     public static function setLineSource(RentalRequest $r, string $lineId, int $locId): array
     {
-        if (! in_array($r->status, ['pending', 'accepted', 'in_progress'], true)) {
-            return self::fail('The allocation can only be changed before the items are released.');
+        $res = Branches::reassign($r, $locId);
+        if ($res['ok']) {
+            self::changed($r->fresh());
         }
-        $loc = $r->supplier->locations()->find($locId);
-        if (! $loc) {
-            return self::fail('Unknown inventory location.');
-        }
-        $lines = $r->lines;
-        $idx = collect($lines)->search(fn ($l) => $l['id'] === $lineId);
-        if ($idx === false) {
-            return self::fail('Line not found.');
-        }
-        $fromId = $lines[$idx]['sourceId'] ?? null;
-        $lines[$idx]['sourceId'] = $locId;
-        $chk = inv()->check($lines, $r->id);
-        $locBad = array_filter($chk['bad'], fn ($b) => ($b['location_id'] ?? null) === $locId);
-        if ($locBad) {
-            return self::fail('Not enough units at '.$loc->name.': '.implode('; ', array_map(fn ($b) => $b['name'].' on '.fmt_date($b['date']).' (available '.$b['available'].', needed '.$b['requested'].')', $locBad)).'.');
-        }
-        $r->update(['lines' => $lines]);
-        BookingDays::sync($r);
-        $from = $fromId ? $r->supplier->locations()->find($fromId)?->name : '—';
-        self::history($r, $r->status, 'Inventory source for '.inv()->itemName($lines[$idx]).' changed: '.$from.' → '.$loc->name);
-        self::changed($r);
-        Notifier::audit('Changed inventory allocation', $r->code.' · '.inv()->itemName($lines[$idx]).' → '.$loc->name);
 
-        return self::ok();
+        return $res;
     }
 
     /** Customer (re)proposes an installment schedule; the supplier approves or rejects it. */
@@ -1714,6 +1610,7 @@ class Rentals
             Notifier::notify('admin', 'admin', $existing ? 'Supplier application resubmitted' : ($s->type === 'organization' ? 'New organization application' : 'New supplier application'), $u->name.($existing ? ' resubmitted ' : ' applied to open ').$s->name.' ('.$kind.').', '');
             Notifier::notify($u, 'customer', 'Application submitted', 'Your '.$kind.' application for '.$s->name.' is pending review. We will notify you once it is decided.', self::link('start-selling'));
         } else {
+            Branches::fromApplication($s); // main branch (its address) + any other branches it listed
             Notifier::notify($u, 'customer', 'Your shop is live!', $s->name.' is approved. Tap your shop name in the profile menu to add your first product.', self::link('supplier.dashboard'));
         }
         Notifier::audit($existing ? 'Resubmitted supplier application' : 'Submitted supplier application', $s->name.' · '.$kind, $u);
@@ -1768,6 +1665,9 @@ class Rentals
         $s->update(['status' => $approve ? 'approved' : 'rejected', 'reviewed_at' => now(), 'reviewed_by' => $by->id, 'reject_reason' => $approve ? null : $reason, 'approved_at' => $approve ? now() : null]
             // Approving a business application also accepts its documents.
             + ($approve && $s->isBusiness() ? ['biz_status' => 'verified', 'biz_verified_at' => now()] : []));
+        if ($approve) {
+            Branches::fromApplication($s); // main branch (its registered address) + the other branches it listed
+        }
         if ($approve && $s->isOrganization()) {
             EventTypes::fromApplication($s); // the events they listed wait for their own check (Event Types)
         }

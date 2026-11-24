@@ -49,7 +49,7 @@ class StartSellingController extends Controller
             'personal' => ['fullName' => $u->name, 'birthDate' => '', 'address' => $u->address, 'phone' => $u->phone, 'email' => $u->email],
             'identity' => ['idType' => Applications::ID_TYPES[0], 'idNumber' => ''],
             'business' => ['shopName' => '', 'address' => $u->address, 'productTypes' => '', 'phone' => $u->phone],
-            'company' => ['legalName' => '', 'companyType' => 'corporation', 'address' => '', 'email' => '', 'phone' => '', 'natureOfBusiness' => 'Party and event equipment rental', 'description' => '', 'branches' => 1, 'website' => ''],
+            'company' => ['legalName' => '', 'companyType' => null, 'address' => '', 'email' => '', 'phone' => '', 'natureOfBusiness' => 'Party and event equipment rental', 'description' => '', 'branches' => 1, 'website' => ''],
             'representative' => ['name' => $u->name, 'position' => '', 'idType' => Applications::ID_TYPES[0], 'email' => $u->email, 'phone' => $u->phone],
             'docs' => [], 'applicable' => [],
             'payout' => ['method' => 'bank', 'provider' => '', 'accountName' => '', 'accountNumber' => '', 'financeContact' => ''],
@@ -133,8 +133,8 @@ class StartSellingController extends Controller
             'app.applicable' => 'nullable|array', 'app.applicable.*' => 'in:'.implode(',', Applications::allDocKeys()),
             'docs' => 'nullable|array', 'docs.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
             ...($type === 'organization' ? [
-                'app.company.legalName' => 'required|string|min:3|max:180', 'app.company.companyType' => 'required|in:'.implode(',', array_keys(Applications::COMPANY_TYPES)),
-                'app.company.branches' => 'required|integer|min:1|max:500', 'app.company.address' => 'required|string|min:8|max:300', 'app.company.email' => 'required|email|max:180',
+                'app.company.legalName' => 'required|string|min:3|max:180', 'app.company.companyType' => 'nullable|in:'.implode(',', array_keys(Applications::COMPANY_TYPES)),
+                'app.company.branches' => 'nullable|integer|min:1|max:500', 'app.company.address' => 'required|string|min:8|max:300', 'app.company.email' => 'required|email|max:180',
                 'app.company.phone' => $phone, 'app.company.natureOfBusiness' => 'required|string|max:180', 'app.company.description' => 'nullable|string|max:2000', 'app.company.website' => 'nullable|string|max:255',
                 'app.representative.name' => 'required|string|max:120', 'app.representative.position' => 'required|string|max:120', 'app.representative.idType' => 'required|in:'.implode(',', Applications::ID_TYPES),
                 'app.representative.email' => 'required|email|max:180', 'app.representative.phone' => $phone, 'app.payout.financeContact' => 'required|string|max:120',
@@ -144,11 +144,15 @@ class StartSellingController extends Controller
                 'app.personal.address' => 'required|string|min:8|max:300', 'app.personal.phone' => $phone, 'app.personal.email' => 'required|email|max:180',
                 'app.identity.idType' => 'required|in:'.implode(',', Applications::ID_TYPES), 'app.identity.idNumber' => 'required|string|max:60',
             ]),
+            // other branches besides the main address (optional; each becomes a branch once approved)
+            'app.branches' => 'nullable|array|max:20', 'app.branches.*.name' => 'nullable|string|max:120|required_with:app.branches.*.address',
+            'app.branches.*.address' => 'nullable|string|max:300|required_with:app.branches.*.name', 'app.branches.*.phone' => 'nullable|string|max:40',
             'app.payout.method' => 'required|in:bank,ewallet', 'app.payout.provider' => 'required|string|max:80', 'app.payout.accountName' => 'required|string|max:120', 'app.payout.accountNumber' => 'required|string|max:40',
         ];
         $badPhone = 'Enter a valid PH mobile number (e.g. 0917 555 0101).';
         $messages = [
-            'app.type.required' => 'Choose Individual Supplier or Organization / Company Supplier.', 'methods.required' => 'Select at least one payment method.',
+            'app.type.required' => 'Choose Individual Supplier or Organization / Company Supplier.',
+            'app.branches.*.name.required_with' => 'Give each extra branch a name.', 'app.branches.*.address.required_with' => 'Enter the address of each extra branch.', 'methods.required' => 'Select at least one payment method.',
             'app.personal.birthDate.before_or_equal' => 'You must be at least 18 years old.',
             'phone.regex' => $badPhone, 'app.personal.phone.regex' => $badPhone, 'app.company.phone.regex' => $badPhone, 'app.representative.phone.regex' => $badPhone,
             ...AddressInput::messages('shop_addr'),
@@ -233,7 +237,7 @@ class StartSellingController extends Controller
         $app = ['type' => $type, 'applicable' => array_values((array) ($in['applicable'] ?? [])), 'payout' => $in['payout']];
         if ($org) {
             $app += ['company' => $in['company'], 'representative' => $in['representative']];
-            $app['company']['branches'] = (int) $app['company']['branches'];
+            $app['company']['companyType'] = ($app['company']['companyType'] ?? '') ?: null;
             if (! $evt) { // rental company: what it rents
                 $app['business'] = ['shopName' => trim($v['name']), 'productTypes' => trim((string) ($in['business']['productTypes'] ?? '')), 'phone' => $v['phone']];
             }
@@ -249,6 +253,12 @@ class StartSellingController extends Controller
         $app['docs'] = array_intersect_key($docs, array_flip($allowed));
         if ($e = Applications::validate($app)) {
             return back()->withInput()->withErrors([str_contains($e, 'document') ? 'docs' : 'app.type' => $e]);
+        }
+        // other branches (the shop address above is the main branch)
+        $app['branches'] = array_values(array_map(fn ($b) => ['name' => trim((string) $b['name']), 'address' => trim((string) $b['address']), 'phone' => trim((string) ($b['phone'] ?? ''))],
+            array_filter((array) ($in['branches'] ?? []), fn ($b) => trim((string) ($b['name'] ?? '')) !== '' && trim((string) ($b['address'] ?? '')) !== '')));
+        if ($org) {
+            $app['company']['branches'] = 1 + count($app['branches']);
         }
         $app['submittedAt'] = now()->toIso8601String();
         $app['history'] = array_merge((array) ($old['history'] ?? []), $existing ? [['status' => $existing->status, 'reason' => $existing->reject_reason ?: $existing->revision_note, 'at' => $existing->reviewed_at?->toIso8601String()]] : []);

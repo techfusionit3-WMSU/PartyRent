@@ -18,7 +18,13 @@ class CatalogController extends Controller
 {
     private function sup(Request $r)
     {
-        return $r->user()->shop();
+        $s = $r->user()->shop();
+        if ($s && ! $r->attributes->get('branch_checked')) {
+            \App\Domain\Branches::main($s); // stock is always kept per branch: a shop has at least its main branch
+            $r->attributes->set('branch_checked', true);
+        }
+
+        return $s;
     }
 
     private function ownProduct(Request $r, Product $p): Product
@@ -187,7 +193,7 @@ class CatalogController extends Controller
             if (\App\Models\LocationStock::where('product_id', $p->id)->exists()) {
                 return;
             }
-            $qty = [$locs[0] => (int) $p->total_stock];
+            $qty = [\App\Domain\Branches::main($p->supplier)->id => (int) $p->total_stock]; // a new item's stock starts at the main branch
         }
         foreach ($locs as $id) {
             \App\Models\LocationStock::updateOrCreate(['product_id' => $p->id, 'inventory_location_id' => $id], ['qty' => (int) ($qty[$id] ?? 0)]);

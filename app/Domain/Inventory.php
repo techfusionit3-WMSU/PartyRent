@@ -558,8 +558,11 @@ class Inventory
 
     /* ---------------- packages & periods ---------------- */
 
-    /** Whole packages bookable on a date (limited by the scarcest rent or sale component). */
-    public function packageAvailableOn(int $pkgId, string $date, ?int $excludeId = null, ?array $sel = null, ?array $def = null, ?array $win = null): int
+    /**
+     * Whole packages bookable on a date (limited by the scarcest rent or sale component). With $locId: every rental
+     * item from that one branch (a package is never put together from two branches).
+     */
+    public function packageAvailableOn(int $pkgId, string $date, ?int $excludeId = null, ?array $sel = null, ?array $def = null, ?array $win = null, ?int $locId = null): int
     {
         $def ??= ($k = $this->package($pkgId)) ? Packages::def($k) : null;
         if (! $def) {
@@ -568,7 +571,8 @@ class Inventory
         $u = Packages::units($def, $sel);
         $min = PHP_INT_MAX;
         foreach ($u['rent'] as $pid => $q) {
-            $min = min($min, intdiv($this->availableOn($pid, $date, $excludeId, $win), max(1, $q)));
+            $free = $locId ? $this->availableAtLocation($pid, $locId, $date, $excludeId, $win) : $this->availableOn($pid, $date, $excludeId, $win);
+            $min = min($min, intdiv($free, max(1, $q)));
         }
         foreach ($u['sale'] as $pid => $q) {
             $min = min($min, intdiv($this->saleAvailable($pid, $excludeId), max(1, $q)));
@@ -734,9 +738,10 @@ class Inventory
                     $conflict = $conflict || isset($badKeys[$date.'|'.$pid]);
                 }
                 $win = $this->lineWindow($l, $date);
+                $loc = ! empty($l['sourceId']) ? (int) $l['sourceId'] : null; // a branch rental: that branch's stock only
                 $avail = ($l['type'] ?? 'item') === 'package'
-                    ? $this->packageAvailableOn((int) $l['ref_id'], $date, $excludeId, $l['sel'] ?? null, ! empty($l['snap']) ? Packages::def($l['snap']) : null, $win)
-                    : $this->availableOn((int) $l['ref_id'], $date, $excludeId, $win);
+                    ? $this->packageAvailableOn((int) $l['ref_id'], $date, $excludeId, $l['sel'] ?? null, ! empty($l['snap']) ? Packages::def($l['snap']) : null, $win, $loc)
+                    : ($loc && ! $this->product($l['ref_id'])?->isSale() ? $this->availableAtLocation((int) $l['ref_id'], $loc, $date, $excludeId, $win) : $this->availableOn((int) $l['ref_id'], $date, $excludeId, $win));
                 $byLine[$lid][$date] = ['ok' => ! $conflict, 'available' => $avail, 'requested' => (int) $l['days'][$date]];
             }
         }

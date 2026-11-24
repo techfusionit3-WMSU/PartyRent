@@ -29,13 +29,16 @@ class RequestController extends Controller
         $sid = $request->user()->shop()->id;
         $tab = array_key_exists($request->query('tab'), self::GROUPS) ? $request->query('tab') : 'pending';
         $q = mb_strtolower((string) $request->query('q', ''));
-        $all = RentalRequest::where('supplier_id', $sid)->with(['customer', 'payments'])->get();
+        // one branch's rentals (multi-branch shops), or all of them
+        $branches = \App\Models\InventoryLocation::where('supplier_id', $sid)->orderByDesc('is_main')->orderBy('id')->get();
+        $branch = $branches->firstWhere('id', (int) $request->query('branch'));
+        $all = RentalRequest::where('supplier_id', $sid)->when($branch, fn ($w) => $w->where('branch_id', $branch->id))->with(['customer', 'payments', 'branch'])->get();
         $list = $all->filter(fn ($r) => ! self::GROUPS[$tab] || in_array($r->status, self::GROUPS[$tab], true))
             ->filter(fn ($r) => ! $q || str_contains(mb_strtolower($r->code.' '.$r->event_name.' '.$r->customer->name), $q));
         $list = in_array($tab, ['pending', 'upcoming'], true) ? $list->sortBy('start_date') : $list->sortByDesc('created_at');
 
         return view('supplier.requests', [
-            'list' => $list->values(), 'tab' => $tab, 'q' => $request->query('q', ''),
+            'list' => $list->values(), 'tab' => $tab, 'q' => $request->query('q', ''), 'branches' => $branches, 'branch' => $branch,
             'counts' => array_map(fn ($st) => $all->filter(fn ($r) => ! $st || in_array($r->status, $st, true))->count(), self::GROUPS),
         ]);
     }
@@ -105,7 +108,7 @@ class RequestController extends Controller
         $data = $request->validate(['line' => 'required|string|max:20', 'location' => 'required|integer']);
         $res = Rentals::setLineSource($r, $data['line'], (int) $data['location']);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Inventory source updated.' : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $r->code.' is now fulfilled by '.($r->fresh()->branch?->name ?? 'the new branch').'.' : $res['error']);
     }
 
     /** Approve or reject the customer's installment schedule. */

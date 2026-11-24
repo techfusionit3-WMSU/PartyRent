@@ -991,3 +991,21 @@ html:has(.dash) { background: var(--bg, #FAF7FD) linear-gradient(#1E1433, #1E143
 .bulk-applied { margin-top: 12px; padding: 8px 12px; border-radius: 10px; background: rgba(22, 163, 74, .1); color: var(--green); font-size: .86rem; }
 .bulk-applied[hidden] { display: none; }
 .bulk-applied s { color: var(--muted); font-size: .8rem; margin-left: 2px; }
+
+/* checkout: the branch that fulfils the order (multi-branch shops) */
+.branch-list { display: grid; gap: 8px; }
+.branch-opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; cursor: pointer; background: var(--surface, #fff); margin: 0; }
+.branch-opt input { accent-color: var(--brand); width: 18px; height: 18px; margin-top: 2px; flex: none; }
+.branch-opt.on { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-50); }
+.branch-opt.off { opacity: .6; cursor: not-allowed; }
+.branch-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.branch-bad { color: var(--red); }
+.branch-one { display: flex; gap: 8px; align-items: center; margin-top: 10px; color: var(--muted); }
+.branch-one svg { width: 16px; height: 16px; flex: none; }
+
+/* supplier Branches page */
+.branch-card.is-off { opacity: .7; }
+.branch-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+.branch-stats div { background: var(--surface-2, #f6f3fb); border-radius: 10px; padding: 6px 4px; }
+.branch-stats b { display: block; font-size: 1.05rem; }
+.branch-stats span { font-size: .72rem; color: var(--muted); }

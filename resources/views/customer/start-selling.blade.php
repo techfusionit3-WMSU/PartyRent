@@ -144,17 +144,11 @@
     {{-- the address above is the main branch; more branches are optional (each keeps its own stock once approved) --}}
     <div class="card card-flat mt-2" style="padding:14px" data-branches>
       <h3 class="mt-0 mb-1">Other branches <span class="muted small">(optional)</span></h3>
-      <p class="small muted mt-0">Customers see one store. If you rent from more than one place, add the other branches here; the address above is your main branch. You can add, edit or deactivate branches, pin them on the map and set their stock any time from your dashboard (Branches).</p>
+      <p class="small muted mt-0">Customers see one store. If you rent from more than one place, add each other branch the same way as your main branch above (name, contact number, address and map pin). Each branch keeps its own stock once you are approved. You can also add, edit or deactivate branches any time from your dashboard (Branches).</p>
       <div data-branch-rows>
-        @foreach($extra as $i => $b)
-          <div class="form-grid branch-row" data-branch-row><div class="field"><label>Branch name</label><input class="input" name="app[branches][{{ $i }}][name]" maxlength="120" value="{{ $b['name'] ?? '' }}" placeholder="e.g. Pasig Branch">{!! $err('app.branches.'.$i.'.name') !!}</div>
-            <div class="field"><label>Contact number</label><input class="input" name="app[branches][{{ $i }}][phone]" maxlength="40" value="{{ $b['phone'] ?? '' }}" inputmode="tel"></div>
-            <div class="field full"><label>Complete address</label><div class="row" style="gap:8px"><input class="input grow" name="app[branches][{{ $i }}][address]" maxlength="300" value="{{ $b['address'] ?? '' }}" placeholder="Street, barangay, city"><button type="button" class="btn btn-ghost" data-branch-rm aria-label="Remove this branch">{{ icon('trash') }}</button></div>{!! $err('app.branches.'.$i.'.address') !!}</div></div>
-        @endforeach
+        @foreach($extra as $i => $b)@include('partials.branch-fields', ['i' => $i, 'b' => $b])@endforeach
       </div>
-      <template data-branch-tpl><div class="form-grid branch-row" data-branch-row><div class="field"><label>Branch name</label><input class="input" name="app[branches][__i__][name]" maxlength="120" placeholder="e.g. Pasig Branch"></div>
-        <div class="field"><label>Contact number</label><input class="input" name="app[branches][__i__][phone]" maxlength="40" inputmode="tel"></div>
-        <div class="field full"><label>Complete address</label><div class="row" style="gap:8px"><input class="input grow" name="app[branches][__i__][address]" maxlength="300" placeholder="Street, barangay, city"><button type="button" class="btn btn-ghost" data-branch-rm aria-label="Remove this branch">{{ icon('trash') }}</button></div></div></div></template>
+      <template data-branch-tpl>@include('partials.branch-fields', ['i' => '__i__', 'b' => []])</template>
       <button type="button" class="btn btn-sm" data-branch-add>{{ icon('plus') }}Add a branch</button>
     </div>
     <div class="field"><label>Business logo</label><div class="row wrap gap-sm">@foreach($logos as $l)<label class="chip {{ $o('logo', '🎈') === $l ? 'active' : '' }}" style="font-size:1.3rem"><input type="radio" name="logo" value="{{ $l }}" @checked($o('logo', '🎈') === $l) hidden>{{ $l }}</label>@endforeach</div></div>
@@ -352,7 +346,7 @@
   document.getElementById('back').addEventListener('click', function () { step--; draw(); });
   // other branches: add / remove rows
   f.addEventListener('click', function (e) {
-    if (e.target.closest('[data-branch-add]')) { var box = f.querySelector('[data-branch-rows]'); if (box.children.length >= 20) return toast('Up to 20 branches here; add more later from your dashboard.'); box.insertAdjacentHTML('beforeend', f.querySelector('[data-branch-tpl]').innerHTML.replace(/__i__/g, 'n' + Date.now())); box.lastElementChild.querySelector('input').focus(); }
+    if (e.target.closest('[data-branch-add]')) { var box = f.querySelector('[data-branch-rows]'); if (box.children.length >= 20) return toast('Up to 20 branches here; add more later from your dashboard.'); box.insertAdjacentHTML('beforeend', f.querySelector('[data-branch-tpl]').innerHTML.replace(/__i__/g, 'n' + Date.now())); var row = box.lastElementChild; if (window.PR && window.PR.mountPlaces) window.PR.mountPlaces(row); applyType(); row.querySelector('input').focus(); }
     var rm = e.target.closest('[data-branch-rm]'); if (rm) rm.closest('[data-branch-row]').remove();
   });
   @if($errors->any())

@@ -269,4 +269,49 @@ class BranchesTest extends TestCase
         $this->actingAs($admin)->withSession(['mode' => 'admin'])->post(route('admin.applications.review', $bare), ['decision' => 'approve'])->assertSessionHas('success');
         $this->assertSame(['North Warehouse'], $bare->fresh()->locations()->where('is_main', false)->pluck('name')->all());
     }
+
+    /** Extra branches in the application are filled in like the main branch: name, number, structured address, pin. */
+    public function test_application_branches_use_the_main_branch_form(): void
+    {
+        config(['partyrent.event_companies' => false]); // a rental company (the default scope)
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $pdf = fn ($n) => \Illuminate\Http\UploadedFile::fake()->create($n, 40, 'application/pdf');
+        $this->asCustomer('jose@demo.ph');
+        $this->get('/start-selling')->assertOk()->assertSee('data-branch-tpl', false)->assertSee('app[branches][__i__][addr][regionCode]', false);
+        $branch = ['name' => 'Pasig Branch', 'contact' => 'Ana', 'phone' => '0917 222 3333',
+            'addr' => ['regionCode' => '130000000', 'provinceCode' => '137400000', 'cityCode' => '137403000', 'barangay' => 'Kapitolyo', 'street' => '5 United St.'], 'lat' => 14.5700, 'lng' => 121.0600];
+        $form = [
+            'app' => ['type' => 'organization',
+                'company' => ['legalName' => 'Garcia Rentals Corp.', 'address' => '7 Sampaguita St., Marikina Heights, Marikina', 'email' => 'ops@garcia.ph', 'phone' => '0923 555 0707', 'natureOfBusiness' => 'Party and event equipment rental'],
+                'representative' => ['name' => 'Jose Garcia', 'position' => 'Manager', 'idType' => 'Passport', 'email' => 'jose@demo.ph', 'phone' => '0923 555 0707'],
+                'business' => ['productTypes' => 'Tents, chairs'], 'branches' => [$branch],
+                'payout' => ['method' => 'bank', 'provider' => 'BPI', 'accountName' => 'Garcia Rentals Corp.', 'accountNumber' => '1234567890', 'financeContact' => 'Ana Garcia']],
+            'docs' => ['business_registration' => $pdf('reg.pdf'), 'bir_cor' => $pdf('bir.pdf'), 'mayors_permit' => $pdf('permit.pdf'), 'rep_id' => $pdf('id.pdf'), 'proof_of_authority' => $pdf('auth.pdf')],
+            'name' => 'Garcia Rentals', 'description' => 'Tents, chairs and backdrops for Marikina parties.', 'logo' => '🎪',
+            'phone' => '0923 555 0707', 'email' => 'ops@garcia.ph', 'hours' => 'Daily 8–6',
+            'shop_addr' => ['regionCode' => '130000000', 'provinceCode' => '137400000', 'cityCode' => '137402000', 'barangay' => 'Marikina Heights', 'street' => '7 Sampaguita St.'],
+            'location_type' => 'shop', 'lat' => 14.6520, 'lng' => 121.1100, 'fulfillment' => 'both', 'methods' => ['cash', 'bank'],
+            'cancelDays' => 5, 'cancellation' => 'Free up to 5 days before.', 'returns' => 'Return clean.', 'conditions' => 'Renter pays for damage.',
+        ];
+        // a branch needs the same details as the main one: no city / bad number is refused on its step
+        $bad = $form;
+        $bad['app']['branches'][0]['addr']['cityCode'] = '';
+        $bad['app']['branches'][0]['phone'] = '123';
+        $this->post('/start-selling/check', array_merge($bad, ['step' => 3]))->assertStatus(422)
+            ->assertJsonValidationErrors(['app.branches.0.addr.cityCode', 'app.branches.0.phone']);
+        $this->post('/start-selling', $form)->assertSessionHasNoErrors()->assertSessionHas('success');
+
+        $s = Supplier::where('name', 'Garcia Rentals')->firstOrFail();
+        $this->assertSame('137403000', $s->application['branches'][0]['cityCode']);
+        $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();
+        $this->actingAs($admin)->withSession(['mode' => 'admin'])->post(route('admin.applications.review', $s), ['decision' => 'approve'])->assertSessionHas('success');
+        $branches = $s->fresh()->branches()->get();
+        $this->assertCount(2, $branches);
+        $this->assertTrue($branches[0]->is_main);
+        $pasig = $branches[1];
+        $this->assertSame(['Pasig Branch', '137403000', '0917 222 3333', 'Ana'], [$pasig->name, $pasig->city_code, $pasig->phone, $pasig->contact]);
+        $this->assertEqualsWithDelta(14.57, $pasig->lat, 0.0001);
+        $this->assertStringContainsString('Kapitolyo', $pasig->address);
+        $this->assertSame('5 United St.', $pasig->address_parts['street']);
+    }
 }

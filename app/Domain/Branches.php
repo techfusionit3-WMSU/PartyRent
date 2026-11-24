@@ -34,7 +34,7 @@ class Branches
         }
         if (! $b) {
             $b = $s->locations()->create([
-                'name' => 'Main branch', 'address' => (string) ($s->address ?? ''), 'city_code' => $s->city_code,
+                'name' => 'Main branch', 'address' => (string) ($s->address ?? ''), 'address_parts' => $s->address_parts, 'city_code' => $s->city_code,
                 'lat' => $s->lat, 'lng' => $s->lng, 'contact' => (string) ($s->contact_person ?? ''), 'phone' => (string) ($s->phone ?? ''),
                 'active' => true, 'is_main' => true,
             ]);
@@ -214,8 +214,9 @@ class Branches
             if ($name === '' || $s->locations()->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->exists()) {
                 continue;
             }
-            $s->locations()->create(['name' => $name, 'address' => trim((string) ($row['address'] ?? '')), 'phone' => trim((string) ($row['phone'] ?? '')),
-                'contact' => '', 'city_code' => $row['cityCode'] ?? null, 'active' => true, 'is_main' => false]);
+            $s->locations()->create(['name' => $name, 'address' => trim((string) ($row['address'] ?? '')), 'address_parts' => $row['addr'] ?? null, 'phone' => trim((string) ($row['phone'] ?? '')),
+                'contact' => trim((string) ($row['contact'] ?? '')), 'city_code' => $row['cityCode'] ?? null, 'lat' => $row['lat'] ?? null, 'lng' => $row['lng'] ?? null,
+                'active' => true, 'is_main' => false]);
         }
     }
 }

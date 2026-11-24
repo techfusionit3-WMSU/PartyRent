@@ -80,6 +80,8 @@
 
   /* ---------- toasts ---------- */
   window.PR = window.PR || {}; window.PR.toast = (m, t) => toast(m, t);
+  // address pickers and map pins added to the page later (e.g. another branch in the supplier application)
+  window.PR.mountPlaces = el => { $$('[data-address]', el).forEach(AddressPicker); $$('[data-map-picker]', el).forEach(MapPicker); };
   function toast(msg, type) {
     let box = $('.toasts'); if (!box) { box = document.createElement('div'); box.className = 'toasts'; box.setAttribute('role', 'status'); document.body.appendChild(box); }
     const t = document.createElement('div'); t.className = 'toast ' + (type || '');

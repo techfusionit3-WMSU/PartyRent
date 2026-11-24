@@ -145,14 +145,17 @@ class StartSellingController extends Controller
                 'app.identity.idType' => 'required|in:'.implode(',', Applications::ID_TYPES), 'app.identity.idNumber' => 'required|string|max:60',
             ]),
             // other branches besides the main address (optional; each becomes a branch once approved)
-            'app.branches' => 'nullable|array|max:20', 'app.branches.*.name' => 'nullable|string|max:120|required_with:app.branches.*.address',
-            'app.branches.*.address' => 'nullable|string|max:300|required_with:app.branches.*.name', 'app.branches.*.phone' => 'nullable|string|max:40',
+            // each one with the same details as the main branch: name, contact number, structured address, optional pin
+            'app.branches' => 'nullable|array|max:20', 'app.branches.*.name' => 'required|string|min:2|max:120', 'app.branches.*.contact' => 'nullable|string|max:120',
+            'app.branches.*.phone' => $phone, ...AddressInput::rules('app.branches.*.addr'),
+            'app.branches.*.lat' => 'nullable|numeric|between:-90,90', 'app.branches.*.lng' => 'nullable|numeric|between:-180,180|required_with:app.branches.*.lat',
             'app.payout.method' => 'required|in:bank,ewallet', 'app.payout.provider' => 'required|string|max:80', 'app.payout.accountName' => 'required|string|max:120', 'app.payout.accountNumber' => 'required|string|max:40',
         ];
         $badPhone = 'Enter a valid PH mobile number (e.g. 0917 555 0101).';
         $messages = [
             'app.type.required' => 'Choose Individual Supplier or Organization / Company Supplier.',
-            'app.branches.*.name.required_with' => 'Give each extra branch a name.', 'app.branches.*.address.required_with' => 'Enter the address of each extra branch.', 'methods.required' => 'Select at least one payment method.',
+            'app.branches.*.name.required' => 'Give each branch a name.', 'app.branches.*.phone.required' => 'Enter the contact number of each branch.', 'app.branches.*.phone.regex' => $badPhone,
+            ...AddressInput::messages('app.branches.*.addr'), 'methods.required' => 'Select at least one payment method.',
             'app.personal.birthDate.before_or_equal' => 'You must be at least 18 years old.',
             'phone.regex' => $badPhone, 'app.personal.phone.regex' => $badPhone, 'app.company.phone.regex' => $badPhone, 'app.representative.phone.regex' => $badPhone,
             ...AddressInput::messages('shop_addr'),
@@ -255,8 +258,18 @@ class StartSellingController extends Controller
             return back()->withInput()->withErrors([str_contains($e, 'document') ? 'docs' : 'app.type' => $e]);
         }
         // other branches (the shop address above is the main branch)
-        $app['branches'] = array_values(array_map(fn ($b) => ['name' => trim((string) $b['name']), 'address' => trim((string) $b['address']), 'phone' => trim((string) ($b['phone'] ?? ''))],
-            array_filter((array) ($in['branches'] ?? []), fn ($b) => trim((string) ($b['name'] ?? '')) !== '' && trim((string) ($b['address'] ?? '')) !== '')));
+        $app['branches'] = array_values(array_map(function ($b) {
+            $a = AddressInput::attributes((array) ($b['addr'] ?? []));
+            $pin = is_numeric($b['lat'] ?? null) && is_numeric($b['lng'] ?? null) ? [round((float) $b['lat'], 7), round((float) $b['lng'], 7)] : [null, null];
+
+            return ['name' => trim((string) $b['name']), 'contact' => trim((string) ($b['contact'] ?? '')), 'phone' => trim((string) $b['phone']),
+                'addr' => $a['address_parts'], 'address' => $a['address'], 'cityCode' => $a['city_code'], 'lat' => $pin[0], 'lng' => $pin[1]];
+        }, (array) ($v['app']['branches'] ?? [])));
+        foreach ($app['branches'] as $i => $b) { // a branch pin must be in the country and near its city, like the main pin
+            if ($b['lat'] !== null && ($e = self::locationErrors(['location_type' => 'shop', 'fulfillment' => 'delivery', 'lat' => $b['lat'], 'lng' => $b['lng']], $b['cityCode']))) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['app.branches.'.$i.'.lat' => $b['name'].': '.reset($e)]);
+            }
+        }
         if ($org) {
             $app['company']['branches'] = 1 + count($app['branches']);
         }

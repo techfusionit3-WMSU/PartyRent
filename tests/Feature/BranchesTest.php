@@ -117,7 +117,7 @@ class BranchesTest extends TestCase
         $this->assertSame($this->bgc->id, $r->branch_id);
         $this->assertSame([$this->bgc->id], array_values(array_unique(array_column($r->lines, 'sourceId'))));
         $this->assertEqualsWithDelta($opts[$this->bgc->id]['fee'], $r->pricing['deliveryFee'], 0.01);
-        $this->get(route('rentals.show', $r))->assertOk()->assertSee('Fulfilled by')->assertSee('Main Warehouse');
+        $this->get(route('rentals.show', $r))->assertOk()->assertSee('Rented from')->assertSee('Main Warehouse');
     }
 
     public function test_never_combines_stock_of_two_branches(): void
@@ -262,7 +262,7 @@ class BranchesTest extends TestCase
         $this->assertSame($bare->address, $main->address);
 
         // registration: no company type, optional extra branches that become branches once approved
-        $this->get('/start-selling')->assertOk()->assertDontSee('name="app[company][companyType]"', false)->assertSee('Other branches');
+        $this->get('/start-selling')->assertOk()->assertDontSee('name="app[company][companyType]"', false)->assertSee('Do you have other branches?');
         $this->assertSame('business_registration', \App\Domain\Applications::requirements('organization')[0]['key']);
         $bare->update(['application' => array_merge((array) $bare->application, ['branches' => [['name' => 'North Warehouse', 'address' => '10 EDSA, Caloocan', 'phone' => '0917 111 2222']]])]);
         $admin = User::where('email', 'admin@partyrent.ph')->firstOrFail();

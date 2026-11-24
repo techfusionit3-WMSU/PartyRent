@@ -28,7 +28,7 @@
         @endif
         @if($kind === 'sale' && ! empty($l['dates']))<div class="small muted">Needed on {{ collect($l['dates'])->map(fn ($d) => fmt_date($d))->implode(', ') }}</div>@endif
         @if($kind !== 'sale')<div class="small">{{ icon('clock', 'width:13px;vertical-align:-2px') }} {{ \App\Domain\Slots::time($sline) ? \App\Domain\Slots::rangeLabel(\App\Domain\Slots::time($sline)).' · '.\App\Domain\Slots::duration($sline)['label'] : 'All day' }}</div>@endif
-        @if($showSource && ! empty($src['sourceId']))<div class="small muted">{{ icon('box', 'width:13px;vertical-align:-2px') }} Inventory source: <b>{{ $locNames[$src['sourceId']] ?? '—' }}</b></div>@endif
+        @if($showSource && ! empty($src['sourceId']))<div class="small muted">{{ icon('box', 'width:13px;vertical-align:-2px') }} From: <b>{{ $locNames[$src['sourceId']] ?? '—' }}</b></div>@endif
       </div><b>{{ money($l['total']) }}</b></div>
       @if($l['days'])
         <div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th class="num">Qty</th><th class="num">{{ $kind === 'package' ? 'Rental part / day' : 'Daily rate' }}</th><th class="num">Subtotal</th></tr></thead><tbody>

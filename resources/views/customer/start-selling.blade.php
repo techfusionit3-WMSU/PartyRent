@@ -93,14 +93,14 @@
       <div class="form-grid">
         {!! $fld('Registered company / organization name', 'app[company][legalName]', $ao('company.legalName'), 'required minlength="3"', 'full') !!}
         @if($ctype)<input type="hidden" name="app[company][companyType]" value="{{ $ctype }}">@endif
-        {!! $fld('Complete business address', 'app[company][address]', $ao('company.address'), 'required minlength="8"', 'full') !!}
+        {!! $fld('Registered business address (as shown on your permits)', 'app[company][address]', $ao('company.address'), 'required minlength="8"', 'full') !!}
         {!! $fld('Official company email', 'app[company][email]', $ao('company.email'), 'type="email" required') !!}
         {!! $fld('Company contact number', 'app[company][phone]', $ao('company.phone'), 'required data-phone') !!}
-        {!! $fld('Nature of business', 'app[company][natureOfBusiness]', $ao('company.natureOfBusiness', 'Party and event equipment rental'), 'required', 'full') !!}
+        {!! $fld('What your business does', 'app[company][natureOfBusiness]', $ao('company.natureOfBusiness', 'Party and event equipment rental'), 'required', 'full') !!}
         {!! $fld('Website or social media page (optional)', 'app[company][website]', $ao('company.website'), '', 'full') !!}
       </div>
       <h3 class="mt-2">Authorized representative</h3>
-      <p class="small muted">The person submitting this application. Once approved, they become the <b>Organization Admin</b> of the supplier account.</p>
+      <p class="small muted">The person filling in this application. Once approved, they manage the shop account and can add staff.</p>
       <div class="form-grid">
         {!! $fld('Full name', 'app[representative][name]', $ao('representative.name')) !!}
         {!! $fld('Position / designation', 'app[representative][position]', $ao('representative.position')) !!}
@@ -143,13 +143,13 @@
     @include('partials.location-fields', ['locFor' => 'either'])
     {{-- the address above is the main branch; more branches are optional (each keeps its own stock once approved) --}}
     <div class="card card-flat mt-2" style="padding:14px" data-branches>
-      <h3 class="mt-0 mb-1">Other branches <span class="muted small">(optional)</span></h3>
-      <p class="small muted mt-0">Customers see one store. If you rent from more than one place, add each other branch the same way as your main branch above (name, contact number, address and map pin). Each branch keeps its own stock once you are approved. You can also add, edit or deactivate branches any time from your dashboard (Branches).</p>
+      <h3 class="mt-0 mb-1">Do you have other branches? <span class="muted small">(optional)</span></h3>
+      <p class="small muted mt-0">The address above is your main branch. If you also rent from other places, add them here. Customers will still see one store. You can also add or change branches later from your dashboard.</p>
       <div data-branch-rows>
         @foreach($extra as $i => $b)@include('partials.branch-fields', ['i' => $i, 'b' => $b])@endforeach
       </div>
       <template data-branch-tpl>@include('partials.branch-fields', ['i' => '__i__', 'b' => []])</template>
-      <button type="button" class="btn btn-sm" data-branch-add>{{ icon('plus') }}Add a branch</button>
+      <button type="button" class="btn btn-sm" data-branch-add>{{ icon('plus') }}Add another branch</button>
     </div>
     <div class="field"><label>Business logo</label><div class="row wrap gap-sm">@foreach($logos as $l)<label class="chip {{ $o('logo', '🎈') === $l ? 'active' : '' }}" style="font-size:1.3rem"><input type="radio" name="logo" value="{{ $l }}" @checked($o('logo', '🎈') === $l) hidden>{{ $l }}</label>@endforeach</div></div>
   </section>
@@ -344,10 +344,13 @@
     }).catch(function () { nextBtn.disabled = false; toast('Could not check this step. Check your connection and try again.'); });
   });
   document.getElementById('back').addEventListener('click', function () { step--; draw(); });
-  // other branches: add / remove rows
+  // other branches: numbered after the main one (Branch 2, Branch 3…); add / remove rows
+  function numberBranches() { f.querySelectorAll('[data-branch-rows] [data-branch-title]').forEach(function (t, i) { t.textContent = 'Branch ' + (i + 2); }); }
+  numberBranches();
   f.addEventListener('click', function (e) {
     if (e.target.closest('[data-branch-add]')) { var box = f.querySelector('[data-branch-rows]'); if (box.children.length >= 20) return toast('Up to 20 branches here; add more later from your dashboard.'); box.insertAdjacentHTML('beforeend', f.querySelector('[data-branch-tpl]').innerHTML.replace(/__i__/g, 'n' + Date.now())); var row = box.lastElementChild; if (window.PR && window.PR.mountPlaces) window.PR.mountPlaces(row); applyType(); row.querySelector('input').focus(); }
     var rm = e.target.closest('[data-branch-rm]'); if (rm) rm.closest('[data-branch-row]').remove();
+    numberBranches();
   });
   @if($errors->any())
     step = {{ $errorStep }};

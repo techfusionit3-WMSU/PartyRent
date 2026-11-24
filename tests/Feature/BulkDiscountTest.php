@@ -67,7 +67,7 @@ class BulkDiscountTest extends TestCase
     public function test_product_form_saves_percent_tiers_and_follows_the_base_price(): void
     {
         $p = $this->juanItem();
-        $this->get(route('supplier.products.edit', $p))->assertOk()->assertSee('data-bulk-editor', false)->assertSee('Add discount tier');
+        $this->get(route('supplier.products.edit', $p))->assertOk()->assertSee('data-bulk-editor', false)->assertSee('Add a discount');
 
         $this->form($p, [['min' => 5, 'pct' => 5], ['min' => 10, 'pct' => 10], ['min' => 20, 'pct' => 15]])->assertSessionHasNoErrors();
         $this->assertSame([95.0, 90.0, 85.0], array_map(fn ($t) => (float) $t['price'], array_slice($p->fresh()->tiers, 1)));

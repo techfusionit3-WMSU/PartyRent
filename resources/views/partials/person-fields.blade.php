@@ -12,9 +12,9 @@
     $msg = fn ($k) => $errors->has($k) ? '<div class="error-text" style="display:block">'.e($errors->first($k)).'</div>' : '';
     $tag = fn ($on) => $on ? '<span class="req" aria-hidden="true">*</span>' : '<span class="muted small">(optional)</span>';
 @endphp
-<div class="name-grid">
+<div class="name-grid {{ ! empty($stacked) ? 'stacked' : '' }}">
   <div class="field {{ $bad('first_name') }}"><label for="first_name">First name {!! $tag(true) !!}</label><input class="input" id="first_name" name="first_name" required maxlength="80" value="{{ $f('first_name') }}" autocomplete="given-name" placeholder="e.g. Maria">{!! $msg('first_name') !!}</div>
-  <div class="field {{ $bad('middle_name') }}"><label for="middle_name">Middle name {!! $tag(false) !!}</label><input class="input" id="middle_name" name="middle_name" maxlength="80" value="{{ $f('middle_name') }}" autocomplete="additional-name" placeholder="e.g. Lopez">{!! $msg('middle_name') !!}</div>
+  <div class="field {{ $bad('middle_name') }}"><label for="middle_name">Middle name</label><input class="input" id="middle_name" name="middle_name" maxlength="80" value="{{ $f('middle_name') }}" autocomplete="additional-name" placeholder="Optional">{!! $msg('middle_name') !!}</div>
   <div class="field {{ $bad('last_name') }}"><label for="last_name">Last name {!! $tag(true) !!}</label><input class="input" id="last_name" name="last_name" required maxlength="80" value="{{ $f('last_name') }}" autocomplete="family-name" placeholder="e.g. Santos">{!! $msg('last_name') !!}</div>
 </div>
 <div class="form-grid">

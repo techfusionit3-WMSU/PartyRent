@@ -61,7 +61,7 @@
       </div>
       <div class="field"><label>Base price (₱ per unit<span data-for="rent"> per <span data-unit-word>{{ $mode === 'hour' ? 'hour' : 'day' }}</span></span>)</label><input class="input" type="number" min="0.01" step="0.01" name="base_price" required value="{{ $base }}" style="max-width:300px">@error('base_price')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
       <div class="mt-2">@include('partials.bulk-editor', ['rows' => $bulk, 'stock' => null, 'errorText' => $errors->first('bulk') ?: $errors->first('bulk.*')])</div>
-      <p class="small muted mt-1 mb-0">Changes apply to new requests only; accepted requests keep their quoted price.</p>
+      <p class="small muted mt-1 mb-0">Price changes only affect new requests. Requests you already received keep their price.</p>
     </div>
 
     {{-- Damage & replacement (rental items): on the Price step, after the price --}}
@@ -104,12 +104,13 @@
     <div class="card" data-wiz-step="{{ __('Stock & listing') }}"><h3>Inventory</h3>
       <div data-for="rent">
         @if($locs->isNotEmpty())
-          <div class="label mb-1">Quantity per inventory location</div>
+          <div class="label mb-1">{{ $locs->count() > 1 ? 'How many you have at each branch' : 'How many you have' }}</div>
+          @if($locs->count() > 1)<p class="small muted mt-0">Customers rent from one branch at a time, so each branch's count is kept separately.</p>@endif
           @foreach($locs as $i => $l)
             <div class="row between mb-1" style="gap:10px"><div><b class="small">{{ $l->name }}</b><div class="small muted">{{ $l->address }}</div></div><input class="input" type="number" min="0" name="qty[{{ $l->id }}]" data-loc value="{{ old('qty.'.$l->id, $p->exists ? inv()->stockAt($p->id, $l->id) : ($i === 0 ? '' : 0)) }}" style="width:100px" aria-label="Quantity at {{ $l->name }}"></div>
           @endforeach
-          <div class="sum-line strong"><span>Total inventory</span><span data-tot>{{ $p->total_stock ?? 0 }}</span></div>
-          @if($p->exists)<p class="small">Highest accepted reservation at one time: <b>{{ $peak }}</b>. A location cannot go below the bookings allocated to it. <a href="{{ route('supplier.locations') }}">Manage locations</a></p>@endif
+          <div class="sum-line strong"><span>{{ $locs->count() > 1 ? 'Total at all branches' : 'Total' }}</span><span data-tot>{{ $p->total_stock ?? 0 }}</span></div>
+          @if($p->exists)<p class="small muted">Most booked at one time: <b>{{ $peak }}</b>. A branch can't go below what is already booked there. <a href="{{ route('supplier.locations') }}">Manage branches</a></p>@endif
         @else
           <div class="field"><label>Quantity (units you own)</label><input class="input" type="number" min="0" name="total_stock" value="{{ old('total_stock', $p->total_stock ?? 0) }}"></div>
         @endif

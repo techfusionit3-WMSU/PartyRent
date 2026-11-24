@@ -1,9 +1,9 @@
 <form class="card" method="POST" action="{{ route('account.update') }}">
   @csrf @method('PUT')
   <h3>Personal information</h3>
-  @include('partials.person-fields', ['u' => $u, 'required' => ! $u->isStaff()])
-  <div class="field @error('email') invalid @enderror"><label>Email address</label><input class="input" type="email" name="email" required value="{{ old('email', $u->email) }}">@error('email')<div class="error-text">{{ $message }}</div>@enderror</div>
-  <div class="field @error('phone') invalid @enderror"><label>Contact number</label><input class="input" name="phone" required value="{{ old('phone', $u->phone) }}">@error('phone')<div class="error-text">{{ $message }}</div>@enderror</div>
+  @include('partials.person-fields', ['u' => $u, 'required' => ! $u->isStaff(), 'stacked' => true])
+  <div class="field @error('email') invalid @enderror"><label>Email address <span class="req" aria-hidden="true">*</span></label><input class="input" type="email" name="email" required value="{{ old('email', $u->email) }}">@error('email')<div class="error-text">{{ $message }}</div>@enderror</div>
+  <div class="field @error('phone') invalid @enderror"><label>Mobile number <span class="req" aria-hidden="true">*</span></label><input class="input" name="phone" placeholder="0917 555 0101" required value="{{ old('phone', $u->phone) }}">@error('phone')<div class="error-text">{{ $message }}</div>@enderror</div>
   @if($u->isStaff())
     <div class="field @error('address') invalid @enderror"><label>Address</label><input class="input" name="address" required value="{{ old('address', $u->address) }}">@error('address')<div class="error-text">{{ $message }}</div>@enderror</div>
   @else

@@ -193,13 +193,13 @@
     const opt = b => {
       const ok = b.ok && b.deliverable, on = b.id === chosen;
       const facts = ok ? [b.km != null ? b.km + ' km away' : null, del ? 'Delivery ' + money(b.fee) : 'Pick up here'].filter(Boolean).join(' · ')
-        : (!b.ok ? 'Not enough stock: ' + b.short.slice(0, 2).join('; ') : (b.note || 'Does not deliver to this address'));
+        : (!b.ok ? 'Doesn\'t have everything you need: ' + b.short.slice(0, 2).join('; ') : (b.note || 'Doesn\'t deliver to this address'));
       return '<label class="branch-opt' + (on ? ' on' : '') + (ok ? '' : ' off') + '"><input type="radio" name="br_' + o.supplier_id + '" value="' + b.id + '" data-branch' + (on ? ' checked' : '') + (ok ? '' : ' disabled') + '>' +
-        '<div class="grow" style="min-width:0"><div class="branch-top"><b>' + esc(b.name) + '</b>' + (b.recommended ? '<span class="badge b-green plain">Recommended</span>' : '') + (b.main ? '<span class="badge b-gray plain">Main</span>' : '') + '</div>' +
+        '<div class="grow" style="min-width:0"><div class="branch-top"><b>' + esc(b.name) + '</b>' + (b.recommended ? '<span class="badge b-green plain">Best for you</span>' : '') + (b.main ? '<span class="badge b-gray plain">Main</span>' : '') + '</div>' +
         '<div class="small muted">' + esc(b.address + (b.city && !String(b.address).toLowerCase().includes(String(b.city).split(',')[0].replace(/ city$/i, '').toLowerCase()) ? ', ' + b.city : '')) + '</div><div class="small ' + (ok ? '' : 'branch-bad') + '">' + esc(facts) + '</div></div></label>';
     };
-    return '<div class="label mt-2 mb-1">Fulfilling branch</div><p class="small muted mt-0 mb-1">' + esc(o.shop.name) + ' has ' + list.length + ' branches; each rents from its own stock. ' +
-      (del && !pinned ? 'Pin your delivery address on the map to compare branches by distance.' : 'The recommended branch has everything for your dates' + (del ? ' at the lowest delivery fee.' : '.')) + '</p>' +
+    return '<div class="label mt-2 mb-1">Which branch to rent from</div><p class="small muted mt-0 mb-1">' + esc(o.shop.name) + ' has ' + list.length + ' branches. We picked the one that has everything you need' + (del ? ' and the lowest delivery fee' : '') + '; you can choose another. ' +
+      (del && !pinned ? 'Tip: tap <b>Pin on map</b> on your address to compare the branches by distance.' : '') + '</p>' +
       '<div class="branch-list">' + list.map(opt).join('') + '</div>' + (o.branch_id ? '<button type="button" class="link-btn small mt-1" data-branchauto>Use the recommended branch</button>' : '');
   }
 

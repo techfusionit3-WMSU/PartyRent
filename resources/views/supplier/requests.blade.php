@@ -8,7 +8,9 @@
 </div>
 <div class="tabs">@foreach([['pending', 'Pending'], ['upcoming', 'Accepted / Upcoming'], ['active', 'Ongoing & Returns'], ['completed', 'Completed'], ['closed', 'Declined / Cancelled'], ['all', 'All']] as [$k, $l])<a class="tab {{ $tab === $k ? 'active' : '' }}" href="{{ route('supplier.requests', array_filter(['tab' => $k, 'q' => $q, 'branch' => $branch?->id])) }}">{{ $l }}<span class="count">{{ $counts[$k] }}</span></a>@endforeach</div>
 <div class="card pad-0">
-  @if($list->isEmpty())
+  @if($list->isEmpty() && $branch)
+    @include('partials.empty', ['emoji' => '🏬', 'title' => 'No rentals for '.$branch->name.' here', 'text' => 'Try another tab, or look at every branch.', 'action' => '<a class="btn" href="'.e(route('supplier.requests', array_filter(['tab' => $tab, 'q' => $q]))).'">Show all branches</a>'])
+  @elseif($list->isEmpty())
     @include('partials.empty', ['emoji' => '📋', 'title' => __('No requests here yet'), 'text' => __('New requests from customers show up here. More customers find you when your shop has photos, clear prices and good reviews.'), 'action' => '<a class="btn" href="'.e(route('suppliers.show', auth()->user()->shop())).'">'.icon('store').e(__('See your shop page')).'</a>'])
   @else
     <div class="table-wrap"><table class="table cards"><thead><tr><th>Request</th><th>Customer</th><th>Products</th><th>Rental dates</th><th class="num">Amount</th><th>Payment</th><th>Submitted</th><th>Status</th><th></th></tr></thead><tbody>

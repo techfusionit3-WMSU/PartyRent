@@ -69,8 +69,10 @@
         <div class="table-wrap"><table class="table cards"><thead><tr><th>Date</th><th>Item</th><th class="num">Requested (peak)</th><th class="num">Available</th><th class="num">Other pending</th><th>Result</th></tr></thead><tbody>
           @foreach($chk['rows'] as $x)
             @php($pend = empty($x['location_id']) && ! empty($x['product_id']) && empty($x['sale']) ? inv()->pendingOn($x['product_id'], $x['date'], $r->id) : 0)
-            <tr class="{{ $x['ok'] ? '' : 'row-bad' }}"><td data-label="Date">{{ fmt_day($x['date']) }}</td><td data-label="Item">{{ $x['name'] }}@if(! empty($x['location_id']))<div class="small muted">at {{ $locs->firstWhere('id', $x['location_id'])?->name }}</div>@endif</td>
-              <td data-label="Requested (peak)" class="num"><b>{{ $x['requested'] }}</b></td><td data-label="Available" class="num">{{ $x['available'] }}</td>
+            @php($atBranch = empty($x['location_id']) && ! empty($x['product_id']) && empty($x['sale']) && $r->branch_id && $locs->count() > 1)
+            @php($avail = $atBranch ? inv()->availableAtLocation($x['product_id'], $r->branch_id, $x['date'], $r->id) : $x['available'])
+            <tr class="{{ $x['ok'] ? '' : 'row-bad' }}"><td data-label="Date">{{ fmt_day($x['date']) }}</td><td data-label="Item">{{ $x['name'] }}@if(! empty($x['location_id']))<div class="small muted">at {{ $locs->firstWhere('id', $x['location_id'])?->name }}</div>@elseif($atBranch)<div class="small muted">at {{ $r->branch?->name }}</div>@endif</td>
+              <td data-label="Requested (peak)" class="num"><b>{{ $x['requested'] }}</b></td><td data-label="Available" class="num">{{ $avail }}</td>
               <td data-label="Other pending" class="num">@if($pend)<span style="color:#B45309">{{ $pend }}</span>@else 0 @endif</td>
               <td data-label="Result">@if($x['ok'])<span class="badge b-green">OK</span>@else<span class="badge b-red">Short by {{ max(1, $x['requested'] - $x['available']) }}</span>@endif</td></tr>
           @endforeach
@@ -80,18 +82,20 @@
     @if($locs->count())
       {{-- one branch fulfils the whole rental: its stock, its address as delivery origin / pickup place --}}
       @php($br = $r->branch)
-      <div class="card"><div class="card-head"><h3>{{ icon('store') }} Fulfilling branch</h3>@if($br)<span class="badge b-purple plain">{{ $br->name }}</span>@endif</div>
-        @if($br)<p class="small mb-1"><b>{{ $br->name }}</b> · {{ $br->address }}{{ $br->phone ? ' · '.$br->phone : '' }}</p>@endif
-        <p class="small muted">Every item in {{ $r->code }} comes from this branch's own stock{{ $r->fulfillment === 'delivery' ? ' and is delivered from it' : ' and is picked up there' }}. {{ $canAlloc && $locs->where('active', true)->count() > 1 ? 'Move it to another branch only if that branch has everything for these dates; the quoted price stays the same.' : '' }}</p>
+      <div class="card"><div class="card-head"><h3>{{ icon('store') }} Branch for this rental</h3></div>
+        @if($br)<p class="mb-1"><b>{{ $br->name }}</b><span class="small muted"> · {{ $br->address }}{{ $br->phone ? ' · '.$br->phone : '' }}</span></p>@endif
+        <p class="small muted">Everything in this rental comes from this branch's stock{{ $r->fulfillment === 'delivery' ? ' and is delivered from there' : ' and is picked up there' }}.</p>
         @if($canAlloc && $locs->where('active', true)->count() > 1)
           @php($ld0 = collect($r->lines)->flatMap(fn ($l) => array_keys($l['days']))->min())
+          <label class="small strong" for="moveBranch">Move this rental to another branch</label>
+          <p class="small muted mt-0 mb-1">Only a branch that has everything for these dates can take it. The customer's price stays the same.</p>
           <form method="POST" action="{{ route('supplier.requests.source', $r) }}" class="row wrap" style="gap:8px">@csrf<input type="hidden" name="line" value="{{ $r->lines[0]['id'] ?? 'l1' }}">
-            <select class="input input-sm" name="location" aria-label="Fulfilling branch" style="max-width:340px">
+            <select class="input input-sm" id="moveBranch" name="location" style="max-width:340px">
               @foreach($locs->where('active', true) as $loc)
                 @php($fit = \App\Domain\Branches::check($r->lines, $loc, $r->id))
-                <option value="{{ $loc->id }}" @selected($r->branch_id === $loc->id)>{{ $loc->name }}{{ $r->branch_id === $loc->id ? ' (current)' : ($fit['ok'] ? ' — has everything' : ' — short: '.($fit['short'][0] ?? '')) }}</option>
+                <option value="{{ $loc->id }}" @selected($r->branch_id === $loc->id)>{{ $loc->name }}{{ $r->branch_id === $loc->id ? ' (current)' : ($fit['ok'] ? ' — has everything' : ' — not enough stock') }}</option>
               @endforeach
-            </select><button class="btn btn-sm">Move to this branch</button></form>
+            </select><button class="btn btn-sm">Move rental</button></form>
         @endif
       </div>
     @endif

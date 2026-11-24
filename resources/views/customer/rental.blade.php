@@ -40,7 +40,7 @@
       <dl class="kv">
         <dt>Supplier</dt><dd><a href="{{ route('suppliers.show', $sup) }}">{{ $sup->name }}</a><div class="small muted">{{ $sup->phone }}</div></dd>
         @if($r->fulfillment === 'delivery')<dt>Deliver to</dt><dd>{{ count($r->destinations ?? []) > 1 ? count($r->destinations).' locations (see left)' : $r->address }}</dd>@else<dt>Pickup at</dt><dd>{{ $r->branch && $r->revealsPickupLocation() ? $r->branch->name.', '.$r->branch->address : ($r->revealsPickupLocation() ? $sup->address : $sup->publicAddress()) }}<div class="small muted">{{ $sup->hours }}</div></dd>@endif
-        @if($r->branch)<dt>Fulfilled by</dt><dd>{{ $r->branch->name }}@if($r->branch->cityName())<div class="small muted">{{ $r->branch->cityName() }}</div>@endif</dd>@endif
+        @if($r->branch)<dt>Rented from</dt><dd>{{ $r->branch->name }}@if($r->branch->cityName())<div class="small muted">{{ $r->branch->cityName() }}</div>@endif</dd>@endif
         <dt>Contact</dt><dd>{{ $r->contact_name }} · {{ $r->contact_phone }}</dd>
         <dt>Payment</dt><dd>{{ \App\Domain\Finance::PLAN_LABEL[$r->plan] ?? '' }} · {{ \App\Domain\Finance::METHOD_LABEL[$r->method] ?? $r->method }}</dd>
         @if(! empty($r->fulfillment_log['releaseDate']))<dt>Released</dt><dd>{{ fmt_date($r->fulfillment_log['releaseDate']) }} to {{ $r->fulfillment_log['receivedBy'] ?? '' }}</dd>@endif

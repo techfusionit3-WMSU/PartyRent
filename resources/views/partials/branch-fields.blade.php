@@ -9,11 +9,11 @@
     $e = fn ($k) => $errors->first('app.branches.'.$i.'.'.$k);
 @endphp
 <div class="card card-flat branch-row mb-2" style="padding:14px" data-branch-row>
-  <div class="row between mb-1"><b data-branch-title>{{ icon('store', 'width:16px;vertical-align:-3px') }} Branch</b><button type="button" class="btn btn-xs btn-ghost" data-branch-rm>{{ icon('trash') }}Remove</button></div>
+  <div class="row between mb-1"><b>{{ icon('store', 'width:16px;vertical-align:-3px') }} <span data-branch-title>Another branch</span></b><button type="button" class="btn btn-xs btn-ghost" data-branch-rm>{{ icon('trash') }}Remove this branch</button></div>
   <div class="form-grid">
     <div class="field full {{ $e('name') ? 'invalid' : '' }}"><label>Branch name</label><input class="input" name="{{ $key }}[name]" required minlength="2" maxlength="120" value="{{ $b['name'] ?? '' }}" placeholder="e.g. Pasig Branch">@if($e('name'))<div class="error-text" style="display:block">{{ $e('name') }}</div>@endif</div>
     <div class="field"><label>Person in charge <span class="muted">(optional)</span></label><input class="input" name="{{ $key }}[contact]" maxlength="120" value="{{ $b['contact'] ?? '' }}"></div>
-    <div class="field {{ $e('phone') ? 'invalid' : '' }}"><label>Branch contact number</label><input class="input" name="{{ $key }}[phone]" required maxlength="40" value="{{ $b['phone'] ?? '' }}" data-phone>@if($e('phone'))<div class="error-text" style="display:block">{{ $e('phone') }}</div>@endif</div>
+    <div class="field {{ $e('phone') ? 'invalid' : '' }}"><label>Branch contact number</label><input class="input" name="{{ $key }}[phone]" required maxlength="40" value="{{ $b['phone'] ?? '' }}" placeholder="0917 555 0101" data-phone>@if($e('phone'))<div class="error-text" style="display:block">{{ $e('phone') }}</div>@endif</div>
   </div>
   <h4 class="mt-1 mb-1">Branch address</h4>
   @include('partials.address-fields', ['key' => $key.'[addr]', 'value' => $b['addr'] ?? [], 'full' => true, 'required' => true])

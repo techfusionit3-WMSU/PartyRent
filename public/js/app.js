@@ -610,10 +610,10 @@
       const hit = tiers.filter(t => q >= t.min).pop();
       const pct = hit ? hit.pct : 0, e1 = hit ? each(b, pct) : r2(b);
       $('[data-p-orig]', ed).textContent = b > 0 ? peso(b) : 'Enter a base price';
-      $('[data-p-pct]', ed).textContent = hit ? pctTxt(pct) + '% off (' + hit.min + '+ tier)' : 'None' + (tiers.length ? ' (below ' + tiers[0].min + ' pieces)' : '');
+      $('[data-p-pct]', ed).textContent = hit ? pctTxt(pct) + '% off (' + hit.min + ' or more)' : 'None' + (tiers.length ? ' (fewer than ' + tiers[0].min + ')' : '');
       $('[data-p-each]', ed).textContent = b > 0 ? peso(e1) : '—';
       $('[data-p-total-lbl]', ed).textContent = 'Total for ' + q + (q === 1 ? ' piece' : ' pieces') + per();
-      $('[data-p-total]', ed).innerHTML = b > 0 ? peso(e1 * q) + (hit ? ' <span class="small" style="color:var(--green)">saves ' + peso((b - e1) * q) + '</span>' : '') : '—';
+      $('[data-p-total]', ed).innerHTML = b > 0 ? peso(e1 * q) + (hit ? '<span class="bulk-save">Customer saves ' + peso((b - e1) * q) + '</span>' : '') : '—';
       // the whole price list, the preview's row highlighted
       const list = [{ min: 1, pct: 0 }].concat(tiers);
       $('[data-p-list]', ed).innerHTML = b > 0 && tiers.length ? list.map((t, i) => {

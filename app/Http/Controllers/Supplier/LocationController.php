@@ -87,7 +87,7 @@ class LocationController extends Controller
         $l = $this->own($request, $location);
         $res = StockLocations::setActive($request->user()->shop(), $l, ! $l->active);
 
-        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $l->name.($l->fresh()->active ? ' takes rentals again.' : ' is deactivated: customers can no longer rent from it.') : $res['error']);
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $l->name.($l->fresh()->active ? ' is open for rentals again.' : ' is paused: customers can\'t rent from it until you open it again.') : $res['error']);
     }
 
     public function destroy(Request $request, InventoryLocation $location)

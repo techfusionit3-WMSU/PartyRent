@@ -83,14 +83,14 @@ class StockLocations
     {
         if (! $on) {
             if ($l->is_main) {
-                return self::fail('Make another branch your main branch before deactivating '.$l->name.'.');
+                return self::fail($l->name.' is your main branch. Make another branch the main one before pausing it.');
             }
             if ($s->locations()->where('active', true)->where('id', '!=', $l->id)->doesntExist()) {
-                return self::fail('Keep at least one active branch.');
+                return self::fail('At least one branch must stay open for rentals.');
             }
             $open = RentalRequest::where('branch_id', $l->id)->whereIn('status', array_merge(['pending'], Inventory::RESERVING))->pluck('code');
             if ($open->isNotEmpty()) {
-                return self::fail($l->name.' still fulfils '.$open->take(5)->implode(', ').($open->count() > 5 ? ' and more' : '').'. Move those rentals to another branch first (open each rental → Fulfilling branch).');
+                return self::fail($l->name.' still has open rentals ('.$open->take(5)->implode(', ').($open->count() > 5 ? ' and more' : '').'). Move those rentals to another branch first (open each rental and change its branch).');
             }
         }
         $l->update(['active' => $on]);

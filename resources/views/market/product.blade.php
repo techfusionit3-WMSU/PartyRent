@@ -83,6 +83,7 @@
         $('hDays').value = JSON.stringify($('hDate').value ? (function () { var o = {}; o[$('hDate').value] = q; return o; })() : {});
         $('hHours').textContent = h ? '(' + h + ' h × ' + q + ')' : '';
         $('hEst').textContent = h ? peso(price(q) * h * q) : '—';
+        if (window.PR && window.PR.bulkApplied) window.PR.bulkApplied(f, [q]);
         clearTimeout(timer); timer = setTimeout(check, 250);
         if (h && h < minH) $('hHours').textContent += ' · minimum ' + minH + ' h';
       }

@@ -125,7 +125,8 @@ class BulkDiscountTest extends TestCase
 
         $this->get(route('products.show', $p))->assertOk()
             ->assertSee('5% off for 5+')->assertSee('data-bulk-prices', false)
-            ->assertSee('1–4 · <b>₱100.00</b>', false)->assertSee('10+ · <b>₱90.00</b>', false);
+            ->assertSee('data-min="10" data-pct="10" data-price="₱90.00"', false)
+            ->assertSee('class="bulk-applied" data-bulk-prices hidden', false); // shown only once the quantity reaches a tier
 
         // the date rows show the price before the discount and the percent
         $d = add_days(today_iso(), 12);

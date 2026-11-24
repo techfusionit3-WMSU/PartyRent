@@ -389,14 +389,7 @@
         if (at) at.innerHTML = !dates.length ? '<span class="badge b-gray">Pick a date</span>' : r.ok ? '<span class="badge b-green">Available for your ' + (dates.length > 1 ? 'dates' : 'date') + '</span>' + (r.minAvailable != null ? '<div class="small muted">' + (dates.length > 1 ? 'Min. ' + r.minAvailable + ' free per day' : r.minAvailable + ' free') + '</div>' : '') : '<span class="badge b-red">Not enough stock</span><div class="small" style="color:var(--red)">' + r.bad.map(b => esc(b.date) + ': only ' + b.available).join(', ') + '</div>';
         const qb = $('#qbox', box); if (qb) qb.classList.toggle('bad', !r.ok);
         const est = $('#est', box); if (est) est.textContent = r.totalText + (dates.length > 1 ? ' · ' + dates.length + ' days' : '');
-        $$('[data-tier]', box).forEach(t => { const min = +t.dataset.min, max = t.dataset.max ? +t.dataset.max : null; t.classList.toggle('on', vals.some(q => q >= min && (max == null || q <= max))); });
-        // bulk discount: how many more pieces (per day) reach the next tier
-        const nx = $('[data-bulk-next]', box);
-        if (nx) {
-          const top = vals.length ? Math.max(...vals) : 0, next = $$('[data-tier]', box).find(t => +t.dataset.min > top && +t.dataset.pct > 0);
-          const cur = $$('[data-tier]', box).filter(t => top >= +t.dataset.min && +t.dataset.pct > 0).pop();
-          nx.textContent = !top || !qtySet ? '' : next ? 'Rent ' + (+next.dataset.min - top) + ' more' + (dates.length > 1 ? ' a day' : '') + ' to get ' + next.dataset.pct + '% off (' + next.dataset.price + ' each).' : cur ? 'You get the best bulk price: ' + cur.dataset.pct + '% off.' : '';
-        }
+        bulkApplied(box, qtySet ? vals : []);
         // not enough stock: the buttons look off but still answer a click with why (and a fix), never silently
         lastCheck = r;
         $$('[data-rent-submit]', box).forEach(b => { b.disabled = false; b.classList.toggle('is-off', !r.ok); });
@@ -540,6 +533,19 @@
     fab.addEventListener('click', () => { panel.classList.toggle('open'); if (panel.classList.contains('open')) $('input', panel).focus(); });
     $('[data-chat-close]', panel).addEventListener('click', () => panel.classList.remove('open'));
   }
+
+  /* ---------- bulk discount on an item page (partials/bulk-prices): shown only once a quantity reaches a tier,
+     and only the discount reached (the highest; on several dates, the days that reach it are named) ---------- */
+  function bulkApplied(box, qtys) {
+    const el = $('[data-bulk-prices]', box); if (!el) return;
+    const top = qtys.length ? Math.max(...qtys) : 0;
+    const t = $$('[data-tier]', el).filter(x => top >= +x.dataset.min).pop();
+    el.hidden = !t;
+    if (!t) return;
+    const some = qtys.filter(q => q > 0).some(q => q < +t.dataset.min);
+    $('[data-bulk-text]', el).innerHTML = '<b>' + esc(t.dataset.pct) + '% bulk discount applied</b> · ' + esc(t.dataset.price) + ' each <s>' + esc(el.dataset.was) + '</s>' + (some ? ' <span class="muted">(days with ' + esc(t.dataset.min) + '+ pieces)</span>' : '');
+  }
+  window.PR = window.PR || {}; window.PR.bulkApplied = bulkApplied;
 
   /* ---------- bulk discount tiers editor (partials/bulk-editor): "from N pieces, X% off", live preview ----------
      Same rules and rounding as Pricing::tiersFrom / Pricing::discounted; the server checks again on save. */

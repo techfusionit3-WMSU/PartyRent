@@ -231,6 +231,9 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/damages', [SupplierReportController::class, 'damages'])->name('damages');
     Route::get('/reports', [SupplierReportController::class, 'reports'])->name('reports');
     Route::get('/reports.csv', [SupplierReportController::class, 'reportsCsv'])->name('reports.csv');
+    Route::get('/reports/view', [\App\Http\Controllers\ReportCenterController::class, 'show'])->name('reports.center');
+    Route::get('/reports/print', [\App\Http\Controllers\ReportCenterController::class, 'print'])->name('reports.print');
+    Route::get('/reports/export', [\App\Http\Controllers\ReportCenterController::class, 'export'])->name('reports.export');
     Route::get('/records', [SupplierReportController::class, 'records'])->name('records');
     Route::get('/activity', [SupplierReportController::class, 'activity'])->name('activity');
 });
@@ -249,6 +252,9 @@ Route::prefix('cashier')->name('cashier.')->middleware(['auth', 'role:cashier,ad
     Route::get('/history', [CashierController::class, 'history'])->name('history');
     Route::get('/reports', [CashierController::class, 'reports'])->name('reports');
     Route::get('/reports.csv', [CashierController::class, 'reportsCsv'])->name('reports.csv');
+    Route::get('/reports/view', [\App\Http\Controllers\ReportCenterController::class, 'show'])->name('reports.center');
+    Route::get('/reports/print', [\App\Http\Controllers\ReportCenterController::class, 'print'])->name('reports.print');
+    Route::get('/reports/export', [\App\Http\Controllers\ReportCenterController::class, 'export'])->name('reports.export');
 });
 
 /* ---------- admin & superadmin ---------- */
@@ -302,6 +308,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::post('/reviews/{review}/moderate', [ReviewController::class, 'moderate'])->name('reviews.moderate');
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     Route::get('/reports.csv', [AdminController::class, 'reportsCsv'])->name('reports.csv');
+    Route::get('/reports/view', [\App\Http\Controllers\ReportCenterController::class, 'show'])->name('reports.center');
+    Route::get('/reports/print', [\App\Http\Controllers\ReportCenterController::class, 'print'])->name('reports.print');
+    Route::get('/reports/export', [\App\Http\Controllers\ReportCenterController::class, 'export'])->name('reports.export');
 });
 Route::prefix('superadmin')->name('super.')->middleware(['auth', 'role:superadmin'])->group(function () {
     Route::get('/', [SuperController::class, 'dashboard'])->name('dashboard');

@@ -176,6 +176,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/requests/{rentalRequest}/remind', [SupplierRequestController::class, 'remind'])->middleware('throttle:10,1')->name('requests.remind');
     Route::post('/requests/{rentalRequest}/cash', [SupplierRequestController::class, 'recordCash'])->name('requests.cash');
     Route::post('/requests/{rentalRequest}/source', [SupplierRequestController::class, 'source'])->name('requests.source');
+    Route::post('/requests/{rentalRequest}/custom-discount', [SupplierRequestController::class, 'applyCustomDiscount'])->name('requests.custom-discount');
+    Route::delete('/requests/{rentalRequest}/custom-discount', [SupplierRequestController::class, 'removeCustomDiscount'])->name('requests.custom-discount.remove');
     Route::post('/requests/{rentalRequest}/schedule/{decision}', [SupplierRequestController::class, 'schedule'])->whereIn('decision', ['approve', 'reject'])->name('requests.schedule');
 
     Route::get('/products', [CatalogController::class, 'products'])->name('products');
@@ -200,6 +202,11 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::get('/shortfalls', [CaseController::class, 'supplierIndex'])->name('shortfalls');
     Route::post('/shortfalls', [CaseController::class, 'report'])->name('shortfalls.store');
     Route::get('/discounts', [DiscountController::class, 'index'])->name('discounts');
+    // custom discounts for one customer (family, regulars): owner-level permission (ShopStaff::ROUTE_PERMS)
+    Route::post('/discounts/custom', [DiscountController::class, 'customStore'])->name('discounts.custom.store');
+    Route::put('/discounts/custom/{discount}', [DiscountController::class, 'customUpdate'])->name('discounts.custom.update');
+    Route::post('/discounts/custom/{discount}/active', [DiscountController::class, 'customActive'])->name('discounts.custom.active');
+    Route::delete('/discounts/custom/{discount}', [DiscountController::class, 'customDestroy'])->name('discounts.custom.delete');
     Route::post('/discounts', [DiscountController::class, 'store'])->name('discounts.store');
     Route::put('/discounts/{discount}', [DiscountController::class, 'update'])->name('discounts.update');
     Route::post('/discounts/{discount}/active', [DiscountController::class, 'active'])->name('discounts.active');
@@ -263,6 +270,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
+    Route::get('/custom-discounts', [AdminController::class, 'customDiscounts'])->name('custom-discounts');
     // automatic payment checking: gateway set-up, open checkouts, webhook / check log, "Check now"
     Route::get('/online-payments', [\App\Http\Controllers\Admin\PaymentMonitorController::class, 'index'])->name('payment-monitor');
     Route::post('/online-payments/check', [\App\Http\Controllers\Admin\PaymentMonitorController::class, 'check'])->middleware('throttle:20,1')->name('payment-monitor.check');

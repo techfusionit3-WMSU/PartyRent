@@ -6,7 +6,8 @@
 <div class="page-head"><div><h1>Discounts</h1><p>Every discount that can lower your prices. Shop discounts come on top of bulk discounts. A discount takes off per item (a percent or pesos per piece) or from the whole order; each order gets the one shop discount that saves the customer the most. Requests already placed keep the price they were quoted.</p></div><button class="btn btn-primary" data-modal="dNew">{{ icon('plus') }}New discount</button></div>
 @if($errors->any())<div class="alert alert-danger mb-2">{{ icon('alert') }}<div>{{ $errors->first() }}</div></div>@endif
 
-<div class="card mb-3"><h3>Shop discounts</h3>
+<div class="card mb-3"><h3>Shop discounts <span class="badge b-green plain">Public</span></h3>
+  <p class="small muted mt-0">Promotions every customer gets automatically when they qualify.</p>
   @if($list->isEmpty())
     @include('partials.empty', ['emoji' => '🏷️', 'title' => 'No shop discounts yet', 'text' => 'Run a promo like "10% off all chairs this December" or "₱20 off per table for 10 or more".'])
   @else
@@ -30,6 +31,8 @@
     </tbody></table></div>
   @endif
 </div>
+
+@include('supplier._custom-discounts')
 
 <div class="card"><h3>Bulk discounts</h3>
   <p class="small muted">A percentage off each piece when the customer rents more of an item on the same day. Customers see it on the item page, for example "5% off for 5+ pieces · up to 15% off at 20+", and the price list as they pick a quantity.</p>

@@ -101,6 +101,23 @@ class RequestController extends Controller
         return redirect()->to(url()->previous().'#chat')->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Message sent.' : $res['error']);
     }
 
+    /** Apply one of the shop's custom discounts for this customer (before any payment). */
+    public function applyCustomDiscount(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $data = $request->validate(['discount_id' => 'required|integer'], ['discount_id.required' => 'Choose a discount.']);
+        $res = \App\Domain\CustomDiscounts::apply($r, (int) $data['discount_id'], $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Discount applied: −'.money($res['amount']).'. '.$r->customer->firstName().' now pays '.money($res['total']).' (was '.money($res['before']).').' : $res['error']);
+    }
+
+    public function removeCustomDiscount(Request $request, RentalRequest $rentalRequest)
+    {
+        $res = \App\Domain\CustomDiscounts::remove($this->own($request, $rentalRequest), $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Discount removed. The total is back to '.money($res['total']).'.' : $res['error']);
+    }
+
     /** Change the inventory source of one line. */
     public function source(Request $request, RentalRequest $rentalRequest)
     {

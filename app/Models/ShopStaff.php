@@ -101,6 +101,7 @@ class ShopStaff extends Model
         'desk' => 'orders.manage', 'stock' => 'inventory.manage', 'crew' => 'fulfillment.update',
         'requests.accept' => 'orders.manage', 'requests.decline' => 'orders.manage', 'requests.notes' => 'orders.manage',
         'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage',
+        'requests.custom-discount*' => 'shop.manage', // custom discounts: owner-level money decisions
         'requests.advance' => 'fulfillment.update', 'requests.complete' => 'fulfillment.update',
         'requests.inspection' => 'returns.inspect', 'requests.settle' => 'returns.inspect',
         'requests.cash' => 'payments.record', 'requests.remind' => 'payments.view',
@@ -108,7 +109,7 @@ class ShopStaff extends Model
         'reviews' => 'orders.view', 'reviews.*' => 'orders.manage',
         'products' => 'products.manage', 'products.*' => 'products.manage',
         'packages' => 'products.manage', 'packages.*' => 'products.manage',
-        'discounts' => 'products.manage', 'discounts.*' => 'products.manage',
+        'discounts.custom.*' => 'shop.manage', 'discounts' => 'products.manage', 'discounts.*' => 'products.manage',
         'shortfalls' => 'orders.view', 'shortfalls.*' => 'orders.manage',
         'inventory' => 'inventory.manage', 'inventory.*' => 'inventory.manage',
         'locations' => 'locations.manage', 'locations.*' => 'locations.manage',

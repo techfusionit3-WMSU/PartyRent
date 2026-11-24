@@ -131,6 +131,19 @@ class AdminController extends Controller
         return view('admin.transactions', ['list' => $list, 'status' => $status]);
     }
 
+    /** Every shop's custom (customer) discounts and the rentals they were applied to, for audit. */
+    public function customDiscounts(Request $request)
+    {
+        $this->need($request, 'transactions.view');
+        $q = trim((string) $request->query('q', ''));
+        $list = \App\Models\Discount::whereNotNull('customer_id')->with(['supplier', 'customer', 'rentals' => fn ($x) => $x->latest()])
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->where('name', 'like', '%'.$q.'%')
+                ->orWhereHas('supplier', fn ($y) => $y->where('name', 'like', '%'.$q.'%'))->orWhereHas('customer', fn ($y) => $y->where('name', 'like', '%'.$q.'%'))))
+            ->latest()->paginate(25)->withQueryString();
+
+        return view('admin.custom-discounts', ['list' => $list, 'q' => $q]);
+    }
+
     /* ---------- listings ---------- */
 
     public function listings(Request $request)

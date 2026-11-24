@@ -12,10 +12,21 @@ class Discount extends Model
 
     protected function casts(): array
     {
-        return ['value' => 'float', 'min_amount' => 'float', 'product_ids' => 'array', 'min_qty' => 'integer', 'active' => 'boolean', 'starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d'];
+        return ['value' => 'float', 'min_amount' => 'float', 'max_uses' => 'integer', 'customer_id' => 'integer', 'product_ids' => 'array', 'min_qty' => 'integer', 'active' => 'boolean', 'starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d'];
     }
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
+    /** Set on a custom discount: the one customer who can get it. */
+    public function customer(): BelongsTo { return $this->belongsTo(User::class, 'customer_id'); }
+    public function rentals(): \Illuminate\Database\Eloquent\Relations\HasMany { return $this->hasMany(RentalRequest::class, 'custom_discount_id'); }
+
+    public function isCustom(): bool { return $this->customer_id !== null; }
+
+    /** Rentals it is used on (cancelled / declined ones give the use back). */
+    public function usedCount(): int
+    {
+        return $this->rentals()->whereNotIn('status', ['declined', 'cancelled'])->count();
+    }
 
     /** What the discount takes off, how it is shown in the form. */
     public const KINDS = [

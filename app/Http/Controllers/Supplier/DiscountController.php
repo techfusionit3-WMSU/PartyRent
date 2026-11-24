@@ -23,9 +23,18 @@ class DiscountController extends Controller
         return $r->user()->shop();
     }
 
+    /** One of this shop's public promotions (custom discounts have their own actions and permission). */
     private function own(Request $r, Discount $d): Discount
     {
-        abort_unless($d->supplier_id === $this->sup($r)->id, 404);
+        abort_unless($d->supplier_id === $this->sup($r)->id && ! $d->isCustom(), 404);
+
+        return $d;
+    }
+
+    /** One of this shop's custom (customer) discounts. */
+    private function ownCustom(Request $r, Discount $d): Discount
+    {
+        abort_unless($d->supplier_id === $this->sup($r)->id && $d->isCustom(), 404);
 
         return $d;
     }
@@ -36,7 +45,11 @@ class DiscountController extends Controller
         $products = Product::where('supplier_id', $s->id)->whereNotIn('status', ['deleted', 'archived'])->orderBy('name')->get();
 
         return view('supplier.discounts', [
-            'list' => Discount::where('supplier_id', $s->id)->orderByDesc('active')->orderByDesc('id')->get(),
+            'list' => Discount::where('supplier_id', $s->id)->whereNull('customer_id')->orderByDesc('active')->orderByDesc('id')->get(),
+            'custom' => Discount::where('supplier_id', $s->id)->whereNotNull('customer_id')->with('customer')->withCount(['rentals as used_count' => fn ($q) => $q->whereNotIn('status', ['declined', 'cancelled'])])
+                ->orderByDesc('active')->orderByDesc('id')->get(),
+            'customers' => \App\Domain\CustomDiscounts::knownCustomers($s),
+            'canCustom' => $request->user()->orgCan('shop.manage'),
             'products' => $products,
         ]);
     }
@@ -100,6 +113,59 @@ class DiscountController extends Controller
         Notifier::audit($d->active ? 'Turned on discount' : 'Turned off discount', $d->name);
 
         return back()->with('success', $d->name.($d->active ? ' is on.' : ' is off. Requests already placed keep their price.'));
+    }
+
+    /* ---------- custom discounts for one customer (family, regulars) ---------- */
+
+    private function customData(Request $request): array
+    {
+        return $request->validate([
+            'name' => 'required|string|min:2|max:80', 'note' => 'nullable|string|max:160',
+            'customer_id' => 'nullable|integer', 'customer_email' => 'nullable|email|max:180',
+            'kind' => 'required|in:order_percent,order_amount', 'value' => 'required|numeric|min:0.01|max:1000000',
+            'max_uses' => 'nullable|integer|min:1|max:1000', 'starts_on' => 'nullable|date', 'ends_on' => 'nullable|date',
+        ], ['name.required' => 'Give the discount a name, e.g. "Family discount".', 'value.required' => 'Enter how much the discount takes off.',
+            'value.min' => 'Enter a discount bigger than zero.', 'customer_email.email' => 'Enter a valid email address.']);
+    }
+
+    public function customStore(Request $request)
+    {
+        $res = \App\Domain\CustomDiscounts::save($this->sup($request), $this->customData($request));
+        if (! $res['ok']) {
+            return back()->withInput()->with('error', $res['error']);
+        }
+
+        return redirect()->route('supplier.discounts', ['tab' => 'custom'])->with('success', $res['discount']->name.' saved for '.$res['discount']->customer->name.'. Apply it from one of their rentals (open the rental, then "Customer discount").');
+    }
+
+    public function customUpdate(Request $request, Discount $discount)
+    {
+        $d = $this->ownCustom($request, $discount);
+        $res = \App\Domain\CustomDiscounts::save($this->sup($request), $this->customData($request), $d);
+
+        return redirect()->route('supplier.discounts', ['tab' => 'custom'])->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $d->name.' updated. Rentals it was already used on keep their price.' : $res['error']);
+    }
+
+    public function customActive(Request $request, Discount $discount)
+    {
+        $d = $this->ownCustom($request, $discount);
+        $d->update(['active' => ! $d->active]);
+        Notifier::audit($d->active ? 'Turned on custom discount' : 'Turned off custom discount', $d->name.' · for '.$d->customer?->name);
+
+        return back()->with('success', $d->name.($d->active ? ' can be used again.' : ' is turned off. Rentals it was already used on keep their price.'));
+    }
+
+    public function customDestroy(Request $request, Discount $discount)
+    {
+        $d = $this->ownCustom($request, $discount);
+        if ($d->rentals()->exists()) {
+            return back()->with('error', $d->name.' was used on a rental, so it stays on record. Turn it off instead.');
+        }
+        $name = $d->name;
+        $d->delete();
+        Notifier::audit('Deleted custom discount', $name);
+
+        return back()->with('success', $name.' deleted.');
     }
 
     public function destroy(Request $request, Discount $discount)

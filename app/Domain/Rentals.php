@@ -714,7 +714,8 @@ class Rentals
         }
 
         return [
-            'check' => $chk, 'fresh' => $fresh, 'priceChanged' => abs($fresh['total'] - (float) $r->pricing['total']) > 0.009,
+            // a custom discount the shop applied is not a price change
+            'check' => $chk, 'fresh' => $fresh, 'priceChanged' => abs($fresh['total'] - (float) ($r->pricing['customDiscount']['amount'] ?? 0) - (float) $r->pricing['total']) > 0.009,
             'policyIssues' => $issues, 'durationNotes' => self::durationIssues($r->lines),
             'canAccept' => $chk['ok'] && $r->status === 'pending',
         ];

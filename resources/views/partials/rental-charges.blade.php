@@ -8,11 +8,15 @@
 <details class="charges" @if($open ?? false) open @endif>
   <summary><span class="ch-title">{{ icon('receipt', $sm) }} Rental Charges @if($estimate ?? false)<span class="badge b-gray plain">Estimate</span>@endif</span><span class="ch-total">{{ money($q['total']) }}</span><span class="ch-chev" aria-hidden="true">{{ icon('down', $sm) }}</span></summary>
   <div class="ch-body">
-    <div class="sum-line"><span>Rental Fee<div class="small muted">{{ $feeNote ?? (count($lines).' item'.(count($lines) === 1 ? '' : 's').($dayCount ? ' · '.$dayCount.' rental day'.($dayCount > 1 ? 's' : '') : '').' · supplier daily rates') }}</div></span><span>{{ money($q['rentalFee'] + ($q['discount'] ?? 0) + array_sum(array_column($q['credits'] ?? [], 'amount')) - array_sum(array_column($q['charges'] ?? [], 'amount'))) }}</span></div>
+    <div class="sum-line"><span>Rental Fee<div class="small muted">{{ $feeNote ?? (count($lines).' item'.(count($lines) === 1 ? '' : 's').($dayCount ? ' · '.$dayCount.' rental day'.($dayCount > 1 ? 's' : '') : '').' · supplier daily rates') }}</div></span><span>{{ money($q['rentalFee'] + ($q['discount'] ?? 0) + (float) ($q['customDiscount']['amount'] ?? 0) + array_sum(array_column($q['credits'] ?? [], 'amount')) - array_sum(array_column($q['charges'] ?? [], 'amount'))) }}</span></div>
     @if(($q['bulkSaved'] ?? 0) > 0)<div class="small" style="color:var(--green);margin:-4px 0 6px">{{ icon('tag', 'width:13px;height:13px;vertical-align:-2px') }} Includes bulk discount: you save {{ money($q['bulkSaved']) }}</div>@endif
     @foreach($q['discounts'] ?? [] as $dc)
       <div class="sum-line" style="color:var(--green)"><span>Shop discount – {{ $dc['name'] }}<div class="small muted">{{ $dc['item'] }} · {{ $dc['label'] }}</div></span><span>−{{ money($dc['amount']) }}</span></div>
     @endforeach
+    {{-- a custom discount the shop gave this customer (kept as it was applied, App\Domain\CustomDiscounts) --}}
+    @if(! empty($q['customDiscount']))
+      <div class="sum-line" style="color:var(--green)"><span>Special discount – {{ $q['customDiscount']['name'] }}<div class="small muted">{{ $q['customDiscount']['label'] }} · given by the shop</div></span><span>−{{ money($q['customDiscount']['amount']) }}</span></div>
+    @endif
     {{-- problem cases: agreed price reductions and rush costs the customer agreed to cover --}}
     @foreach($q['credits'] ?? [] as $cr)
       <div class="sum-line" style="color:var(--green)"><span>Case credit<div class="small muted">{{ $cr['label'] }}</div></span><span>−{{ money($cr['amount']) }}</span></div>

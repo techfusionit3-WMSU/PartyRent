@@ -63,7 +63,40 @@ class RentalOnlyScopeTest extends TestCase
             ->assertDontSee(route('admin.events'), false)->assertDontSee(route('admin.event-types'), false);
         $this->get(route('admin.event-types'))->assertRedirect(route('home'));
 
-        $this->as('jose@demo.ph', 'customer')->get(route('start-selling'))->assertOk()->assertDontSee('value="organization"', false);
+        // companies can still apply: as rental companies (no event-company fields)
+        $this->as('jose@demo.ph', 'customer')->get(route('start-selling'))->assertOk()->assertSee('value="organization"', false)
+            ->assertSee('For rental companies')->assertDontSee('data-for="organization">'."\n".'      <h3 class="mt-2 mb-1">What your business offers', false);
+    }
+
+    /** A company applies with company papers and a representative, then delivery, payments and policies like a shop. */
+    public function test_rental_company_application(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $pdf = fn ($n) => \Illuminate\Http\UploadedFile::fake()->create($n, 40, 'application/pdf');
+        $this->as('jose@demo.ph', 'customer');
+        $form = [
+            'app' => ['type' => 'organization',
+                'company' => ['legalName' => 'Garcia Rentals Corp.', 'companyType' => 'corporation', 'branches' => 3, 'address' => '7 Sampaguita St., Marikina Heights, Marikina', 'email' => 'ops@garcia.ph', 'phone' => '0923 555 0707', 'natureOfBusiness' => 'Party and event equipment rental'],
+                'representative' => ['name' => 'Jose Garcia', 'position' => 'Manager', 'idType' => 'Passport', 'email' => 'jose@demo.ph', 'phone' => '0923 555 0707'],
+                'business' => ['productTypes' => 'Tents, chairs, backdrops'],
+                'payout' => ['method' => 'bank', 'provider' => 'BPI', 'accountName' => 'Garcia Rentals Corp.', 'accountNumber' => '1234567890', 'financeContact' => 'Ana Garcia']],
+            'docs' => ['sec_certificate' => $pdf('sec.pdf'), 'bir_cor' => $pdf('bir.pdf'), 'mayors_permit' => $pdf('permit.pdf'), 'rep_id' => $pdf('id.pdf'), 'proof_of_authority' => $pdf('auth.pdf')],
+            'name' => 'Garcia Rentals', 'description' => 'Tents, chairs and backdrops for Marikina parties.', 'logo' => '🎪',
+            'phone' => '0923 555 0707', 'email' => 'ops@garcia.ph', 'hours' => 'Daily 8–6',
+            'shop_addr' => ['regionCode' => '130000000', 'provinceCode' => '137000000', 'cityCode' => '137402000', 'barangay' => 'Marikina Heights', 'street' => '7 Sampaguita St.'],
+            'location_type' => 'shop', 'lat' => 14.6520, 'lng' => 121.1100, 'fulfillment' => 'both', 'methods' => ['cash', 'bank'],
+            'cancelDays' => 5, 'cancellation' => 'Free up to 5 days before.', 'returns' => 'Return clean.', 'conditions' => 'Renter pays for damage.',
+        ];
+        $this->post('/start-selling/check', array_merge($form, ['step' => 3]))->assertOk(); // no event-company fields asked
+        $this->post('/start-selling', $form)->assertSessionHasNoErrors()->assertSessionHas('success');
+
+        $s = Supplier::where('name', 'Garcia Rentals')->firstOrFail();
+        $this->assertSame(['organization', 'business', 'both'], [$s->type, $s->account_type, $s->fulfillment]);
+        $this->assertSame(['cash', 'bank'], $s->methods);
+        $this->assertSame('Tents, chairs, backdrops', $s->application['business']['productTypes']);
+        $this->assertEmpty($s->business_profile);
+        $this->assertFalse($s->isOrganization()); // runs as a rental shop with a team, not the event workspace
+        $this->assertTrue($s->isBusiness());
     }
 
     public function test_rental_checkout_still_works(): void

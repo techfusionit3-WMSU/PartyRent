@@ -13,6 +13,10 @@
     $applicable = old('app.applicable', $app['applicable'] ?? []);
     $docs = (array) ($app['docs'] ?? []);
     $bp = (array) ($d['business_profile'] ?? []);
+    // Event-company module off: an Organization / Company supplier is a rental company and fills in the same shop
+    // details, delivery, payments and policies as an individual (plus company papers and a representative).
+    $shopFor = $eventCo ? 'individual' : 'individual organization';
+    $evtFor = $eventCo ? 'organization' : 'event-company';
     $fld = function ($label, $name, $val, $attrs = 'required', $cls = '') use ($err) {
         $key = str_replace(['[', ']'], ['.', ''], $name);
 
@@ -57,11 +61,9 @@
       <label class="type-card {{ $type === 'individual' ? 'on' : '' }}"><input type="radio" name="app[type]" value="individual" @checked($type === 'individual') hidden data-type>
         <div style="font-size:2rem">🧑‍💼</div><h3 class="mt-1">Individual Supplier</h3><p class="small muted">For individual owners and small rental businesses — even if you have a few helpers.</p>
         <ul class="small"><li>Valid government ID (+ selfie)</li><li>Personal and business information</li><li>DTI, barangay or mayor's permit <i>if applicable</i></li></ul><span class="badge b-pink">Single owner account</span></label>
-      @if(\App\Models\Supplier::eventCompanies())
       <label class="type-card {{ $type === 'organization' ? 'on' : '' }}"><input type="radio" name="app[type]" value="organization" @checked($type === 'organization') hidden data-type>
-        <div style="font-size:2rem">🏢</div><h3 class="mt-1">Organization / Company Supplier</h3><p class="small muted">For corporations, partnerships, cooperatives and companies with employees or branches.</p>
-        <ul class="small"><li>Company registration documents (SEC / DTI / CDA)</li><li>BIR registration and business permits</li><li>Authorized representative's ID and proof of authority</li></ul><span class="badge b-purple">Multiple employee accounts</span></label>
-      @endif
+        <div style="font-size:2rem">🏢</div><h3 class="mt-1">Organization / Company Supplier</h3><p class="small muted">{{ $eventCo ? 'For corporations, partnerships, cooperatives and companies with employees or branches.' : 'For rental companies, corporations, partnerships and cooperatives with employees, warehouses or branches.' }}</p>
+        <ul class="small"><li>Company registration documents (SEC / DTI / CDA)</li><li>BIR registration and business permits</li><li>Authorized representative's ID and proof of authority</li></ul><span class="badge b-purple">{{ $eventCo ? 'Multiple employee accounts' : 'Employee accounts & branches' }}</span></label>
     </div>
     {!! $err('app.type') !!}
     <p class="small muted mt-2 mb-0">Applications are subject to PartyRent administrator verification. Employees (cashier, inventory staff) are added after approval — not during the application.</p>
@@ -123,7 +125,7 @@
   <section data-step="3">
     <div class="field"><label data-org-label="Shop / brand name on PartyRent">Business or rental shop name</label><input class="input" name="name" required minlength="3" value="{{ $o('name') }}" placeholder="e.g. Santos Party Rentals">{!! $err('name') !!}</div>
     <div class="field"><label data-org-label="About us">Shop description</label><textarea class="input" name="description" required minlength="20" placeholder="Tell customers about your shop: what you offer and for which events.">{{ $o('description', $ao('company.description')) }}</textarea>{!! $err('description') !!}</div>
-    <div data-for="organization">
+    <div data-for="{{ $evtFor }}">
       <h3 class="mt-2 mb-1">What your business offers</h3>
       <p class="small muted mt-0">Customers and the AI planner use this to find you. Pick suggestions or type your own.</p>
       <div class="field @error('events_catered') invalid @enderror" data-tagfield="events_catered"><label>Events you cater</label>@include('partials.tag-input', ['name' => 'events_catered', 'values' => old('events_catered', $bp['events'] ?? []), 'suggest' => array_keys(\App\Domain\Ai::EVENTS), 'placeholder' => 'Type an event, e.g. Graduation'])<div class="error-text" @error('events_catered') style="display:block" @enderror>{{ $errors->first('events_catered') ?: 'Add at least one type of event.' }}</div></div>
@@ -134,7 +136,7 @@
       </div>
       @include('partials.business-photos', ['photos' => $photos])
     </div>
-    <div class="field" data-for="individual"><label>Types of rental products offered</label><input class="input" name="app[business][productTypes]" required value="{{ $ao('business.productTypes') }}" placeholder="e.g. chairs, tables, tents, sound system"></div>
+    <div class="field" data-for="{{ $shopFor }}"><label>Types of rental products offered</label><input class="input" name="app[business][productTypes]" required value="{{ $ao('business.productTypes') }}" placeholder="e.g. chairs, tables, tents, sound system"></div>
     <div class="form-grid">
       <div class="field"><label>Business contact number</label><input class="input" name="phone" data-phone required value="{{ $o('phone') }}">{!! $err('phone') !!}</div>
       <div class="field"><label>Business email</label><input class="input" type="email" name="email" required value="{{ $o('email') }}">{!! $err('email') !!}</div>
@@ -146,7 +148,7 @@
 
   {{-- 5 · Delivery & payments --}}
   <section data-step="4">
-    <div data-for="organization">
+    <div data-for="{{ $evtFor }}">
       <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">As an event company you set up on-site at the customer's venue, so there is no delivery or pickup. Customers book you by asking for a quotation; you set the price per event.</div></div>
       @php($bset = array_replace(\App\Domain\Events::SETTINGS, (array) data_get($d, 'business_profile.settings', [])))
       <div class="field @error('serviceAreas') invalid @enderror" data-tagfield="serviceAreas"><label>Cities and areas you serve</label>@include('partials.tag-input', ['name' => 'serviceAreas', 'values' => old('serviceAreas', $bset['serviceAreas']), 'suggest' => [], 'placeholder' => 'Type a city and press Enter, e.g. Zamboanga City'])<div class="error-text" @error('serviceAreas') style="display:block" @enderror>{{ $errors->first('serviceAreas') ?: 'Add at least one city or area.' }}</div></div>
@@ -157,7 +159,7 @@
         <div class="field"><label>Deposit (% due {{ $bset['depositDays'] }} days before)</label><input class="input" type="number" min="0" max="100" step="0.5" name="depositPct" required value="{{ old('depositPct', $bset['depositPct']) }}">{!! $err('depositPct') !!}<div class="hint">The rest is the balance, due {{ $bset['balanceDays'] }} days before the event.</div></div>
       </div>
     </div>
-    <div data-for="individual">
+    <div data-for="{{ $shopFor }}">
     <div class="stack-sm">@foreach([['delivery', 'Delivery only', 'You bring items to the customer.'], ['pickup', 'Pickup only', 'Customers collect from your location.'], ['both', 'Both delivery and pickup', 'Let customers choose.']] as [$v, $l, $desc])
       <label class="card card-flat row" style="padding:12px 14px;cursor:pointer"><input type="radio" name="fulfillment" value="{{ $v }}" @checked($o('fulfillment', 'both') === $v) style="accent-color:var(--brand);width:18px;height:18px"><div><b>{{ $l }}</b><div class="small muted">{{ $desc }}</div></div></label>
     @endforeach</div>{!! $err('fulfillment') !!}
@@ -165,7 +167,7 @@
       @foreach(['cash' => 'Cash', 'bank' => 'Online Bank Transfer', 'debit' => 'Debit'] as $k => $l)<label class="check"><input type="checkbox" name="methods[]" value="{{ $k }}" @checked(in_array($k, $methods, true))> {{ $l }}</label>@endforeach
       {!! $err('methods') !!}</div>
     </div>
-    <div class="alert alert-info" data-for="individual">{{ icon('info') }}<div class="small">No delivery fee, down payment or deposit percentages are asked here. They differ per item, event and situation, so you set them in Shop Settings after approval and when you post each package.</div></div>
+    <div class="alert alert-info" data-for="{{ $shopFor }}">{{ icon('info') }}<div class="small">No delivery fee, down payment or deposit percentages are asked here. They differ per item, event and situation, so you set them in Shop Settings after approval and when you post each package.</div></div>
   </section>
 
   {{-- 6 · Payout --}}
@@ -182,11 +184,11 @@
 
   {{-- 7 · Policies --}}
   <section data-step="6">
-    <div class="field" data-for="individual"><label>Free cancellation window (days before rental)</label><input class="input" type="number" min="0" max="30" name="cancelDays" value="{{ old('cancelDays', $pol['cancelDays'] ?? 3) }}"></div>
+    <div class="field" data-for="{{ $shopFor }}"><label>Free cancellation window (days before rental)</label><input class="input" type="number" min="0" max="30" name="cancelDays" value="{{ old('cancelDays', $pol['cancelDays'] ?? 3) }}"></div>
     <div class="field"><label>Cancellation policy</label><textarea class="input" name="cancellation" required>{{ old('cancellation', $pol['cancellation'] ?? '') }}</textarea>{!! $err('cancellation') !!}</div>
-    <div class="field" data-for="individual"><label>Return policy</label><textarea class="input" name="returns" required>{{ old('returns', $pol['returns'] ?? '') }}</textarea></div>
-    <div class="field" data-for="individual"><label>Rental conditions</label><textarea class="input" name="conditions" required>{{ old('conditions', $pol['conditions'] ?? '') }}</textarea></div>
-    <div class="field" data-for="organization"><label>Rescheduling policy</label><textarea class="input" name="rescheduling" required minlength="10" placeholder="e.g. One free date change if asked at least 14 days before the event.">{{ old('rescheduling', $pol['rescheduling'] ?? 'One free date change if asked at least 14 days before the event, subject to availability.') }}</textarea>{!! $err('rescheduling') !!}</div>
+    <div class="field" data-for="{{ $shopFor }}"><label>Return policy</label><textarea class="input" name="returns" required>{{ old('returns', $pol['returns'] ?? '') }}</textarea></div>
+    <div class="field" data-for="{{ $shopFor }}"><label>Rental conditions</label><textarea class="input" name="conditions" required>{{ old('conditions', $pol['conditions'] ?? '') }}</textarea></div>
+    <div class="field" data-for="{{ $evtFor }}"><label>Rescheduling policy</label><textarea class="input" name="rescheduling" required minlength="10" placeholder="e.g. One free date change if asked at least 14 days before the event.">{{ old('rescheduling', $pol['rescheduling'] ?? 'One free date change if asked at least 14 days before the event, subject to availability.') }}</textarea>{!! $err('rescheduling') !!}</div>
   </section>
 
   {{-- 8 · Review --}}
@@ -204,17 +206,18 @@
 @push('scripts')
 <script>
 (function () {
-  var f = document.getElementById('wf'), steps = f.querySelectorAll('section[data-step]'), indTitles = @json($steps), orgTitles = @json(\App\Http\Controllers\Customer\StartSellingController::ORG_STEPS), titles = indTitles, step = 0;
+  var f = document.getElementById('wf'), steps = f.querySelectorAll('section[data-step]'), indTitles = @json($steps), orgTitles = @json($eventCo ? \App\Http\Controllers\Customer\StartSellingController::ORG_STEPS : \App\Http\Controllers\Customer\StartSellingController::RENTAL_CO_STEPS), eventCo = @json($eventCo), titles = indTitles, step = 0;
   var $$ = function (s, r) { return Array.prototype.slice.call((r || f).querySelectorAll(s)); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var val = function (n) { var i = f.querySelector('[name="' + n + '"]'); return i ? i.value.trim() : ''; };
   var type = function () { var r = f.querySelector('[data-type]:checked'); return r ? r.value : ''; };
   var org = function () { return type() === 'organization'; };
+  var evt = function () { return org() && eventCo; }; // event company (module on) vs rental company
   // Show the fields for the chosen supplier type (and company type); hidden fields are disabled so they are not validated or sent.
   function applyType() {
     var t = type(), ct = (f.querySelector('#ctype') || {}).value;
     $$('[data-for]').forEach(function (el) {
-      var on = el.dataset.for === t && (!el.dataset.ctype || el.dataset.ctype === ct);
+      var on = el.dataset.for.split(' ').indexOf(t) >= 0 && (!el.dataset.ctype || el.dataset.ctype === ct);
       el.hidden = !on; $$('input,select,textarea', el).forEach(function (i) { i.disabled = !on; });
     });
     $$('[data-type]').forEach(function (r) { r.closest('.type-card').classList.toggle('on', r.checked); });
@@ -230,7 +233,7 @@
     else { rows.push(['Applicant', val('app[personal][fullName]') + ' · born ' + (val('app[personal][birthDate]') || '—')]); rows.push(['ID', val('app[identity][idType]') + ' · ' + val('app[identity][idNumber]')]); }
     rows.push(['Shop contact', val('phone') + ' · ' + val('email')]);
     rows.push(['Address', [val('shop_addr[street]'), val('shop_addr[barangay]')].filter(Boolean).join(', ')]);
-    if (org()) {
+    if (evt()) {
       rows.push(['Serves', $$('[name="serviceAreas[]"]:not([disabled])').map(function (i) { return i.value; }).join(', ')]);
       rows.push(['Payments', val('reservePct') + '% to reserve · ' + val('depositPct') + '% deposit · rest before the event']);
     } else rows.push(['Methods', $$('[name="methods[]"]:checked').map(function (c) { return c.parentNode.textContent.trim(); }).join(', ')]);
@@ -285,15 +288,15 @@
     });
     if (step === 0 && !type()) { toast('Choose Individual Supplier or Organization / Company Supplier.'); return false; }
     if (step === 2 && missingDocs().length) { toast('Please upload: ' + missingDocs().join(', ') + '.'); return false; }
-    if (step === 3 && org()) {
+    if (step === 3 && evt()) {
       var bad = null;
       ['events_catered', 'offers'].forEach(function (n) { var fd = f.querySelector('[data-tagfield="' + n + '"]'), none = !f.querySelector('[name="' + n + '[]"]:not([disabled])'); fd.classList.toggle('invalid', none); if (none && !bad) bad = fd; });
       if (bad) { toast(bad.querySelector('.error-text').textContent); bad.scrollIntoView({ block: 'center', behavior: 'smooth' }); return false; }
       var pc = window.PR_portfolioCount ? window.PR_portfolioCount() : 0;
       if (pc < {{ \App\Models\Supplier::PORTFOLIO_MIN }}) { toast('Add at least {{ \App\Models\Supplier::PORTFOLIO_MIN }} photos of events you have done (you have ' + pc + ').'); var pf = f.querySelector('[data-portfolio]'); if (pf) pf.scrollIntoView({ block: 'center', behavior: 'smooth' }); return false; }
     }
-    if (step === 4 && !org()) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } }
-    if (step === 4 && org()) {
+    if (step === 4 && !evt()) { if (!f.querySelector('[name="methods[]"]:checked')) { toast('Select at least one payment method.'); return false; } }
+    if (step === 4 && evt()) {
       var sa = f.querySelector('[data-tagfield="serviceAreas"]'), none = !f.querySelector('[name="serviceAreas[]"]:not([disabled])');
       sa.classList.toggle('invalid', none); if (none) { toast('Add at least one city or area you serve.'); return false; }
       if ((+val('reservePct') || 0) + (+val('depositPct') || 0) > 100) { toast('The reservation fee and deposit together cannot be more than 100%.'); return false; }

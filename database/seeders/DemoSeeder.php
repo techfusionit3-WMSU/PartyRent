@@ -111,6 +111,14 @@ class DemoSeeder extends Seeder
         $this->eventCompany();
         // every rental is fulfilled by one branch (the one its lines use, else the shop's main branch)
         \App\Domain\Branches::backfillRequests();
+        // open demo rentals keep the damage terms of their items, like rentals booked at checkout
+        RentalRequest::whereNotIn('status', ['completed', 'declined', 'cancelled'])->get()->each(function (RentalRequest $r) {
+            $p = (array) $r->pricing;
+            if ($p && empty($p['damageTerms'])) {
+                $p['damageTerms'] = \App\Domain\Damage::termsForLines($r->lines ?? []);
+                $r->forceFill(['pricing' => $p])->saveQuietly();
+            }
+        });
     }
 
     /**

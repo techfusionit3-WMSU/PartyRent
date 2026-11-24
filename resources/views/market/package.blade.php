@@ -28,6 +28,15 @@
       @include('market._package-contents', ['def' => $def, 'pp' => $pp, 'interactive' => ! $own])
       @if($k->conditions)<div class="small muted" style="padding:10px 16px;border-top:1px solid var(--line)">{{ $k->conditions }}</div>@endif
     </div>
+    {{-- damage fees of the items inside one package (each item's own fee × how many the package has) --}}
+    @php($dmgRows = \App\Domain\Damage::termsForLines([['id' => 'pkg', 'type' => 'package', 'ref_id' => $k->id, 'days' => [today_iso() => 1], 'sel' => $pp['sel']]]))
+    @if($dmgRows)
+      @php($dmgMax = r2(array_sum(array_map(fn ($x) => (float) $x['max'] * $x['qty'], array_filter($dmgRows, fn ($x) => $x['max'] !== null)))))
+      <details class="card mt-2 dmg-card"><summary><span>{{ icon('shield', 'width:16px;vertical-align:-3px') }} <b>If something gets damaged</b></span><span class="small muted">{{ $dmgMax > 0 ? 'up to '.money($dmgMax).' per package' : 'no damage fees set' }}</span></summary>
+        <div class="mt-1">@include('partials.damage-fees', ['rows' => $dmgRows, 'personal' => \App\Domain\Damage::usesOutcomes($k->supplier)])
+          <p class="small muted mb-0 mt-1">For one package with the items shown above. Renting more packages multiplies these amounts.</p></div>
+      </details>
+    @endif
     <form class="card soft mt-2" method="POST" action="{{ route('cart.add') }}">
       @csrf
       <input type="hidden" name="type" value="package"><input type="hidden" name="ref_id" value="{{ $k->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}"><input type="hidden" name="sel" id="selInput" value="{{ json_encode($pp['sel']) }}">

@@ -131,7 +131,7 @@ class RentalLifecycleTest extends TestCase
 
         // 7. inspection: of 6 released, 5 returned (1 repairable), 1 lost; ₱250 value × 100% (default policy, condition per seed)
         $table->update(['replacement_value' => 250, 'condition' => 'brand_new']);
-        inv()->flush();
+        $this->rebookDamageTerms($r); // as if booked with this value
         $this->post("/supplier/requests/{$r->code}/inspection", ['returnDate' => today_iso(), 'confirmed' => 1, 'items' => [$table->id => ['returned' => 5, 'repairable' => 2, 'nonRepairable' => 0, 'description' => 'Chipped tops; one missing']]])
             ->assertSessionHas('success');
         $table->refresh();

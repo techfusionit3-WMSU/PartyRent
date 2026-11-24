@@ -132,14 +132,29 @@
       @if($p->colors)<dt>Colors</dt><dd><div class="row wrap gap-sm">@foreach($p->colors as $c)<span class="tag"><span class="swatch" title="{{ $c }}" style="background:{{ color_hex($c) }}"></span> {{ $c }}</span>@endforeach</div></dd>@endif
       @if($p->themes)<dt>Themes</dt><dd><div class="row wrap gap-sm">@foreach($p->themes as $t)<span class="tag">{{ $t }}</span>@endforeach</div></dd>@endif
       @if(! $p->isSale())<dt>Stock</dt><dd>{{ $p->total_stock }} {{ $p->unitWord() }}{{ $p->total_stock === 1 ? '' : 's' }} in total</dd>@endif
-      @if($dt = \App\Domain\Damage::terms($p))
-        <dt>If something happens</dt><dd>
-          @if($dt['minor'] !== null)<div><b>Minor</b> (cleaning, stain, small scratch): {{ money($dt['minor']) }} per {{ $p->unitWord() }}</div>@endif
-          <div><b>Damaged</b>: the repair cost{{ $dt['value'] > 0 ? ', never more than '.money($dt['value']) : '' }}</div>
-          <div><b>Not working</b>: free if it is a normal fault; charged as a repair only if misused</div>
-          <div><b>Lost or beyond repair</b>: {{ $dt['value'] > 0 ? money($dt['value']).' per '.$p->unitWord() : 'replacement value not set' }} @if($dt['receipt'])<span class="badge b-green plain">Receipt on file</span>@endif</div>
-          <div class="small muted">The shop photographs the items at release and at return. You get {{ \App\Domain\Damage::REVIEW_HOURS }} hours to accept or dispute any charge; PartyRent decides disputes.</div></dd>
-      @elseif(! $p->isSale() && $p->replacement_value)<dt>Replacement value{{ term('replacement_value') }}</dt><dd>{{ money($p->replacement_value) }} per {{ $p->unitWord() }}: the most you would pay if one is lost or destroyed.</dd>@endif
+      @unless($p->isSale())
+        {{-- damage fee: a possible charge only if the item comes back damaged or missing, never part of the rental price --}}
+        @php($lia = \App\Domain\Damage::liability($p))
+        @php($dt = \App\Domain\Damage::terms($p))
+        <dt>Damage fee</dt><dd class="dmg-dd">
+          @if($lia['max'] !== null)
+            <div><b>Up to {{ money($lia['max']) }}</b> per {{ $p->unitWord() }} if lost or beyond repair{{ $lia['minor'] !== null ? ' · minor damage '.money($lia['minor']) : '' }} @if($dt && $dt['receipt'])<span class="badge b-green plain">Receipt on file</span>@endif</div>
+          @else
+            <div><b>No damage fee set</b> for this item.</div>
+          @endif
+          <div class="small muted">Not part of the rental price. You only pay if it comes back damaged or missing, after the shop checks it. You get {{ \App\Domain\Damage::REVIEW_HOURS }} hours to accept or dispute any charge; PartyRent decides disputes.</div>
+          @if($dt && $lia['max'] !== null)
+            <details class="small mt-1"><summary>How damage is charged</summary>
+              @if($dt['minor'] !== null)<div><b>Minor</b> (cleaning, stain, small scratch): {{ money($dt['minor']) }} per {{ $p->unitWord() }}</div>@endif
+              <div><b>Damaged</b>: the repair cost, never more than {{ money($dt['value']) }}</div>
+              <div><b>Not working</b>: free if it is a normal fault; charged as a repair only if misused</div>
+              <div><b>Lost or beyond repair</b>: {{ money($dt['value']) }} per {{ $p->unitWord() }}</div>
+            </details>
+          @elseif($lia['max'] !== null)
+            <div class="small muted">Repairs are charged as a share of the item's value ({{ money($lia['value']) }}), set in the shop's damage policy.</div>
+          @endif
+        </dd>
+      @endunless
       @if(! $p->isSale() && $p->rental_policy)<dt>Item rental policy</dt><dd style="white-space:pre-line">{{ $p->rental_policy }}</dd>@endif
     </dl>
   </section>

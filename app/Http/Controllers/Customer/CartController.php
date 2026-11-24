@@ -164,7 +164,7 @@ class CartController extends Controller
                 'branch_id' => null, // null = the recommended branch (the customer can pick another eligible one)
                 'destinations' => [['id' => 'd1', 'label' => 'Event venue', 'address' => $u->address ?: '', 'zoneId' => '', 'deliveryTime' => $st['open'], 'contactName' => '', 'contactPhone' => '']],
                 'inst' => ['n' => min(3, (int) $cfg['installment']['maxInstallments']), 'items' => [], 'auto' => true],
-                'damage' => self::damageTerms($chosen),
+                'damage' => self::damageTerms($chosen, $s),
                 // static shop info for the page
                 'shop' => [
                     'name' => $s->name, 'logo' => $s->logo, 'color' => $s->color, 'address' => $s->publicAddress(), 'hours' => $s->hours, 'fulfillment' => $s->fulfillment,
@@ -251,26 +251,10 @@ class CartController extends Controller
     }
 
     /** Damage terms of the rental items in these lines (packages expand into their items), individual shops only. */
-    private static function damageTerms(array $lines): array
+    /** Damage fees of the rental items in these lines (packages broken into their items), every shop. */
+    private static function damageTerms(array $lines, ?Supplier $s = null): array
     {
-        $pids = [];
-        foreach ($lines as $l) {
-            if ($l['type'] === 'package') {
-                $def = inv()->lineDef($l);
-                $pids = array_merge($pids, $def ? array_keys(\App\Domain\Packages::units($def, $l['sel'] ?? null)['rent']) : []);
-            } else {
-                $pids[] = (int) $l['ref_id'];
-            }
-        }
-        $out = [];
-        foreach (array_unique($pids) as $pid) {
-            $p = inv()->product($pid);
-            if ($t = \App\Domain\Damage::terms($p)) {
-                $out[] = ['name' => $p->name, 'text' => $t['text'], 'receipt' => $t['receipt']];
-            }
-        }
-
-        return $out;
+        return ['rows' => \App\Domain\Damage::termsForLines($lines), 'personal' => \App\Domain\Damage::usesOutcomes($s)];
     }
 
     /**

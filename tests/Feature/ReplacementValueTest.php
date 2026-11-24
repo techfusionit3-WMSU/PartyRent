@@ -55,9 +55,9 @@ class ReplacementValueTest extends TestCase
         $p = Product::where('listing_type', 'rent')->where('status', 'active')->firstOrFail();
         $owner = Supplier::find($p->supplier_id)->owner;
         $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get(route('supplier.products.edit', $p))
-            ->assertOk()->assertSee('Replacement value (₱ per unit)', false);
+            ->assertOk()->assertSee('Damage fees');
         $p->update(['replacement_value' => 850]);
-        $this->get(route('products.show', $p))->assertOk()->assertSee('Replacement value')->assertSee('850');
+        $this->get(route('products.show', $p))->assertOk()->assertSee('Damage fee')->assertSee('850')->assertSee('Not part of the rental price');
     }
 
     public function test_compensation_follows_the_damage_policy(): void
@@ -66,7 +66,7 @@ class ReplacementValueTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $q, 'need at least 2 units for this scenario');
         Product::whereKey($pid)->update(['replacement_value' => 1000, 'condition' => 'used']);
         Supplier::whereKey($r->supplier_id)->update(['damage_policy' => null]); // defaults: 50 / 70 / lost used 70
-        inv()->flush();
+        $r = $this->rebookDamageTerms($r); // as if booked with this value and policy
         $peak = Rentals::peakUnits($r);
         $before = Product::find($pid);
 
@@ -101,7 +101,7 @@ class ReplacementValueTest extends TestCase
         $p = Product::find($pid);
         $p->update(['replacement_value' => 1000, 'condition' => 'brand_new']);
         Supplier::whereKey($r->supplier_id)->update(['damage_policy' => ['nonRepairable' => ['enabled' => true, 'pct' => 70], 'categories' => [$p->category_id => ['nonRepairable' => ['enabled' => true, 'pct' => 80]]]]]);
-        inv()->flush();
+        $r = $this->rebookDamageTerms($r);
         $ok = Rentals::recordInspection($r->fresh(), $this->items(Rentals::peakUnits($r), $pid, ['nonRepairable' => 1, 'description' => 'Broken']));
         $this->assertTrue($ok['ok'], $ok['error'] ?? '');
         $it = collect($r->fresh()->inspection['items'])->firstWhere('productId', $pid);

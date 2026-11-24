@@ -517,6 +517,9 @@ class Rentals
         }
         // every line rents from the fulfilling branch (no split across branches)
         $attrs['allocation'] = ['status' => 'proposed'];
+        // the damage fee of every rented item (packages broken into their items) as agreed now: a later change
+        // by the shop never changes what this rental can be charged
+        $pricing['damageTerms'] = Damage::termsForLines($lines);
         $attrs['pricing'] = $pricing;
 
         return self::ok(['attrs' => $attrs, 'supplier' => $s, 'sourceIds' => array_column($src, 'id'), 'branch' => $branch, 'branches' => $pick['options']]);
@@ -1733,7 +1736,13 @@ class Rentals
             $plain = fn ($ts) => json_encode(array_map(fn ($t) => [(int) $t['min'], $t['max'] === null ? null : (int) $t['max'], r2($t['price'])], $ts ?? [])); // a percent added to an old tier is not a price change
             $priceChanged = $plain($p->tiers) !== $plain($tiers);
             $stockDelta = $type === 'sale' && $p->isSale() ? (int) $data['total_stock'] - $p->stockOnHand() : 0;
+            $dmgBefore = [(float) $p->replacement_value, $p->minor_fee === null ? null : (float) $p->minor_fee];
             $p->update($data);
+            $dmgAfter = [(float) $p->replacement_value, $p->minor_fee === null ? null : (float) $p->minor_fee];
+            if ($dmgBefore !== $dmgAfter) { // existing rentals keep the fees agreed at booking (pricing.damageTerms)
+                Notifier::audit('Updated damage fee', $p->name.' · lost or beyond repair '.money($dmgBefore[0]).' → '.money($dmgAfter[0])
+                    .' · minor '.($dmgBefore[1] === null ? 'none' : money($dmgBefore[1])).' → '.($dmgAfter[1] === null ? 'none' : money($dmgAfter[1])));
+            }
             if ($stockDelta) {
                 StockMovement::create(['product_id' => $p->id, 'qty' => $stockDelta, 'type' => 'adjust', 'user_id' => auth()->id(), 'balance' => $p->stockOnHand(), 'note' => 'Edited stock on hand', 'created_at' => now()]);
             }

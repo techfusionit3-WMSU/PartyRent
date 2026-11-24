@@ -56,6 +56,67 @@ class Damage
         ];
     }
 
+    /* ---------- item damage fees: what a customer could be charged, and the terms kept with each rental ---------- */
+
+    /**
+     * Damage fee of one rental item per unit, as customers see it before booking: the minor fee (personal shops)
+     * and the most one unit can cost (lost or beyond repair: the replacement value, or for business shops the
+     * replacement value × the highest loss percentage of their policy). null max = no damage fee set.
+     */
+    public static function liability($p): array
+    {
+        $value = (float) ($p?->replacement_value ?? 0);
+        if (! $p || $p->isSale()) {
+            return ['minor' => null, 'max' => null, 'value' => 0.0];
+        }
+        if (self::usesOutcomes($p->supplier)) {
+            return ['minor' => $p->minor_fee !== null ? (float) $p->minor_fee : null, 'max' => $value > 0 ? r2($value) : null, 'value' => $value];
+        }
+        $rt = self::rates($p->supplier, $p);
+        $pct = max($rt['lost']['enabled'] ? $rt['lost']['pct'] : 0, $rt['nonRepairable']['enabled'] ? (float) $rt['nonRepairable']['pct'] : 0);
+
+        return ['minor' => null, 'max' => $value > 0 && $pct > 0 ? r2($value * $pct / 100) : null, 'value' => $value];
+    }
+
+    /**
+     * Damage terms of every rental item in some lines (packages are broken into their items; the same item from a
+     * package and on its own is counted once, at its busiest day): [productId => ['name', 'unit', 'qty', 'minor',
+     * 'max', 'value', 'condition', 'rates']]. Kept with the rental when it is booked (pricing.damageTerms), so the
+     * return inspection charges the terms the customer agreed to, even if the shop changes them later.
+     */
+    public static function termsForLines(array $lines): array
+    {
+        $peak = [];
+        foreach (inv()->demandMap($lines) as $units) {
+            foreach ($units as $pid => $q) {
+                $peak[$pid] = max($peak[$pid] ?? 0, (int) $q);
+            }
+        }
+        $out = [];
+        foreach ($peak as $pid => $qty) {
+            $p = inv()->product($pid);
+            if (! $p || $p->isSale()) {
+                continue;
+            }
+            $l = self::liability($p);
+            $out[$pid] = ['name' => $p->name, 'unit' => $p->unitWord() ?: 'piece', 'qty' => $qty, 'minor' => $l['minor'], 'max' => $l['max'],
+                'value' => $l['value'], 'condition' => $p->condition, 'rates' => self::rates($p->supplier, $p)];
+        }
+
+        return $out;
+    }
+
+    /** The damage terms the return inspection uses for one item of a rental: kept from booking, else the item's current ones. */
+    public static function termsAt(RentalRequest $r, $p): array
+    {
+        $t = $p ? ($r->pricing['damageTerms'][$p->id] ?? $r->pricing['damageTerms'][(string) $p->id] ?? null) : null;
+        if ($t) {
+            return ['value' => (float) $t['value'], 'minorFee' => $t['minor'] !== null ? (float) $t['minor'] : null, 'rates' => $t['rates'], 'kept' => true];
+        }
+
+        return ['value' => (float) ($p?->replacement_value ?? 0), 'minorFee' => $p?->minor_fee !== null ? (float) $p->minor_fee : null, 'rates' => self::rates($r->supplier, $p), 'kept' => false];
+    }
+
     /** Error message for an invalid policy, or null. */
     public static function validatePolicy(array $dp): ?string
     {
@@ -122,8 +183,9 @@ class Damage
             if ($repairable + $nonRepairable > $returned) {
                 $errors[] = $name.': damaged units ('.($repairable + $nonRepairable).') cannot exceed the units returned ('.$returned.').';
             }
-            $rates = self::rates($sup, $p);
-            $value = (float) ($p?->replacement_value ?? 0);
+            $kept = self::termsAt($r, $p); // the terms agreed at booking, not today's
+            $rates = $kept['rates'];
+            $value = $kept['value'];
             $pct = [
                 'repairable' => $rates['repairable']['enabled'] ? (float) $rates['repairable']['pct'] : 0,
                 'nonRepairable' => $rates['nonRepairable']['enabled'] ? (float) $rates['nonRepairable']['pct'] : 0,
@@ -142,7 +204,7 @@ class Damage
                 'productId' => $pid, 'rented' => $rented, 'returned' => $returned, 'repairable' => $repairable, 'nonRepairable' => $nonRepairable, 'lost' => $lost,
                 'condition' => $rates['condition'], 'value' => $value, 'pcts' => $pct,
                 'enabled' => ['repairable' => (bool) $rates['repairable']['enabled'], 'nonRepairable' => (bool) $rates['nonRepairable']['enabled'], 'lost' => $rates['lost']['enabled']],
-                'rateSource' => $rates['source'], 'amounts' => $amounts, 'total' => r2(array_sum($amounts)), 'description' => $desc,
+                'rateSource' => $rates['source'], 'amounts' => $amounts, 'total' => r2(array_sum($amounts)), 'description' => $desc, 'name' => $name, 'termsKept' => $kept['kept'],
             ];
         }
 
@@ -238,8 +300,9 @@ class Damage
             $q = ['minor' => $n('minor'), 'repairable' => $n('repairable'), 'notWorking' => $n('notWorking'), 'beyond' => $n('beyond')];
             $lost = max(0, $rented - $returned);
             $misuse = $q['notWorking'] > 0 && ! empty($x['misuse']) && $x['misuse'] !== '0';
-            $value = (float) ($p?->replacement_value ?? 0);
-            $fee = (float) ($p?->minor_fee ?? 0);
+            $kept = self::termsAt($r, $p); // the terms agreed at booking, not today's
+            $value = $kept['value'];
+            $fee = (float) ($kept['minorFee'] ?? 0);
             if ($returned > $rented) {
                 $errors[] = $name.': returned ('.$returned.') cannot exceed the quantity rented ('.$rented.').';
             }
@@ -271,7 +334,7 @@ class Damage
                 'minor' => $q['minor'], 'repairable' => $q['repairable'], 'notWorking' => $q['notWorking'], 'misuse' => $misuse, 'beyond' => $q['beyond'], 'lost' => $lost,
                 'nonRepairable' => $q['beyond'], // inventory effect uses the same keys as the percentage model
                 'value' => $value, 'minorFee' => $fee, 'repairCost' => $repairCost, 'misuseCost' => $misuseCost,
-                'amounts' => $amounts, 'total' => r2(array_sum($amounts)), 'description' => $desc,
+                'amounts' => $amounts, 'total' => r2(array_sum($amounts)), 'description' => $desc, 'name' => $name, 'termsKept' => $kept['kept'],
             ];
         }
 

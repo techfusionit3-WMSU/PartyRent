@@ -57,6 +57,22 @@ abstract class TestCase extends BaseTestCase
         ]);
     }
 
+    /**
+     * Records a rental's damage terms again from its items' current fees and the shop's current policy, as if it had
+     * been booked after a test changed them (a rental keeps the terms of the day it was booked).
+     */
+    protected function rebookDamageTerms(\App\Models\RentalRequest $r): \App\Models\RentalRequest
+    {
+        inv()->flush();
+        $r = $r->fresh();
+        $p = (array) $r->pricing;
+        $p['damageTerms'] = \App\Domain\Damage::termsForLines($r->lines ?? []);
+        $r->forceFill(['pricing' => $p])->saveQuietly();
+        inv()->flush();
+
+        return $r->fresh();
+    }
+
     /** PartyRent's own cashier (no shop): checks bank / debit transfers for every shop. */
     protected function platformCashier(): User
     {

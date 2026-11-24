@@ -1038,3 +1038,9 @@ html:has(.dash) { background: var(--bg, #FAF7FD) linear-gradient(#1E1433, #1E143
 .reg-sec { border: 0; margin: 0 0 18px; padding: 0 0 4px; border-bottom: 1px solid var(--line); }
 .reg-sec:last-of-type { border-bottom: 0; }
 .reg-sec legend { padding: 0; margin-bottom: 8px; font-weight: 800; font-size: .98rem; color: var(--ink); }
+
+/* damage fees customers see before booking */
+.dmg-fees .dmg-table th, .dmg-fees .dmg-table td { padding-top: 8px; padding-bottom: 8px; }
+.dmg-fees .dmg-total { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; }
+.dmg-card > summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; cursor: pointer; list-style: none; }
+.dmg-card > summary::-webkit-details-marker { display: none; }

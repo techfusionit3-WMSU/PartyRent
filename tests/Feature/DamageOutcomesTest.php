@@ -48,9 +48,9 @@ class DamageOutcomesTest extends TestCase
         $peak = Rentals::peakUnits($r);
         $pid = (int) $itemPid($r);
         Product::whereKey($pid)->update(['replacement_value' => 1000, 'minor_fee' => 100]);
-        inv()->flush();
+        $r = $this->rebookDamageTerms($r); // as if booked with these fees
 
-        return [$r->fresh(), $pid, $peak[$pid], $peak];
+        return [$r, $pid, $peak[$pid], $peak];
     }
 
     private function inspect(RentalRequest $r, array $peak, int $pid, array $row): array
@@ -79,7 +79,7 @@ class DamageOutcomesTest extends TestCase
         $owner = $p->supplier->owner;
         $base = ['name' => $p->name, 'category_id' => $p->category_id, 'description' => 'A sturdy item for every party.', 'listing_type' => 'rent', 'total_stock' => $p->total_stock,
             'unit' => 'piece / day', 'condition' => 'used', 'status' => 'active', 'base_price' => 100, 'rental_mode' => 'day'];
-        $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get(route('supplier.products.edit', $p))->assertOk()->assertSee('Price you paid')->assertSee('Minor damage fee');
+        $this->actingAs($owner)->withSession(['mode' => 'supplier'])->get(route('supplier.products.edit', $p))->assertOk()->assertSee('Price you paid')->assertSee('Minor damage (₱ per unit)');
 
         // value left empty → the suggestion (bought 18 months ago, used: 1,000 × 85% × 75%)
         $this->put(route('supplier.products.update', $p), $base + ['purchase_price' => 1000, 'purchased_on' => now()->subMonths(18)->toDateString(), 'minor_fee' => 80,
@@ -98,7 +98,7 @@ class DamageOutcomesTest extends TestCase
 
         // the customer sees the terms (not the receipt)
         $jose = User::where('email', 'jose@demo.ph')->firstOrFail();
-        $this->actingAs($jose)->get(route('products.show', $p))->assertOk()->assertSee('If something happens')->assertSee('the repair cost')->assertSee('Receipt on file');
+        $this->actingAs($jose)->get(route('products.show', $p))->assertOk()->assertSee('Damage fee')->assertSee('the repair cost')->assertSee('Receipt on file');
         $this->assertNotSame(200, $this->get(route('supplier.products.receipt', $p))->status());
     }
 

@@ -42,13 +42,15 @@
       <div class="field full"><label for="ev-in">Special instructions (optional)</label><textarea class="input" id="ev-in" data-s="instructions" rows="2" placeholder="Setup location, gate codes…"></textarea></div>
     </div></div>
     <div class="stack" id="shops"></div>
-    @if($terms = collect($orders)->flatMap(fn ($o) => $o['damage'] ?? []))
-      @if($terms->isNotEmpty())
-      <div class="card"><h3>If something gets damaged</h3>
-        <p class="small muted">Per unit, agreed now so there are no surprises. The shop photographs the items at release and at return; you get {{ \App\Domain\Damage::REVIEW_HOURS }} hours to accept or dispute any charge, and PartyRent decides disputes. A normal fault (not working, not misused) is never charged.</p>
-        <div class="stack-sm">@foreach($terms as $t)<div class="small"><b>{{ $t['name'] }}</b>@if($t['receipt']) <span class="badge b-green plain">Receipt on file</span>@endif<div class="muted">{{ $t['text'] }}</div></div>@endforeach</div>
-      </div>
-      @endif
+    {{-- damage fees: not part of the price; only if something comes back damaged or missing --}}
+    @php($dmgOrders = array_values(array_filter($orders, fn ($o) => ! empty($o['damage']['rows']))))
+    @if($dmgOrders)
+      <details class="card dmg-card"><summary><span>{{ icon('shield', 'width:16px;vertical-align:-3px') }} <b>If something gets damaged</b></span><span class="small muted">damage fees, not part of the price</span></summary>
+        @foreach($dmgOrders as $o)
+          <div class="mt-2">@if(count($dmgOrders) > 1)<div class="label mb-1">{{ $o['shop']['name'] }}</div>@endif
+            @include('partials.damage-fees', ['rows' => $o['damage']['rows'], 'personal' => $o['damage']['personal']])</div>
+        @endforeach
+      </details>
     @endif
   </div>
   <aside class="card sticky-side"><h3>Order summary</h3><div id="sum"><div class="page-loading"><div class="spinner"></div></div></div>

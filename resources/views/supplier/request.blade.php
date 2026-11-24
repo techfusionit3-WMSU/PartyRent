@@ -195,8 +195,9 @@
     @endforeach
     @foreach($peak as $pid => $q)
       @php($p = inv()->product($pid))
-      <div class="card card-flat mb-1" data-out data-name="{{ $p->name }}" data-rented="{{ $q }}" data-value="{{ (float) $p->replacement_value }}" data-fee="{{ (float) $p->minor_fee }}" style="padding:14px">
-        <div class="mb-1"><b>{{ $p->name }}</b><div class="small muted">Rented {{ $q }} · replacement value {{ $p->replacement_value ? money($p->replacement_value) : 'not set' }} · minor fee {{ $p->minor_fee !== null ? money($p->minor_fee) : 'not set' }}</div></div>
+      @php($kt = \App\Domain\Damage::termsAt($r, $p)) {{-- the damage fees agreed at booking --}}
+      <div class="card card-flat mb-1" data-out data-name="{{ $p->name }}" data-rented="{{ $q }}" data-value="{{ $kt['value'] }}" data-fee="{{ (float) ($kt['minorFee'] ?? 0) }}" style="padding:14px">
+        <div class="mb-1"><b>{{ $p->name }}</b><div class="small muted">Rented {{ $q }} · replacement value {{ $kt['value'] ? money($kt['value']) : 'not set' }} · minor fee {{ $kt['minorFee'] !== null ? money($kt['minorFee']) : 'not set' }}{{ $kt['kept'] ? ' (as agreed at booking)' : '' }}</div></div>
         <div class="form-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
           <div class="field"><label class="small">Returned</label><input class="input input-sm" type="number" min="0" max="{{ $q }}" name="items[{{ $pid }}][returned]" data-k="returned" value="{{ $q }}"></div>
           <div class="field"><label class="small">Minor (cleaning, stain)</label><input class="input input-sm" type="number" min="0" name="items[{{ $pid }}][minor]" data-k="minor" value="0"></div>
@@ -230,10 +231,11 @@
     @endforeach
     @foreach($peak as $pid => $q)
       @php($p = inv()->product($pid))
-      @php($rt = \App\Domain\Damage::rates($r->supplier, $p))
+      @php($kt = \App\Domain\Damage::termsAt($r, $p)) {{-- the damage terms agreed at booking --}}
+      @php($rt = $kt['rates'])
       @php($pcs = ['repairable' => $rt['repairable']['enabled'] ? +$rt['repairable']['pct'] : 0, 'nonRepairable' => $rt['nonRepairable']['enabled'] ? +$rt['nonRepairable']['pct'] : 0, 'lost' => $rt['lost']['enabled'] ? +$rt['lost']['pct'] : 0])
-      <div class="card card-flat mb-1" data-insp data-name="{{ $p->name }}" data-rented="{{ $q }}" data-value="{{ (float) $p->replacement_value }}" data-pcts="{{ json_encode($pcs) }}" style="padding:14px">
-        <div class="row between wrap mb-1"><div><b>{{ $p->name }}</b><div class="small muted">Rented: {{ $q }} · condition before rental: {{ $C[$rt['condition']] }} · product value {{ money($p->replacement_value ?? 0) }}</div></div>
+      <div class="card card-flat mb-1" data-insp data-name="{{ $p->name }}" data-rented="{{ $q }}" data-value="{{ $kt['value'] }}" data-pcts="{{ json_encode($pcs) }}" style="padding:14px">
+        <div class="row between wrap mb-1"><div><b>{{ $p->name }}</b><div class="small muted">Rented: {{ $q }} · condition before rental: {{ $C[$rt['condition']] }} · product value {{ money($kt['value']) }}{{ $kt['kept'] ? ' (as agreed at booking)' : '' }}</div></div>
           <div class="row wrap gap-sm">@foreach([['repairable', 'Repairable'], ['nonRepairable', 'Non-repairable'], ['lost', 'Lost ('.$C[$rt['condition']].')']] as [$k, $lbl])<span class="badge {{ $rt[$k]['enabled'] ? 'b-gray' : 'b-red' }} plain">{{ $lbl }}: {{ $rt[$k]['enabled'] ? +$rt[$k]['pct'].'%' : 'off' }}</span>@endforeach @if($rt['source'] === 'category')<span class="badge b-purple plain">category rule</span>@endif</div></div>
         <div class="form-grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
           <div class="field"><label class="small">Returned</label><input class="input input-sm" type="number" min="0" max="{{ $q }}" name="items[{{ $pid }}][returned]" data-k="returned" value="{{ $q }}"></div>

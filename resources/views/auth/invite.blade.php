@@ -31,12 +31,13 @@
         <input class="input" id="code" name="code" required inputmode="numeric" autocomplete="one-time-code" pattern="\s*\d{3}\s?\d{3}\s*" maxlength="7" placeholder="123456" autofocus style="font-size:1.6rem;letter-spacing:.4em;text-align:center;font-weight:700">
         @error('code')<div class="error-text">{{ $message }}</div>@enderror
       </div>
-      <div class="field @error('name') invalid @enderror"><label for="name">Full name</label><input class="input" id="name" name="name" required minlength="3" value="{{ old('name') }}" autocomplete="name">@error('name')<div class="error-text">{{ $message }}</div>@enderror</div>
+      @include('partials.person-fields')
       <div class="field @error('phone') invalid @enderror"><label for="phone">Mobile number</label><input class="input" id="phone" name="phone" required placeholder="0917 555 0101" value="{{ old('phone') }}" autocomplete="tel">@error('phone')<div class="error-text">{{ $message }}</div>@enderror</div>
       <div class="form-grid">
         <div class="field @error('password') invalid @enderror"><label for="password">Password</label><input class="input" id="password" type="password" name="password" required minlength="8" autocomplete="new-password">@error('password')<div class="error-text">{{ $message }}</div>@enderror</div>
         <div class="field"><label for="password_confirmation">Confirm password</label><input class="input" id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password"></div>
       </div>
+      @include('partials.password-rules', ['for' => 'password', 'confirm' => 'password_confirmation'])
       <button class="btn btn-primary btn-block btn-lg">Create account &amp; join</button>
     </form>
     <p class="center mt-2 small muted">The invitation expires {{ $inv->expires_at->diffForHumans() }}.</p>

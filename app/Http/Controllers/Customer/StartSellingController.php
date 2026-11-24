@@ -46,7 +46,7 @@ class StartSellingController extends Controller
         }
         $app = array_replace_recursive([
             'type' => $existing?->type ?? '',
-            'personal' => ['fullName' => $u->name, 'birthDate' => '', 'address' => $u->address, 'phone' => $u->phone, 'email' => $u->email],
+            'personal' => ['fullName' => $u->name, 'birthDate' => $u->birthday?->format('Y-m-d') ?? '', 'address' => $u->address, 'phone' => $u->phone, 'email' => $u->email],
             'identity' => ['idType' => Applications::ID_TYPES[0], 'idNumber' => ''],
             'business' => ['shopName' => '', 'address' => $u->address, 'productTypes' => '', 'phone' => $u->phone],
             'company' => ['legalName' => '', 'companyType' => null, 'address' => '', 'email' => '', 'phone' => '', 'natureOfBusiness' => 'Party and event equipment rental', 'description' => '', 'branches' => 1, 'website' => ''],

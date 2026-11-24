@@ -48,7 +48,7 @@ class TeamRolesTest extends TestCase
         $this->assertNull(User::where('email', $email)->first(), 'no account before they confirm');
         $this->post('/logout');
         $this->get($path)->assertOk()->assertSee('Create account &amp; join', false);
-        $this->post($path.'/join', ['code' => $code, 'name' => 'New Person', 'phone' => '0917 000 0000', 'password' => 'temp1234A', 'password_confirmation' => 'temp1234A'])
+        $this->post($path.'/join', ['code' => $code, 'first_name' => 'New', 'last_name' => 'Person', 'birthday' => add_days(today_iso(), -365 * 30), 'gender' => 'prefer_not', 'phone' => '0917 000 0000', 'password' => 'temp1234A', 'password_confirmation' => 'temp1234A'])
             ->assertSessionHas('success');
         $u = User::where('email', $email)->firstOrFail();
         $this->assertAuthenticatedAs($u);
@@ -114,7 +114,7 @@ class TeamRolesTest extends TestCase
         $this->post('/logout');
 
         $wrong = $code === '000000' ? '111111' : '000000';
-        $form = ['name' => 'Fresh Hire', 'phone' => '0917 000 0001', 'password' => 'mypass123', 'password_confirmation' => 'mypass123'];
+        $form = ['first_name' => 'Fresh', 'last_name' => 'Hire', 'birthday' => add_days(today_iso(), -365 * 30), 'gender' => 'male', 'phone' => '0917 000 0001', 'password' => 'Mypass123', 'password_confirmation' => 'Mypass123'];
         $this->post($path.'/join', ['code' => $wrong] + $form)->assertSessionHasErrors('code');
         $this->assertNull(User::where('email', 'fresh@demo.ph')->first());
         $this->post($path.'/join', ['code' => $code] + $form)->assertRedirect();
@@ -124,7 +124,7 @@ class TeamRolesTest extends TestCase
         $this->assertSame(0, StaffInvite::count());
         // their own password works, and the link is used up
         $this->post('/logout');
-        $this->post('/login', ['email' => 'fresh@demo.ph', 'password' => 'mypass123'])->assertRedirect();
+        $this->post('/login', ['email' => 'fresh@demo.ph', 'password' => 'Mypass123'])->assertRedirect();
         $this->assertAuthenticatedAs($u);
         $this->get($path)->assertOk()->assertSee('Invitation not available');
     }

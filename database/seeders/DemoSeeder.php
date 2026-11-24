@@ -310,8 +310,14 @@ class DemoSeeder extends Seeder
         if ($this->staffOnly) {
             $rows = array_filter($rows, fn ($r) => (bool) array_intersect(['admin', 'superadmin', 'cashier'], $r[5]));
         }
+        // demo birthday and gender of the customer accounts (PartyRent staff accounts leave them empty)
+        $who = ['u1' => ['1994-03-12', 'female'], 'u2' => ['1985-07-21', 'male'], 'u3' => ['1990-11-02', 'female'], 'u4' => ['1988-01-30', 'male'],
+            'u5' => ['1983-09-14', 'female'], 'u6' => ['1979-05-05', 'male'], 'u7' => ['1992-08-18', 'male'], 'u8' => ['1997-02-25', 'female'],
+            'u9' => ['1989-12-09', 'female'], 'u14' => ['2000-06-15', 'male'], 'u10' => ['1995-04-11', 'female'], 'u15' => ['1991-10-03', 'male'],
+            'u16' => ['1998-07-27', 'prefer_not'], 'u17' => ['1996-03-19', 'female']];
         foreach ($rows as [$key, $name, $email, $phone, $addr, $roles, $status, $d]) {
-            $u = new User(array_merge(['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => $roles, 'status' => $status, 'password' => $pw], is_array($addr) ? $this->addr($addr) : ['address' => $addr]));
+            $u = new User(array_merge(['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => $roles, 'status' => $status, 'password' => $pw],
+                isset($who[$key]) ? ['birthday' => $who[$key][0], 'gender' => $who[$key][1]] : [], is_array($addr) ? $this->addr($addr) : ['address' => $addr]));
             $u->created_at = $this->ts($d);
             $u->email_verified_at = $u->created_at;
             if ($key === 'u13') {

@@ -71,10 +71,10 @@ class InviteController extends Controller
         }
         $data = $request->validate([
             'code' => 'required|string',
-            'name' => 'required|string|min:3|max:120',
+            ...\App\Support\AccountRules::name(), ...\App\Support\AccountRules::birthday(), ...\App\Support\AccountRules::gender(),
             'phone' => 'required|string|max:30',
-            'password' => ['required', 'confirmed', PasswordRule::min(8)],
-        ]);
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ], \App\Support\AccountRules::messages());
         $res = ShopStaffs::joinNew($inv, $data);
         if (! $res['ok']) {
             return back()->withInput($request->except('password', 'password_confirmation', 'code'))->withErrors([$res['field'] ?? 'invite' => $res['error']]);

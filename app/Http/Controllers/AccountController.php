@@ -87,14 +87,17 @@ class AccountController extends Controller
     public function updateProfile(Request $request)
     {
         $u = $request->user();
+        // staff accounts (PartyRent admins, cashiers) may leave birthday and gender empty; everyone else keeps them
         $data = $request->validate([
-            'name' => 'required|string|min:3|max:120',
+            ...\App\Support\AccountRules::name(), ...\App\Support\AccountRules::birthday(! $u->isStaff()), ...\App\Support\AccountRules::gender(! $u->isStaff()),
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($u->id)],
             'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'],
             // Staff accounts keep a free-text office address; customers get the structured one used for delivery.
             ...($u->isStaff() ? ['address' => 'required|string|max:255'] : AddressInput::rules('addr')),
-        ], array_merge(AddressInput::messages(), ['phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'email.unique' => 'That email is used by another account.']));
-        $attrs = ['name' => trim($data['name']), 'email' => trim($data['email']), 'phone' => trim($data['phone'])];
+        ], array_merge(AddressInput::messages(), \App\Support\AccountRules::messages(), ['phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'email.unique' => 'That email is used by another account.']));
+        $attrs = ['first_name' => trim($data['first_name']), 'middle_name' => trim((string) ($data['middle_name'] ?? '')) ?: null, 'last_name' => trim($data['last_name']),
+            'birthday' => $data['birthday'] ?? null, 'gender' => $data['gender'] ?? null,
+            'email' => trim($data['email']), 'phone' => trim($data['phone'])];
         $u->fill($u->isStaff() ? $attrs + ['address' => trim($data['address'])] : $attrs + AddressInput::attributes($data['addr']));
         // A customer who changes their email must verify the new address (staff emails are managed by the superadmin).
         $reverify = ! $u->isStaff() && $u->isDirty('email');
@@ -117,7 +120,7 @@ class AccountController extends Controller
     public function updatePassword(Request $request)
     {
         $u = $request->user();
-        $request->validate(['cur' => 'required', 'np' => ['required', 'confirmed', PasswordRule::min(8)]], ['np.confirmed' => 'Passwords do not match.']);
+        $request->validate(['cur' => 'required', 'np' => ['required', 'confirmed', PasswordRule::defaults()]], \App\Support\AccountRules::messages('np'));
         if (! Hash::check($request->input('cur'), $u->password)) {
             return back()->withErrors(['cur' => 'Current password is incorrect.']);
         }

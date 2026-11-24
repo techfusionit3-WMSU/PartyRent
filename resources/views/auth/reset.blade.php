@@ -8,6 +8,7 @@
   <div class="field @error('email') invalid @enderror"><label for="email">Email address</label><input class="input" id="email" type="email" name="email" required value="{{ old('email', $email) }}">@error('email')<div class="error-text">{{ $message }}</div>@enderror</div>
   <div class="field @error('password') invalid @enderror"><label for="password">New password</label><input class="input" id="password" type="password" name="password" required minlength="8">@error('password')<div class="error-text">{{ $message }}</div>@enderror</div>
   <div class="field"><label for="password_confirmation">Confirm new password</label><input class="input" id="password_confirmation" type="password" name="password_confirmation" required></div>
+  @include('partials.password-rules', ['for' => 'password', 'confirm' => 'password_confirmation'])
   <button class="btn btn-primary btn-block btn-lg">Update password</button>
 </form>
 @endsection

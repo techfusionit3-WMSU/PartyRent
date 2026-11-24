@@ -23,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Every new or changed password: 8+ characters with an uppercase and a lowercase letter.
+        \Illuminate\Validation\Rules\Password::defaults(fn () => \App\Support\AccountRules::password());
+
         // The request memo (Inventory) never outlives a change to what it remembers.
         foreach ([\App\Models\Product::class, \App\Models\Package::class, \App\Models\Supplier::class, \App\Models\Discount::class] as $m) {
             $m::saved(fn () => inv()->flush());

@@ -136,7 +136,7 @@ class SuperController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|min:3|max:120', 'email' => 'required|email|unique:users,email',
-            'phone' => 'nullable|string|max:40', 'role' => 'required|in:admin,cashier', 'password' => ['required', PasswordRule::min(10)],
+            'phone' => 'nullable|string|max:40', 'role' => 'required|in:admin,cashier', 'password' => ['required', PasswordRule::min(10)->mixedCase()],
         ]);
         $u = User::create(['name' => $data['name'], 'email' => strtolower($data['email']), 'phone' => $data['phone'] ?? '', 'address' => 'PartyRent HQ', 'roles' => [$data['role']], 'status' => 'active', 'password' => $data['password']]);
         $u->forceFill(['email_verified_at' => now()])->save(); // staff accounts are vouched for by the superadmin

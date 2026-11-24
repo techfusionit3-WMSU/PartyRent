@@ -29,7 +29,7 @@
   <form method="POST" action="{{ route('super.admins.store') }}" data-confirm-title="Create this account?" data-confirm="The new staff member gets access as soon as it is created." data-confirm-ok="Create">@csrf<div class="modal-body">
     <div class="field"><label>Full name</label><input class="input" name="name" required minlength="3" value="{{ old('name') }}"></div>
     <div class="form-grid"><div class="field"><label>Email</label><input class="input" type="email" name="email" required value="{{ old('email') }}"></div><div class="field"><label>Phone</label><input class="input" name="phone" value="{{ old('phone') }}"></div></div>
-    <div class="form-grid"><div class="field"><label>Role</label><select class="input" name="role"><option value="admin">Admin</option><option value="cashier">Cashier</option></select></div><div class="field"><label>Temporary password</label><input class="input" type="text" name="password" required minlength="10" autocomplete="off"><div class="hint">At least 10 characters.</div></div></div>
+    <div class="form-grid"><div class="field"><label>Role</label><select class="input" name="role"><option value="admin">Admin</option><option value="cashier">Cashier</option></select></div><div class="field"><label>Temporary password</label><input class="input" type="text" name="password" required minlength="10" autocomplete="off"><div class="hint">At least 10 characters, with an uppercase and a lowercase letter.</div></div></div>
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Create account</button></div></form>
 </div></div>
 @endsection

@@ -60,19 +60,22 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string|min:3|max:120',
+            ...\App\Support\AccountRules::name(), ...\App\Support\AccountRules::birthday(), ...\App\Support\AccountRules::gender(),
             'email' => 'required|email|max:180|unique:users,email',
             'phone' => ['required', 'string', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'],
             ...AddressInput::rules('addr', false), // city is enough to sign up; street/barangay can come at checkout
-            'password' => ['required', 'confirmed', PasswordRule::min(8)],
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
             'terms' => 'accepted',
-        ], array_merge(AddressInput::messages(), ['phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'email.unique' => 'An account with this email already exists. Try logging in.']));
+        ], array_merge(AddressInput::messages(), \App\Support\AccountRules::messages(), ['phone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'email.unique' => 'An account with this email already exists. Try logging in.']));
 
         // No account yet: hold the details until the email code is confirmed. Signing up again with the same email replaces the old attempt.
         $email = strtolower(trim($data['email']));
         $pending = PendingRegistration::firstOrNew(['email' => $email]);
         $pending->payload = array_merge([
-            'name' => trim($data['name']), 'phone' => trim($data['phone']), 'password' => Hash::make($data['password']),
+            'name' => \App\Support\AccountRules::fullName($data['first_name'], $data['middle_name'] ?? null, $data['last_name']),
+            'first_name' => trim($data['first_name']), 'middle_name' => trim((string) ($data['middle_name'] ?? '')) ?: null, 'last_name' => trim($data['last_name']),
+            'birthday' => $data['birthday'], 'gender' => $data['gender'],
+            'phone' => trim($data['phone']), 'password' => Hash::make($data['password']),
         ], AddressInput::attributes($data['addr']));
         $code = $pending->newCode();
         session(['pending_reg' => $pending->id]);
@@ -153,7 +156,9 @@ class AuthController extends Controller
 
         // Code confirmed: now the account is created, already verified.
         $data = $p->payload;
-        $u = new User(['name' => $data['name'], 'email' => $p->email, 'phone' => $data['phone'], 'roles' => ['customer'], 'status' => 'active',
+        $u = new User(['name' => $data['name'], 'email' => $p->email,
+            'first_name' => $data['first_name'] ?? null, 'middle_name' => $data['middle_name'] ?? null, 'last_name' => $data['last_name'] ?? null,
+            'birthday' => $data['birthday'] ?? null, 'gender' => $data['gender'] ?? null, 'phone' => $data['phone'], 'roles' => ['customer'], 'status' => 'active',
             'address' => $data['address'] ?? '', 'address_parts' => $data['address_parts'] ?? null, 'city_code' => $data['city_code'] ?? null]);
         $u->password = $data['password']; // already hashed; the "hashed" cast leaves it as is
         $u->email_verified_at = now();
@@ -259,7 +264,7 @@ class AuthController extends Controller
 
     public function reset(Request $request)
     {
-        $request->validate(['token' => 'required', 'email' => 'required|email', 'password' => ['required', 'confirmed', PasswordRule::min(8)]]);
+        $request->validate(['token' => 'required', 'email' => 'required|email', 'password' => ['required', 'confirmed', PasswordRule::defaults()]], \App\Support\AccountRules::messages());
         $status = Password::reset($request->only('email', 'password', 'password_confirmation', 'token'), function (User $user, string $password) {
             $user->forceFill(['password' => Hash::make($password)])->setRememberToken(Str::random(60));
             $user->save();

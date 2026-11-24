@@ -228,7 +228,10 @@ class ShopStaffs
         $s = $inv->supplier;
         $u = DB::transaction(function () use ($inv, $data, $s) {
             $u = User::create([
-                'name' => trim($data['name']), 'email' => $inv->email, 'phone' => trim((string) $data['phone']),
+                'name' => \App\Support\AccountRules::fullName($data['first_name'] ?? ($data['name'] ?? ''), $data['middle_name'] ?? null, $data['last_name'] ?? null),
+                'first_name' => $data['first_name'] ?? null, 'middle_name' => ($data['middle_name'] ?? null) ?: null, 'last_name' => $data['last_name'] ?? null,
+                'birthday' => $data['birthday'] ?? null, 'gender' => $data['gender'] ?? null,
+                'email' => $inv->email, 'phone' => trim((string) $data['phone']),
                 'address' => $s->address, 'password' => Hash::make($data['password']),
                 'roles' => ['customer'], 'status' => 'active',
             ]);

@@ -2,11 +2,11 @@
 
 @section('content')
 <div class="page-head"><div><h1>Customers & suppliers</h1><p>Suspended accounts can't log in. Staff accounts are managed by the superadmin.</p></div>
-  <form method="GET"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search name or email" style="width:240px"></form></div>
+  <form method="GET"><input class="input input-sm" name="q" value="{{ $q }}" placeholder="Search name or email" style="width:240px" aria-label="Search name or email"></form></div>
 <div class="card pad-0"><div class="table-wrap"><table class="table cards"><thead><tr><th>User</th><th>Roles</th><th>Supplier shop</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>
   @foreach($list as $u)
     <tr>
-      <td data-label="User"><div class="row"><span class="avatar">{{ $u->initials() }}</span><div><b>{{ $u->name }}</b><div class="small muted">{{ $u->email }} · {{ $u->phone }}</div></div></div></td>
+      <td data-label="User"><div class="row"><span class="avatar">{{ $u->initials() }}</span><div><b>{{ $u->name }}</b><div class="small muted">{{ $u->email }} · {{ $u->phone }}</div><div class="small muted">{{ $u->birthday ? 'Age '.$u->age().' · born '.fmt_date($u->birthday->format('Y-m-d')) : 'Birthday not given' }}{{ $u->gender ? ' · '.$u->genderLabel() : '' }}</div></div></div></td>
       <td data-label="Roles">{{ implode(', ', array_map('ucfirst', $u->roles)) }}</td>
       <td data-label="Shop">@if($u->supplier){{ $u->supplier->name }} <span class="badge {{ $u->supplier->status === 'approved' ? 'b-green' : ($u->supplier->status === 'pending' ? 'b-gold' : 'b-red') }}">{{ ucfirst($u->supplier->status) }}</span>@else<span class="muted">—</span>@endif</td>
       <td data-label="Joined">{{ fmt_date($u->created_at) }}</td>

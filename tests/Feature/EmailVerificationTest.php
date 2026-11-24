@@ -22,9 +22,9 @@ class EmailVerificationTest extends TestCase
     private function register(string $email = 'new.user@gmail.com')
     {
         return $this->post('/register', [
-            'name' => 'Nina Reyes', 'email' => $email, 'phone' => '0917 555 0101',
+            'first_name' => 'Nina', 'last_name' => 'Reyes', 'birthday' => add_days(today_iso(), -365 * 30), 'gender' => 'female', 'email' => $email, 'phone' => '0917 555 0101',
             'addr' => ['regionCode' => '070000000', 'provinceCode' => '072200000', 'cityCode' => '072217000'],
-            'password' => 'secret123', 'password_confirmation' => 'secret123', 'terms' => '1',
+            'password' => 'Secret123', 'password_confirmation' => 'Secret123', 'terms' => '1',
         ]);
     }
 
@@ -65,7 +65,7 @@ class EmailVerificationTest extends TestCase
 
         // the password typed at sign-up works
         $this->post('/logout');
-        $this->post('/login', ['email' => 'new.user@gmail.com', 'password' => 'secret123'])->assertRedirect();
+        $this->post('/login', ['email' => 'new.user@gmail.com', 'password' => 'Secret123'])->assertRedirect();
         $this->assertAuthenticatedAs($u);
     }
 
@@ -116,7 +116,7 @@ class EmailVerificationTest extends TestCase
         $maria = User::where('email', 'maria@demo.ph')->firstOrFail();
         $this->assertTrue($maria->hasVerifiedEmail());
         $this->actingAs($maria)->withSession(['mode' => 'customer'])->put('/account', [
-            'name' => $maria->name, 'email' => 'maria.new@gmail.com', 'phone' => $maria->phone,
+            'first_name' => $maria->first_name, 'last_name' => $maria->last_name, 'birthday' => add_days(today_iso(), -365 * 30), 'gender' => 'female', 'email' => 'maria.new@gmail.com', 'phone' => $maria->phone,
             'addr' => ['regionCode' => '110000000', 'provinceCode' => '112400000', 'cityCode' => '112402000', 'barangay' => 'Bajada', 'street' => '1 Test St.'],
         ])->assertRedirect(route('verification.notice'));
         $this->assertFalse($maria->fresh()->hasVerifiedEmail());

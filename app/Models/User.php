@@ -44,7 +44,8 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     ];
 
     protected $fillable = [
-        'name', 'email', 'password', 'phone', 'address', 'city_code', 'address_parts', 'roles', 'status',
+        'name', 'first_name', 'middle_name', 'last_name', 'birthday', 'gender',
+        'email', 'password', 'phone', 'address', 'city_code', 'address_parts', 'roles', 'status',
         'admin_perms', 'cashier_perms', 'last_login_at',
     ];
 
@@ -55,6 +56,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'birthday' => 'date:Y-m-d',
             'password' => 'hashed',
             'roles' => 'array',
             'address_parts' => 'array',
@@ -62,6 +64,35 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
             'cashier_perms' => 'array',
             'ui_flags' => 'array',
         ];
+    }
+
+    /**
+     * `name` is the full display name used everywhere; the legal name is kept in parts. Setting the parts rebuilds the
+     * name; setting only a name (staff accounts made by an admin, older code) fills the parts from it.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $u) {
+            if ($u->isDirty(['first_name', 'middle_name', 'last_name']) && trim((string) $u->first_name) !== '') {
+                $u->name = \App\Support\AccountRules::fullName($u->first_name, $u->middle_name, $u->last_name);
+            } elseif ($u->isDirty('name') || ! $u->first_name) {
+                $parts = preg_split('/\s+/', trim((string) $u->name)) ?: [];
+                $u->last_name = count($parts) > 1 ? array_pop($parts) : null;
+                $u->first_name = implode(' ', $parts) ?: null;
+                $u->middle_name = null;
+            }
+        });
+    }
+
+    /** Age today from the birthday (null when not given). */
+    public function age(): ?int
+    {
+        return $this->birthday ? \App\Support\AccountRules::age($this->birthday) : null;
+    }
+
+    public function genderLabel(): string
+    {
+        return \App\Support\AccountRules::GENDERS[$this->gender] ?? '—';
     }
 
     /** The supplier shop this user OWNS (any status). Use shop() for the shop they work in. */
@@ -289,6 +320,6 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
 
     public function firstName(): string
     {
-        return explode(' ', trim($this->name))[0];
+        return $this->first_name ? explode(' ', trim($this->first_name))[0] : explode(' ', trim($this->name))[0];
     }
 }

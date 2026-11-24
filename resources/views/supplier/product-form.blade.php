@@ -6,7 +6,8 @@
     $lt = old('listing_type', $p->listing_type ?: 'rent');
     $tiers = collect($p->tiers ?: [['min' => 1, 'max' => null, 'price' => '']])->sortBy('min')->values();
     $base = old('base_price', $tiers->first()['price'] ?? '');
-    $bulk = old('bulk', $tiers->slice(1)->map(fn ($t) => ['min' => $t['min'], 'price' => $t['price']])->values()->all());
+    // bulk discount tiers as "from N pieces, X% off" (older tiers saved a price only: their percent is worked out)
+    $bulk = array_values(array_filter((array) old('bulk', $p->exists ? \App\Domain\Pricing::bulkSteps($p) : []), fn ($t) => ($t['min'] ?? '') !== '' || ($t['pct'] ?? '') !== ''));
     $colors = old('colors', $p->colors ?? []);
     $themes = old('themes', $p->themes ?? []);
     $evs = old('events', $p->events ?? []);
@@ -81,15 +82,7 @@
         <div class="field" data-for="sale"><label>Sold per</label><select class="input" name="unit">@foreach(\App\Models\Product::SALE_UNITS as $un)<option @selected(old('unit', $p->unit) === $un)>{{ $un }}</option>@endforeach</select></div>
       </div>
       <div class="field"><label>Base price (₱ per unit<span data-for="rent"> per <span data-unit-word>{{ $mode === 'hour' ? 'hour' : 'day' }}</span></span>)</label><input class="input" type="number" min="0.01" step="0.01" name="base_price" required value="{{ $base }}" style="max-width:300px">@error('base_price')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-      <div class="label mt-1">Bulk discount <span class="muted">(optional)</span></div>
-      <p class="small muted">Cheaper per unit when a customer rents more. Each row applies from that quantity up; the price that fits each date's quantity is used automatically.</p>
-      <div id="bulk">
-        @foreach(array_merge($bulk, [['min' => '', 'price' => '']]) as $i => $t)
-          <div class="row mb-1 bulk-row" style="gap:8px;align-items:center" data-row><span class="small muted">Quantity</span><input class="input input-sm" type="number" min="2" name="bulk[{{ $i }}][min]" value="{{ $t['min'] }}" style="width:100px" aria-label="From quantity"><span class="small muted">pcs and up →</span><input class="input input-sm" type="number" min="0.01" step="0.01" name="bulk[{{ $i }}][price]" value="{{ $t['price'] }}" style="width:120px" aria-label="Price per unit"><span class="small muted">each</span><button type="button" class="btn btn-xs btn-ghost" data-rmrow aria-label="Remove">{{ icon('trash') }}</button></div>
-        @endforeach
-      </div>
-      @error('bulk')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
-      <button type="button" class="btn btn-sm" data-addrow="#bulk">{{ icon('plus') }}Add bulk discount</button>
+      <div class="mt-2">@include('partials.bulk-editor', ['rows' => $bulk, 'stock' => null, 'errorText' => $errors->first('bulk') ?: $errors->first('bulk.*')])</div>
       <p class="small muted mt-1 mb-0">Changes apply to new requests only; accepted requests keep their quoted price.</p>
     </div>
 
@@ -196,9 +189,6 @@
   f.addEventListener('click', function (e) {
     if (e.target.closest('#addMax')) { $('addMax').hidden = true; $('maxBox').hidden = false; $('hasMax').value = 1; $('maxBox').querySelector('input').focus(); }
     if (e.target.closest('#rmMax')) { $('addMax').hidden = false; $('maxBox').hidden = true; $('hasMax').value = 0; }
-    var rm = e.target.closest('[data-rmrow]'); if (rm) { var rows = f.querySelectorAll('#bulk [data-row]'); if (rows.length > 1) rm.closest('[data-row]').remove(); else rm.closest('[data-row]').querySelectorAll('input').forEach(function (i) { i.value = ''; }); }
-    var add = e.target.closest('[data-addrow]'); if (add) { var box = f.querySelector(add.dataset.addrow), last = box.querySelector('[data-row]:last-child'), c = last.cloneNode(true), n = Date.now();
-      c.querySelectorAll('input').forEach(function (i) { i.name = i.name.replace(/\[\d+\]/, '[' + n + ']'); i.value = ''; }); box.appendChild(c); c.querySelector('input').focus(); }
   });
   sync();
 })();

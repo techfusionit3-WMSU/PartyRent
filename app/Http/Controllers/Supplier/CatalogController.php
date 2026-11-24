@@ -75,7 +75,7 @@ class CatalogController extends Controller
             'condition' => 'nullable|in:'.implode(',', array_keys(\App\Domain\Damage::CONDITIONS)),
             'status' => 'required|in:active,inactive',
             'base_price' => 'required|numeric|min:0.01|max:10000000',
-            'bulk' => 'nullable|array|max:7', 'bulk.*.min' => 'nullable|integer|min:2', 'bulk.*.price' => 'nullable|numeric|min:0.01',
+            'bulk' => 'nullable|array|max:20', 'bulk.*.min' => 'nullable|integer|min:2|max:100000', 'bulk.*.pct' => 'nullable|numeric|min:1|max:'.\App\Domain\Pricing::MAX_BULK_PCT, 'bulk.*.price' => 'nullable|numeric|min:0.01',
             'colors' => 'nullable|array|max:15', 'colors.*' => 'string|max:40', 'colors_other' => 'nullable|string|max:120',
             'themes' => 'nullable|array|max:15', 'themes.*' => 'string|max:40', 'themes_other' => 'nullable|string|max:120',
             'events' => 'nullable|array|max:15', 'events.*' => 'string|max:40',
@@ -94,7 +94,7 @@ class CatalogController extends Controller
             'purchase_price' => 'nullable|numeric|min:0|max:100000000', 'purchased_on' => 'nullable|date|before_or_equal:today',
             'purchase_receipt' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:8192', 'clear_receipt' => 'nullable|boolean',
             'value_reason' => 'nullable|string|max:255', 'minor_fee' => 'nullable|numeric|min:0|max:100000000',
-        ], ['base_price.required' => 'Enter the base price.', 'bulk.*.min.min' => 'A bulk discount starts at 2 or more pieces.', 'purchased_on.before_or_equal' => 'The purchase date cannot be in the future.']);
+        ], ['base_price.required' => 'Enter the base price.', 'bulk.*.min.min' => 'A bulk discount starts at 2 or more pieces.', 'bulk.*.pct.min' => 'A bulk discount is at least 1% off.', 'bulk.*.pct.max' => 'A bulk discount is at most '.\App\Domain\Pricing::MAX_BULK_PCT.'% off.', 'purchased_on.before_or_equal' => 'The purchase date cannot be in the future.']);
         $sale = ($v['listing_type'] ?? 'rent') === 'sale';
         // Individual shops: purchase record → replacement value (suggested, lowered for age and condition).
         $personal = ! $this->sup($request)->isBusiness() && ! $sale;
@@ -112,8 +112,10 @@ class CatalogController extends Controller
             ? (in_array($v['unit'], Product::SALE_UNITS, true) ? $v['unit'] : 'pc')
             : trim(explode('/', $v['unit'])[0]).' / '.($hourly ? 'hour' : 'day');
 
-        // base price + bulk discount (optional) → continuous tiers 1…, last open-ended
-        $tiers = \App\Domain\Pricing::tiersFrom((float) $v['base_price'], $v['bulk'] ?? []);
+        // base price + bulk discount tiers (optional, % off) → continuous tiers 1…, last open-ended; no tier above the stock
+        $qty = array_map('intval', array_filter((array) ($v['qty'] ?? []), fn ($q) => $q !== null && $q !== ''));
+        $total = ! $sale && $qty ? array_sum($qty) : (int) ($v['total_stock'] ?? 0);
+        $tiers = \App\Domain\Pricing::tiersFrom((float) $v['base_price'], $v['bulk'] ?? [], $sale ? null : $total);
         if (is_string($tiers)) {
             throw \Illuminate\Validation\ValidationException::withMessages(['bulk' => $tiers]);
         }
@@ -145,8 +147,6 @@ class CatalogController extends Controller
         if (($v['min_hours'] ?? null) && ($v['max_hours'] ?? null) && $v['max_hours'] < $v['min_hours']) {
             throw \Illuminate\Validation\ValidationException::withMessages(['max_hours' => 'Maximum hours cannot be less than the minimum.']);
         }
-        $qty = array_map('intval', array_filter((array) ($v['qty'] ?? []), fn ($q) => $q !== null && $q !== ''));
-        $total = ! $sale && $qty ? array_sum($qty) : (int) ($v['total_stock'] ?? 0);
 
         return [
             'listing_type' => $sale ? 'sale' : 'rent',

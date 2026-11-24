@@ -104,12 +104,13 @@ class DiscountsTest extends TestCase
     {
         $s = $this->juan();
         $p = Product::where('supplier_id', $s->id)->where('listing_type', 'rent')->orderBy('id')->firstOrFail();
-        $this->put(route('supplier.discounts.bulk', $p), ['base_price' => 20, 'bulk' => [['min' => 100, 'price' => 15], ['min' => '', 'price' => '']]])->assertSessionHas('success');
-        $this->assertEquals([['min' => 1, 'max' => 99, 'price' => 20], ['min' => 100, 'max' => null, 'price' => 15]], $p->fresh()->tiers);
-        $this->assertSame('₱5 off per piece for orders of 100+', Pricing::bulkLine($p->fresh()));
-        // a bulk price must be cheaper than the base; duplicate steps refused; removing all steps = base price only
+        $p->update(['total_stock' => 200]);
+        $this->put(route('supplier.discounts.bulk', $p), ['base_price' => 20, 'bulk' => [['min' => 100, 'pct' => 25], ['min' => '', 'pct' => '']]])->assertSessionHas('success');
+        $this->assertEquals([['min' => 1, 'max' => 99, 'price' => 20], ['min' => 100, 'max' => null, 'price' => 15, 'pct' => 25]], $p->fresh()->tiers);
+        $this->assertSame('25% off for 100+ pieces', Pricing::bulkLine($p->fresh()));
+        // a discount must lower the price; duplicate quantities refused; removing all tiers = base price only
         $this->put(route('supplier.discounts.bulk', $p), ['base_price' => 20, 'bulk' => [['min' => 10, 'price' => 25]]])->assertSessionHas('error');
-        $this->put(route('supplier.discounts.bulk', $p), ['base_price' => 20, 'bulk' => [['min' => 10, 'price' => 15], ['min' => 10, 'price' => 12]]])->assertSessionHas('error');
+        $this->put(route('supplier.discounts.bulk', $p), ['base_price' => 20, 'bulk' => [['min' => 10, 'pct' => 5], ['min' => 10, 'pct' => 10]]])->assertSessionHas('error');
         $this->put(route('supplier.discounts.bulk', $p), ['base_price' => 18])->assertSessionHas('success');
         $this->assertEquals([['min' => 1, 'max' => null, 'price' => 18]], $p->fresh()->tiers);
     }

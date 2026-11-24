@@ -56,6 +56,7 @@
       </div>
       <p class="small muted mb-1">Minimum {{ rtrim(rtrim(number_format((float) $p->min_hours, 1), '0'), '.') }} hours. The supplier keeps {{ (int) $p->buffer_min }} minutes free before and after each booking for set-up and travel.</p>
       <div id="hBusy" class="small mb-1"></div>
+      @include('partials.bulk-prices', ['p' => $p])
       @include('market._policies')
       <div class="sum-line total"><span>Estimated rental <span class="small muted" id="hHours"></span></span><span class="price" id="hEst"></span></div>
       @if($own)
@@ -105,6 +106,7 @@
       @csrf
       <input type="hidden" name="type" value="item"><input type="hidden" name="ref_id" value="{{ $p->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}">
       @include('partials.rent-box', ['type' => 'item', 'ref' => $p->id, 'days' => $days, 'siblings' => $siblings, 'start' => $start, 'end' => $end, 'qty' => $qty, 'minDate' => today_iso(), 'sup' => $sup, 'item' => $p, 'sel' => null, 'stockText' => 'Stock: '.$p->total_stock.' total', 'timed' => ! $p->isSale()])
+      @include('partials.bulk-prices', ['p' => $p])
       <div id="altBox"></div>
       @include('market._policies')
       <div class="sum-line total"><span>Estimated rental</span><span class="price" id="est"></span></div>

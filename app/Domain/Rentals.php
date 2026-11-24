@@ -1782,7 +1782,7 @@ class Rentals
     /** Validate and normalize pricing tiers: continuous, starting at 1, last tier open-ended. */
     public static function normalizeTiers(array $tiers): array|string
     {
-        $tiers = array_values(array_filter(array_map(fn ($t) => ['min' => (int) ($t['min'] ?? 0), 'max' => isset($t['max']) && $t['max'] !== '' && $t['max'] !== null ? (int) $t['max'] : null, 'price' => r2($t['price'] ?? 0)], $tiers), fn ($t) => $t['price'] > 0));
+        $tiers = array_values(array_filter(array_map(fn ($t) => ['min' => (int) ($t['min'] ?? 0), 'max' => isset($t['max']) && $t['max'] !== '' && $t['max'] !== null ? (int) $t['max'] : null, 'price' => r2($t['price'] ?? 0)] + (isset($t['pct']) ? ['pct' => (float) $t['pct']] : []), $tiers), fn ($t) => $t['price'] > 0));
         usort($tiers, fn ($a, $b) => $a['min'] <=> $b['min']);
         if (! $tiers) {
             return 'Add at least one price.';
@@ -1829,7 +1829,8 @@ class Rentals
                     return self::fail('Total stock cannot be reduced to '.$data['total_stock'].'. Accepted reservations need '.implode(', ', array_map(fn ($c) => $c['reserved'].' on '.fmt_date($c['date']), $conflicts)).'.');
                 }
             }
-            $priceChanged = json_encode($p->tiers) !== json_encode($tiers);
+            $plain = fn ($ts) => json_encode(array_map(fn ($t) => [(int) $t['min'], $t['max'] === null ? null : (int) $t['max'], r2($t['price'])], $ts ?? [])); // a percent added to an old tier is not a price change
+            $priceChanged = $plain($p->tiers) !== $plain($tiers);
             $stockDelta = $type === 'sale' && $p->isSale() ? (int) $data['total_stock'] - $p->stockOnHand() : 0;
             $p->update($data);
             if ($stockDelta) {
@@ -1837,7 +1838,7 @@ class Rentals
             }
             inv()->flush();
             if ($priceChanged) {
-                Notifier::audit('Updated product pricing', $p->name.' · '.implode(', ', array_map(fn ($t) => $t['min'].($t['max'] ? '–'.$t['max'] : '+').': '.money($t['price']), $tiers)));
+                Notifier::audit('Updated product pricing', $p->name.' · '.implode(', ', array_map(fn ($t) => $t['min'].($t['max'] ? '–'.$t['max'] : '+').': '.money($t['price']).(isset($t['pct']) ? ' ('.Pricing::pctText($t['pct']).'% off)' : ''), $tiers)));
             }
 
             return self::ok(['product' => $p]);

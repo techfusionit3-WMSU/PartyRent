@@ -943,3 +943,48 @@ html:has(.dash) { background: var(--bg, #FAF7FD) linear-gradient(#1E1433, #1E143
   .chat-layout { grid-template-columns: minmax(0, 1fr); }
   .rental-sum { position: static; order: -1; }
 }
+
+/* bulk discount tiers editor (supplier): from N pieces, X% off, live preview */
+.bulk-ed { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.bulk-ed > * { max-width: 100%; }
+.bulk-cols, .bulk-row { display: grid; grid-template-columns: 150px 150px minmax(110px, 1fr) 36px; gap: 10px; align-items: center; width: 100%; max-width: 560px; }
+.bulk-cols { font-size: .74rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+[data-bulk-rows] { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.bulk-f { display: flex; align-items: center; gap: 6px; margin: 0; }
+.bulk-f .input { width: 72px; min-width: 0; }
+.bulk-suf { font-size: .82rem; color: var(--muted); white-space: nowrap; }
+.bulk-lbl { display: none; }
+.bulk-each { font-size: .86rem; }
+.bulk-each s { font-size: .78rem; margin-left: 2px; }
+.bulk-row.bad .input:invalid { border-color: var(--red); box-shadow: 0 0 0 3px rgba(220, 38, 38, .12); }
+.bulk-err { display: block; margin: 0; color: var(--red); font-weight: 600; }
+.bulk-err[hidden] { display: none; }
+.bulk-prev { width: 100%; border: 1px dashed var(--line-2); border-radius: 12px; padding: 12px 14px; background: var(--brand-50); margin-top: 4px; }
+.bulk-prev-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bulk-prev-head label { display: flex; align-items: center; gap: 6px; margin: 0; }
+.bulk-prev-head .input { width: 76px; }
+.bulk-prev-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 10px 0 0; }
+.bulk-prev-grid dt { font-size: .74rem; color: var(--muted); margin: 0; }
+.bulk-prev-grid dd { margin: 2px 0 0; font-weight: 800; font-size: .95rem; }
+.bulk-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.bulk-list:empty { display: none; }
+.bulk-chip { border: 1.5px solid var(--line-2); border-radius: 999px; padding: 4px 10px; font-size: .78rem; background: var(--card, #fff); }
+.bulk-chip.on { border-color: var(--brand); background: #fff; color: var(--brand); }
+@media (max-width: 640px) {
+  .bulk-cols { display: none; }
+  .bulk-row { grid-template-columns: 1fr 1fr 36px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  .bulk-lbl { display: block; font-size: .72rem; color: var(--muted); font-weight: 700; }
+  .bulk-f { flex-wrap: wrap; column-gap: 6px; row-gap: 2px; }
+  .bulk-f .bulk-lbl { flex-basis: 100%; }
+  .bulk-each { grid-column: 1 / 3; grid-row: 2; }
+  .bulk-rm { grid-column: 3; grid-row: 1; }
+  .bulk-prev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* bulk discount price list (customer, item page) */
+.bulk-prices { margin-top: 12px; }
+.bulk-prices .bulk-list { margin-top: 6px; }
+.bulk-next { margin-top: 6px; font-size: .82rem; font-weight: 700; color: var(--green); }
+.bulk-next:empty { display: none; }
+.rate-was { text-decoration: line-through; color: var(--muted); font-size: .78rem; margin-right: 4px; }
+.rate-off { display: inline-block; margin-top: 2px; padding: 1px 6px; border-radius: 6px; background: rgba(22, 163, 74, .12); color: var(--green); font-size: .72rem; font-weight: 800; }

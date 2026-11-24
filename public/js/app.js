@@ -243,7 +243,7 @@
       const rows = r.rows.map(x => '<div class="day-row ' + (x.ok ? '' : 'bad') + '" data-date="' + x.date + '"><div class="dl">' + esc(x.label) + (x.past ? ' <span class="badge b-red">Past date</span>' : '') + '</div>' +
         '<div data-l="Quantity"><div class="qty ' + (x.ok ? '' : 'bad') + '"><button type="button" data-dec aria-label="Decrease">−</button><input type="number" min="0" value="' + x.qty + '" data-qty aria-label="Quantity for ' + esc(x.label) + '"><button type="button" data-inc aria-label="Increase">+</button></div></div>' +
         '<div data-l="Available">' + (x.ok || x.past ? '<span class="avail-pill ' + (x.available - x.qty < 5 && st.type === 'item' ? 'low' : 'ok') + '">' + x.available + ' ' + (st.type === 'package' ? 'pkg' : 'avail.') + '</span>' : '<span class="avail-pill none">Only ' + x.available + '</span>') + '</div>' +
-        '<div data-l="Daily rate">' + esc(x.unitText) + '<div class="small muted">/' + esc(r.unitWord) + (x.tier ? ' · tier ' + esc(x.tier) : '') + '</div></div>' +
+        '<div data-l="Daily rate">' + (x.wasText ? '<span class="rate-was">' + esc(x.wasText) + '</span>' : '') + esc(x.unitText) + '<div class="small muted">/' + esc(r.unitWord) + '</div>' + (x.tier ? '<span class="rate-off">' + esc(x.tier) + '</span>' : '') + '</div>' +
         '<div data-l="Subtotal" class="strong">' + esc(x.subtotalText) + '</div>' +
         '<div class="rm">' + (fixed ? '' : '<button type="button" class="icon-btn" data-remove aria-label="Remove date" style="width:34px;height:34px">' + svg('trash', 'width:17px') + '</button>') + '</div></div>').join('');
       const first = Object.keys(st.days).sort()[0];
@@ -390,6 +390,13 @@
         const qb = $('#qbox', box); if (qb) qb.classList.toggle('bad', !r.ok);
         const est = $('#est', box); if (est) est.textContent = r.totalText + (dates.length > 1 ? ' · ' + dates.length + ' days' : '');
         $$('[data-tier]', box).forEach(t => { const min = +t.dataset.min, max = t.dataset.max ? +t.dataset.max : null; t.classList.toggle('on', vals.some(q => q >= min && (max == null || q <= max))); });
+        // bulk discount: how many more pieces (per day) reach the next tier
+        const nx = $('[data-bulk-next]', box);
+        if (nx) {
+          const top = vals.length ? Math.max(...vals) : 0, next = $$('[data-tier]', box).find(t => +t.dataset.min > top && +t.dataset.pct > 0);
+          const cur = $$('[data-tier]', box).filter(t => top >= +t.dataset.min && +t.dataset.pct > 0).pop();
+          nx.textContent = !top || !qtySet ? '' : next ? 'Rent ' + (+next.dataset.min - top) + ' more' + (dates.length > 1 ? ' a day' : '') + ' to get ' + next.dataset.pct + '% off (' + next.dataset.price + ' each).' : cur ? 'You get the best bulk price: ' + cur.dataset.pct + '% off.' : '';
+        }
         // not enough stock: the buttons look off but still answer a click with why (and a fix), never silently
         lastCheck = r;
         $$('[data-rent-submit]', box).forEach(b => { b.disabled = false; b.classList.toggle('is-off', !r.ok); });
@@ -534,9 +541,103 @@
     $('[data-chat-close]', panel).addEventListener('click', () => panel.classList.remove('open'));
   }
 
+  /* ---------- bulk discount tiers editor (partials/bulk-editor): "from N pieces, X% off", live preview ----------
+     Same rules and rounding as Pricing::tiersFrom / Pricing::discounted; the server checks again on save. */
+  function BulkEditor(ed) {
+    const form = ed.closest('form'), rowsBox = $('[data-bulk-rows]', ed), tpl = $('[data-bulk-tpl]', ed), err = $('[data-bulk-err]', ed);
+    const maxN = +ed.dataset.max || 7, maxPct = +ed.dataset.maxPct || 90, prevQty = $('[data-prev-qty]', ed);
+    const peso = n => '₱' + (Math.round(n * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+    const pctTxt = n => String(Math.round(n * 100) / 100);
+    const each = (base, pct) => r2(base * (1 - pct / 100));
+    const base = () => { const b = form && form.querySelector('[name=base_price]'); return b ? +b.value || 0 : 0; };
+    const isSale = () => { const t = form && form.querySelector('[name=listing_type]:checked'); return !!t && t.value === 'sale'; };
+    const stock = () => {
+      if (isSale()) return 0;
+      if (ed.dataset.stock) return +ed.dataset.stock;
+      const locs = form ? $$('[data-loc]', form) : [];
+      if (locs.length) return locs.reduce((t, i) => t + Math.max(0, Math.floor(+i.value || 0)), 0);
+      const ts = form && form.querySelector('[name=total_stock]:not([disabled])');
+      return ts ? Math.floor(+ts.value || 0) : 0;
+    };
+    const per = () => { const m = form && form.querySelector('#rentalMode'); return isSale() ? '' : (m && m.value === 'hour' ? ' per hour' : ' per day'); };
+    let serverMsg = err.hidden ? '' : err.textContent.trim();
+
+    const read = () => $$('[data-bulk-row]', rowsBox).map(el => ({ el, minIn: $('[data-min]', el), pctIn: $('[data-pct]', el) }))
+      .map(r => ({ ...r, min: r.minIn.value.trim(), pct: r.pctIn.value.trim() }));
+    /** First problem with the tiers (same order as the server), with the field to point at. */
+    function problem(rows, b) {
+      const filled = [];
+      for (const r of rows) {
+        if (r.min === '' && r.pct === '') continue;
+        if (r.min === '' || r.pct === '') return { msg: 'Fill in both the quantity and the % off for each bulk discount, or remove the row.', input: r.min === '' ? r.minIn : r.pctIn };
+        filled.push({ min: Math.floor(+r.min), pct: +r.pct, r });
+      }
+      filled.sort((a, c) => a.min - c.min);
+      for (const t of filled) if (t.min < 2) return { msg: 'A bulk discount starts at 2 or more pieces.', input: t.r.minIn };
+      for (let i = 1; i < filled.length; i++) if (filled[i].min === filled[i - 1].min) return { msg: 'Each bulk discount needs a different quantity.', input: filled[i].r.minIn };
+      for (const t of filled) if (!(t.pct >= 1 && t.pct <= maxPct)) return { msg: 'The discount for ' + t.min + '+ pieces must be between 1% and ' + maxPct + '%.', input: t.r.pctIn };
+      for (let i = 1; i < filled.length; i++) if (filled[i].pct <= filled[i - 1].pct) return { msg: 'Bigger quantities need a bigger discount: ' + filled[i].min + '+ pieces (' + pctTxt(filled[i].pct) + '%) must be more than ' + filled[i - 1].min + '+ pieces (' + pctTxt(filled[i - 1].pct) + '%).', input: filled[i].r.pctIn };
+      const s = stock();
+      if (s > 0) for (const t of filled) if (t.min > s) return { msg: 'The discount for ' + t.min + '+ pieces can never apply: you have ' + s + ' in stock.', input: t.r.minIn };
+      return { tiers: filled };
+    }
+    function draw() {
+      const rows = read(), b = base(), p = problem(rows, b);
+      $('.bulk-cols', ed).hidden = !rows.length;
+      rows.forEach(r => {
+        r.minIn.setCustomValidity(''); r.pctIn.setCustomValidity('');
+        r.el.classList.remove('bad');
+        const pct = +r.pct;
+        $('[data-each]', r.el).innerHTML = b > 0 && pct > 0 && pct <= maxPct ? '<b>' + peso(each(b, pct)) + '</b> <s class="muted">' + peso(b) + '</s>' : '—';
+      });
+      const msg = p.msg || '';
+      if (p.input) { p.input.setCustomValidity(msg); p.input.closest('[data-bulk-row]').classList.add('bad'); }
+      err.textContent = msg || serverMsg; err.hidden = !(msg || serverMsg);
+      const left = maxN - rows.length;
+      $('[data-bulk-add]', ed).disabled = left <= 0;
+      $('[data-bulk-left]', ed).textContent = left <= 0 ? 'Up to ' + maxN + ' tiers.' : '';
+      // preview: the tier the quantity reaches, applied once
+      const q = Math.max(1, Math.floor(+prevQty.value || 1)), tiers = p.tiers || [];
+      const hit = tiers.filter(t => q >= t.min).pop();
+      const pct = hit ? hit.pct : 0, e1 = hit ? each(b, pct) : r2(b);
+      $('[data-p-orig]', ed).textContent = b > 0 ? peso(b) : 'Enter a base price';
+      $('[data-p-pct]', ed).textContent = hit ? pctTxt(pct) + '% off (' + hit.min + '+ tier)' : 'None' + (tiers.length ? ' (below ' + tiers[0].min + ' pieces)' : '');
+      $('[data-p-each]', ed).textContent = b > 0 ? peso(e1) : '—';
+      $('[data-p-total-lbl]', ed).textContent = 'Total for ' + q + (q === 1 ? ' piece' : ' pieces') + per();
+      $('[data-p-total]', ed).innerHTML = b > 0 ? peso(e1 * q) + (hit ? ' <span class="small" style="color:var(--green)">saves ' + peso((b - e1) * q) + '</span>' : '') : '—';
+      // the whole price list, the preview's row highlighted
+      const list = [{ min: 1, pct: 0 }].concat(tiers);
+      $('[data-p-list]', ed).innerHTML = b > 0 && tiers.length ? list.map((t, i) => {
+        const nx = list[i + 1], range = nx ? (nx.min - 1 > t.min ? t.min + '–' + (nx.min - 1) : String(t.min)) : t.min + '+';
+        const on = q >= t.min && (!nx || q < nx.min);
+        return '<span class="bulk-chip' + (on ? ' on' : '') + '">' + range + ' pcs · <b>' + peso(each(b, t.pct)) + '</b>' + (t.pct ? ' · ' + pctTxt(t.pct) + '% off' : '') + '</span>';
+      }).join('') : '';
+    }
+    ed.addEventListener('click', e => {
+      if (e.target.closest('[data-bulk-add]')) {
+        if ($$('[data-bulk-row]', rowsBox).length >= maxN) return;
+        const last = read().filter(r => r.min !== '' && r.pct !== '').pop();
+        rowsBox.insertAdjacentHTML('beforeend', tpl.innerHTML.replace(/__i__/g, 'n' + Date.now()));
+        const row = rowsBox.lastElementChild;
+        if (last) { $('[data-min]', row).placeholder = String(Math.floor(+last.min) * 2); $('[data-pct]', row).placeholder = pctTxt(Math.min(maxPct, +last.pct + 5)); }
+        $('[data-min]', row).focus(); serverMsg = ''; draw();
+      }
+      const rm = e.target.closest('[data-bulk-rm]'); if (rm) { rm.closest('[data-bulk-row]').remove(); serverMsg = ''; draw(); }
+    });
+    ed.addEventListener('input', () => { serverMsg = ''; draw(); });
+    if (form) {
+      form.addEventListener('input', e => { if (!ed.contains(e.target) && e.target.matches('[name=base_price], [data-loc], [name=total_stock]')) draw(); });
+      form.addEventListener('change', e => { if (!ed.contains(e.target) && e.target.matches('[name=listing_type], #rentalMode')) draw(); });
+      form.addEventListener('submit', e => { const p = problem(read(), base()); if (p.msg) { e.preventDefault(); e.stopImmediatePropagation(); draw(); p.input.focus(); toast(p.msg, 'warn'); } }, true);
+    }
+    draw();
+  }
+
   /* ---------- boot ---------- */
   document.addEventListener('DOMContentLoaded', () => {
     (window.PR && window.PR.flash || []).forEach(f => toast(f[1], f[0]));
+    $$('[data-bulk-editor]').forEach(BulkEditor);
     $$('[data-address]').forEach(AddressPicker);
     $$('[data-map-picker]').forEach(MapPicker);
     $$('[data-map-view]').forEach(MapView);

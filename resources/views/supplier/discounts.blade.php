@@ -32,7 +32,7 @@
 </div>
 
 <div class="card"><h3>Bulk discounts</h3>
-  <p class="small muted">A lower price per piece when the customer rents more of an item on the same day. Customers see one line on the item page, for example "₱5 off per piece for orders of 100+".</p>
+  <p class="small muted">A percentage off each piece when the customer rents more of an item on the same day. Customers see it on the item page, for example "5% off for 5+ pieces · up to 15% off at 20+", and the price list as they pick a quantity.</p>
   @if($products->isEmpty())
     @include('partials.empty', ['emoji' => '📦', 'title' => 'No items yet', 'text' => 'Add a product first.'])
   @else
@@ -102,13 +102,7 @@
   <div class="modal-backdrop hidden" id="b{{ $p->id }}"><div class="modal" role="dialog" aria-modal="true" aria-label="Bulk discount"><div class="modal-head"><h3>Bulk discount · {{ $p->name }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
     <form method="POST" action="{{ route('supplier.discounts.bulk', $p) }}">@csrf @method('PUT')<div class="modal-body">
       <div class="field"><label for="bp{{ $p->id }}">Base price (₱ / {{ $p->unit }})</label><input class="input" type="number" id="bp{{ $p->id }}" name="base_price" min="0.01" step="0.01" required value="{{ $tiers[0]['price'] ?? '' }}"></div>
-      <div class="label mb-1">Bulk discount <span class="muted">(optional)</span></div>
-      <div data-bulk-rows>
-        @foreach(array_slice($tiers, 1) as $i => $t)
-          <div class="form-grid mb-1" data-bulk-row style="grid-template-columns:1fr 1fr auto;align-items:end"><div class="field"><label class="small">From (pieces)</label><input class="input input-sm" type="number" min="2" name="bulk[{{ $i }}][min]" value="{{ $t['min'] }}"></div><div class="field"><label class="small">Price (₱)</label><input class="input input-sm" type="number" min="0.01" step="0.01" name="bulk[{{ $i }}][price]" value="{{ $t['price'] }}"></div><div class="field"><button type="button" class="btn btn-xs btn-ghost" data-bulk-rm aria-label="Remove">✕</button></div></div>
-        @endforeach
-      </div>
-      <button type="button" class="btn btn-sm" data-bulk-add>{{ icon('plus') }}Add a bulk price</button>
+      @include('partials.bulk-editor', ['rows' => \App\Domain\Pricing::bulkSteps($p), 'stock' => $p->isSale() ? null : (int) $p->total_stock, 'errorText' => null])
     </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Save</button></div></form>
   </div></div>
 @endforeach
@@ -166,18 +160,6 @@
       if (f.querySelector('[data-scope][value=products]').checked && !f.querySelector('[data-pick]:checked')) { e.preventDefault(); e.stopImmediatePropagation(); window.PR.toast('Choose at least one item, or apply the discount to all items.', 'warn'); openPicker(); }
     }, true);
     draw();
-  });
-  // bulk rows: add / remove
-  var n = 100;
-  document.addEventListener('click', function (e) {
-    var add = e.target.closest('[data-bulk-add]');
-    if (add) {
-      var wrap = add.parentNode.querySelector('[data-bulk-rows]'), i = n++;
-      if (wrap.querySelectorAll('[data-bulk-row]').length >= 7) { window.PR.toast('Up to 7 bulk prices.', 'warn'); return; }
-      wrap.insertAdjacentHTML('beforeend', '<div class="form-grid mb-1" data-bulk-row style="grid-template-columns:1fr 1fr auto;align-items:end"><div class="field"><label class="small">From (pieces)</label><input class="input input-sm" type="number" min="2" name="bulk[' + i + '][min]" required></div><div class="field"><label class="small">Price (₱)</label><input class="input input-sm" type="number" min="0.01" step="0.01" name="bulk[' + i + '][price]" required></div><div class="field"><button type="button" class="btn btn-xs btn-ghost" data-bulk-rm aria-label="Remove">✕</button></div></div>');
-      return;
-    }
-    var rm = e.target.closest('[data-bulk-rm]'); if (rm) rm.closest('[data-bulk-row]').remove();
   });
 })();
 </script>

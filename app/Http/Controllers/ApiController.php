@@ -54,17 +54,22 @@ class ApiController extends Controller
         $total = 0.0;
         foreach ($days as $d => $q) {
             $info = $mine[$d] ?? ['ok' => true, 'available' => 0];
+            $was = null;
             if ($data['type'] === 'package') {
                 $unit = $pp['perDay'];
                 $tier = null;
             } else {
-                $unit = Pricing::unitPrice($item, $q);
-                $t = count($item->tiers) > 1 ? Pricing::tierFor($item, $q) : null;
-                $tier = $t && $t['min'] > 1 ? $t['min'].($t['max'] ? '–'.$t['max'] : '+') : null;
+                // bulk tier by this day's quantity (adding to the rental list merges with the same item already there)
+                $tierQty = $q;
+                $unit = Pricing::unitPrice($item, $tierQty);
+                $t = count($item->tiers) > 1 ? Pricing::tierFor($item, $tierQty) : null;
+                $pct = $t && $t['min'] > 1 ? Pricing::tierPct($t, $item->basePrice()) : 0;
+                $tier = $pct > 0 ? Pricing::pctText($pct).'% bulk discount' : null;
+                $was = $pct > 0 ? money($item->basePrice()) : null;
             }
             $sub = r2($unit * $q);
             $total += $sub;
-            $rows[] = ['date' => $d, 'label' => fmt_day($d), 'qty' => $q, 'available' => $info['available'], 'ok' => $info['ok'] && $d >= $today, 'past' => $d < $today, 'unit' => $unit, 'unitText' => money($unit), 'tier' => $tier, 'subtotal' => $sub, 'subtotalText' => money($sub)];
+            $rows[] = ['date' => $d, 'label' => fmt_day($d), 'qty' => $q, 'available' => $info['available'], 'ok' => $info['ok'] && $d >= $today, 'past' => $d < $today, 'unit' => $unit, 'unitText' => money($unit), 'tier' => $tier, 'wasText' => $was, 'subtotal' => $sub, 'subtotalText' => money($sub)];
         }
         $once = 0.0;
         if ($pp && $pp['once'] > 0 && $days && max($days) > 0) {

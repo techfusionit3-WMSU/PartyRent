@@ -29,54 +29,134 @@ class Pricing
         return $t;
     }
 
-    /**
-     * Change list C3: the bulk discounts as one short plain-language line instead of a quantity-price table,
-     * e.g. "₱5 off per piece for orders of 100+" (+ "· up to ₱8 off at 200+" when there are more steps). '' without discounts.
-     */
-    public static function bulkLine(Product $p): string
-    {
-        $t = self::sortedTiers($p);
-        if (count($t) < 2) {
-            return '';
-        }
-        $base = (float) $t[0]['price'];
-        $word = $p->unitWord() ?: 'piece';
-        $amt = fn (float $n) => fmod(round($n, 2), 1.0) == 0.0 ? money_short($n) : money($n);
-        $parts = [];
-        foreach (array_slice($t, 1) as $x) {
-            $off = $base - (float) $x['price'];
-            if ($off <= 0) {
-                continue;
-            }
-            $parts[] = [$off, $x['min']];
-        }
-        if (! $parts) {
-            return '';
-        }
-        // one short line: the first step, plus the deepest discount when there are more
-        $line = $amt($parts[0][0]).' off per '.$word.' for orders of '.$parts[0][1].'+';
-        $last = end($parts);
+    /** Largest bulk discount a supplier may set, in percent. */
+    public const MAX_BULK_PCT = 90;
 
-        return count($parts) > 1 ? $line.' · up to '.$amt($last[0]).' off at '.$last[1].'+' : $line;
+    /** Most bulk discount tiers per item. */
+    public const MAX_BULK_TIERS = 7;
+
+    /** "10" / "12.5": a percent without trailing zeros. */
+    public static function pctText(float $pct): string
+    {
+        return rtrim(rtrim(number_format($pct, 2, '.', ''), '0'), '.');
     }
 
     /**
-     * Base price + bulk discount steps ([['min' => n, 'price' => x], …]) → continuous tiers starting at 1, the last
-     * one open-ended. Returns an error message for duplicate starting quantities or a step below 2 pieces.
+     * Percent off the base price of one tier: the stored 'pct' (tiers saved since bulk discounts became percentages),
+     * else worked out from its price (older tiers kept a price only). 0 for the base tier.
      */
-    public static function tiersFrom(float $base, array $bulk): array|string
+    public static function tierPct(array $tier, float $base): float
     {
-        $steps = collect($bulk)->filter(fn ($b) => ($b['min'] ?? '') !== '' && ($b['price'] ?? '') !== '' && $b['min'] !== null && $b['price'] !== null)
-            ->map(fn ($b) => ['min' => (int) $b['min'], 'price' => (float) $b['price']])->sortBy('min')->values();
-        if ($steps->pluck('min')->duplicates()->isNotEmpty()) {
-            return 'Each bulk discount needs a different starting quantity.';
+        if (isset($tier['pct'])) {
+            return (float) $tier['pct'];
+        }
+        if ($base <= 0 || (int) ($tier['min'] ?? 1) <= 1) {
+            return 0.0;
+        }
+
+        return max(0.0, round((1 - (float) $tier['price'] / $base) * 100, 2));
+    }
+
+    /**
+     * The bulk discount tiers of an item for forms and price lists: [['min', 'max', 'pct', 'price'], …] without the
+     * base tier. Steps that don't lower the price are left out.
+     */
+    public static function bulkSteps(Product $p): array
+    {
+        $t = self::sortedTiers($p);
+        $base = (float) ($t[0]['price'] ?? 0);
+        $out = [];
+        foreach (array_slice($t, 1) as $x) {
+            $pct = self::tierPct($x, $base);
+            if ($pct > 0) {
+                $out[] = ['min' => (int) $x['min'], 'max' => $x['max'] ?? null, 'pct' => $pct, 'price' => (float) $x['price']];
+            }
+        }
+
+        return $out;
+    }
+
+    /** Price of one piece at $pct off $base, rounded to the centavo once (the same rounding the form preview uses). */
+    public static function discounted(float $base, float $pct): float
+    {
+        return r2($base * (1 - $pct / 100));
+    }
+
+    /**
+     * Change list C3: the bulk discounts as one short plain-language line instead of a quantity-price table,
+     * e.g. "5% off for 5+ pieces · up to 15% off at 20+". '' without discounts.
+     */
+    public static function bulkLine(Product $p): string
+    {
+        $steps = self::bulkSteps($p);
+        if (! $steps) {
+            return '';
+        }
+        $words = $p->unitWord() ?: 'piece';
+        $plural = str_ends_with($words, 's') ? $words : $words.'s';
+        $line = self::pctText($steps[0]['pct']).'% off for '.$steps[0]['min'].'+ '.$plural;
+        $last = end($steps);
+
+        return count($steps) > 1 ? $line.' · up to '.self::pctText($last['pct']).'% off at '.$last['min'].'+' : $line;
+    }
+
+    /**
+     * Base price + bulk discount tiers ([['min' => n, 'pct' => %], …]) → continuous tiers starting at 1, the last one
+     * open-ended; each discount tier keeps its percent and its price (base − %), so the price follows the base price.
+     * An older ['min', 'price'] row is still read (turned into a percent). Returns an error message when:
+     *   a row is half filled in · a tier starts below 2 · two tiers start at the same quantity · a percent is not
+     *   between 1 and 90 · a bigger quantity does not get a bigger discount · a tier starts above the stock
+     *   ($stock, when known) · more than 7 tiers.
+     */
+    public static function tiersFrom(float $base, array $bulk, ?int $stock = null): array|string
+    {
+        $blank = fn ($v) => $v === null || $v === '';
+        $steps = collect();
+        foreach ($bulk as $b) {
+            $min = $b['min'] ?? null;
+            $pct = $b['pct'] ?? null;
+            if ($blank($pct) && ! $blank($b['price'] ?? null) && $base > 0) {
+                $pct = round((1 - (float) $b['price'] / $base) * 100, 2); // older price rows
+            }
+            if ($blank($min) && $blank($pct)) {
+                continue; // empty row
+            }
+            if ($blank($min) || $blank($pct)) {
+                return 'Fill in both the quantity and the % off for each bulk discount, or remove the row.';
+            }
+            $steps->push(['min' => (int) $min, 'pct' => round((float) $pct, 2)]);
+        }
+        $steps = $steps->sortBy('min')->values();
+        if ($steps->count() > self::MAX_BULK_TIERS) {
+            return 'Up to '.self::MAX_BULK_TIERS.' bulk discounts per item.';
         }
         if ($steps->contains(fn ($b) => $b['min'] < 2)) {
             return 'A bulk discount starts at 2 or more pieces.';
         }
-        $all = collect([['min' => 1, 'price' => $base]])->concat($steps)->values();
+        if ($steps->pluck('min')->duplicates()->isNotEmpty()) {
+            return 'Each bulk discount needs a different quantity.';
+        }
+        if ($bad = $steps->first(fn ($b) => $b['pct'] < 1 || $b['pct'] > self::MAX_BULK_PCT)) {
+            return 'The discount for '.$bad['min'].'+ pieces must be between 1% and '.self::MAX_BULK_PCT.'%.';
+        }
+        foreach ($steps as $i => $b) {
+            if ($i > 0 && $b['pct'] <= $steps[$i - 1]['pct']) {
+                return 'Bigger quantities need a bigger discount: '.$b['min'].'+ pieces ('.self::pctText($b['pct']).'%) must be more than '.$steps[$i - 1]['min'].'+ pieces ('.self::pctText($steps[$i - 1]['pct']).'%).';
+            }
+        }
+        if ($stock !== null && $stock > 0 && ($over = $steps->first(fn ($b) => $b['min'] > $stock))) {
+            return 'The discount for '.$over['min'].'+ pieces can never apply: you have '.$stock.' in stock.';
+        }
+        if ($steps->contains(fn ($b) => self::discounted($base, $b['pct']) <= 0)) {
+            return 'A bulk discount cannot make the price ₱0.';
+        }
+        $all = collect([['min' => 1, 'pct' => 0.0]])->concat($steps)->values();
 
-        return $all->map(fn ($t, $i) => ['min' => $t['min'], 'max' => isset($all[$i + 1]) ? $all[$i + 1]['min'] - 1 : null, 'price' => $t['price']])->all();
+        return $all->map(function ($t, $i) use ($all, $base) {
+            $row = ['min' => $t['min'], 'max' => isset($all[$i + 1]) ? $all[$i + 1]['min'] - 1 : null, 'price' => $i ? self::discounted($base, $t['pct']) : r2($base)];
+
+            return $i ? $row + ['pct' => $t['pct']] : $row;
+        })->all();
     }
 
     public static function tierFor(Product $p, int $qty): array
@@ -182,13 +262,18 @@ class Pricing
                 'kind' => 'sale', 'name' => $p->name, 'unitWord' => $p->unitWord(), 'dates' => array_keys($days),
                 'once' => $qty ? [['label' => $p->name, 'qty' => $qty, 'unit' => $unit, 'subtotal' => $gross]] : [],
                 'gross' => $gross, 'discount' => $disc, 'sale' => $total, 'total' => $total,
+                'bulkSaved' => $qty ? r2(max(0, $p->basePrice() - $unit) * $qty) : 0.0, // already in the unit price; shown, never taken off again
             ]);
         }
         // Hourly items: the tier price is per hour, so one unit costs price × hours of the booking.
+        // Bulk discount: the tier comes from the date's combined quantity of the item and is taken once, in the unit
+        // price; a shop discount is then worked out on that lower price (Discounts::best), never on the base price.
         $hours = $p && $p->isHourly() ? Hours::length($line['time'] ?? null) : 0.0;
+        $bulkSaved = 0.0;
         foreach ($days as $date => $qty) {
             $tierQty = $combined[$line['ref_id'].'|'.$date] ?? $qty;
             $unit = $p ? self::unitPrice($p, $tierQty) : 0.0;
+            $bulkSaved += $p ? max(0, $p->basePrice() - $unit) * ($hours ?: 1) * $qty : 0;
             $row = ['date' => $date, 'qty' => $qty, 'unit' => $hours ? r2($unit * $hours) : $unit];
             if ($hours) {
                 $row += ['hourly' => $unit, 'hours' => $hours];
@@ -200,7 +285,7 @@ class Pricing
         $rent = r2($gross - ($disc['amount'] ?? 0));
         $name = ($p?->name ?? 'Item').($hours ? ' · '.Hours::label($line['time']) : '');
 
-        return array_merge($base, ['kind' => 'rent', 'name' => $name, 'gross' => $gross, 'discount' => $disc, 'rent' => $rent, 'total' => $rent] + ($hours ? ['hours' => $hours] : []));
+        return array_merge($base, ['kind' => 'rent', 'name' => $name, 'gross' => $gross, 'discount' => $disc, 'rent' => $rent, 'total' => $rent, 'bulkSaved' => r2($bulkSaved)] + ($hours ? ['hours' => $hours] : []));
     }
 
     /* ---------- delivery ---------- */
@@ -378,6 +463,7 @@ class Pricing
 
         return [
             'lines' => $lq, 'rentalFee' => $rentalFee, 'itemsSubtotal' => $rentalFee, 'discount' => $discount, 'discounts' => $discounts,
+            'bulkSaved' => r2(array_sum(array_map(fn ($l) => (float) ($l['bulkSaved'] ?? 0), $lq))), // informational: already in the Rental Fee
             'rentalSubtotal' => $rentalSubtotal, 'salesSubtotal' => $salesSubtotal, 'servicesSubtotal' => $packageServices,
             'delivery' => $delivery, 'deliveryFee' => $deliveryFee, 'services' => $services, 'serviceFee' => $serviceFee, 'serviceVisits' => $visits,
             'total' => $total, 'payable' => $total, 'plan' => $plan, 'terms' => $terms,

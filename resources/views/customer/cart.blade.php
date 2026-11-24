@@ -41,7 +41,7 @@
           <div class="cart-line" data-line="{{ $l['id'] }}">
             <div class="cl-top"><input type="checkbox" class="sel-box" data-select='@json([$l['id']])' @checked($l['selected']) aria-label="Select {{ $item->name }}">@include('partials.thumb', ['item' => $item])<div class="grow" style="min-width:0"><div class="row between top"><div style="min-width:0">
               <a class="strong" href="{{ $l['type'] === 'package' ? route('packages.show', $item) : route('products.show', $item) }}">{{ $item->name }}</a>@if($l['type'] === 'package') <span class="badge b-pink plain">Package</span>@endif
-              <div class="small muted">{{ $ds ? count($ds).' date'.(count($ds) > 1 ? 's' : '').' · '.fmt_range($ds[0], end($ds)) : 'No dates' }}{{ $l['type'] === 'item' && count($item->tiers ?? []) > 1 ? ' · tiered pricing applies per day' : '' }}</div>
+              <div class="small muted">{{ $ds ? count($ds).' date'.(count($ds) > 1 ? 's' : '').' · '.fmt_range($ds[0], end($ds)) : 'No dates' }}{{ $l['type'] === 'item' && count($item->tiers ?? []) > 1 ? ' · bulk discount by each day\'s quantity' : '' }}</div>
               @if(rental_period_outside($l['days']))<div class="small" style="color:#B45309">{{ icon('info', 'width:13px;vertical-align:-2px') }} These dates differ from your selected rental period.</div>@endif
               @if($l['type'] === 'package')@foreach(\App\Domain\Packages::describe(\App\Domain\Packages::def($item), $l['sel'] ?? null) as $d)<div class="small muted">{{ $d }}</div>@endforeach @endif
               </div>

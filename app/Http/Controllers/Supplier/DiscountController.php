@@ -118,18 +118,15 @@ class DiscountController extends Controller
         abort_unless($product->supplier_id === $this->sup($request)->id, 404);
         $v = $request->validate([
             'base_price' => 'required|numeric|min:0.01|max:10000000',
-            'bulk' => 'nullable|array|max:7', 'bulk.*.min' => 'nullable|integer|min:2', 'bulk.*.price' => 'nullable|numeric|min:0.01',
+            'bulk' => 'nullable|array|max:20', 'bulk.*.min' => 'nullable|integer|min:2|max:100000', 'bulk.*.pct' => 'nullable|numeric', 'bulk.*.price' => 'nullable|numeric|min:0.01',
         ], ['bulk.*.min.min' => 'A bulk discount starts at 2 or more pieces.']);
-        $tiers = Pricing::tiersFrom((float) $v['base_price'], $v['bulk'] ?? []);
+        $tiers = Pricing::tiersFrom((float) $v['base_price'], $v['bulk'] ?? [], $product->isSale() ? null : (int) $product->total_stock);
         if (is_string($tiers)) {
             return back()->withInput()->with('error', $product->name.': '.$tiers);
         }
-        if (collect($tiers)->skip(1)->contains(fn ($t) => $t['price'] >= $tiers[0]['price'])) {
-            return back()->withInput()->with('error', $product->name.': each bulk price must be lower than the base price.');
-        }
         $product->update(['tiers' => $tiers]);
         inv()->flush();
-        Notifier::audit('Updated product pricing', $product->name.' · '.implode(', ', array_map(fn ($t) => $t['min'].($t['max'] ? '–'.$t['max'] : '+').': '.money($t['price']), $tiers)));
+        Notifier::audit('Updated product pricing', $product->name.' · '.money($tiers[0]['price']).($tiers[1] ?? null ? ' · bulk: '.implode(', ', array_map(fn ($t) => $t['min'].'+ '.Pricing::pctText($t['pct']).'% off ('.money($t['price']).')', array_slice($tiers, 1))) : ''));
 
         return back()->with('success', $product->name.': '.(Pricing::bulkLine($product->fresh()) ?: 'no bulk discount').'.');
     }

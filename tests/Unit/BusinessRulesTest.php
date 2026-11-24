@@ -171,8 +171,9 @@ class BusinessRulesTest extends TestCase
     public function test_bulk_discount_line(): void
     {
         $this->assertSame('', Pricing::bulkLine($this->product(10)));
-        $this->assertSame('₱5 off per piece for orders of 100+', Pricing::bulkLine($this->product(10, [[1, 99, 20], [100, null, 15]])));
-        $this->assertSame('₱2.50 off per piece for orders of 11+ · up to ₱5 off at 51+', Pricing::bulkLine($this->product(10, [[1, 10, 15], [11, 50, 12.5], [51, null, 10]])));
+        // older tiers saved a price only: the percent is worked out from it
+        $this->assertSame('25% off for 100+ pieces', Pricing::bulkLine($this->product(10, [[1, 99, 20], [100, null, 15]])));
+        $this->assertSame('16.67% off for 11+ pieces · up to 33.33% off at 51+', Pricing::bulkLine($this->product(10, [[1, 10, 15], [11, 50, 12.5], [51, null, 10]])));
     }
 
     public function test_item_time_frame_and_overnight_rule(): void

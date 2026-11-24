@@ -42,28 +42,6 @@
           <div class="hint">@if($reqCat)<b>"{{ $reqCat->name }}"</b> is waiting for PartyRent to approve it; until then this item shows under Other Party Supplies.@else Pick a suggestion, or type a new one. A new category is reviewed by PartyRent; until then the item shows under Other Party Supplies.@endif</div></div>
         <div class="field" data-for="rent"><label>Condition</label><select class="input" name="condition">@foreach(\App\Domain\Damage::CONDITIONS as $k => $l)<option value="{{ $k }}" @selected(old('condition', $p->condition ?: 'brand_new') === $k)>{{ $l }}</option>@endforeach</select><div class="hint">Used for "Lost or Not Returned" compensation.</div></div>
       </div>
-      @if(auth()->user()->shop()?->isBusiness())
-      <div class="field" data-for="rent"><label>Replacement value (₱ per unit){{ term('replacement_value') }}</label><input class="input" type="number" min="0" step="0.01" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}" style="max-width:300px"><div class="hint">The selling / replacement value — the basis for damage compensation (not the rental fee).</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-      @else
-      {{-- Individual shops: purchase record → suggested replacement value (lowered for age and condition) + minor fee --}}
-      <div class="card card-flat" data-for="rent" id="dmgBox" style="padding:14px">
-        <h4 class="mt-0">Damage & replacement</h4>
-        <p class="small muted">Customers see these amounts before they book. If something breaks, they pay the <b>repair cost</b> (never more than the replacement value); <b>lost or beyond repair</b> = the replacement value; <b>not working</b> from normal wear is free.</p>
-        <div class="form-grid">
-          <div class="field"><label for="buyPrice">Price you paid (₱ per unit) <span class="muted">(optional)</span></label><input class="input" type="number" min="0" step="0.01" id="buyPrice" name="purchase_price" value="{{ old('purchase_price', $p->purchase_price) }}">@error('purchase_price')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-          <div class="field"><label for="buyDate">When you bought it</label><input class="input" type="date" id="buyDate" name="purchased_on" max="{{ today_iso() }}" value="{{ old('purchased_on', $p->purchased_on?->format('Y-m-d')) }}">@error('purchased_on')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-        </div>
-        <div class="field"><label for="buyReceipt">Receipt <span class="muted">(optional, private)</span></label><input class="input" type="file" id="buyReceipt" name="purchase_receipt" accept="image/*,application/pdf">
-          <div class="hint">Only PartyRent admins see it, and only if a customer disputes a charge. Customers just see "Receipt on file".@if($p->purchase_receipt) <a href="{{ route('supplier.products.receipt', $p) }}" target="_blank" rel="noopener">View current receipt</a> · <label class="check" style="display:inline-flex"><input type="checkbox" name="clear_receipt" value="1"> remove</label>@endif</div>
-          @error('purchase_receipt')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-        <div class="form-grid">
-          <div class="field"><label for="repValue">Replacement value (₱ per unit){{ term('replacement_value') }}</label><input class="input" type="number" min="0" step="0.01" id="repValue" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}">
-            <div class="hint" id="sugHint">Enter the price you paid to get a suggestion.</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-          <div class="field"><label for="minorFee">Minor damage fee (₱ per unit) <span class="muted">(optional)</span></label><input class="input" type="number" min="0" step="0.01" id="minorFee" name="minor_fee" value="{{ old('minor_fee', $p->minor_fee) }}"><div class="hint">For cleaning, a stain or a small scratch.</div>@error('minor_fee')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-        </div>
-        <div class="field" id="reasonBox" hidden><label for="valReason">Why is the value above what you paid?</label><input class="input" id="valReason" name="value_reason" maxlength="255" value="{{ old('value_reason', $p->value_reason) }}" placeholder="e.g. Same chair now costs ₱1,200 at the store (link)">@error('value_reason')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
-      </div>
-      @endif
       <div class="field"><label>Description</label><textarea class="input" name="description" required rows="4">{{ old('description', $p->description) }}</textarea></div>
       <div class="field"><label>Product images</label>
         @if($p->images)<div class="thumbs mb-1">@foreach($p->images as $im)<img src="{{ asset('storage/'.$im) }}" alt="Product photo">@endforeach</div><label class="check mb-1"><input type="checkbox" name="clear_images" value="1"> Remove current photos</label>@endif
@@ -85,6 +63,30 @@
       <div class="mt-2">@include('partials.bulk-editor', ['rows' => $bulk, 'stock' => null, 'errorText' => $errors->first('bulk') ?: $errors->first('bulk.*')])</div>
       <p class="small muted mt-1 mb-0">Changes apply to new requests only; accepted requests keep their quoted price.</p>
     </div>
+
+    {{-- Damage & replacement (rental items): on the Price step, after the price --}}
+      @if(auth()->user()->shop()?->isBusiness())
+      <div class="card" data-for="rent" data-wiz-step="{{ __('Price') }}"><h3>Damage & replacement</h3><div class="field"><label>Replacement value (₱ per unit){{ term('replacement_value') }}</label><input class="input" type="number" min="0" step="0.01" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}" style="max-width:300px"><div class="hint">The selling / replacement value — the basis for damage compensation (not the rental fee).</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div></div>
+      @else
+      {{-- Individual shops: purchase record → suggested replacement value (lowered for age and condition) + minor fee --}}
+      <div class="card" data-for="rent" id="dmgBox" data-wiz-step="{{ __('Price') }}">
+        <h3>Damage & replacement</h3>
+        <p class="small muted">Customers see these amounts before they book. If something breaks, they pay the <b>repair cost</b> (never more than the replacement value); <b>lost or beyond repair</b> = the replacement value; <b>not working</b> from normal wear is free.</p>
+        <div class="form-grid">
+          <div class="field"><label for="buyPrice">Price you paid (₱ per unit) <span class="muted">(optional)</span></label><input class="input" type="number" min="0" step="0.01" id="buyPrice" name="purchase_price" value="{{ old('purchase_price', $p->purchase_price) }}">@error('purchase_price')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+          <div class="field"><label for="buyDate">When you bought it</label><input class="input" type="date" id="buyDate" name="purchased_on" max="{{ today_iso() }}" value="{{ old('purchased_on', $p->purchased_on?->format('Y-m-d')) }}">@error('purchased_on')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+        </div>
+        <div class="field"><label for="buyReceipt">Receipt <span class="muted">(optional, private)</span></label><input class="input" type="file" id="buyReceipt" name="purchase_receipt" accept="image/*,application/pdf">
+          <div class="hint">Only PartyRent admins see it, and only if a customer disputes a charge. Customers just see "Receipt on file".@if($p->purchase_receipt) <a href="{{ route('supplier.products.receipt', $p) }}" target="_blank" rel="noopener">View current receipt</a> · <label class="check" style="display:inline-flex"><input type="checkbox" name="clear_receipt" value="1"> remove</label>@endif</div>
+          @error('purchase_receipt')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+        <div class="form-grid">
+          <div class="field"><label for="repValue">Replacement value (₱ per unit){{ term('replacement_value') }}</label><input class="input" type="number" min="0" step="0.01" id="repValue" name="replacement_value" value="{{ old('replacement_value', $p->replacement_value) }}">
+            <div class="hint" id="sugHint">Enter the price you paid to get a suggestion.</div>@error('replacement_value')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+          <div class="field"><label for="minorFee">Minor damage fee (₱ per unit) <span class="muted">(optional)</span></label><input class="input" type="number" min="0" step="0.01" id="minorFee" name="minor_fee" value="{{ old('minor_fee', $p->minor_fee) }}"><div class="hint">For cleaning, a stain or a small scratch.</div>@error('minor_fee')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+        </div>
+        <div class="field" id="reasonBox" hidden><label for="valReason">Why is the value above what you paid?</label><input class="input" id="valReason" name="value_reason" maxlength="255" value="{{ old('value_reason', $p->value_reason) }}" placeholder="e.g. Same chair now costs ₱1,200 at the store (link)">@error('value_reason')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
+      </div>
+      @endif
 
     {{-- Sale-only: ordering & freshness --}}
     <div class="card" data-for="sale" data-wiz-step="{{ __('Price') }}"><h3>Ordering & freshness</h3>

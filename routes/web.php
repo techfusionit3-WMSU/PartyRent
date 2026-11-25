@@ -136,6 +136,11 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::post('/rentals/{rentalRequest}/review', [RentalController::class, 'review'])->name('rentals.review');
     Route::get('/my-payments', [RentalController::class, 'payments'])->name('customer.payments');
     Route::get('/profile', [RentalController::class, 'profile'])->name('profile');
+    // verification before renting: government ID + payment account (required), insurance (optional)
+    Route::get('/verification', [\App\Http\Controllers\Customer\VerificationController::class, 'show'])->name('account.verification');
+    Route::post('/verification', [\App\Http\Controllers\Customer\VerificationController::class, 'submit'])->middleware('throttle:10,1')->name('account.verification.submit');
+    Route::post('/verification/insurance', [\App\Http\Controllers\Customer\VerificationController::class, 'insurance'])->middleware('throttle:10,1')->name('account.verification.insurance');
+    Route::get('/verification/file/{which}', [\App\Http\Controllers\Customer\VerificationController::class, 'file'])->whereIn('which', ['id_front', 'id_back', 'pay_proof', 'insurance'])->name('account.verification.file');
 
     Route::get('/start-selling', [StartSellingController::class, 'show'])->name('start-selling');
     Route::post('/start-selling', [StartSellingController::class, 'submit'])->name('start-selling.submit');
@@ -291,6 +296,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,superadm
     Route::post('/event-types/business/{row}/pause', [\App\Http\Controllers\Admin\EventTypeController::class, 'pause'])->middleware('event.module')->name('event-types.pause');
     Route::get('/event-types/business/{row}/{which}/{i}', [\App\Http\Controllers\Admin\EventTypeController::class, 'file'])->whereIn('which', ['photo', 'doc'])->whereNumber('i')->middleware('event.module')->name('event-types.file');
     Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::get('/verifications', [\App\Http\Controllers\Admin\VerificationController::class, 'index'])->name('verifications');
+    Route::post('/verifications/{verification}', [\App\Http\Controllers\Admin\VerificationController::class, 'decide'])->name('verifications.decide');
+    Route::get('/verifications/{verification}/file/{which}', [\App\Http\Controllers\Admin\VerificationController::class, 'file'])->whereIn('which', ['id_front', 'id_back', 'pay_proof', 'insurance'])->name('verifications.file');
     Route::post('/users/{user}/status', [AdminController::class, 'userStatus'])->name('users.status');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
     Route::get('/custom-discounts', [AdminController::class, 'customDiscounts'])->name('custom-discounts');

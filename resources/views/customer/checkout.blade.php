@@ -15,6 +15,9 @@
 <div class="crumbs"><a href="{{ route('cart') }}">Rental List</a> / Checkout</div>
 <div class="page-head"><div><h1>Checkout</h1><p>{{ collect($orders)->sum(fn ($o) => count($o['lines'])) }} selected item(s) from your Rental List, <b>{{ count($orders) }} shop{{ count($orders) > 1 ? 's' : '' }}</b>. Each shop gets its own rental order, payment plan and payment schedule.</p></div></div>
 @endif
+@if($verifyBlock ?? null)
+  <div class="alert alert-warn mb-2" id="verifyBlock">{{ icon('shield') }}<div><b>Verify your account to rent.</b> {{ $verifyBlock }} You can still review your order here. <a class="btn btn-sm btn-primary mt-1" href="{{ route('account.verification') }}">Go to Verification</a></div></div>
+@endif
 {{-- Rental period = the dates of the items being checked out; changing it here moves every item (stock checked first). --}}
 @php($pMulti = $period && $period['end'] > $period['start'])
 <div class="card date-bar mb-2 co-dates" id="coDates" data-url="{{ route('checkout.dates') }}" data-today="{{ today_iso() }}">
@@ -66,7 +69,8 @@
   </div>
   <aside class="card sticky-side"><h3>Order summary</h3><div id="sum"><div class="page-loading"><div class="spinner"></div></div></div>
     <label class="check mt-2"><input type="checkbox" id="agree"> I agree to each shop's cancellation, return and rental policies{{ collect($orders)->contains(fn ($o) => ! empty($o['damage'])) ? ', and the damage terms' : '' }}.</label>
-    <button type="button" class="btn btn-primary btn-lg btn-block mt-1" id="submitBtn">Submit {{ count($orders) > 1 ? count($orders).' rental requests' : 'rental request' }}</button>
+    @if($verifyBlock ?? null)<a class="btn btn-primary btn-lg btn-block mt-1" href="{{ route('account.verification') }}">{{ icon('shield') }}Verify your account to submit</a>@endif
+    <button type="button" class="btn btn-primary btn-lg btn-block mt-1" id="submitBtn" @if($verifyBlock ?? null) hidden disabled @endif>Submit {{ count($orders) > 1 ? count($orders).' rental requests' : 'rental request' }}</button>
     <p class="small muted mt-1 mb-0">Requests stay <b>Pending</b> until each supplier reviews them. Payment deadlines start when a supplier accepts. {{ $direct ? '' : 'Unselected items stay in your Rental List.' }}</p>
   </aside>
 </form>

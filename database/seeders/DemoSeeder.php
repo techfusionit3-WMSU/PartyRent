@@ -109,6 +109,13 @@ class DemoSeeder extends Seeder
         $this->audit();
         $this->cart();
         $this->eventCompany();
+        // demo accounts are verified customers (ID + payment account checked), a few also sent insurance
+        foreach (User::pluck('id') as $i => $uid) {
+            \App\Models\CustomerVerification::updateOrCreate(['user_id' => $uid], ['status' => 'approved', 'id_type' => 'philsys', 'id_last4' => str_pad((string) (1000 + $uid * 37 % 9000), 4, '0'),
+                'pay_provider' => 'GCash', 'pay_account_name' => User::find($uid)->name, 'pay_last4' => str_pad((string) (2000 + $uid * 53 % 7000), 4, '0'),
+                'id_verified_at' => now()->subDays(30), 'pay_verified_at' => now()->subDays(30), 'submitted_at' => now()->subDays(31), 'reviewed_at' => now()->subDays(30),
+                'insurance_status' => $i % 4 === 0 ? 'verified' : 'none', 'history' => [['at' => now()->subDays(30)->toIso8601String(), 'what' => 'Approved (demo data)', 'by' => null]]]);
+        }
         // every rental is fulfilled by one branch (the one its lines use, else the shop's main branch)
         \App\Domain\Branches::backfillRequests();
         // open demo rentals keep the damage terms of their items, like rentals booked at checkout

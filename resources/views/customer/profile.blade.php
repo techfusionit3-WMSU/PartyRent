@@ -16,6 +16,13 @@
     <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn">{{ icon('logout') }}Log out</button></form>
   </div>
 </div>
+@php($ver = \App\Domain\Verifications::of($u))
+<div class="card row wrap between mb-3" style="gap:10px">
+  <div><b>{{ icon('shield') }} Account verification</b> <span class="badge {{ \App\Models\CustomerVerification::STATUS_BADGE[$ver->status] ?? 'b-gray' }}">{{ $ver->statusLabel() }}</span>
+    <div class="small muted">{{ $ver->isApproved() ? 'You can rent from any shop.' : 'Needed before you rent: a government ID and your bank or e-wallet account.' }}</div>
+    @if($ver->trustBadges())<div class="row wrap gap-sm mt-1">@foreach($ver->trustBadges() as [$l, $c])<span class="badge {{ $c }}">{{ $l }}</span>@endforeach</div>@endif</div>
+  <a class="btn {{ $ver->isApproved() ? '' : 'btn-primary' }}" href="{{ route('account.verification') }}">{{ $ver->isApproved() ? 'View' : ($ver->status === 'pending' ? 'View status' : 'Verify now') }}</a>
+</div>
 <div class="stats mb-3">
   @include('partials.stat', ['label' => 'Total requests', 'value' => $reqs->count(), 'icon' => 'list', 'color' => 'pink', 'href' => route('rentals.index')])
   @include('partials.stat', ['label' => 'Active rentals', 'value' => $reqs->filter->isActive()->count(), 'icon' => 'calendar', 'color' => 'purple', 'href' => route('rentals.index', ['tab' => 'active'])])

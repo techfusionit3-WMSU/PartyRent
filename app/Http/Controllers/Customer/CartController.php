@@ -179,7 +179,7 @@ class CartController extends Controller
         $period = $all->isNotEmpty() ? ['start' => $all->first(), 'end' => $all->last()] : null;
         $sameDates = collect($orders)->flatMap(fn ($o) => array_map(fn ($l) => implode(',', array_keys($l['days'])), $o['lines']))->unique()->count() <= 1;
 
-        return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'direct' => (bool) $direct, 'period' => $period, 'sameDates' => $sameDates]);
+        return view('customer.checkout', ['orders' => $orders, 'u' => $u, 'direct' => (bool) $direct, 'period' => $period, 'sameDates' => $sameDates, 'verifyBlock' => \App\Domain\Verifications::blocker($u)]);
     }
 
     /** The date part of one shop's checkout order: first / last day, range label, event date and the lines. */
@@ -408,6 +408,10 @@ class CartController extends Controller
             'shared.instructions' => 'nullable|string|max:1000', 'orders' => 'required|array|min:1', 'agree' => 'accepted',
         ], ['shared.contactPhone.regex' => 'Enter a valid PH mobile number (e.g. 0917 555 0101).', 'agree.accepted' => 'Please accept the shops\' policies.',
 ]);
+        // renting needs a verified account (government ID + payment account, reviewed by PartyRent)
+        if ($why = \App\Domain\Verifications::blocker($request->user())) {
+            return response()->json(['ok' => false, 'error' => $why, 'verify' => route('account.verification')], 422);
+        }
         // Renting needs only the customer's contact details: no event name/type (the booking is named after its items).
         $shared = array_diff_key((array) $request->input('shared'), ['eventName' => 1, 'eventType' => 1]);
         $orders = array_map(fn ($o) => array_merge($shared, $o, ['installments' => $o['inst']['items'] ?? []]), (array) $request->input('orders'));

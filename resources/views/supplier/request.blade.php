@@ -84,14 +84,16 @@
       @php($br = $r->branch)
       <div class="card"><div class="card-head"><h3>{{ icon('store') }} Branch for this rental</h3></div>
         @if($br)<p class="mb-1"><b>{{ $br->name }}</b><span class="small muted"> · {{ $br->address }}{{ $br->phone ? ' · '.$br->phone : '' }}</span></p>@endif
-        <p class="small muted">Everything in this rental comes from this branch's stock{{ $r->fulfillment === 'delivery' ? ' and is delivered from there' : ' and is picked up there' }}.</p>
-        @if($canAlloc && $locs->where('active', true)->count() > 1)
+        <p class="small muted">{{ \App\Domain\Branches::isCombined($r) ? 'This branch serves the customer' : 'Everything in this rental comes from this branch\'s stock' }}{{ $r->fulfillment === 'delivery' ? ' and delivers from there' : ' and is the pickup place' }}.</p>
+        @unless(\App\Support\BranchScope::covers($r->branch_id))<div class="alert alert-info mb-1">{{ icon('store') }}<div class="small">Your branch lends stock to this rental. {{ $br?->name }} manages it; you only send the items below.</div></div>@endunless
+        @include('supplier._transfers')
+        @if($canAlloc && \App\Support\BranchScope::covers($r->branch_id) && $locs->where('active', true)->filter(fn ($l) => \App\Support\BranchScope::covers($l->id))->count() > 1)
           @php($ld0 = collect($r->lines)->flatMap(fn ($l) => array_keys($l['days']))->min())
           <label class="small strong" for="moveBranch">Move this rental to another branch</label>
           <p class="small muted mt-0 mb-1">Only a branch that has everything for these dates can take it. The customer's price stays the same.</p>
           <form method="POST" action="{{ route('supplier.requests.source', $r) }}" class="row wrap" style="gap:8px">@csrf<input type="hidden" name="line" value="{{ $r->lines[0]['id'] ?? 'l1' }}">
             <select class="input input-sm" id="moveBranch" name="location" style="max-width:340px">
-              @foreach($locs->where('active', true) as $loc)
+              @foreach($locs->where('active', true)->filter(fn ($l) => \App\Support\BranchScope::covers($l->id)) as $loc)
                 @php($fit = \App\Domain\Branches::check($r->lines, $loc, $r->id))
                 <option value="{{ $loc->id }}" @selected($r->branch_id === $loc->id)>{{ $loc->name }}{{ $r->branch_id === $loc->id ? ' (current)' : ($fit['ok'] ? ' — has everything' : ' — not enough stock') }}</option>
               @endforeach

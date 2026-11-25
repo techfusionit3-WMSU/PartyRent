@@ -20,16 +20,31 @@ class ShopStaff extends Model
 
     protected function casts(): array
     {
-        return ['roles' => 'array', 'perms_add' => 'array', 'perms_remove' => 'array'];
+        return ['roles' => 'array', 'perms_add' => 'array', 'perms_remove' => 'array', 'branch_ids' => 'array'];
     }
 
-    public const ORG_ROLES = ['org_admin' => 'Owner', 'desk' => 'Front Desk', 'cashier' => 'Cashier', 'inventory' => 'Inventory Keeper', 'crew' => 'Field Crew'];
+    public const ORG_ROLES = ['org_admin' => 'Owner', 'org_manager' => 'Organization Admin', 'branch_admin' => 'Branch Admin', 'desk' => 'Front Desk', 'cashier' => 'Cashier', 'inventory' => 'Inventory Keeper', 'crew' => 'Field Crew'];
 
     /** Roles an owner can give an employee (one or more). */
-    public const EMPLOYEE_ROLES = ['desk', 'cashier', 'inventory', 'crew'];
+    public const EMPLOYEE_ROLES = ['org_manager', 'branch_admin', 'desk', 'cashier', 'inventory', 'crew'];
+
+    /**
+     * Levels (App\Support\BranchScope):
+     *   organization — the owner and Organization Admins: every branch, organization-wide reports, branch switcher.
+     *   branch       — a Branch Admin runs their branch(es); other members may also be limited to branches.
+     * An Organization Admin always covers every branch; a Branch Admin always has at least one branch.
+     */
+    public const ORG_LEVEL_ROLES = ['org_manager'];
+
+    public const BRANCH_ROLES = ['branch_admin'];
+
+    /** Roles a Branch Admin may give the members of their branch. */
+    public const BRANCH_TEAM_ROLES = ['desk', 'cashier', 'inventory', 'crew'];
 
     /** One line per role, shown when choosing roles. */
     public const ROLE_HINTS = [
+        'org_manager' => 'Runs the whole business with the owner: every branch, all orders, stock, money and reports, and the branch teams. Only the owner changes who is an admin.',
+        'branch_admin' => 'Runs one branch: its rentals, deliveries, returns, stock, payments, reports and its own team. Sees nothing of other branches.',
         'desk' => 'Takes bookings: accepts or declines requests, chats with customers, handles problem cases and reviews.',
         'cashier' => 'Handles money: confirms payments, records cash, receipts, balances and overdue accounts.',
         'inventory' => 'Keeps the stock: products and packages, stock per location, maintenance, return inspections.',
@@ -62,7 +77,7 @@ class ShopStaff extends Model
         return $s && $s->isOrganization() ? self::EVENT_ROLE_HINTS : self::ROLE_HINTS;
     }
 
-    public const ROLE_BADGE = ['org_admin' => 'b-purple', 'desk' => 'b-pink', 'cashier' => 'b-teal', 'inventory' => 'b-sky', 'crew' => 'b-gray'];
+    public const ROLE_BADGE = ['org_admin' => 'b-purple', 'org_manager' => 'b-purple', 'branch_admin' => 'b-gold', 'desk' => 'b-pink', 'cashier' => 'b-teal', 'inventory' => 'b-sky', 'crew' => 'b-gray'];
 
     /** Permissions an owner may NOT hand to an employee. */
     public const OWNER_ONLY = ['team.manage'];
@@ -82,9 +97,14 @@ class ShopStaff extends Model
         'reports.view' => 'View business & financial reports',
         'shop.manage' => 'Edit shop profile, payment plans & policies',
         'team.manage' => 'Manage employees & roles',
+        'team.branch' => 'Manage the team of their branch(es)',
     ];
 
     public const ORG_PERMS = [
+        'org_manager' => ['orders.view', 'orders.manage', 'fulfillment.update', 'products.manage', 'inventory.manage', 'locations.manage', 'returns.inspect',
+            'payments.view', 'payments.verify', 'payments.record', 'receipts.issue', 'reports.view', 'shop.manage', 'team.branch'],
+        'branch_admin' => ['orders.view', 'orders.manage', 'fulfillment.update', 'inventory.manage', 'locations.manage', 'returns.inspect',
+            'payments.view', 'payments.verify', 'payments.record', 'receipts.issue', 'reports.view', 'team.branch'],
         'desk' => ['orders.view', 'orders.manage'],
         'cashier' => ['payments.view', 'payments.verify', 'payments.record', 'receipts.issue', 'reports.view'],
         'inventory' => ['orders.view', 'products.manage', 'inventory.manage', 'locations.manage', 'returns.inspect'],
@@ -100,7 +120,7 @@ class ShopStaff extends Model
         // module home pages (App\Support\CompanyModules)
         'desk' => 'orders.manage', 'stock' => 'inventory.manage', 'crew' => 'fulfillment.update',
         'requests.accept' => 'orders.manage', 'requests.decline' => 'orders.manage', 'requests.notes' => 'orders.manage',
-        'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage',
+        'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage', 'requests.replan' => 'orders.manage',
         'requests.custom-discount*' => 'shop.manage', // custom discounts: owner-level money decisions
         'requests.advance' => 'fulfillment.update', 'requests.complete' => 'fulfillment.update',
         'requests.inspection' => 'returns.inspect', 'requests.settle' => 'returns.inspect',
@@ -118,7 +138,9 @@ class ShopStaff extends Model
         'payouts' => 'payments.view', 'payouts.account' => 'shop.manage', 'payouts.schedule' => 'shop.manage',
         'reports' => 'reports.view', 'reports.*' => 'reports.view', 'records' => 'reports.view', 'activity' => 'team.manage',
         'shop' => 'shop.manage', 'shop.*' => 'shop.manage', 'business' => 'shop.manage',
-        'team' => 'team.manage', 'team.*' => 'team.manage', 'staff' => 'team.manage', 'staff.*' => 'team.manage',
+        'transfers.*' => null, // each step is checked against the user's branch (App\Domain\Transfers::can)
+        'branch-view' => null,
+        'team' => 'team.manage|team.branch', 'team.*' => 'team.manage|team.branch', 'staff' => 'team.manage', 'staff.*' => 'team.manage',
     ];
 
     /** Business (event company) workspace routes (after "business.") => permission; no match = any member. */
@@ -143,6 +165,12 @@ class ShopStaff extends Model
     public function scopeWithRole(Builder $q, string $role): Builder
     {
         return $q->where(fn ($w) => $w->where('role', $role)->orWhereJsonContains('roles', $role));
+    }
+
+    /** Organization level (every branch): an Organization Admin, or a member with no branch set. */
+    public function isOrgLevel(): bool
+    {
+        return (bool) array_intersect($this->roleList(), self::ORG_LEVEL_ROLES);
     }
 
     /** All roles of this member, main role first. */
@@ -230,6 +258,6 @@ class ShopStaff extends Model
     {
         $perm = self::permFor($routeName);
 
-        return $perm === null || in_array($perm, $perms, true);
+        return $perm === null || (bool) array_intersect(explode('|', $perm), $perms); // "a|b" = either permission
     }
 }

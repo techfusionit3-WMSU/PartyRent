@@ -36,7 +36,7 @@ class LocationController extends Controller
         $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('date')) ? $request->query('date') : today_iso();
 
         return view('supplier.locations', [
-            's' => $s, 'locs' => $s->branches()->get(), 'prods' => $prods, 'focus' => (int) $request->query('product'), 'date' => $date,
+            's' => $s, 'locs' => \App\Support\BranchScope::choices(), 'prods' => $prods, 'orgLevel' => \App\Support\BranchScope::isOrgLevel(), 'settings' => $s->branchSettings(), 'focus' => (int) $request->query('product'), 'date' => $date,
             'pkgs' => \App\Models\Package::where('supplier_id', $s->id)->where('active', true)->where('is_draft', false)->orderBy('id')->get(),
             'open' => $open->groupBy('branch_id')->map(fn ($g) => ['pending' => $g->where('status', 'pending')->count(), 'booked' => $g->where('status', '!=', 'pending')->count()]),
             'moves' => StockMovement::whereIn('product_id', Product::where('supplier_id', $s->id)->pluck('id'))->with(['product', 'user', 'fromLocation', 'toLocation'])->orderByDesc('id')->limit(40)->get(),
@@ -58,11 +58,15 @@ class LocationController extends Controller
     {
         $request->validate([
             'name' => 'required|string|min:2|max:120', 'address' => 'nullable|string|max:300', 'addr' => 'nullable|array',
-            'contact' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:40',
+            'contact' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:40', 'hours' => 'nullable|string|max:120',
+            'service_km' => 'nullable|numeric|min:1|max:2000',
             'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat', 'is_main' => 'nullable|boolean',
         ]);
 
-        return $request->only(['name', 'address', 'addr', 'contact', 'phone', 'is_main']) + ($request->has('lat') ? ['lat' => $request->input('lat'), 'lng' => $request->input('lng')] : []);
+        // only the organization level chooses the main branch
+        $keep = \App\Support\BranchScope::isOrgLevel() ? ['name', 'address', 'addr', 'contact', 'phone', 'hours', 'service_km', 'is_main'] : ['name', 'address', 'addr', 'contact', 'phone', 'hours', 'service_km'];
+
+        return $request->only($keep) + ($request->has('lat') ? ['lat' => $request->input('lat'), 'lng' => $request->input('lng')] : []);
     }
 
     public function store(Request $request)
@@ -97,10 +101,27 @@ class LocationController extends Controller
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Branch removed.' : $res['error']);
     }
 
+    /** Shop-wide branch settings: default service distance, combining nearby branches (organization level). */
+    public function settings(Request $request)
+    {
+        $s = $request->user()->shop();
+        $v = $request->validate(['serviceKm' => 'required|numeric|min:1|max:2000', 'combine' => 'nullable|boolean', 'combineKm' => 'required|numeric|min:1|max:500']);
+        $new = ['serviceKm' => (float) $v['serviceKm'], 'combine' => $request->boolean('combine'), 'combineKm' => (float) $v['combineKm']];
+        $old = $s->branchSettings();
+        $s->update(['branch_settings' => $new]);
+        \App\Domain\Notifier::audit('Updated branch settings', 'Serves up to '.$new['serviceKm'].' km · combine nearby branches: '.($new['combine'] ? 'on, within '.$new['combineKm'].' km' : 'off')
+            .($old != $new ? '' : ' (no change)'));
+
+        return back()->with('success', 'Branch settings saved.');
+    }
+
     public function transfer(Request $request, Product $product)
     {
         abort_unless($product->supplier_id === $request->user()->shop()->id, 404);
         $v = $request->validate(['from' => 'required|integer', 'to' => 'required|integer', 'qty' => 'required|integer|min:1', 'note' => 'nullable|string|max:255']);
+        if (! \App\Support\BranchScope::covers((int) $v['from'])) {
+            return back()->with('error', 'You can only send stock from your own branch.'); // never take another branch's stock
+        }
         $res = StockLocations::transfer($product, (int) $v['from'], (int) $v['to'], (int) $v['qty'], (string) ($v['note'] ?? ''));
 
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Transferred '.$v['qty'].' unit(s).' : $res['error']);

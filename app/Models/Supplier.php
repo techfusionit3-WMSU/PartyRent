@@ -19,6 +19,7 @@ class Supplier extends Model
             'arrangements' => 'array',
             'policy' => 'array',
             'delivery' => 'array',
+            'branch_settings' => 'array',
             'free_ship' => 'boolean',
             'address_parts' => 'array',
             'portfolio' => 'array', 'business_profile' => 'array',
@@ -74,6 +75,14 @@ class Supplier extends Model
     public function products(): HasMany { return $this->hasMany(Product::class); }
     public function locations(): HasMany { return $this->hasMany(InventoryLocation::class)->orderBy('id'); }
     /** Branches (same rows as locations): the main branch first. */
+    /** Branch settings with defaults (App\Domain\Branches): serviceKm (default service distance), combine, combineKm. */
+    public const BRANCH_DEFAULTS = ['serviceKm' => 50, 'combine' => false, 'combineKm' => 30];
+
+    public function branchSettings(): array
+    {
+        return array_merge(self::BRANCH_DEFAULTS, array_intersect_key((array) ($this->branch_settings ?? []), self::BRANCH_DEFAULTS));
+    }
+
     public function branches(): HasMany { return $this->hasMany(InventoryLocation::class)->orderByDesc('is_main')->orderBy('id'); }
     public function payouts(): HasMany { return $this->hasMany(Payout::class); }
     public function payoutBatches(): HasMany { return $this->hasMany(PayoutBatch::class); }

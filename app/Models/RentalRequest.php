@@ -71,6 +71,33 @@ class RentalRequest extends Model
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     /** The supplier's branch that fulfils this rental (its stock, its address as delivery origin / pickup place). */
     public function branch(): BelongsTo { return $this->belongsTo(InventoryLocation::class, 'branch_id'); }
+    public function transfers(): HasMany { return $this->hasMany(RentalTransfer::class)->orderBy('id'); }
+
+    /**
+     * A shop's rentals as the signed-in user may see them (App\Support\BranchScope): the branch the dashboard shows,
+     * else all the user's branches, else every branch. $lending also lists rentals their branches lend stock to.
+     * $view = false ignores the switcher (the user's whole scope).
+     */
+    public function scopeForShop($q, Supplier $s, bool $lending = false, bool $view = true)
+    {
+        $ids = $view ? \App\Support\BranchScope::viewIds() : \App\Support\BranchScope::allowed();
+        $q->where('supplier_id', $s->id);
+        if ($ids !== null) {
+            $q->where(fn ($w) => $w->whereIn('branch_id', $ids)->when($lending, fn ($x) => $x->orWhereHas('transfers', fn ($t) => $t->whereIn('from_location_id', $ids)->where('status', '!=', 'cancelled'))));
+        }
+
+        return $q;
+    }
+
+    protected static function booted(): void
+    {
+        // combined rentals: keep the stock moves between branches in step with the lines (App\Domain\Transfers)
+        static::saved(function (RentalRequest $r) {
+            if ($r->wasRecentlyCreated || $r->wasChanged(['lines', 'branch_id', 'status', 'start_date'])) {
+                \App\Domain\Transfers::sync($r);
+            }
+        });
+    }
     public function payout(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(Payout::class); }
     public function messages(): HasMany { return $this->hasMany(RequestMessage::class)->orderBy('id'); }
     public function payments(): HasMany { return $this->hasMany(Payment::class)->orderBy('submitted_at')->orderBy('id'); }

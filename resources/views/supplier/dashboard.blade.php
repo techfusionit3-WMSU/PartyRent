@@ -11,6 +11,7 @@
 @endif
 @include('partials.guides', ['guide' => \App\Domain\Guides::shop(auth()->user())])
 @include('partials.needs-you', ['tasks' => \App\Domain\Tasks::forModule(auth()->user(), 'manage')])
+@include('supplier._transfers-todo')
 <div class="stats">
   @include('partials.stat', ['label' => 'New requests', 'value' => $pend->count(), 'sub' => $pend->count() ? 'waiting for your answer' : 'all caught up', 'icon' => 'clock', 'color' => 'gold', 'href' => route('supplier.requests')])
   @if($money)

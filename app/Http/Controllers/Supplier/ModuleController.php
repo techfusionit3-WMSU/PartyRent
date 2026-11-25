@@ -23,7 +23,7 @@ class ModuleController extends Controller
     {
         $sup = $request->user()->shop();
         $T = today_iso();
-        $reqs = RentalRequest::where('supplier_id', $sup->id)->whereIn('status', array_merge(['pending'], Finance::ACTIVE))->with('customer')->get();
+        $reqs = RentalRequest::forShop($sup)->whereIn('status', array_merge(['pending'], Finance::ACTIVE))->with('customer')->get();
         $pend = $reqs->where('status', 'pending')->sortBy('created_at')->values();
         $lastCustomerMsg = RequestMessage::whereIn('rental_request_id', $reqs->pluck('id'))->where('side', 'customer')
             ->selectRaw('rental_request_id, max(created_at) as last_at')->groupBy('rental_request_id')->pluck('last_at', 'rental_request_id');
@@ -33,7 +33,7 @@ class ModuleController extends Controller
         return view('supplier.modules.desk', [
             'sup' => $sup, 'T' => $T, 'pend' => $pend, 'unread' => $unread, 'plans' => $plans,
             'conflicts' => $pend->filter(fn ($r) => inv()->check($r->lines, $r->id)['bad'])->pluck('id')->all(),
-            'cases' => ShortfallCase::where('supplier_id', $sup->id)->where('status', '!=', 'resolved')->latest()->limit(8)->get(),
+            'cases' => ShortfallCase::where('supplier_id', $sup->id)->whereHas('rentalRequest', fn ($q) => $q->forShop($sup))->where('status', '!=', 'resolved')->latest()->limit(8)->get(),
             'soon' => $reqs->whereIn('status', Jobs::BEFORE_RELEASE)->filter(fn ($r) => $r->start_date <= add_days($T, 7))->sortBy('start_date')->values(),
         ]);
     }
@@ -45,7 +45,7 @@ class ModuleController extends Controller
         $T = today_iso();
         $prods = Product::where('supplier_id', $sup->id)->whereNotIn('status', ['deleted', 'archived'])->get();
         inv()->primeProducts($prods);
-        $reqs = RentalRequest::where('supplier_id', $sup->id)->whereIn('status', Jobs::BEFORE_RELEASE)
+        $reqs = RentalRequest::forShop($sup, true)->whereIn('status', Jobs::BEFORE_RELEASE)
             ->whereBetween('start_date', [$T, add_days($T, 3)])->with('customer')->orderBy('start_date')->get();
         $prep = [];
         foreach ($reqs as $r) {
@@ -67,7 +67,7 @@ class ModuleController extends Controller
 
         return view('supplier.modules.stock', [
             'sup' => $sup, 'T' => $T, 'prep' => array_values(array_filter($prep, fn ($x) => $x['p'])), 'reqs' => $reqs, 'out' => $out,
-            'inspect' => RentalRequest::where('supplier_id', $sup->id)->whereIn('status', ['return_pending', 'inspection'])->with('customer')->orderBy('end_date')->get(),
+            'inspect' => RentalRequest::forShop($sup)->whereIn('status', ['return_pending', 'inspection'])->with('customer')->orderBy('end_date')->get(),
             'low' => $prods->filter->isLowStock()->values(),
         ]);
     }

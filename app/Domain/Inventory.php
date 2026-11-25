@@ -229,6 +229,29 @@ class Inventory
     }
 
     /** Occupied intervals of a line for ONE product (units), with buffers. */
+    /**
+     * Where a line's $qty units of $pid come from: [[locationId|null, qty], …]. A line rents from its branch
+     * (sourceId); a combined rental borrows some units from other nearby branches (line "from": [pid => [loc => qty]],
+     * see App\Domain\Branches::combine). Borrowed units are booked at the lending branch.
+     */
+    public function lineSources(array $l, int $pid, int $qty): array
+    {
+        $home = ! empty($l['sourceId']) ? (int) $l['sourceId'] : null;
+        $out = [];
+        foreach ((array) ($l['from'][$pid] ?? []) as $loc => $b) {
+            $take = min($qty, (int) $b);
+            if ($take > 0 && (int) $loc !== $home) {
+                $out[] = [(int) $loc, $take];
+                $qty -= $take;
+            }
+        }
+        if ($qty > 0 || ! $out) {
+            $out[] = [$home, $qty];
+        }
+
+        return $out;
+    }
+
     public function productIntervals(array $line, int $pid): array
     {
         $out = [];
@@ -292,8 +315,9 @@ class Inventory
                     $meta = ['requestId' => $d['id'], 'code' => $d['code'], 'status' => $d['status'], 'sourceId' => isset($l['sourceId']) ? (int) $l['sourceId'] : null];
                     foreach (Slots::lineIntervals($l, $this->bufFor($l)) as $iv) {
                         foreach ($this->unitsForLine($l, $iv['date']) as $pid => $qty) {
-                            if ($qty > 0) {
-                                $this->ivIndex[$pid][] = array_merge($iv, ['qty' => $qty]) + $meta;
+                            // a combined rental: some units come from another branch (line "from")
+                            foreach ($qty > 0 ? $this->lineSources($l, $pid, $qty) : [] as [$loc, $q]) {
+                                $this->ivIndex[$pid][] = array_merge($iv, ['qty' => $q], $meta, ['sourceId' => $loc]);
                             }
                         }
                     }
@@ -634,7 +658,9 @@ class Inventory
             }
             foreach (array_keys($pids) as $pid) {
                 foreach ($this->productIntervals($l, $pid) as $iv) {
-                    $cand[$pid][] = $iv + ['lineId' => $l['id'] ?? null, 'sourceId' => isset($l['sourceId']) && $l['sourceId'] ? (int) $l['sourceId'] : null];
+                    foreach ($this->lineSources($l, $pid, (int) $iv['qty']) as [$loc, $q]) {
+                        $cand[$pid][] = array_merge($iv, ['qty' => $q, 'lineId' => $l['id'] ?? null, 'sourceId' => $loc]);
+                    }
                 }
             }
         }
@@ -761,7 +787,7 @@ class Inventory
                 continue;
             }
             foreach ($d['lines'] as $l) {
-                if ($locId && (int) ($l['sourceId'] ?? 0) !== $locId) {
+                if ($locId && (int) ($l['sourceId'] ?? 0) !== $locId && ! collect((array) ($l['from'] ?? []))->contains(fn ($m) => isset($m[$locId]))) {
                     continue;
                 }
                 foreach (array_keys($l['days'] ?? []) as $date) {

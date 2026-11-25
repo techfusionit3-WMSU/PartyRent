@@ -14,11 +14,15 @@ class TeamController extends Controller
     public function index(Request $request)
     {
         $s = $request->user()->shop();
+        $scope = ShopStaffs::managerScope($s, $request->user());
+        abort_unless($scope, 403);
 
         return view('supplier.team', [
-            's' => $s,
-            'members' => ShopStaffs::members($s),
-            'invites' => StaffInvite::where('supplier_id', $s->id)->latest()->get(),
+            's' => $s, 'scope' => $scope,
+            'members' => ShopStaffs::members($s, $scope['owner'] ? null : $scope),
+            'invites' => StaffInvite::where('supplier_id', $s->id)->latest()->get()->filter(fn ($i) => ShopStaffs::canManage($scope, $i))->values(),
+            'branches' => $s->branches()->get()->when($scope['branches'] !== null, fn ($c) => $c->whereIn('id', $scope['branches'])->values()),
+            'allBranches' => $s->branches()->get()->keyBy('id'),
         ]);
     }
 
@@ -30,7 +34,7 @@ class TeamController extends Controller
 
     public function store(Request $request)
     {
-        $res = ShopStaffs::invite($request->user()->shop(), $request->user(), $request->only('email', 'role', 'roles'));
+        $res = ShopStaffs::invite($request->user()->shop(), $request->user(), $request->only('email', 'role', 'roles', 'branches'));
         if (! $res['ok']) {
             return back()->withInput()->withErrors(['team' => $res['error']])->with('error', $res['error']);
         }
@@ -63,13 +67,14 @@ class TeamController extends Controller
 
     public function update(Request $request, User $user)
     {
-        $res = ShopStaffs::update($request->user()->shop(), $request->user(), $user, $request->only('role', 'roles', 'perms', 'perms_set', 'status'));
+        $res = ShopStaffs::update($request->user()->shop(), $request->user(), $user, $request->only('role', 'roles', 'perms', 'perms_set', 'status', 'branches', 'branches_set'));
         if (! $res['ok']) {
             return back()->with('error', $res['error']);
         }
         $msg = match (true) {
             $request->filled('roles') || $request->filled('role') => $user->name.' is now '.$res['member']->label().'.',
             $request->boolean('perms_set') => 'Permissions of '.$user->name.' saved.',
+            $request->boolean('branches_set') => 'Branches of '.$user->name.' saved.',
             default => $user->name.' is now '.$res['member']->status.'.',
         };
 

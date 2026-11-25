@@ -220,7 +220,18 @@ class MarketController extends Controller
             'pkgs' => $supplier->packages()->where('active', true)->where('is_draft', false)->orderBy('sort')->with('supplier')->get(),
             'reviews' => Review::visible()->where('supplier_id', $supplier->id)->with(['customer', 'product', 'package'])->latest()->get(),
             'tab' => $request->query('tab', $supplier->isOrganization() ? 'packages' : 'items'), 'catFilter' => $request->query('category'),
+            'branchInfo' => $supplier->isOrganization() ? [] : self::branchInfo($supplier),
         ]);
+    }
+
+    /** The shop's branches for its public page (information only): distance from the customer and whether it serves them. */
+    public static function branchInfo(Supplier $s): array
+    {
+        $point = \App\Support\Near::point();
+        $rows = \App\Domain\Branches::active($s)->map(fn ($b) => ['b' => $b, 'km' => \App\Domain\Branches::km($b, $point), 'serves' => \App\Domain\Branches::serves($b, $point)])
+            ->sortBy(fn ($x) => [! $x['serves'], $x['km'] ?? PHP_FLOAT_MAX, ! $x['b']->is_main])->values()->all();
+
+        return count($rows) > 1 ? $rows : [];
     }
 
     public function product(Request $request, Product $product)
@@ -247,6 +258,7 @@ class MarketController extends Controller
             'similar' => $live->where('category_id', $product->category_id)->where('id', '!=', $product->id)->sortByDesc('rating')->take(4),
             'own' => $u && $product->supplier->owner_id === $u->id,
             'siblings' => $u ? \App\Domain\Rentals::cartLinesFor($u, $product->supplier_id) : [],
+            'nearAvail' => $product->isSale() ? null : \App\Domain\Branches::availableNear($product->supplier, 'item', $product->id, $start),
         ]);
     }
 

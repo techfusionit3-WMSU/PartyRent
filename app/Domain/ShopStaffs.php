@@ -25,15 +25,95 @@ use Illuminate\Support\Str;
  */
 class ShopStaffs
 {
-    /** @return array<int, array{role: string, user: User}> owner first */
-    public static function members(Supplier $s): array
+    /** @return array<int, array{role: string, user: User}> owner first; $scope (managerScope) keeps only the members that manager handles */
+    public static function members(Supplier $s, ?array $scope = null): array
     {
         $out = [['role' => 'org_admin', 'roles' => ['org_admin'], 'user' => $s->owner, 'status' => 'active', 'since' => $s->created_at]];
         foreach ($s->staff()->with('user')->get()->sortBy('created_at') as $m) {
+            if ($scope && ! self::canManage($scope, $m)) {
+                continue;
+            }
             $out[] = ['role' => $m->role, 'roles' => $m->roleList(), 'user' => $m->user, 'member' => $m, 'status' => $m->status, 'since' => $m->created_at];
         }
 
         return $out;
+    }
+
+    /**
+     * What $by may do on the team page, or null: ['owner' => bool, 'roles' => roles they may give, 'branches' => ?ids].
+     *   Owner (team.manage): everyone, every role, any branch.
+     *   Organization Admin (team.branch, every branch): every member except other Organization Admins; any branch.
+     *   Branch Admin (team.branch, their branches): Front Desk / Cashier / Inventory / Crew members of their branches only.
+     */
+    public static function managerScope(Supplier $s, User $by): ?array
+    {
+        if ($by->shop()?->id !== $s->id) {
+            return null;
+        }
+        if ($by->orgCan('team.manage')) {
+            return ['owner' => true, 'roles' => ShopStaff::employeeRoles($s), 'branches' => null];
+        }
+        if (! $by->orgCan('team.branch')) {
+            return null;
+        }
+        $ids = $by->branchIds();
+
+        return ['owner' => false, 'branches' => $ids, 'roles' => array_values($ids === null
+            ? array_diff(ShopStaff::employeeRoles($s), ShopStaff::ORG_LEVEL_ROLES)
+            : array_intersect(ShopStaff::employeeRoles($s), ShopStaff::BRANCH_TEAM_ROLES))];
+    }
+
+    /** May a manager (managerScope) handle this member or invitation? */
+    public static function canManage(array $scope, ShopStaff|StaffInvite $m): bool
+    {
+        if ($scope['owner']) {
+            return true;
+        }
+        if (array_diff($m->roleList(), $scope['roles'])) {
+            return false; // e.g. an Organization Admin, or a Branch Admin for a Branch Admin
+        }
+        if ($scope['branches'] === null) {
+            return true;
+        }
+        $b = array_map('intval', (array) $m->branch_ids);
+
+        return $b && ! array_diff($b, $scope['branches']);
+    }
+
+    /**
+     * Branches for a member with these roles: ['ok' => true, 'ids' => ?array] (null = every branch).
+     * An Organization Admin always covers every branch; a Branch Admin needs at least one; a branch-level manager
+     * can only give their own branches.
+     */
+    public static function branchesFrom(Supplier $s, array $scope, array $roles, $input): array
+    {
+        $all = $s->locations()->pluck('id')->all();
+        if (array_intersect($roles, ShopStaff::ORG_LEVEL_ROLES)) {
+            if (array_intersect($roles, ShopStaff::BRANCH_ROLES)) {
+                return ['ok' => false, 'error' => 'An Organization Admin already runs every branch; do not also make them a Branch Admin.'];
+            }
+
+            return ['ok' => true, 'ids' => null];
+        }
+        $ids = array_values(array_unique(array_map('intval', array_filter((array) $input, 'is_numeric'))));
+        if (array_diff($ids, $all)) {
+            return ['ok' => false, 'error' => 'Choose branches of your own business.'];
+        }
+        if ($scope['branches'] !== null) {
+            $ids = $ids ?: $scope['branches'];
+            if (array_diff($ids, $scope['branches'])) {
+                return ['ok' => false, 'error' => 'You can only add people to your own branch.'];
+            }
+        }
+        if (! $ids && array_intersect($roles, ShopStaff::BRANCH_ROLES)) {
+            if (count($all) !== 1) {
+                return ['ok' => false, 'error' => 'Choose the branch this Branch Admin runs.'];
+            }
+            $ids = $all;
+        }
+        sort($ids);
+
+        return ['ok' => true, 'ids' => $ids ?: null];
     }
 
     /** Masked name for the email check, so the form cannot be used to look people up ("Juan Dela Cruz" → "J*** C."). */
@@ -110,12 +190,17 @@ class ShopStaffs
     /** Invite an email to the team. Nobody joins until the person confirms from that inbox. */
     public static function invite(Supplier $s, User $by, array $data): array
     {
-        if (! $by->orgCan('team.manage') || $by->shop()?->id !== $s->id) {
-            return ['ok' => false, 'error' => 'Only the Organization Admin can add employees.'];
+        $scope = self::managerScope($s, $by);
+        if (! $scope) {
+            return ['ok' => false, 'error' => 'Only the owner, an Organization Admin or a Branch Admin can add employees.'];
         }
         $roles = self::rolesFrom($data);
-        if (! $roles) {
-            return ['ok' => false, 'error' => 'Choose at least one role: Front Desk, Cashier, Inventory Keeper or Field Crew. Owner rights stay with the account owner.'];
+        if (! $roles || array_diff($roles, $scope['roles'])) {
+            return ['ok' => false, 'error' => 'Choose at least one role you may give: '.ShopStaff::rolesLabel($scope['roles'], $s).'. Owner rights stay with the account owner.'];
+        }
+        $br = self::branchesFrom($s, $scope, $roles, $data['branches'] ?? []);
+        if (! $br['ok']) {
+            return ['ok' => false, 'error' => $br['error']];
         }
         $role = $roles[0];
         $email = Str::lower(trim((string) ($data['email'] ?? '')));
@@ -123,7 +208,7 @@ class ShopStaffs
         if (! in_array($chk['state'], ['existing', 'new'], true)) {
             return ['ok' => false, 'error' => $chk['message']];
         }
-        $inv = new StaffInvite(['supplier_id' => $s->id, 'email' => $email, 'role' => $role, 'roles' => $roles, 'invited_by' => $by->id]);
+        $inv = new StaffInvite(['supplier_id' => $s->id, 'email' => $email, 'role' => $role, 'roles' => $roles, 'branch_ids' => $br['ids'], 'invited_by' => $by->id]);
         $sent = self::send($inv);
         Notifier::audit('Invited employee', $s->name.' · '.$email.' ('.ShopStaff::rolesLabel($roles).')', $by);
 
@@ -151,7 +236,8 @@ class ShopStaffs
 
     public static function resend(Supplier $s, User $by, StaffInvite $inv): array
     {
-        if (! $by->orgCan('team.manage') || $inv->supplier_id !== $s->id) {
+        $scope = self::managerScope($s, $by);
+        if (! $scope || $inv->supplier_id !== $s->id || ! self::canManage($scope, $inv)) {
             return ['ok' => false, 'error' => 'You can only manage your own invitations.'];
         }
         if (($w = $inv->secondsUntilResend()) > 0) {
@@ -163,7 +249,8 @@ class ShopStaffs
 
     public static function cancel(Supplier $s, User $by, StaffInvite $inv): array
     {
-        if (! $by->orgCan('team.manage') || $inv->supplier_id !== $s->id) {
+        $scope = self::managerScope($s, $by);
+        if (! $scope || $inv->supplier_id !== $s->id || ! self::canManage($scope, $inv)) {
             return ['ok' => false, 'error' => 'You can only manage your own invitations.'];
         }
         $inv->delete();
@@ -186,7 +273,7 @@ class ShopStaffs
             return ['ok' => false, 'error' => str_replace('That account', 'Your account', $why)];
         }
         DB::transaction(function () use ($inv, $u, $s) {
-            ShopStaff::updateOrCreate(['supplier_id' => $s->id, 'user_id' => $u->id], ['role' => $inv->role, 'roles' => $inv->roleList(), 'perms_add' => null, 'perms_remove' => null, 'status' => 'active', 'added_by' => $inv->invited_by]);
+            ShopStaff::updateOrCreate(['supplier_id' => $s->id, 'user_id' => $u->id], ['role' => $inv->role, 'roles' => $inv->roleList(), 'branch_ids' => $inv->branch_ids, 'perms_add' => null, 'perms_remove' => null, 'status' => 'active', 'added_by' => $inv->invited_by]);
             StaffInvite::where('email', $inv->email)->delete(); // other shops' invitations no longer apply
         });
         Notifier::notify($s->owner, 'supplier', $u->name.' joined your team', $u->name.' accepted your invitation and is now '.$inv->roleLabel().'.', route('supplier.team', [], false));
@@ -250,19 +337,25 @@ class ShopStaffs
      */
     public static function update(Supplier $s, User $by, User $u, array $patch): array
     {
-        if (! $by->orgCan('team.manage') || $by->shop()?->id !== $s->id) {
-            return ['ok' => false, 'error' => 'Only the Organization Admin can manage employees.'];
+        $scope = self::managerScope($s, $by);
+        if (! $scope) {
+            return ['ok' => false, 'error' => 'Only the owner, an Organization Admin or a Branch Admin can manage employees.'];
         }
         $m = ShopStaff::where('supplier_id', $s->id)->where('user_id', $u->id)->first();
-        if (! $m || $u->id === $s->owner_id) {
-            return ['ok' => false, 'error' => 'You can only manage your own organization\'s employees.'];
+        if (! $m || $u->id === $s->owner_id || $u->id === $by->id || ! self::canManage($scope, $m)) {
+            return ['ok' => false, 'error' => 'You can only manage the employees you are in charge of.'];
+        }
+        if (! empty($patch['perms_set']) && ! $scope['owner']) {
+            return ['ok' => false, 'error' => 'Only the owner changes single permissions.'];
         }
         $changes = [];
+        $rolesNow = $m->roleList();
         if (! empty($patch['roles']) || ! empty($patch['role'])) {
             $roles = self::rolesFrom($patch);
-            if (! $roles) {
-                return ['ok' => false, 'error' => 'Choose at least one valid role.'];
+            if (! $roles || array_diff($roles, $scope['roles'])) {
+                return ['ok' => false, 'error' => 'Choose at least one role you may give.'];
             }
+            $rolesNow = $roles;
             $m->role = $roles[0];
             $m->roles = $roles;
             // the owner's tweaks stay, trimmed to what still differs from the new roles' defaults
@@ -270,6 +363,18 @@ class ShopStaffs
             $m->perms_add = array_values(array_diff((array) $m->perms_add, $base)) ?: null;
             $m->perms_remove = array_values(array_intersect((array) $m->perms_remove, $base)) ?: null;
             $changes[] = 'roles: '.implode(', ', $roles);
+        }
+        // branches: re-checked whenever roles or branches change (an Organization Admin covers all, a Branch Admin needs one)
+        if (! empty($patch['branches_set']) || ! empty($patch['roles']) || ! empty($patch['role'])) {
+            $br = self::branchesFrom($s, $scope, $rolesNow, ! empty($patch['branches_set']) ? ($patch['branches'] ?? []) : (array) $m->branch_ids);
+            if (! $br['ok']) {
+                return ['ok' => false, 'error' => $br['error']];
+            }
+            if ($br['ids'] != $m->branch_ids) {
+                $names = $br['ids'] ? $s->locations()->whereIn('id', $br['ids'])->pluck('name')->implode(', ') : 'all branches';
+                $changes[] = 'branches: '.$names;
+            }
+            $m->branch_ids = $br['ids'];
         }
         if (! empty($patch['perms_set'])) {
             $m->setPerms((array) ($patch['perms'] ?? []));

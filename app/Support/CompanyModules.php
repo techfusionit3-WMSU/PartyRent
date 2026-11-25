@@ -20,13 +20,13 @@ class CompanyModules
     /** Modules of a solo shop / rental company (direct bookings). */
     public const SHOP = [
         'manage' => [
-            'label' => 'Owner', 'icon' => 'store', 'roles' => ['org_admin'], 'home' => 'supplier.dashboard',
-            'about' => 'Everything: catalog, policies, team, reports and payouts.',
+            'label' => 'Owner', 'icon' => 'store', 'roles' => ['org_admin', 'org_manager', 'branch_admin'], 'home' => 'supplier.dashboard',
+            'about' => 'Everything: catalog, policies, team, reports and payouts. Organization Admins share it (all branches); a Branch Admin sees it for their branch only.',
             'nav' => [
                 ['Overview'], ['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['requests', 'supplier.requests', 'list', 'Rentals', 'requests', 'orders.view'], ['schedule', 'supplier.schedule', 'truck', 'Fulfillment & Returns', null, 'orders.view'], ['cases', 'supplier.shortfalls', 'alert', 'Problems & Cases', 'cases', 'orders.view'],
                 ['Catalog'], ['products', 'supplier.products', 'box', 'Products', null, 'products.manage'], ['packages', 'supplier.packages', 'package', 'Packages', null, 'products.manage'], ['discounts', 'supplier.discounts', 'tag', 'Discounts', null, 'products.manage'], ['inventory', 'supplier.inventory', 'layers', 'Inventory', null, 'inventory.manage'], ['locations', 'supplier.locations', 'store', 'Branches', null, 'locations.manage'], ['calendar', 'supplier.calendar', 'calendar', 'Inventory Calendar', null, 'orders.view'],
                 ['Money & reports'], ['payments', 'supplier.payments', 'card', 'Payments', 'payments', 'payments.view'], ['damages', 'supplier.damages', 'tool', 'Damage & Compensation', null, 'returns.inspect'], ['reports', 'supplier.reports', 'bars', 'Business Reports', null, 'reports.view'], ['records', 'supplier.records', 'file', 'Transaction Records', null, 'reports.view'], ['printable', 'supplier.reports.center', 'print', 'Printable Reports', null, 'reports.view'],
-                ['Shop'], ['shop', 'supplier.shop', 'store', 'Shop Profile & Settings', null, 'shop.manage'], ['reviews', 'supplier.reviews', 'star', 'Reviews', null, 'orders.view'], ['team', 'supplier.team', 'users', 'Team & Roles', null, 'team.manage'], ['activity', 'supplier.activity', 'clock', 'Store History', null, 'team.manage'], ['notifications', 'notifications', 'bell', 'Notifications'],
+                ['Shop'], ['shop', 'supplier.shop', 'store', 'Shop Profile & Settings', null, 'shop.manage'], ['reviews', 'supplier.reviews', 'star', 'Reviews', null, 'orders.view'], ['team', 'supplier.team', 'users', 'Team & Roles', null, 'team.manage|team.branch'], ['activity', 'supplier.activity', 'clock', 'Store History', null, 'team.manage'], ['notifications', 'notifications', 'bell', 'Notifications'],
             ],
             'bottom' => [['dashboard', 'supplier.dashboard', 'grid', 'Dashboard'], ['products', 'supplier.products', 'box', 'Products', null, 'products.manage'], ['requests', 'supplier.requests', 'list', 'Rentals', null, 'orders.view'], ['payments', 'supplier.payments', 'card', 'Payments', null, 'payments.view']],
         ],
@@ -205,7 +205,9 @@ class CompanyModules
      */
     public static function nav(User $u, string $module, array $badges): array
     {
-        $can = fn ($it) => empty($it[5]) || $u->orgCan($it[5]);
+        $branchLevel = BranchScope::allowed($u) !== null;
+        $can = fn ($it) => (empty($it[5]) || collect(explode('|', $it[5]))->contains(fn ($p) => $u->orgCan($p)))
+            && ! ($branchLevel && isset($it[1]) && BranchScope::orgOnly($it[1]));
         if ($module === 'event_manage') {
             return array_replace(BusinessNav::config($u->shop()), ['tag' => 'Owner']);
         }
@@ -239,7 +241,10 @@ class CompanyModules
         }
         $bottom = array_values(array_filter($m['bottom'], $can));
 
-        return ['tag' => $m['label'], 'items' => $items, 'bottom' => array_map(fn ($it) => [$it[0], $it[1], $it[2], $it[3]], $bottom)];
+        // an Organization Admin / Branch Admin works in the owner's workspace under their own title
+        $tag = $module === 'manage' && ! $u->isShopOwner() ? ShopStaff::rolesLabel(array_values(array_intersect($u->orgRoles(), ['org_manager', 'branch_admin'])) ?: ['org_admin']) : $m['label'];
+
+        return ['tag' => $tag, 'items' => $items, 'bottom' => array_map(fn ($it) => [$it[0], $it[1], $it[2], $it[3]], $bottom)];
     }
 
     /** RBAC matrix rows for documentation and the Team page: module => roles that open it. */

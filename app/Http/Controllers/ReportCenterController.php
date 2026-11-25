@@ -53,6 +53,7 @@ class ReportCenterController extends Controller
                 ? [$s ? 'Supplier: '.$s->name.($s->city ? ' · '.$s->city : '') : 'Platform report: all suppliers']
                 : [trim(($s->address ?: '').($s->city ? ', '.$s->city : ''), ', '), implode(' · ', array_filter([$s->phone, $s->email]))])),
             'branch' => $f['branch'] ? $f['branch']->name.($f['branch']->address ? ' — '.$f['branch']->address : '') : null,
+            'scopeNote' => ! $f['admin'] && ! $f['branch'] && ! $f['branchSet'] && $f['supplier']->branches()->count() > 1 ? 'Whole organization: all branches' : null,
             'period' => ReportCenter::periodText($f),
             'filters' => ReportCenter::applied($f),
             'generated' => now(),

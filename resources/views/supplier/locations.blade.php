@@ -3,8 +3,20 @@
 {{-- Reference SP.locations --}}
 @php($today = $date)
 @section('content')
-<div class="page-head"><div><h1>Branches</h1><p>The places your shop rents from. Customers still see one {{ $s->name }} store. Each rental comes from one branch and uses only that branch's stock.</p></div><a class="btn btn-primary" href="{{ route('supplier.locations.create') }}">{{ icon('plus') }}Add branch</a></div>
+<div class="page-head"><div><h1>Branches</h1><p>The places your shop rents from. Customers still see one {{ $s->name }} store; checkout picks the nearest branch that serves them and has everything.</p></div>@if($orgLevel)<a class="btn btn-primary" href="{{ route('supplier.locations.create') }}">{{ icon('plus') }}Add branch</a>@endif</div>
 
+@if($orgLevel)
+<form method="POST" action="{{ route('supplier.locations.settings') }}" class="card mb-3">@csrf
+  <h3 class="mb-1">How branches serve customers</h3>
+  <div class="form-grid">
+    <div class="field"><label for="bsKm">Each branch serves customers up to (km)</label><input class="input" id="bsKm" type="number" name="serviceKm" min="1" max="2000" step="1" value="{{ $settings['serviceKm'] }}" required>
+      <div class="hint">A branch is never offered to customers farther than this (for delivery or pickup). Set a different distance on a branch to override it.</div></div>
+    <div class="field"><label class="check"><input type="checkbox" name="combine" value="1" @checked($settings['combine'])> <span><b>Combine nearby branches</b><span class="small muted" style="display:block">When no single branch has everything, the branch serving the customer borrows the missing items from your other branches nearby. The customer gets one rental and pays no extra; you move the items between branches (a transfer task on the rental).</span></span></label></div>
+    <div class="field"><label for="bsCk">Only combine branches within (km of each other)</label><input class="input" id="bsCk" type="number" name="combineKm" min="1" max="500" step="1" value="{{ $settings['combineKm'] }}" required></div>
+  </div>
+  <button class="btn btn-sm">Save branch settings</button>
+</form>
+@endif
 <div class="grid grid-3 mb-3">
   @foreach($locs as $l)
     @php($o = $open[$l->id] ?? ['pending' => 0, 'booked' => 0])
@@ -13,16 +25,17 @@
         <div class="row wrap" style="gap:4px">@if($l->is_main)<span class="badge b-purple plain">Main</span>@endif<span class="badge {{ $l->active ? 'b-green' : 'b-gray' }} plain">{{ $l->active ? 'Open for rentals' : 'Paused' }}</span></div></div>
       <div class="small muted">{{ $l->address }}</div>
       <div class="small">{{ $l->contact ? $l->contact.' · ' : '' }}{{ $l->phone ?: 'No contact number yet' }}</div>
+      <div class="small">{{ $l->hours ? $l->hours.' · ' : '' }}Serves up to {{ rtrim(rtrim(number_format(\App\Domain\Branches::serviceKm($l), 1), '0'), '.') }} km{{ $l->service_km === null ? ' (shop default)' : '' }}</div>
       <div class="small">@if($l->hasPin()){{ icon('map', 'width:13px;vertical-align:-2px') }} Pinned on the map @else<a href="{{ route('supplier.locations.edit', $l) }}" style="color:#B45309">{{ icon('alert', 'width:13px;vertical-align:-2px') }} Add a map pin for accurate delivery fees</a>@endif</div>
       <div class="branch-stats"><div><b>{{ $prods->sum(fn ($p) => inv()->stockAt($p->id, $l->id)) }}</b><span>in stock</span></div><div><b>{{ $o['pending'] }}</b><span>new requests</span></div><div><b>{{ $o['booked'] }}</b><span>booked</span></div></div>
       <div class="branch-actions">
         <a class="btn btn-sm" href="{{ route('supplier.locations.edit', $l) }}">{{ icon('edit') }}Edit</a>
         <a class="btn btn-sm" href="{{ route('supplier.requests', ['branch' => $l->id, 'tab' => 'all']) }}">{{ icon('list') }}See rentals</a>
       </div>
-      @unless($l->is_main)<div class="branch-more">
+      @if(! $l->is_main && $orgLevel)<div class="branch-more">
         <form method="POST" action="{{ route('supplier.locations.active', $l) }}" @if($l->active) data-confirm-title="Pause {{ $l->name }}?" data-confirm="Customers can't rent from this branch while it's paused. Its stock stays recorded, and you can open it again any time." data-confirm-ok="Pause branch" @endif>@csrf<button class="link-btn small">{{ $l->active ? 'Pause this branch' : 'Open this branch again' }}</button></form>
         <form method="POST" action="{{ route('supplier.locations.delete', $l) }}" data-confirm-title="Delete {{ $l->name }}?" data-confirm="This can't be undone. Only a branch with no stock and no rentals can be deleted." data-confirm-ok="Delete branch" data-danger>@csrf @method('DELETE')<button class="link-btn small" style="color:var(--red)">Delete</button></form>
-      </div>@endunless
+      </div>@endif
     </div>
   @endforeach
 </div>

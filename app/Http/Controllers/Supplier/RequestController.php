@@ -26,13 +26,16 @@ class RequestController extends Controller
 
     public function index(Request $request)
     {
-        $sid = $request->user()->shop()->id;
+        $sup = $request->user()->shop();
+        $sid = $sup->id;
         $tab = array_key_exists($request->query('tab'), self::GROUPS) ? $request->query('tab') : 'pending';
         $q = mb_strtolower((string) $request->query('q', ''));
         // one branch's rentals (multi-branch shops), or all of them
-        $branches = \App\Models\InventoryLocation::where('supplier_id', $sid)->orderByDesc('is_main')->orderBy('id')->get();
+        // only branches this user may see; the dashboard's branch (switcher) applies unless one is picked here
+        $branches = \App\Support\BranchScope::choices();
         $branch = $branches->firstWhere('id', (int) $request->query('branch'));
-        $all = RentalRequest::where('supplier_id', $sid)->when($branch, fn ($w) => $w->where('branch_id', $branch->id))->with(['customer', 'payments', 'branch'])->get();
+        $all = RentalRequest::forShop($sup, true, ! $branch)->when($branch, fn ($w) => $w->where(fn ($x) => $x->where('branch_id', $branch->id)
+            ->orWhereHas('transfers', fn ($t) => $t->where('from_location_id', $branch->id)->where('status', '!=', 'cancelled'))))->with(['customer', 'payments', 'branch'])->get();
         $list = $all->filter(fn ($r) => ! self::GROUPS[$tab] || in_array($r->status, self::GROUPS[$tab], true))
             ->filter(fn ($r) => ! $q || str_contains(mb_strtolower($r->code.' '.$r->event_name.' '.$r->customer->name), $q));
         $list = in_array($tab, ['pending', 'upcoming'], true) ? $list->sortBy('start_date') : $list->sortByDesc('created_at');
@@ -123,9 +126,21 @@ class RequestController extends Controller
     {
         $r = $this->own($request, $rentalRequest);
         $data = $request->validate(['line' => 'required|string|max:20', 'location' => 'required|integer']);
+        if (! \App\Support\BranchScope::covers((int) $data['location'])) {
+            return back()->with('error', 'You can only move a rental to one of your own branches.');
+        }
         $res = Rentals::setLineSource($r, $data['line'], (int) $data['location']);
 
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $r->code.' is now fulfilled by '.($r->fresh()->branch?->name ?? 'the new branch').'.' : $res['error']);
+    }
+
+    /** Work out again where a combined rental's items come from (a lending branch closed or ran short). */
+    public function replan(Request $request, RentalRequest $rentalRequest)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $res = \App\Domain\Branches::reassign($r, (int) $r->branch_id);
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Branches re-planned for '.$r->code.'.' : $res['error']);
     }
 
     /** Approve or reject the customer's installment schedule. */

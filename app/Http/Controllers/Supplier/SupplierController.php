@@ -26,7 +26,7 @@ class SupplierController extends Controller
         $u = $request->user();
         $sup = $u->shop();
         $T = today_iso();
-        $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['payments', 'customer'])->get();
+        $reqs = RentalRequest::forShop($sup)->with(['payments', 'customer'])->get();
         $ids = $reqs->pluck('id');
         $pend = $reqs->where('status', 'pending');
         $booked = ['accepted', 'in_progress', 'ready_pickup', 'out_delivery'];
@@ -94,7 +94,7 @@ class SupplierController extends Controller
     {
         $u = $request->user();
         $sup = $u->shop();
-        $reqs = RentalRequest::where('supplier_id', $sup->id)->whereIn('status', array_merge(Finance::ACTIVE, ['completed', 'cancelled']))->with(['payments', 'customer'])->get();
+        $reqs = RentalRequest::forShop($sup)->whereIn('status', array_merge(Finance::ACTIVE, ['completed', 'cancelled']))->with(['payments', 'customer'])->get();
         $pays = Payment::whereIn('rental_request_id', $reqs->pluck('id'))->with('rentalRequest.customer')->orderByDesc('submitted_at')->get();
         $fins = $reqs->map(fn ($r) => ['r' => $r, 'f' => $r->fin()]);
         $canVerify = Rentals::canFinance($sup->id, 'payments.verify', $u);

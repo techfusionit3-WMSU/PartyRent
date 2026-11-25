@@ -26,6 +26,8 @@
       <div class="form-grid">
         <div class="field"><label for="bContact">Person in charge <span class="muted small">(optional)</span></label><input class="input" id="bContact" name="contact" maxlength="120" value="{{ old('contact', $l->contact) }}" placeholder="e.g. Joy Lim"></div>
         <div class="field"><label for="bPhone">Contact number <span class="muted small">(optional)</span></label><input class="input" id="bPhone" name="phone" maxlength="40" value="{{ old('phone', $l->phone) }}" placeholder="0917 555 0101" inputmode="tel"><div class="hint">Mobile or landline, e.g. (02) 8820 1234.</div></div>
+        <div class="field"><label for="bHours">Opening hours <span class="muted small">(optional)</span></label><input class="input" id="bHours" name="hours" maxlength="120" value="{{ old('hours', $l->hours) }}" placeholder="e.g. Mon–Sat 8 AM–6 PM"></div>
+        <div class="field"><label for="bKm">Serves customers up to (km) <span class="muted small">(optional)</span></label><input class="input" id="bKm" name="service_km" type="number" min="1" max="2000" step="1" value="{{ old('service_km', $l->service_km) }}" placeholder="Shop default: {{ $s->branchSettings()['serviceKm'] }} km"><div class="hint">Customers farther than this are never offered this branch.</div></div>
       </div>
     </div>
     <div class="card"><h3 class="mb-1">3. Location</h3>
@@ -46,7 +48,8 @@
   </div>
   <aside class="stack">
     <div class="card"><h3 class="mb-1">Main branch</h3>
-      @if($l->is_main)
+      @if(! \App\Support\BranchScope::isOrgLevel())<p class="small muted mb-0">Only the owner or an Organization Admin chooses the main branch.</p>
+      @elseif($l->is_main)
         <p class="small mb-0">{{ icon('check', 'width:14px;vertical-align:-2px') }} This is your <b>main branch</b>. It is listed first, and new items start with their stock here.</p>
       @else
         <label class="check mb-1"><input type="hidden" name="is_main" value="0"><input type="checkbox" name="is_main" value="1" @checked(old('is_main'))> Make this my main branch</label>

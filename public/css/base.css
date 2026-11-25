@@ -582,3 +582,17 @@ main:focus { outline: none; }
 /* comfortable tap targets for small icon buttons (UI audit: some were 19-23px wide) */
 .btn.btn-icon { min-width: 36px; min-height: 36px; justify-content: center; }
 .tag-x { min-width: 24px; min-height: 24px; display: inline-grid; place-items: center; }
+
+/* Branch switcher (multi-branch shops) and "renting near" chip */
+.branch-switch { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; margin: 0 0 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: .86rem; }
+.branch-switch > svg { width: 16px; height: 16px; color: var(--brand); flex: none; }
+.branch-switch.on { border-color: var(--brand); background: var(--brand-50); }
+.near-chip { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--muted); text-decoration: none; max-width: 100%; }
+.near-chip b { color: var(--ink, inherit); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.near-chip svg { width: 14px; height: 14px; flex: none; }
+.branch-list-info { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.branch-list-info .card { padding: 12px; }
+@media (max-width: 640px) { .branch-switch select { max-width: 100% !important; width: 100% !important; } .branch-switch form { width: 100%; } }
+.near-row { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
+.near-chip .link { color: var(--brand); font-weight: 600; }
+@media (max-width: 640px) { .near-row { justify-content: flex-start; } }

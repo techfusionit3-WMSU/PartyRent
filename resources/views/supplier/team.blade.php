@@ -2,21 +2,24 @@
 @php($R = \App\Models\ShopStaff::labels($s))
 @php($P = \App\Models\ShopStaff::ORG_PERM_LIST)
 @php($solo = ! $s->isOrganization())
+@php($multi = $solo && $allBranches->count() > 1)
+@php($brNames = fn ($ids) => $ids ? collect($ids)->map(fn ($id) => $allBranches[(int) $id]->name ?? null)->filter()->implode(', ') : 'All branches')
 @section('content')
 <div class="page-head"><div><h1>Team & Roles</h1><p>Roles belong to <b>{{ $s->name }}</b>, not to PartyRent. Each person uses their own PartyRent account, switches to <b>Business Mode</b> and works only in the modules of their roles.@if($solo) A team is <b>optional</b>: as the owner you can run every module yourself.@endif</p></div><button class="btn btn-primary" data-modal="empAdd">{{ icon('plus') }}Add employee</button></div>
 
-<div class="card pad-0 mb-3"><div class="table-wrap"><table class="table cards"><thead><tr><th>Member</th><th>Roles</th><th>Status</th><th>Added</th><th></th></tr></thead><tbody>
+<div class="card pad-0 mb-3"><div class="table-wrap"><table class="table cards"><thead><tr><th>Member</th><th>Roles</th>@if($multi)<th>Branches</th>@endif<th>Status</th><th>Added</th><th></th></tr></thead><tbody>
 @foreach($members as $m)
   @php($tweaked = isset($m['member']) && ($m['member']->perms_add || $m['member']->perms_remove))
   <tr>
     <td data-label="Member"><div class="row"><span class="avatar">{{ $m['user']->initials() }}</span><div><b>{{ $m['user']->name }}</b><div class="small muted">{{ $m['user']->email }}</div></div></div></td>
     <td data-label="Roles">@foreach($m['roles'] as $r)<span class="badge {{ \App\Models\ShopStaff::ROLE_BADGE[$r] ?? 'b-gray' }}">{{ $R[$r] ?? $r }}</span> @endforeach @if($tweaked)<span class="badge b-gold plain" title="The owner added or removed permissions for this person">Custom permissions</span>@endif</td>
+    @if($multi)<td data-label="Branches"><span class="small">{{ $m['role'] === 'org_admin' ? 'All branches' : $brNames($m['member']->branch_ids) }}</span></td>@endif
     <td data-label="Status"><span class="badge {{ $m['status'] === 'active' ? 'b-green' : 'b-gray' }}">{{ ucfirst($m['status']) }}</span></td>
     <td data-label="Added"><span class="small">{{ fmt_date($m['since']?->toDateString()) }}</span></td>
     <td data-label="">@if($m['role'] === 'org_admin')<span class="small muted">Account owner · all modules</span>@else
       <div class="btn-group">
-        <button class="btn btn-xs" data-modal="empRole{{ $m['user']->id }}">Roles</button>
-        <button class="btn btn-xs" data-modal="empPerm{{ $m['user']->id }}">Permissions</button>
+        <button class="btn btn-xs" data-modal="empRole{{ $m['user']->id }}">Roles{{ $multi ? ' & branches' : '' }}</button>
+        @if($scope['owner'])<button class="btn btn-xs" data-modal="empPerm{{ $m['user']->id }}">Permissions</button>@endif
         @php($on = $m['status'] !== 'active')
         <form method="POST" action="{{ route('supplier.team.update', $m['user']) }}" data-confirm-title="{{ ($on ? 'Reactivate ' : 'Deactivate ').$m['user']->name }}?" data-confirm="{{ $on ? 'They can switch to Business Mode for your shop again.' : 'They lose access to your shop. Their own customer account stays, and their past actions stay in the records.' }}" data-confirm-ok="{{ $on ? 'Reactivate' : 'Deactivate' }}" @if(! $on) data-danger @endif>@csrf @method('PUT')<input type="hidden" name="status" value="{{ $on ? 'active' : 'deactivated' }}"><button class="btn btn-xs {{ $on ? 'btn-success' : 'btn-ghost' }}">{{ $on ? 'Reactivate' : 'Deactivate' }}</button></form>
       </div>
@@ -28,6 +31,7 @@
   <tr>
     <td data-label="Member"><div class="row"><span class="avatar">{{ icon('user') }}</span><div><b>{{ $i->email }}</b><div class="small muted">Invited by {{ $i->inviter?->name ?? '—' }}</div></div></div></td>
     <td data-label="Roles">@foreach($i->roleList() as $r)<span class="badge {{ \App\Models\ShopStaff::ROLE_BADGE[$r] ?? 'b-gray' }}">{{ $R[$r] ?? $r }}</span> @endforeach</td>
+    @if($multi)<td data-label="Branches"><span class="small">{{ $brNames($i->branch_ids) }}</span></td>@endif
     <td data-label="Status">@if($expired)<span class="badge b-gray">Expired</span>@else<span class="badge b-gold">Invited · waiting</span>@endif</td>
     <td data-label="Added"><span class="small">{{ fmt_date($i->last_sent_at->toDateString()) }}</span></td>
     <td data-label=""><div class="btn-group">
@@ -63,10 +67,16 @@
       <div class="hint" id="emHint">We check the email first. An account that already works for another business can't be added. A new email gets a code to create its own account.</div>
     </div>
     <div class="field"><label>Roles <span class="muted small">(one or more; the first one ticked is their main module)</span></label>
-      @foreach(\App\Models\ShopStaff::employeeRoles($s) as $r)
+      @foreach($scope['roles'] as $r)
         <label class="check mb-1"><input type="checkbox" name="roles[]" value="{{ $r }}" @checked(in_array($r, (array) old('roles', []), true))> <span><b>{{ $R[$r] }}</b><span class="small muted" style="display:block">{{ \App\Models\ShopStaff::hints($s)[$r] }}</span></span></label>
       @endforeach
     </div>
+    @if($multi)
+      <div class="field"><label>Branches</label>
+        @foreach($branches as $b)<label class="check mb-1"><input type="checkbox" name="branches[]" value="{{ $b->id }}" @checked(in_array($b->id, array_map('intval', (array) old('branches', $scope['branches'] ?? [])), true))> <span>{{ $b->name }}</span></label>@endforeach
+        <div class="hint">{{ $scope['branches'] === null ? 'Leave all unticked for every branch. A Branch Admin needs at least one branch; an Organization Admin always has every branch.' : 'They can only see and work on the branches ticked here.' }}</div>
+      </div>
+    @endif
     <p class="small muted mb-0">Nobody joins until they confirm from their inbox. The invitation expires in {{ \App\Models\StaffInvite::TTL_HOURS }} hours.</p>
   </div><div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary" id="emSend" disabled>{{ icon('send') }}Send invitation</button></div></form>
 </div></div>
@@ -121,14 +131,22 @@
   @php($mem = $m['member'])
   <div class="modal-backdrop hidden" id="empRole{{ $m['user']->id }}"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h3>Roles · {{ $m['user']->name }}</h3><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
     <form method="POST" action="{{ route('supplier.team.update', $m['user']) }}">@csrf @method('PUT')<div class="modal-body">
-      <div class="field"><label>Main role <span class="muted small">(opens first in Business Mode)</span></label><select class="input" name="roles[]">@foreach(\App\Models\ShopStaff::employeeRoles($s) as $r)<option value="{{ $r }}" @selected($r === $mem->role)>{{ $R[$r] }}</option>@endforeach</select></div>
+      <div class="field"><label>Main role <span class="muted small">(opens first in Business Mode)</span></label><select class="input" name="roles[]">@foreach($scope['roles'] as $r)<option value="{{ $r }}" @selected($r === $mem->role)>{{ $R[$r] }}</option>@endforeach</select></div>
       <div class="field"><label>Also works as</label>
-        @foreach(\App\Models\ShopStaff::employeeRoles($s) as $r)
+        @foreach($scope['roles'] as $r)
           <label class="check mb-1"><input type="checkbox" name="roles[]" value="{{ $r }}" @checked($r !== $mem->role && in_array($r, $m['roles'], true))> <span><b>{{ $R[$r] }}</b><span class="small muted" style="display:block">{{ \App\Models\ShopStaff::hints($s)[$r] }}</span></span></label>
         @endforeach
       </div>
     </div>
-    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Save roles</button></div></form>
+      @if($multi)
+        <input type="hidden" name="branches_set" value="1">
+        <div class="field"><label>Branches</label>
+          @foreach($branches as $b)<label class="check mb-1"><input type="checkbox" name="branches[]" value="{{ $b->id }}" @checked(in_array($b->id, array_map('intval', (array) $mem->branch_ids), true))> <span>{{ $b->name }}</span></label>@endforeach
+          <div class="hint">{{ $scope['branches'] === null ? 'None ticked = every branch (organization level).' : 'Only your branches are listed.' }}</div>
+        </div>
+      @endif
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary">Save</button></div></form>
   </div></div>
 
   @php($have = $mem->perms())

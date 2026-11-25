@@ -54,6 +54,8 @@ class StockLocations
             return self::fail('That map pin is outside the area PartyRent serves. Move it to the branch.');
         }
         $rec = ['name' => $name, 'address' => $address, 'contact' => trim((string) ($data['contact'] ?? '')), 'phone' => $phone]
+            + (array_key_exists('hours', $data) ? ['hours' => trim((string) $data['hours']) ?: null] : [])
+            + (array_key_exists('service_km', $data) ? ['service_km' => is_numeric($data['service_km']) ? round((float) $data['service_km'], 1) : null] : [])
             + ($parts ? ['address_parts' => $parts['address_parts'], 'city_code' => $parts['city_code']] : [])
             + (array_key_exists('lat', $data) ? ['lat' => $pin[0] ?? null, 'lng' => $pin[1] ?? null] : []);
         DB::transaction(function () use ($s, &$l, $rec, $data) {
@@ -113,7 +115,7 @@ class StockLocations
             return self::fail($l->name.' still holds stock ('.$stocked->map(fn ($x) => $x->product->name.': '.$x->qty)->implode(', ').'). Transfer it to another location first.');
         }
         $booked = RentalRequest::where('supplier_id', $s->id)->whereIn('status', array_merge(['pending'], Inventory::RESERVING))->get()
-            ->filter(fn ($r) => $r->branch_id === $l->id || collect($r->lines)->contains(fn ($x) => (int) ($x['sourceId'] ?? 0) === $l->id));
+            ->filter(fn ($r) => $r->branch_id === $l->id || collect($r->lines)->contains(fn ($x) => (int) ($x['sourceId'] ?? 0) === $l->id || collect((array) ($x['from'] ?? []))->contains(fn ($m) => isset($m[$l->id]))));
         if ($booked->isNotEmpty()) {
             return self::fail('Bookings are allocated to '.$l->name.' ('.$booked->pluck('code')->implode(', ').'). Change their allocation first.');
         }

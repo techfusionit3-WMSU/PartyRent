@@ -24,7 +24,7 @@ class StaffInvite extends Model
 
     protected function casts(): array
     {
-        return ['expires_at' => 'datetime', 'last_sent_at' => 'datetime', 'roles' => 'array'];
+        return ['expires_at' => 'datetime', 'last_sent_at' => 'datetime', 'roles' => 'array', 'branch_ids' => 'array'];
     }
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }

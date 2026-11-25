@@ -9,7 +9,7 @@
   <div class="rp-brand">
     <div class="rp-name">{{ $head['name'] }}</div>
     @foreach($head['lines'] as $l)<div class="rp-line">{{ $l }}</div>@endforeach
-    @if($head['branch'])<div class="rp-line">Branch: {{ $head['branch'] }}</div>@endif
+    @if($head['branch'])<div class="rp-line">Branch: {{ $head['branch'] }}</div>@elseif(! empty($head['scopeNote']))<div class="rp-line">{{ $head['scopeNote'] }}</div>@endif
   </div>
   <div class="rp-meta">
     <h2 class="rp-title">{{ $report['title'] }}</h2>

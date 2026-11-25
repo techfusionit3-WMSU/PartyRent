@@ -381,6 +381,8 @@ class CartController extends Controller
                 'supplier_id' => $s->id, 'ok' => $prep['ok'], 'error' => $prep['error'] ?? null, 'total' => $q['total'], 'finalBalance' => $q['finalBalance'],
                 'avail' => self::availability($u->id, $o, $branchId),
                 'branches' => $branches, 'branchId' => $branchId,
+                // a combined order: the nearby branches that bring some of the items to the home branch
+                'lenders' => $prep['ok'] ? \App\Models\InventoryLocation::whereIn('id', collect($prep['attrs']['lines'])->flatMap(fn ($l) => collect((array) ($l['from'] ?? []))->flatMap(fn ($m) => array_keys($m)))->unique()->all())->pluck('name')->all() : [],
                 'suggest' => $suggest, 'installmentOk' => $elig['ok'], 'installmentMsg' => $elig['message'] ?? '',
                 'html' => view('customer._checkout-review', ['q' => $q, 'o' => $o, 'prep' => $prep])->render(),
                 'summary' => ['name' => $s->name, 'plan' => Finance::PLAN_LABEL[$q['plan']], 'where' => ($o['fulfillment'] ?? '') === 'delivery' ? count($o['destinations'] ?? []).' location'.(count($o['destinations'] ?? []) > 1 ? 's' : '') : 'pickup', 'q' => $q],

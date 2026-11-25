@@ -388,7 +388,7 @@
         const dates = Object.keys(st.days).sort();
         const vals = Object.values(st.days).map(Number);
         const at = $('#availTxt', box);
-        if (at) at.innerHTML = !dates.length ? '<span class="badge b-gray">Pick a date</span>' : r.ok ? '<span class="badge b-green">Available for your ' + (dates.length > 1 ? 'dates' : 'date') + '</span>' + (r.minAvailable != null ? '<div class="small muted">' + (dates.length > 1 ? 'Min. ' + r.minAvailable + ' free per day' : r.minAvailable + ' free') + '</div>' : '') : '<span class="badge b-red">Not enough stock</span><div class="small" style="color:var(--red)">' + r.bad.map(b => esc(b.date) + ': only ' + b.available).join(', ') + '</div>';
+        if (at) at.innerHTML = !dates.length ? '<span class="badge b-gray">Pick a date</span>' : r.ok ? '<span class="badge b-green">Available for your ' + (dates.length > 1 ? 'dates' : 'date') + '</span>' + (r.minAvailable != null ? '<div class="small muted">' + (dates.length > 1 ? 'Min. ' + r.minAvailable + ' free per day' : r.minAvailable + ' free') + (r.near ? ' near ' + esc(r.near) : '') + '</div>' : '') : '<span class="badge b-red">Not enough stock' + (r.near ? ' near ' + esc(r.near) : '') + '</span><div class="small" style="color:var(--red)">' + r.bad.map(b => esc(b.date) + ': only ' + b.available).join(', ') + '</div>';
         const qb = $('#qbox', box); if (qb) qb.classList.toggle('bad', !r.ok);
         const est = $('#est', box); if (est) est.textContent = r.totalText + (dates.length > 1 ? ' · ' + dates.length + ' days' : '');
         bulkApplied(box, qtySet ? vals : []);
@@ -397,7 +397,7 @@
         $$('[data-rent-submit]', box).forEach(b => { b.disabled = false; b.classList.toggle('is-off', !r.ok); });
         if (!qtySet) {
           if (est) est.textContent = '—';
-          if (at) at.innerHTML = '<span class="badge b-gold">Enter how many you need</span>' + (r.minAvailable != null ? '<div class="small muted">' + r.minAvailable + ' free</div>' : '');
+          if (at) at.innerHTML = '<span class="badge b-gold">Enter how many you need</span>' + (r.minAvailable != null ? '<div class="small muted">' + r.minAvailable + ' free' + (r.near ? ' near ' + esc(r.near) : '') + '</div>' : '');
         }
         if (cal) cal.update({ month: (dates[0] || r.today).slice(0, 7), need: Math.max(1, ...vals, 1), selected: dates });
         const alt = $('#altBox', box);

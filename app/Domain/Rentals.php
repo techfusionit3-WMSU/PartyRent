@@ -475,7 +475,8 @@ class Rentals
             return self::fail($s->name.': '.$pick['error'], ['branches' => $pick['options']]);
         }
         $branch = $pick['branch'];
-        $lines = Branches::onBranch($lines, $branch->id);
+        // one home branch; a shop that combines branches may borrow missing units from nearby branches (line "from")
+        $lines = $pick['lines'] ?? Branches::onBranch($lines, $branch->id);
         // payment plan & method
         $plans = Finance::plansOf($s);
         $plan = in_array($o['plan'] ?? null, $plans, true) ? $o['plan'] : null;
@@ -515,8 +516,8 @@ class Rentals
             }
             $attrs['installment_plan'] = ['status' => 'proposed', 'items' => $items, 'proposedAt' => now()->toIso8601String()];
         }
-        // every line rents from the fulfilling branch (no split across branches)
-        $attrs['allocation'] = ['status' => 'proposed'];
+        // every line rents from the home branch; borrowed units (combined rentals) are moved there (App\Domain\Transfers)
+        $attrs['allocation'] = ['status' => 'proposed'] + (! empty($pick['borrow']) ? ['combined' => true] : []);
         // the damage fee of every rented item (packages broken into their items) as agreed now: a later change
         // by the shop never changes what this rental can be charged
         $pricing['damageTerms'] = Damage::termsForLines($lines);

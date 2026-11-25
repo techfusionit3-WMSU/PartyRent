@@ -186,21 +186,34 @@
 
   /** The shop's branch that fulfils this order: the recommended one, or the customer's pick among eligible branches. */
   const branchOf = o => { const q = lastQuote[o.supplier_id] || {}; return (q.branches || []).find(b => b.id === (o.branch_id || q.branchId)) || null; };
+  /**
+   * The branch line at checkout: "Rented from Pasig · 8 km away", picked for the customer (has everything, serves their
+   * area, cheapest / nearest). "Change branch" lists only the other branches that can do the whole order; branches
+   * outside the customer's area are never offered. A combined order says which branch brings some items in.
+   */
   function branchBlock(o) {
     const q = lastQuote[o.supplier_id] || {}, list = q.branches || [], chosen = o.branch_id || q.branchId;
-    if (list.length < 2) { const b = list[0]; return b ? '<div class="branch-one small">' + svg('store') + '<span>Rented from <b>' + esc(b.name) + '</b>' + (b.address ? ' · ' + esc(b.address) : '') + '</span></div>' : ''; }
+    const cur = list.find(b => b.id === chosen);
+    if (!cur) return '';
     const del = o.fulfillment === 'delivery', pinned = o.destinations.some(d => d.lat != null && d.lat !== '');
+    const lenders = q.lenders || [];
+    const facts = b => [b.km != null ? b.km + ' km away' : null, del ? 'Delivery ' + money(b.fee) : 'Pick up here' + (b.hours ? ' · ' + b.hours : '')].filter(Boolean).join(' · ');
     const opt = b => {
-      const ok = b.ok && b.deliverable, on = b.id === chosen;
-      const facts = ok ? [b.km != null ? b.km + ' km away' : null, del ? 'Delivery ' + money(b.fee) : 'Pick up here'].filter(Boolean).join(' · ')
-        : (!b.ok ? 'Doesn\'t have everything you need: ' + b.short.slice(0, 2).join('; ') : (b.note || 'Doesn\'t deliver to this address'));
-      return '<label class="branch-opt' + (on ? ' on' : '') + (ok ? '' : ' off') + '"><input type="radio" name="br_' + o.supplier_id + '" value="' + b.id + '" data-branch' + (on ? ' checked' : '') + (ok ? '' : ' disabled') + '>' +
+      const on = b.id === chosen;
+      return '<label class="branch-opt' + (on ? ' on' : '') + '"><input type="radio" name="br_' + o.supplier_id + '" value="' + b.id + '" data-branch' + (on ? ' checked' : '') + '>' +
         '<div class="grow" style="min-width:0"><div class="branch-top"><b>' + esc(b.name) + '</b>' + (b.recommended ? '<span class="badge b-green plain">Best for you</span>' : '') + (b.main ? '<span class="badge b-gray plain">Main</span>' : '') + '</div>' +
-        '<div class="small muted">' + esc(b.address + (b.city && !String(b.address).toLowerCase().includes(String(b.city).split(',')[0].replace(/ city$/i, '').toLowerCase()) ? ', ' + b.city : '')) + '</div><div class="small ' + (ok ? '' : 'branch-bad') + '">' + esc(facts) + '</div></div></label>';
+        '<div class="small muted">' + esc(b.address + (b.city && !String(b.address).toLowerCase().includes(String(b.city).split(',')[0].replace(/ city$/i, '').toLowerCase()) ? ', ' + b.city : '')) + '</div><div class="small">' + esc(facts(b)) + '</div></div></label>';
     };
-    return '<div class="label mt-2 mb-1">Which branch to rent from</div><p class="small muted mt-0 mb-1">' + esc(o.shop.name) + ' has ' + list.length + ' branches. We picked the one that has everything you need' + (del ? ' and the lowest delivery fee' : '') + '; you can choose another. ' +
-      (del && !pinned ? 'Tip: tap <b>Pin on map</b> on your address to compare the branches by distance.' : '') + '</p>' +
-      '<div class="branch-list">' + list.map(opt).join('') + '</div>' + (o.branch_id ? '<button type="button" class="link-btn small mt-1" data-branchauto>Use the recommended branch</button>' : '');
+    let html = '<div class="branch-one small mt-2">' + svg('store') + '<span>Rented from <b>' + esc(cur.name) + '</b>' + (cur.km != null ? ' · ' + cur.km + ' km away' : '') + (cur.address ? ' · ' + esc(cur.address) : '') + '</span></div>';
+    if (lenders.length) html += '<div class="small muted mt-1">Part of your order is brought in from our ' + esc(lenders.join(', ')) + ' branch. Nothing changes for you: one rental, one price, ' + (del ? 'delivered from ' : 'picked up at ') + esc(cur.name) + '.</div>';
+    const others = list.filter(b => b.id !== cur.id && b.ok && b.deliverable);
+    if (others.length) {
+      html += '<details class="branch-change mt-1"' + (o.branch_id ? ' open' : '') + '><summary class="link-btn small">Change branch</summary>' +
+        '<p class="small muted mt-1 mb-1">Only branches that serve your area and have everything for your dates are listed.' + (del && !pinned ? ' Tip: tap <b>Pin on map</b> on your address to compare them by distance.' : '') + '</p>' +
+        '<div class="branch-list">' + [cur].concat(others).map(opt).join('') + '</div>' +
+        (o.branch_id ? '<button type="button" class="link-btn small mt-1" data-branchauto>Use the recommended branch</button>' : '') + '</details>';
+    }
+    return html;
   }
 
   function shopCard(o, idx) {

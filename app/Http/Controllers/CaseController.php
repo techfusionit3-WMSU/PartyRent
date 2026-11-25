@@ -59,7 +59,7 @@ class CaseController extends Controller
         Shortfalls::escalateDue();
 
         return view('supplier.shortfalls', [
-            'cases' => ShortfallCase::where('supplier_id', $s->id)->with(['rentalRequest', 'customer', 'product'])->orderByRaw("status = 'resolved'")->orderByDesc('id')->get(),
+            'cases' => ShortfallCase::where('supplier_id', $s->id)->when(\App\Support\BranchScope::viewIds(), fn ($q) => $q->whereHas('rentalRequest', fn ($r) => $r->forShop($s)))->with(['rentalRequest', 'customer', 'product'])->orderByRaw("status = 'resolved'")->orderByDesc('id')->get(),
             'products' => Product::where('supplier_id', $s->id)->where('listing_type', 'rent')->whereNotIn('status', ['deleted', 'archived'])->orderBy('name')->get(),
         ]);
     }

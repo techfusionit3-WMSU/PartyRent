@@ -62,7 +62,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
             'address_parts' => 'array',
             'admin_perms' => 'array',
             'cashier_perms' => 'array',
-            'ui_flags' => 'array',
+            'ui_flags' => 'array', 'near' => 'array',
         ];
     }
 
@@ -148,6 +148,24 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     public function isShopOwner(): bool
     {
         return $this->supplier?->status === 'approved';
+    }
+
+    /**
+     * Branches this shop user works with (App\Support\BranchScope): null = every branch (owner, Organization Admin,
+     * members with no branch set); else the ids of their assigned branches that still exist ([0] = none left).
+     */
+    public function branchIds(): ?array
+    {
+        if ($this->isShopOwner() || ! ($shop = $this->shop())) {
+            return null;
+        }
+        $m = $this->staffOf;
+        if (! $m || $m->isOrgLevel() || ! is_array($m->branch_ids) || ! $m->branch_ids) {
+            return null;
+        }
+        $ids = \App\Models\InventoryLocation::where('supplier_id', $shop->id)->whereIn('id', array_map('intval', $m->branch_ids))->pluck('id')->all();
+
+        return $ids ?: [0];
     }
 
     /** Company permissions: everything for the owner; role defaults ± the owner's tweaks for an employee. */

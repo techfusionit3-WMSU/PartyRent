@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\RentalRequest;
 use App\Models\StockMovement;
 use App\Models\Supplier;
+use App\Support\BranchScope;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -95,11 +96,21 @@ class ReportCenter
             $supplier = Supplier::find((int) $q->query('supplier'));
             abort_unless($supplier, 404);
         }
+        // a shop user: only their branches (BranchScope); "all" = every branch they may see (the whole organization for
+        // the owner / Organization Admins); no choice yet = the branch the dashboard shows
+        $allowed = $admin ? null : BranchScope::allowed();
         $branch = null;
-        if (in_array('branch', $uses, true) && filled($q->query('branch'))) {
+        $pickedAll = (string) $q->query('branch') === 'all';
+        if (in_array('branch', $uses, true) && filled($q->query('branch')) && ! $pickedAll) {
             $branch = $supplier ? InventoryLocation::where('supplier_id', $supplier->id)->find((int) $q->query('branch')) : null;
-            abort_unless($branch, 404);
+            abort_unless($branch && ($allowed === null || in_array($branch->id, $allowed, true)), 404);
+        } elseif (! $admin && in_array('branch', $uses, true) && ! $q->has('branch')) {
+            $branch = BranchScope::current();
         }
+        if (! $branch && $allowed !== null && count($allowed) === 1 && in_array('branch', $uses, true)) {
+            $branch = InventoryLocation::find($allowed[0]);
+        }
+        $branchSet = ! $branch && $allowed !== null ? $allowed : null;
         $item = null;
         if (in_array('item', $uses, true) && filled($q->query('item'))) {
             abort_unless($supplier && preg_match('/^([pk]):(\d+)$/', (string) $q->query('item'), $m), 404);
@@ -111,7 +122,7 @@ class ReportCenter
 
         return [
             'type' => $type, 'admin' => $admin, 'period' => $period, 'date' => $date, 'from' => $from, 'to' => $to,
-            'supplier' => $supplier, 'branch' => $branch, 'item' => $item,
+            'supplier' => $supplier, 'branch' => $branch, 'branchSet' => $branchSet, 'item' => $item,
             'category' => in_array('category', $uses, true) && filled($q->query('category')) ? Category::find((int) $q->query('category')) : null,
             'status' => $pick('status', array_keys(RentalRequest::STATUS)),
             'pay' => $pick('pay', self::PAY_STATUSES),
@@ -132,7 +143,7 @@ class ReportCenter
             'type' => $f['type'], 'period' => $f['period'],
             'date' => $f['period'] !== 'custom' ? $f['date'] : null,
             'from' => $f['period'] === 'custom' ? $f['from'] : null, 'to' => $f['period'] === 'custom' ? $f['to'] : null,
-            'supplier' => $f['admin'] ? $f['supplier']?->id : null, 'branch' => $f['branch']?->id, 'item' => $f['item']['key'] ?? null,
+            'supplier' => $f['admin'] ? $f['supplier']?->id : null, 'branch' => $f['branch']?->id ?? ($f['admin'] ? null : 'all'), 'item' => $f['item']['key'] ?? null,
             'category' => $f['category']?->id, 'status' => $f['status'], 'pay' => $f['pay'], 'pstatus' => $f['pstatus'], 'method' => $f['method'],
         ], fn ($v) => $v !== null && $v !== '');
     }
@@ -142,7 +153,8 @@ class ReportCenter
     {
         return array_filter([
             'Supplier' => $f['admin'] ? ($f['supplier']?->name ?? ($f['type'] === 'suppliers' ? null : 'All suppliers')) : null,
-            'Branch' => $f['branch']?->name ?? (in_array('branch', self::TYPES[$f['type']][3], true) ? 'All branches' : null),
+            'Branch' => $f['branch']?->name ?? ($f['branchSet'] ? 'Your branches: '.InventoryLocation::whereIn('id', $f['branchSet'])->pluck('name')->implode(', ')
+                : (in_array('branch', self::TYPES[$f['type']][3], true) || $f['type'] === 'branches' ? ($f['admin'] ? 'All branches' : 'All branches (whole organization)') : null)),
             'Item / package' => $f['item']['name'] ?? null,
             'Category' => $f['category']?->name,
             'Rental status' => $f['status'] ? RentalRequest::statusLabel($f['status']) : null,
@@ -172,7 +184,9 @@ class ReportCenter
 
         return [
             'suppliers' => $f['admin'] ? Supplier::approved()->orderBy('name')->get(['id', 'name']) : collect(),
-            'branches' => $sid ? InventoryLocation::where('supplier_id', $sid)->orderByDesc('is_main')->orderBy('name')->get(['id', 'name', 'active']) : collect(),
+            'branches' => $sid ? InventoryLocation::where('supplier_id', $sid)->when(! $f['admin'] && BranchScope::allowed() !== null, fn ($q) => $q->whereIn('id', BranchScope::allowed()))
+                ->orderByDesc('is_main')->orderBy('name')->get(['id', 'name', 'active']) : collect(),
+            'orgLevel' => $f['admin'] || BranchScope::allowed() === null,
             'products' => $sid ? Product::where('supplier_id', $sid)->where('status', '!=', 'deleted')->orderBy('name')->get(['id', 'name']) : collect(),
             'packages' => $sid ? Package::where('supplier_id', $sid)->where('status', '!=', 'deleted')->orderBy('name')->get(['id', 'name']) : collect(),
             'categories' => Category::orderBy('name')->get(['id', 'name']),
@@ -195,6 +209,7 @@ class ReportCenter
         return RentalRequest::query()
             ->when($f['supplier'], fn ($q, $s) => $q->where('supplier_id', $s->id))
             ->when($f['branch'], fn ($q, $b) => $q->where('branch_id', $b->id))
+            ->when($f['branchSet'], fn ($q, $ids) => $q->whereIn('branch_id', $ids))
             ->with(['customer:id,name', 'supplier:id,name', 'branch:id,name', 'payments']);
     }
 
@@ -328,7 +343,7 @@ class ReportCenter
     private static function payments(array $f)
     {
         return Payment::whereBetween('date', [$f['from'], $f['to']])
-            ->whereHas('rentalRequest', fn ($q) => $q->when($f['supplier'], fn ($x, $s) => $x->where('supplier_id', $s->id))->when($f['branch'], fn ($x, $b) => $x->where('branch_id', $b->id)))
+            ->whereHas('rentalRequest', fn ($q) => $q->when($f['supplier'], fn ($x, $s) => $x->where('supplier_id', $s->id))->when($f['branch'], fn ($x, $b) => $x->where('branch_id', $b->id))->when($f['branchSet'], fn ($x, $ids) => $x->whereIn('branch_id', $ids)))
             ->with(['rentalRequest:id,code,customer_id,supplier_id,branch_id', 'rentalRequest.customer:id,name', 'rentalRequest.supplier:id,name', 'rentalRequest.branch:id,name']);
     }
 
@@ -577,7 +592,10 @@ class ReportCenter
         $low = 0;
         foreach ($prods as $p) {
             $by = inv()->stockByLocation($p->id);
-            $stock = $f['branch'] ? (int) ($by[$f['branch']->id] ?? 0) : (int) $p->total_stock;
+            if ($f['branchSet']) {
+                $by = array_intersect_key($by, array_flip($f['branchSet'])); // only the user's branches
+            }
+            $stock = $f['branch'] ? (int) ($by[$f['branch']->id] ?? 0) : ($f['branchSet'] ? (int) array_sum($by) : (int) $p->total_stock);
             $out = $p->isSale() ? 0 : inv()->reservedOn($p->id, $today);
             $usable = max(0, (int) $p->total_stock - (int) $p->damaged - (int) $p->missing);
             $isLow = $p->isSale() && $p->low_stock_at !== null && $usable <= (int) $p->low_stock_at;
@@ -589,7 +607,7 @@ class ReportCenter
             ]);
         }
         $cols = array_merge(! $f['supplier'] ? [['Supplier', 'text']] : [], [
-            ['Item', 'text'], ['Category', 'text'], ['Type', 'text'], [$f['branch'] ? 'Stock at '.$f['branch']->name : 'Total stock', 'int'], ['By branch', 'text'],
+            ['Item', 'text'], ['Category', 'text'], ['Type', 'text'], [$f['branch'] ? 'Stock at '.$f['branch']->name : ($f['branchSet'] ? 'Stock at your branches' : 'Total stock'), 'int'], ['By branch', 'text'],
             ['Damaged', 'int'], ['Missing', 'int'], ['Written off', 'int'], ['Rented out today', 'int'], ['Usable', 'int'], ['Status', 'text'],
         ]);
         if ($f['branch']) { // the "By branch" column is only for all branches
@@ -714,6 +732,7 @@ class ReportCenter
         $list = StockMovement::whereBetween('created_at', [$f['from'].' 00:00:00', $f['to'].' 23:59:59'])
             ->whereHas('product', fn ($q) => $q->when($f['supplier'], fn ($x, $s) => $x->where('supplier_id', $s->id)))
             ->when($f['branch'], fn ($q, $b) => $q->where(fn ($w) => $w->where('inventory_location_id', $b->id)->orWhere('to_location_id', $b->id)))
+            ->when($f['branchSet'], fn ($q, $ids) => $q->where(fn ($w) => $w->whereIn('inventory_location_id', $ids)->orWhereIn('to_location_id', $ids)))
             ->when($f['item'], fn ($q, $i) => $q->where('product_id', $i['id']))
             ->with(['product:id,name,supplier_id', 'product.supplier:id,name', 'user:id,name'])->orderBy('created_at')->orderBy('id')->get();
         $locs = InventoryLocation::whereIn('id', $list->pluck('inventory_location_id')->merge($list->pluck('to_location_id'))->filter()->unique())->pluck('name', 'id');
@@ -732,7 +751,7 @@ class ReportCenter
 
     private static function rBranches(array $f): array
     {
-        $locs = InventoryLocation::query()->when($f['supplier'], fn ($q, $s) => $q->where('supplier_id', $s->id))->with('supplier:id,name')->orderBy('supplier_id')->orderByDesc('is_main')->orderBy('name')->get();
+        $locs = InventoryLocation::query()->when($f['supplier'], fn ($q, $s) => $q->where('supplier_id', $s->id))->when($f['branchSet'], fn ($q, $ids) => $q->whereIn('id', $ids))->with('supplier:id,name')->orderBy('supplier_id')->orderByDesc('is_main')->orderBy('name')->get();
         $rentals = self::rentals($f)->with('events')->get();
         $pays = self::payments($f)->where('status', 'verified')->get();
         $rows = [];

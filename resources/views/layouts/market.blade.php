@@ -34,6 +34,10 @@
 </header>
 
 <main class="mk-main" id="main" tabindex="-1"><div class="container">
+  @unless(request()->routeIs('near'))
+    @php($nearNow = \App\Support\Near::get())
+    <div class="near-row"><a class="near-chip" href="{{ route('near', ['back' => request()->fullUrl()]) }}">{{ icon('map') }}@if($nearNow)<span>{{ __('Renting near') }}</span> <b>{{ $nearNow['label'] }}</b> · <span class="link">{{ __('Change') }}</span>@else<span>{{ __('Set where you are renting to see stock near you') }}</span>@endif</a></div>
+  @endunless
   @yield('content')
   @if(session(\App\Support\RentalPeriod::ASK))@include('partials.date-prompt')@endif
 </div></main>

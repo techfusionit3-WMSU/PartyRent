@@ -40,6 +40,11 @@ Route::get('/api/slots', [ApiController::class, 'slots'])->name('api.slots');
 Route::post('/api/schedule', [ApiController::class, 'schedule'])->name('api.schedule');
 Route::get('/api/locations', [ApiController::class, 'locations'])->name('api.locations');
 Route::post('/api/package-quote', [ApiController::class, 'packageQuote'])->name('api.package-quote');
+/* ---------- where the customer rents near; the dashboard's branch (shop users) ---------- */
+Route::get('/near', [\App\Http\Controllers\NearController::class, 'show'])->name('near');
+Route::post('/near', [\App\Http\Controllers\NearController::class, 'store'])->middleware('throttle:30,1')->name('near.store');
+Route::delete('/near', [\App\Http\Controllers\NearController::class, 'clear'])->name('near.clear');
+Route::post('/branch-view', [\App\Http\Controllers\NearController::class, 'branchView'])->middleware('auth')->name('branch-view');
 /* ---------- authentication ---------- */
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -226,6 +231,11 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::put('/locations/{location}', [\App\Http\Controllers\Supplier\LocationController::class, 'update'])->name('locations.update');
     Route::delete('/locations/{location}', [\App\Http\Controllers\Supplier\LocationController::class, 'destroy'])->name('locations.delete');
     Route::post('/locations/transfer/{product}', [\App\Http\Controllers\Supplier\LocationController::class, 'transfer'])->name('locations.transfer');
+    Route::post('/locations/settings', [\App\Http\Controllers\Supplier\LocationController::class, 'settings'])->name('locations.settings');
+    // stock lent between branches for a combined rental: each step by the right branch (App\Domain\Transfers)
+    Route::post('/transfers/{transfer}/{step}', [\App\Http\Controllers\Supplier\TransferController::class, 'step'])->whereIn('step', ['send', 'receive', 'return', 'keep'])->name('transfers.step');
+    Route::get('/transfers/{transfer}/slip', [\App\Http\Controllers\Supplier\TransferController::class, 'slip'])->name('transfers.slip');
+    Route::post('/requests/{rentalRequest}/replan', [SupplierRequestController::class, 'replan'])->name('requests.replan');
 
     Route::get('/calendar', [SupplierReportController::class, 'calendar'])->name('calendar');
     Route::get('/damages', [SupplierReportController::class, 'damages'])->name('damages');

@@ -49,7 +49,7 @@ class ReportController extends Controller
         }
         // returns due the day after a rental ends
         $returns = [];
-        foreach (RentalRequest::where('supplier_id', $sup->id)->whereIn('status', Finance::ACTIVE)->get() as $r) {
+        foreach (RentalRequest::forShop($sup, true)->whereIn('status', Finance::ACTIVE)->get() as $r) {
             foreach ($r->lines as $l) {
                 if (! empty(inv()->unitsForLine($l, $r->end_date)[$p->id])) {
                     $returns[add_days($r->end_date, 1)] = ($returns[add_days($r->end_date, 1)] ?? 0) + 1;
@@ -69,7 +69,7 @@ class ReportController extends Controller
 
     public function damages(Request $request)
     {
-        $list = RentalRequest::where('supplier_id', $request->user()->shop()->id)->whereNotNull('inspection')->with(['customer', 'payments'])->get()
+        $list = RentalRequest::forShop($request->user()->shop())->whereNotNull('inspection')->with(['customer', 'payments'])->get()
             ->sortByDesc(fn ($r) => $r->inspection['at'] ?? '')->values();
 
         return view('supplier.damages', ['list' => $list]);
@@ -85,7 +85,7 @@ class ReportController extends Controller
         $rg = Report::range($request);
         $status = array_key_exists((string) $request->query('status'), RentalRequest::STATUS) ? $request->query('status') : null;
         $q = trim((string) $request->query('q', ''));
-        $list = RentalRequest::where('supplier_id', $sup->id)
+        $list = RentalRequest::forShop($sup)
             ->where('start_date', '<=', $rg['to'])->where('end_date', '>=', $rg['from'])
             ->when($status, fn ($x) => $x->where('status', $status))
             ->when($q !== '', fn ($x) => $x->where(fn ($w) => $w->where('code', 'like', "%$q%")->orWhere('event_name', 'like', "%$q%")->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%$q%"))))
@@ -153,7 +153,7 @@ class ReportController extends Controller
     {
         $sup = $request->user()->shop();
         $rg = Report::range($request);
-        $reqs = RentalRequest::where('supplier_id', $sup->id)->with(['customer', 'payments'])->get();
+        $reqs = RentalRequest::forShop($sup)->with(['customer', 'payments'])->get();
         $ids = $reqs->pluck('id');
         $ver = Payment::whereIn('rental_request_id', $ids)->where('status', 'verified')->get();
         $net = fn ($list) => $list->whereIn('type', Finance::RENTAL_TYPES)->sum('amount') - $list->where('type', 'refund')->sum('amount');

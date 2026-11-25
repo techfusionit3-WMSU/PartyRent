@@ -106,7 +106,7 @@
     <form class="card soft" method="POST" action="{{ route('cart.add') }}">
       @csrf
       <input type="hidden" name="type" value="item"><input type="hidden" name="ref_id" value="{{ $p->id }}"><input type="hidden" name="days" id="daysInput" value="{{ json_encode($days) }}">
-      @include('partials.rent-box', ['type' => 'item', 'ref' => $p->id, 'days' => $days, 'siblings' => $siblings, 'start' => $start, 'end' => $end, 'qty' => $qty, 'minDate' => today_iso(), 'sup' => $sup, 'item' => $p, 'sel' => null, 'stockText' => 'Stock: '.$p->total_stock.' total', 'timed' => ! $p->isSale()])
+      @include('partials.rent-box', ['type' => 'item', 'ref' => $p->id, 'days' => $days, 'siblings' => $siblings, 'start' => $start, 'end' => $end, 'qty' => $qty, 'minDate' => today_iso(), 'sup' => $sup, 'item' => $p, 'sel' => null, 'stockText' => $nearAvail === null ? 'Stock: '.$p->total_stock.' total' : $nearAvail.' available near you', 'timed' => ! $p->isSale()])
       @include('partials.bulk-prices', ['p' => $p])
       <div id="altBox"></div>
       @include('market._policies')
@@ -131,7 +131,17 @@
       <dt>Condition</dt><dd>{{ \App\Domain\Damage::conditionLabel($p->condition) }}</dd>
       @if($p->colors)<dt>Colors</dt><dd><div class="row wrap gap-sm">@foreach($p->colors as $c)<span class="tag"><span class="swatch" title="{{ $c }}" style="background:{{ color_hex($c) }}"></span> {{ $c }}</span>@endforeach</div></dd>@endif
       @if($p->themes)<dt>Themes</dt><dd><div class="row wrap gap-sm">@foreach($p->themes as $t)<span class="tag">{{ $t }}</span>@endforeach</div></dd>@endif
-      @if(! $p->isSale())<dt>Stock</dt><dd>{{ $p->total_stock }} {{ $p->unitWord() }}{{ $p->total_stock === 1 ? '' : 's' }} in total</dd>@endif
+      @if(! $p->isSale())
+        <dt>Stock</dt><dd>
+          @if($nearAvail === null)
+            {{ $p->total_stock }} {{ $p->unitWord() }}{{ $p->total_stock === 1 ? '' : 's' }} in total
+          @elseif($nearAvail > 0)
+            <b>{{ $nearAvail }}</b> available{{ \App\Support\Near::label() ? ' near '.\App\Support\Near::label() : '' }} on {{ fmt_date($start) }}
+          @else
+            <span style="color:var(--red)">Not available{{ \App\Support\Near::label() ? ' near '.\App\Support\Near::label() : '' }} on {{ fmt_date($start) }}</span> · <a href="{{ route('near', ['back' => request()->fullUrl()]) }}">change place</a>
+          @endif
+        </dd>
+      @endif
       @unless($p->isSale())
         {{-- damage fee: a possible charge only if the item comes back damaged or missing, never part of the rental price --}}
         @php($lia = \App\Domain\Damage::liability($p))

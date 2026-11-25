@@ -37,6 +37,24 @@
   <dl class="kv" style="min-width:260px;max-width:340px"><dt>Address</dt><dd>{{ $own ? $s->address : $s->publicAddress() }}</dd><dt>Contact</dt><dd>{{ $s->phone }}<br>{{ $s->email }}</dd><dt>Hours</dt><dd>{{ $s->hours }}</dd></dl>
 </div></div>
 
+@if($branchInfo)
+  @php($nb = $branchInfo[0])
+  <details class="card mt-3 shop-branches"><summary class="row between wrap" style="gap:8px;cursor:pointer">
+      <span>{{ icon('store') }} <b>{{ count($branchInfo) }} branches</b> · @if($nb['serves'] && $nb['km'] !== null)nearest to you: <b>{{ $nb['b']->name }}</b> ({{ $nb['km'] }} km)@elseif(! $nb['serves'])<span style="color:var(--red)">none near {{ \App\Support\Near::label() }}</span>@else<b>{{ $nb['b']->name }}</b>@endif</span>
+      <span class="small muted">One shop, one price list: checkout picks the branch for you</span></summary>
+    <div class="branch-list-info mt-2">
+      @foreach($branchInfo as $x)
+        <div class="card card-flat"><b>{{ $x['b']->name }}</b>@if($x['b']->is_main) <span class="badge b-gray plain">Main</span>@endif
+          {{-- a home-based shop keeps exact addresses private until a pickup is accepted: city only --}}
+          <div class="small muted">{{ $s->isPublicLocation() ? $x['b']->address : $x['b']->cityName() }}</div>
+          @if($x['b']->hours)<div class="small">{{ icon('clock') }} {{ $x['b']->hours }}</div>@endif
+          <div class="small mt-1">@if($x['km'] !== null){{ $x['km'] }} km from you · @endif<span style="color:{{ $x['serves'] ? 'var(--green)' : 'var(--red)' }}">{{ $x['serves'] ? 'Serves your area' : 'Outside your area' }}</span></div>
+          @if($s->isPublicLocation() && $x['b']->point())<a class="small" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query={{ $x['b']->point()[0] }},{{ $x['b']->point()[1] }}">Map</a>@endif
+        </div>
+      @endforeach
+    </div>
+  </details>
+@endif
 <div class="mt-3"><div class="tabs" role="tablist">
   @foreach($tabList as [$k, $l, $c])
     <a class="tab {{ $tab === $k ? 'active' : '' }}" role="tab" href="{{ route('suppliers.show', [$s, 'tab' => $k]) }}">{{ $l }}@if($c !== null)<span class="count">{{ $c }}</span>@endif</a>

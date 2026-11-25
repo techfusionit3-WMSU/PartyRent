@@ -6,6 +6,7 @@
     $sum = fn ($k) => $rows->sum(fn ($x) => $x['b'][$k] ?? 0);
 @endphp
 @section('content')
+@include('supplier._transfers-todo')
 <div class="page-head"><div><h1>Inventory Management</h1><p>One shared calculation powers the marketplace, calendar, request review and AI.</p></div>
   <form method="GET" class="row wrap"><label class="small strong" for="dt">Check date</label><input class="input input-sm" type="date" id="dt" name="date" value="{{ $date }}" style="width:auto" data-autosubmit><a class="btn btn-sm" href="{{ route('supplier.calendar') }}">{{ icon('calendar') }}Calendar</a></form></div>
 <div class="alert alert-info mb-2">{{ icon('info') }}<div class="small"><b>Available</b> = Total − Reserved (the highest number of units booked at the same time on {{ fmt_date($date) }}, incl. preparation/recovery time) − Damaged − Written off − Missing − Maintenance − Set-aside. Pending requests do not consume stock.</div></div>
@@ -41,11 +42,11 @@
         <td data-label="Pending" class="num">{!! $b['pending'] ? '<span style="color:'.($b['pending'] > $b['available'] ? 'var(--red)' : '#B45309').';font-weight:700">'.$b['pending'].'</span>' : '0' !!}</td>
         <td><div class="btn-group">
           @if($p->isSale())
-            <button class="btn btn-xs" data-modal="sale{{ $p->id }}">Restock</button>
+            @if($orgLevel)<button class="btn btn-xs" data-modal="sale{{ $p->id }}">Restock</button>@endif
           @else
             <button class="btn btn-xs" data-modal="stock{{ $p->id }}">Update stock</button>
-            <button class="btn btn-xs" data-modal="hold{{ $p->id }}">Maintenance / set aside</button>
-            <button class="btn btn-xs btn-ghost" data-modal="cond{{ $p->id }}">Damaged / missing</button>
+            @if($orgLevel)<button class="btn btn-xs" data-modal="hold{{ $p->id }}">Maintenance / set aside</button>@endif
+            @if($orgLevel)<button class="btn btn-xs btn-ghost" data-modal="cond{{ $p->id }}">Damaged / missing</button>@endif
           @endif
         </div></td>
       </tr>
@@ -59,7 +60,7 @@
   <div class="table-wrap"><table class="table cards"><thead><tr><th>Item</th><th>Type</th><th class="num">Qty</th><th>From</th><th>Until</th><th>Note</th><th></th></tr></thead><tbody>
     @foreach($holds as $h)
       <tr><td data-label="Item">{{ $h->product->name }}</td><td data-label="Type"><span class="badge {{ $h->type === 'setaside' ? 'b-purple' : 'b-gold' }}">{{ $h->type === 'setaside' ? 'Set aside' : 'Maintenance' }}</span></td><td data-label="Qty" class="num">{{ $h->qty }}</td><td data-label="From">{{ fmt_date($h->start_date) }}</td><td data-label="Until">{{ $h->end_date ? fmt_date($h->end_date) : 'Until released' }}</td><td data-label="Note">{{ $h->note }}</td>
-        <td><form method="POST" action="{{ route('supplier.inventory.release', $h) }}" data-confirm-title="Release hold?" data-confirm="These units return to available stock." data-confirm-ok="Release">@csrf @method('DELETE')<button class="btn btn-xs">Release</button></form></td></tr>
+        <td>@if($orgLevel)<form method="POST" action="{{ route('supplier.inventory.release', $h) }}" data-confirm-title="Release hold?" data-confirm="These units return to available stock." data-confirm-ok="Release">@csrf @method('DELETE')<button class="btn btn-xs">Release</button></form>@endif</td></tr>
     @endforeach
   </tbody></table></div>
   @endif

@@ -49,6 +49,23 @@ class ApiController extends Controller
         }
         $chk = inv()->check(array_merge($siblings, [$self]));
         $mine = $chk['byLine']['__self'] ?? [];
+        // what the branches near the customer can do (App\Domain\Branches::availableNear); null = no limit
+        $shop = $item->supplier;
+        $nearBad = [];
+        $nearMin = null;
+        foreach ($days as $d => $q) {
+            $n = $shop ? \App\Domain\Branches::availableNear($shop, $data['type'], (int) $data['ref_id'], $d, $sel) : null;
+            $nearMin = $n === null ? $nearMin : min($nearMin ?? PHP_INT_MAX, $n);
+            if ($n !== null && isset($mine[$d])) {
+                $mine[$d]['available'] = min((int) $mine[$d]['available'], $n);
+                if ($q > $n) {
+                    $mine[$d]['ok'] = false;
+                    $nearBad[] = ['date' => $d, 'name' => $item->name, 'available' => $n];
+                }
+            } elseif ($n !== null) {
+                $mine[$d] = ['ok' => $q <= $n, 'available' => $n];
+            }
+        }
         $today = today_iso();
         $rows = [];
         $total = 0.0;
@@ -79,15 +96,16 @@ class ApiController extends Controller
         if ($e = Rentals::leadTimeError($self)) {
             $lead = $e;
         }
-        $okAll = $chk['ok'] && empty($lead) && ! array_filter(array_keys($days), fn ($d) => $d < $today) && array_sum($days) > 0;
-        $bad = array_map(fn ($b) => ['date' => fmt_date($b['date'], false), 'name' => $b['name'], 'available' => $b['available']], $chk['bad']);
+        $okAll = $chk['ok'] && ! $nearBad && empty($lead) && ! array_filter(array_keys($days), fn ($d) => $d < $today) && array_sum($days) > 0;
+        $bad = array_map(fn ($b) => ['date' => fmt_date($b['date'], false), 'name' => $b['name'], 'available' => $b['available']], array_merge($chk['bad'], $nearBad));
 
         return response()->json([
             'rows' => $rows, 'ok' => $okAll, 'total' => r2($total), 'totalText' => money($total),
             'unitWord' => $data['type'] === 'package' ? 'package' : $item->unitWord(),
-            'minAvailable' => $data['type'] === 'item' && $days ? inv()->minAvailable($item->id, array_keys($days)) : null,
+            'minAvailable' => $data['type'] === 'item' && $days ? min(inv()->minAvailable($item->id, array_keys($days)), $nearMin ?? PHP_INT_MAX) : null,
             'once' => $once, 'onceText' => money($once), 'lead' => $lead ?? null,
             'bad' => $bad, 'maxDays' => (int) setting('maxRentalDays', 30), 'today' => $today,
+            'near' => \App\Support\Near::label(),
         ]);
     }
 
@@ -140,10 +158,14 @@ class ApiController extends Controller
         $daysIn = (int) date('t', strtotime($first));
         $today = today_iso();
         $need = (int) ($data['need'] ?? 1);
+        $shop = ($data['kind'] === 'package' ? inv()->package((int) $data['id']) : inv()->product((int) $data['id']))?->supplier;
         $out = [];
         for ($i = 1; $i <= $daysIn; $i++) {
             $d = $data['month'].'-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT);
             $a = $data['kind'] === 'package' ? inv()->packageAvailableOn((int) $data['id'], $d) : inv()->availableOn((int) $data['id'], $d);
+            if ($shop && $d >= $today && ($n = \App\Domain\Branches::availableNear($shop, $data['kind'], (int) $data['id'], $d)) !== null) {
+                $a = min($a, $n); // what the customer can rent near them
+            }
             $out[] = ['date' => $d, 'n' => $i, 'available' => $a, 'cls' => $d < $today ? 'past' : ($a <= 0 ? 'none' : ($a < $need ? 'low' : 'ok'))];
         }
 

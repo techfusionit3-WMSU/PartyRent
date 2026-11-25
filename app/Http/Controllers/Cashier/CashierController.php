@@ -27,12 +27,13 @@ class CashierController extends Controller implements \Illuminate\Routing\Contro
 
     private function requests(Request $request)
     {
-        return RentalRequest::query()->when($this->shopId($request), fn ($q, $sid) => $q->where('supplier_id', $sid));
+        // a shop's cashier: their shop, and only their branches when they are limited to branches (BranchScope)
+        return RentalRequest::query()->when($this->shopId($request), fn ($q, $sid) => $q->where('supplier_id', $sid)->when(\App\Support\BranchScope::viewIds(), fn ($x, $ids) => $x->whereIn('branch_id', $ids)));
     }
 
     private function payments(Request $request)
     {
-        return Payment::query()->when($this->shopId($request), fn ($q, $sid) => $q->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $sid)));
+        return Payment::query()->when($this->shopId($request), fn ($q, $sid) => $q->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $sid)->when(\App\Support\BranchScope::viewIds(), fn ($x, $ids) => $x->whereIn('branch_id', $ids))));
     }
 
     /**

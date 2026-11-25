@@ -582,14 +582,18 @@ class CatalogController extends Controller
 
         $sup = $this->sup($request);
         $conflicts = [];
-        foreach (\App\Models\RentalRequest::where('supplier_id', $sup->id)->where('status', 'pending')->get() as $r) {
+        foreach (\App\Models\RentalRequest::forShop($sup)->where('status', 'pending')->get() as $r) {
             foreach (inv()->check($r->lines, $r->id)['bad'] as $bad) {
                 $conflicts[] = ['r' => $r, 'b' => $bad];
             }
         }
         $holds = Hold::whereIn('product_id', $prods->pluck('id'))->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', today_iso()))->with('product')->orderBy('start_date')->get();
 
-        return view('supplier.inventory', ['prods' => $prods, 'date' => $date, 'locs' => $sup->locations()->get(), 'conflicts' => $conflicts, 'holds' => $holds]);
+        // branch-level members see (and set) their own branches' stock only
+        $locs = $sup->locations()->get()->when(\App\Support\BranchScope::viewIds() !== null, fn ($c) => $c->whereIn('id', \App\Support\BranchScope::viewIds())->values());
+
+        return view('supplier.inventory', ['prods' => $prods, 'date' => $date, 'locs' => $locs, 'conflicts' => $conflicts, 'holds' => $holds,
+            'orgLevel' => \App\Support\BranchScope::isOrgLevel()]);
     }
 
     public function restock(Request $request, Product $product)
@@ -645,7 +649,12 @@ class CatalogController extends Controller
     {
         $p = $this->ownProduct($request, $product);
         $data = $request->validate(['qty' => 'required|array', 'qty.*' => 'integer|min:0|max:100000']);
-        $res = Rentals::setLocationStock($p, $data['qty']);
+        $ids = \App\Support\BranchScope::allowed();
+        $qty = $ids === null ? $data['qty'] : array_intersect_key($data['qty'], array_flip($ids)); // other branches keep their count
+        if (! $qty) {
+            return back()->with('error', 'You can only set the stock of your own branch.');
+        }
+        $res = Rentals::setLocationStock($p, $qty);
 
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Stock updated (total '.$res['total'].').' : $res['error']);
     }

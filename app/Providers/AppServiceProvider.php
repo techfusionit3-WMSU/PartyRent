@@ -65,8 +65,8 @@ class AppServiceProvider extends ServiceProvider
             $openCases = fn () => \App\Models\ShortfallCase::where('status', '!=', 'resolved');
             if ($role === 'supplier' && ($shop = $u->shop())) {
                 $badges['cases'] = $openCases()->where('supplier_id', $shop->id)->count();
-                $badges['requests'] = RentalRequest::where('supplier_id', $shop->id)->where('status', 'pending')->count();
-                $badges['payments'] = Payment::where('status', 'pending')->whereIn('method', ['cash', 'cod'])->whereHas('rentalRequest', fn ($q) => $q->where('supplier_id', $shop->id))->count();
+                $badges['requests'] = RentalRequest::forShop($shop)->where('status', 'pending')->count();
+                $badges['payments'] = Payment::where('status', 'pending')->whereIn('method', ['cash', 'cod'])->whereHas('rentalRequest', fn ($q) => $q->forShop($shop))->count();
                 if ($shop->isOrganization()) { // event company role modules
                     $badges['inquiries'] = \App\Models\EventBooking::where('supplier_id', $shop->id)->where('status', 'inquiry')->count();
                     $badges['eventPayments'] = \App\Models\EventPayment::where('status', 'pending')->whereHas('booking', fn ($q) => $q->where('supplier_id', $shop->id))->count();
@@ -75,7 +75,7 @@ class AppServiceProvider extends ServiceProvider
                 $shop = $u->shop();
                 // a shop's cashier confirms cash only; PartyRent's cashier checks transfers for every shop
                 $badges['verification'] = $shop
-                    ? Payment::where('status', 'pending')->whereIn('method', ['cash', 'cod'])->whereHas('rentalRequest', fn ($r) => $r->where('supplier_id', $shop->id))->count()
+                    ? Payment::where('status', 'pending')->whereIn('method', ['cash', 'cod'])->whereHas('rentalRequest', fn ($r) => $r->forShop($shop))->count()
                     : Payment::where('status', 'pending')->whereNotIn('method', ['cash', 'cod'])->count();
             } elseif ($role === 'superadmin') {
                 $badges['applications'] = Supplier::where('status', 'pending')->count() + Supplier::where('status', 'approved')->where('biz_status', 'pending')->count();

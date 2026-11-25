@@ -40,7 +40,7 @@
     @endif
     @if(in_array('branch', $uses) && $options['branches']->count() > 1)
       <label class="rp-field"><span>Branch</span>
-        <select class="input" name="branch"><option value="">All branches</option>@foreach($options['branches'] as $b)<option value="{{ $b->id }}" @selected($f['branch']?->id === $b->id)>{{ $b->name }}{{ $b->active ? '' : ' (closed)' }}</option>@endforeach</select>
+        <select class="input" name="branch"><option value="{{ $f['admin'] ? '' : 'all' }}">{{ $f['admin'] ? 'All branches' : ($options['orgLevel'] ? 'All branches (whole organization)' : 'All my branches') }}</option>@foreach($options['branches'] as $b)<option value="{{ $b->id }}" @selected($f['branch']?->id === $b->id)>{{ $b->name }}{{ $b->active ? '' : ' (closed)' }}</option>@endforeach</select>
       </label>
     @endif
     @if(in_array('status', $uses))

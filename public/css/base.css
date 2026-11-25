@@ -639,3 +639,28 @@ main:focus { outline: none; }
 .drop-bad svg, .drop-warn svg { width: 14px; height: 14px; vertical-align: -2px; }
 @media (max-width: 640px) { .drops .drop-row { grid-template-columns: 1fr; gap: 4px; } .drop-time { flex-direction: row; align-items: center; justify-content: space-between; } }
 .drop-time > span { white-space: nowrap; margin-right: 8px; }
+
+/* checkout location: search + map pin + details, kept in sync (public/js/geo.js) */
+.loc-card.is-ok { border-color: var(--green, #16a34a); }
+.loc-map-wrap { position: relative; }
+.loc-map { height: 260px; }
+.loc-locate { position: absolute; z-index: 500; right: 10px; bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.18); background: var(--surface); }
+.loc-pin-note { color: var(--muted); }
+.loc-pin-note b { color: #B45309; }
+.loc-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.loc-confirm .badge svg { width: 13px; height: 13px; vertical-align: -2px; }
+@media (max-width: 640px) { .loc-map { height: 220px; } .loc-locate { left: 10px; right: 10px; } }
+
+/* browsing location bar + stores map */
+.loc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; }
+.loc-bar-now { display: flex; align-items: center; gap: 6px; font-size: .9rem; min-width: 0; }
+.loc-bar-now svg { width: 16px; height: 16px; color: var(--brand); flex: none; }
+.loc-bar-q { flex: 1 1 220px; min-width: 0; }
+.loc-bar-msg { flex-basis: 100%; }
+.loc-bar-msg:empty { display: none; }
+.stores-map { height: 440px; border: 0; border-radius: var(--radius); }
+.store-pin span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.store-pin span { font-size: 16px; }
+.store-pop { min-width: 170px; }
+.near-picked { margin-top: 8px; padding: 8px 12px; border-radius: 10px; background: var(--brand-50); }
+@media (max-width: 640px) { .stores-map { height: 360px; } .loc-bar .seg { flex: 1 1 auto; } }

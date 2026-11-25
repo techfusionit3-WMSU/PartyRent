@@ -44,13 +44,13 @@
     <div class="card deliv-card" id="delivCard">
       <h3 class="mb-1">{{ icon('map') }} Delivery information</h3>
       <div id="delivWrap">
-        <p class="small muted mt-0">Enter the delivery address once for every store set to <b>Delivery</b>. We work out the delivery zone, the fee and the branch that delivers for each store from it.</p>
+        <p class="small muted mt-0">Search for your address or move the pin on the map; they follow each other. One address serves every store set to <b>Delivery</b>, and we work out each store's delivery zone, fee and branch from it.</p>
         <div id="deliv"></div>
       </div>
       <div class="form-grid mt-2">
         <div class="field"><label for="ev-cn">Contact person</label><input class="input" id="ev-cn" data-s="contactName" required value="{{ $u->name }}"></div>
         <div class="field"><label for="ev-cp">Contact number</label><input class="input" id="ev-cp" data-s="contactPhone" data-phone required value="{{ $u->phone }}"></div>
-        <div class="field full"><label for="ev-in">Special Instructions <span class="muted small">(optional)</span></label><textarea class="input" id="ev-in" data-s="instructions" rows="3" maxlength="1000" placeholder="Anything the stores should know, e.g. nearby landmarks, gate or parking details, directions, or where to set up."></textarea><div class="hint">Shared with every store in this checkout.</div></div>
+        <div class="field full"><label for="ev-in">Special Instructions <span class="muted small">(optional)</span></label><textarea class="input" id="ev-in" data-s="instructions" rows="3" maxlength="1000" placeholder="Provide any additional information or instructions for your delivery (e.g., nearby landmarks, gate details, or directions)."></textarea><div class="hint">Shared with every store in this checkout.</div></div>
       </div>
     </div>
     {{-- damage fees: not part of the price; only if something comes back damaged or missing --}}
@@ -71,6 +71,7 @@
   </aside>
 </form>
 @include('partials.leaflet')
+<script src="{{ asset('js/geo.js') }}?v={{ filemtime(public_path('js/geo.js')) }}" defer></script>
 <script src="{{ asset('js/checkout.js') }}?v={{ filemtime(public_path('js/checkout.js')) }}" defer></script>
 @endif
 @endsection

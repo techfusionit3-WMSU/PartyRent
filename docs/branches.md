@@ -130,3 +130,24 @@ Rules enforced on the server (not only hidden in the menu):
 - Damaged, missing and written-off counts are kept per item, not per branch.
 - A combined rental borrows the same number of units for every day of a line (the largest shortfall).
 - Distances are straight-line × a road factor, not real routes.
+
+## 8. Location services: search, map pin, current location (checkout and browsing)
+
+One implementation for both (server `App\Domain\Geo` + `/api/geo/search` and `/api/geo/reverse`; browser
+`public/js/geo.js`):
+
+- **Search** (streets, buildings, landmarks, barangays, cities) and **address at a pin** use OpenStreetMap Nominatim
+  through the server only (`config/partyrent.php` → `geocoder`; `GEOCODER_URL`, `GEOCODER_ENABLED`). Answers are cached
+  for 7 days, so the same query or pin never asks twice; requests are rate limited. If the service is slow or down, the
+  app's own list of cities and municipalities still answers, and a pin gets its nearest city (marked "not exact").
+- **Checkout delivery location** (each location card): search box → the pin moves there and the details fill in;
+  tapping / dragging the pin → the address there is looked up and the details fill in (a street the customer typed is
+  kept); editing the details → the address is looked up and the pin follows, or the pin is marked "does not match"
+  and its coordinates are **not** sent until the customer moves it. "Use my current location" asks first and explains
+  why. The customer confirms each location ("Use this location"); any change un-confirms it, and the request cannot be
+  sent until every location in use is confirmed. The exact pin is used for coverage and delivery-fee distance; the
+  zone, fee and branch are still decided on the server.
+- **Browsing**: the *Where are you renting?* page and the Suppliers page (List / Map, Nearest / Top rated) use the
+  same search, pin and current location. The Suppliers map shows one marker per open branch (shops working from home:
+  their city only), with a popup (shop, branch, rating, items, distance, *View products*). Changing the place refreshes
+  the shops. Only a rounded centre (about 1 km) is put in the page; the precise spot is never shown to shops or others.

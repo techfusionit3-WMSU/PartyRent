@@ -39,6 +39,9 @@ Route::get('/api/calendar', [ApiController::class, 'calendar'])->name('api.calen
 Route::get('/api/slots', [ApiController::class, 'slots'])->name('api.slots');
 Route::post('/api/schedule', [ApiController::class, 'schedule'])->name('api.schedule');
 Route::get('/api/locations', [ApiController::class, 'locations'])->name('api.locations');
+// address search / address at a pin (checkout delivery address, browsing location); cached, rate limited
+Route::get('/api/geo/search', [\App\Http\Controllers\GeoController::class, 'search'])->middleware('throttle:40,1')->name('api.geo.search');
+Route::get('/api/geo/reverse', [\App\Http\Controllers\GeoController::class, 'reverse'])->middleware('throttle:40,1')->name('api.geo.reverse');
 Route::post('/api/package-quote', [ApiController::class, 'packageQuote'])->name('api.package-quote');
 /* ---------- where the customer rents near; the dashboard's branch (shop users) ---------- */
 Route::get('/near', [\App\Http\Controllers\NearController::class, 'show'])->name('near');

@@ -30,6 +30,15 @@ return [
         'max_km_from_city' => 60,
     ],
 
+    // Address search and "address at this pin" for checkout and browsing (App\Domain\Geo). OpenStreetMap Nominatim by
+    // default (fair use: answers are cached, one request at a time per visitor); point it at your own instance if needed.
+    // Off: only the built-in list of cities and municipalities is searched, and pins get their nearest city.
+    'geocoder' => [
+        'enabled' => (bool) env('GEOCODER_ENABLED', true),
+        'url' => env('GEOCODER_URL', 'https://nominatim.openstreetmap.org'),
+        'timeout' => (int) env('GEOCODER_TIMEOUT', 6),
+    ],
+
     /*
      * Event-company module (whole-event quotations, coordinators, crews, event parts and venues).
      * PartyRent rents decorations and party items; it does not book or manage events, so this is OFF.

@@ -34,26 +34,34 @@
   /* ---------- delivery: ONE address section for the whole checkout ----------
      G.locs = the delivery locations (one by default; more only with "Deliver to more than one location").
      Every store set to Delivery uses them: its order's destinations mirror G.locs and each item says which location
-     it goes to. The customer enters the address; the SERVER works out, per store and location, the delivery zone,
-     the fee and the branch that delivers (Rentals::prepareOrder → Pricing::zoneForAddress, Branches::choose).
-     Here they are only shown, read-only, under each location. */
+     it goes to. The SERVER works out, per store and location, the delivery zone, the fee and the branch that delivers
+     (Rentals::prepareOrder → Pricing::zoneForAddress, Branches::choose); they are shown read-only under each location.
+
+     Each location is chosen like a food-delivery app: search a street / building / landmark / barangay, or move the
+     pin on the map (or use the current location). Address and pin always follow each other (window.PRGeo):
+       search pick     → pin moves there, fields fill in
+       pin moved       → address looked up at the pin (reverse geocoding), fields fill in (a typed street is kept)
+       fields edited   → the address is looked up and the pin follows; if it cannot be placed, the pin is marked
+                         "not matching" and its coordinates are NOT sent until the customer moves it
+     A location must be confirmed ("Use this location") before the request can be sent; any change un-confirms it. */
   const delivEl = $('#deliv');
   const KEY = 'pr.checkout.delivery';
   const store = { get() { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }, set(v) { try { sessionStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* private mode: nothing kept */ } } };
   const anyDelivery = () => orders.some(o => o.fulfillment === 'delivery');
-  const newLoc = n => ({ id: 'd' + n, label: '', addr: { regionCode: '', provinceCode: '', cityCode: '', barangay: '', street: '' }, text: '', lat: null, lng: null, contactName: '' });
+  const newLoc = n => ({ id: 'd' + n, label: '', addr: { regionCode: '', provinceCode: '', cityCode: '', barangay: '', street: '' }, text: '', lat: null, lng: null,
+    mapLat: null, mapLng: null, pin: 'none', confirmed: false, streetTyped: false, status: '', contactName: '' });
   const G = { multi: false, locs: [newLoc(1)] };
-  const saveState = () => store.set({ multi: G.multi, locs: G.locs, instructions: shared.instructions || '' });
+  const saveState = () => store.set({ multi: G.multi, locs: G.locs.map(g => Object.assign({}, g, { status: '' })), instructions: shared.instructions || '' });
   const locName = (g, i) => G.multi ? (g.label || 'Location ' + (i + 1)) : 'Delivery address';
+  const used = g => orders.some(o => o.fulfillment === 'delivery' && o.lines.some(l => l.destId === g.id));
+  const complete = g => !!(g.addr.cityCode && (g.addr.barangay || '').trim() && (g.addr.street || '').trim().length >= 3);
 
   let T = null, treeP = null;
   const getTree = () => treeP || (treeP = fetch(window.PR.routes.locations, { headers: { Accept: 'application/json' } }).then(r => r.json()).then(rows => {
     const byCode = {}, kids = {};
     rows.forEach(r => { const x = { code: r[0], name: r[1], type: r[2], parent: r[3] || '', lat: r[4] != null ? r[4] : null, lng: r[5] != null ? r[5] : null }; byCode[x.code] = x; (kids[x.parent] = kids[x.parent] || []).push(x); });
     Object.values(kids).forEach(l => l.sort((a, b) => a.name.localeCompare(b.name)));
-    const cities = Object.values(byCode).filter(x => x.type === 'city' || x.type === 'municipality');
-    cities.forEach(c => { const pr = byCode[c.parent]; c.label = c.name + (pr ? ', ' + pr.name : ''); c.key = c.name.toLowerCase(); });
-    T = { byCode, kids, cities };
+    T = { byCode, kids };
     return T;
   }));
   /** region / province / city codes above a city (the selects follow them). */
@@ -62,7 +70,6 @@
     const up = []; let x = c; while (x && x.parent && T.byCode[x.parent]) { x = T.byCode[x.parent]; up.unshift(x); }
     return { regionCode: up[0] ? up[0].code : '', provinceCode: up.length > 1 ? up[up.length - 1].code : '', cityCode: code };
   }
-  const nearestCity = (lat, lng) => { let best = null, bd = Infinity; (T ? T.cities : []).forEach(c => { if (c.lat == null) return; const d = (c.lat - lat) ** 2 + ((c.lng - lng) * Math.cos(lat * Math.PI / 180)) ** 2; if (d < bd) { bd = d; best = c; } }); return best; };
   function textOf(g) {
     const a = g.addr, c = T && T.byCode[a.cityCode], p = T && c && T.byCode[c.parent];
     const b = (a.barangay || '').trim();
@@ -74,8 +81,9 @@
     orders.forEach(o => {
       o.dt = o.dt || {};
       if (o.fulfillment !== 'delivery') return;
+      // the pin is sent only while it matches the address (never a stale one)
       o.destinations = G.locs.map((g, i) => Object.assign({ id: g.id, label: locName(g, i), address: g.text, addr: Object.assign({}, g.addr), contactName: g.contactName || '', contactPhone: '',
-        deliveryTime: o.dt[g.id] || o.shop.times[0] }, g.lat != null ? { lat: g.lat, lng: g.lng } : {}));
+        deliveryTime: o.dt[g.id] || o.shop.times[0] }, g.lat != null && g.pin !== 'stale' ? { lat: g.lat, lng: g.lng } : {}));
       const ids = G.locs.map(g => g.id);
       o.lines.forEach(l => { if (!G.multi || !ids.includes(l.destId)) l.destId = ids[0]; });
       if (!G.multi) mergeSame(o);
@@ -84,16 +92,28 @@
   }
   const opt = (list, val, ph) => '<option value="">' + esc(ph) + '</option>' + list.map(x => '<option value="' + esc(x.code) + '"' + (x.code === val ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('');
 
-  /** One location: address first (search / current location / saved address, then the fields, then the map pin). */
+  const pinNote = g => g.status === 'loading' ? '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:-2px"></span> Finding the address at the pin…'
+    : g.status ? esc(g.status)
+      : g.pin === 'exact' ? 'The pin is on this address. Drag it if your exact spot is a little off.'
+        : g.pin === 'area' ? 'The pin is in the area only. Drag it to your exact spot.'
+          : g.pin === 'stale' ? '<b>The pin does not match the address you typed.</b> Drag it to your exact spot, or search again.'
+            : g.pin === 'notfound' ? '<b>We could not find this exact address on the map.</b> Tap the map at your spot, or use your current location, so the driver finds you.'
+            : 'Search above, tap the map, or use your current location to drop the pin.';
+
+  /** One location: search / current location, the map with its pin, the address details, confirm. */
   function locCard(g, i) {
-    const a = g.addr, k = T ? T.kids : {}, pinned = g.lat != null;
-    const regions = (k[''] || []).filter(x => x.type === 'region' || !x.type || x.type === 'reg');
+    const a = g.addr, k = T ? T.kids : {};
+    const regions = (k[''] || []).filter(x => x.type === 'region' || !x.type);
     const f = (n, label, inner, cls) => '<div class="field ' + (cls || '') + '" data-f="' + n + '"><label for="' + g.id + '-' + n + '">' + label + '</label>' + inner + '</div>';
-    return '<div class="loc-card" data-loc="' + g.id + '">' +
-      '<div class="loc-head"><b>' + svg('map') + ' ' + esc(locName(g, i)) + '</b>' + (G.multi && i > 0 ? '<button type="button" class="btn btn-xs btn-ghost" data-rmloc>' + svg('trash') + 'Remove</button>' : '') + '</div>' +
+    const ready = complete(g);
+    return '<div class="loc-card' + (g.confirmed ? ' is-ok' : '') + '" data-loc="' + g.id + '">' +
+      '<div class="loc-head"><b>' + esc(locName(g, i)) + '</b>' + (G.multi && i > 0 ? '<button type="button" class="btn btn-xs btn-ghost" data-rmloc>' + svg('trash') + 'Remove</button>' : '') + '</div>' +
       (G.multi ? f('label', 'Name of this location <span class="muted small">(optional)</span>', '<input class="input" id="' + g.id + '-label" data-lf="label" value="' + esc(g.label) + '" placeholder="e.g. Church, Reception hall">') : '') +
-      '<div class="field place-find"><label for="' + g.id + '-q">Find your city or municipality</label><div class="place-search"><input class="input" id="' + g.id + '-q" type="search" autocomplete="off" placeholder="Type to search, e.g. Zamboanga City" data-place aria-expanded="false"><ul class="place-sugg" role="listbox" hidden></ul></div>' +
-        '<div class="row wrap mt-1" style="gap:6px"><button type="button" class="btn btn-sm" data-locate>' + svg('map') + 'Use my current location</button>' + (i === 0 && S.saved && S.saved.cityCode ? '<button type="button" class="btn btn-sm" data-saved>' + svg('user') + 'Use my saved address</button>' : '') + '</div></div>' +
+      '<div class="field place-find"><label for="' + g.id + '-q">Search for your address</label><div class="place-search"><input class="input" id="' + g.id + '-q" type="search" data-place placeholder="Street, building, landmark or barangay, e.g. Pilar St. Zamboanga" aria-expanded="false"><ul class="place-sugg" role="listbox" hidden></ul></div></div>' +
+      '<div class="loc-map-wrap"><div class="pr-map loc-map" data-pinmap="' + g.id + '" role="application" aria-label="Map: tap or drag the pin to your delivery spot"></div>' +
+        '<button type="button" class="btn btn-sm loc-locate" data-locate title="Use my current location">' + svg('map') + 'Use my current location</button></div>' +
+      '<p class="small loc-pin-note mt-1" data-pinnote>' + pinNote(g) + '</p>' +
+      '<div class="label mt-1 mb-1">Address details</div>' +
       '<div class="form-grid">' +
         f('regionCode', 'Region', '<select class="input" id="' + g.id + '-regionCode" data-af="regionCode">' + opt(regions, a.regionCode, 'Select region…') + '</select>') +
         f('provinceCode', 'Province', '<select class="input" id="' + g.id + '-provinceCode" data-af="provinceCode"' + (a.regionCode ? '' : ' disabled') + '>' + opt(k[a.regionCode] || [], a.provinceCode, 'Select province…') + '</select>') +
@@ -101,21 +121,25 @@
         f('barangay', 'Barangay', '<input class="input" id="' + g.id + '-barangay" data-af="barangay" maxlength="120" value="' + esc(a.barangay) + '" placeholder="e.g. Tetuan">') +
         f('street', 'House no., building and street', '<input class="input" id="' + g.id + '-street" data-af="street" maxlength="180" value="' + esc(a.street) + '" placeholder="e.g. 23 Mabini St." autocomplete="street-address">', 'full') +
       '</div>' +
-      '<div class="row wrap mt-1" style="gap:8px;align-items:center"><button type="button" class="btn btn-sm' + (pinned ? ' btn-outline' : '') + '" data-pinloc>' + svg('map') + (pinned ? 'Pinned · move pin' : 'Pin on map') + '</button><span class="small muted">' + (pinned ? 'Pinned at ' + (+g.lat).toFixed(5) + ', ' + (+g.lng).toFixed(5) + '. The driver gets this exact spot.' : 'Optional: pin the exact spot. It also finds the zone and branch more precisely.') + '</span></div>' +
-      f('contactName', 'On-site contact <span class="muted small">(optional)</span>', '<input class="input" id="' + g.id + '-contactName" data-lf="contactName" value="' + esc(g.contactName) + '" placeholder="Name and number of who receives the items">', 'mt-1') +
+      (S.saved && S.saved.cityCode && i === 0 ? '<button type="button" class="link-btn small" data-saved>Use my saved address instead</button>' : '') +
+      '<div class="loc-confirm mt-2">' + confirmHtml(g) + '</div>' +
+      f('contactName', 'On-site contact <span class="muted small">(optional)</span>', '<input class="input" id="' + g.id + '-contactName" data-lf="contactName" value="' + esc(g.contactName) + '" placeholder="Name and number of who receives the items">', 'mt-2') +
       '<div class="drops" data-drops="' + g.id + '">' + dropsHtml(g) + '</div>' +
     '</div>';
   }
+
+  const confirmHtml = g => g.confirmed
+    ? '<span class="badge b-green">' + svg('check') + ' Location confirmed</span><span class="small muted">' + esc(g.text) + '</span><button type="button" class="link-btn small" data-editloc>Change</button>'
+    : '<button type="button" class="btn btn-primary btn-sm" data-confirmloc' + (complete(g) ? '' : ' disabled') + '>' + svg('check') + 'Use this location</button><span class="small muted">' + (complete(g) ? 'Check the pin and the details, then confirm.' : 'Fill in the city, barangay and street first.') + '</span>';
 
   /** What the system found for this location, per store delivering there: zone, fee, branch, and the time to deliver by. */
   function dropsHtml(g) {
     const list = orders.filter(o => o.fulfillment === 'delivery' && o.lines.some(l => l.destId === g.id));
     if (!list.length) return G.multi ? '<p class="small muted mb-0">No items go here yet. In the store sections above, choose this location for the items that should be delivered here.</p>' : '';
-    const ready = g.addr.cityCode && (g.addr.barangay || '').trim() && (g.addr.street || '').trim().length >= 3;
     return '<div class="label mt-2 mb-1">Delivery details for this address</div>' + list.map(o => {
       const q = lastQuote[o.supplier_id] || {}, d = (q.drops || []).find(x => x.destId === g.id);
       let info;
-      if (!ready) info = '<span class="muted">Complete the address to see the delivery zone, fee and branch.</span>';
+      if (!complete(g)) info = '<span class="muted">Choose the address to see the delivery zone, fee and branch.</span>';
       else if (q.ok === false && q.error) info = '<span class="drop-bad">' + svg('alert') + ' ' + esc(q.error) + '</span>';
       else if (!d) info = '<span class="muted">Checking the delivery zone…</span>';
       else info = '<span>Zone: <b>' + esc(d.basis === 'distance' ? 'By distance (' + d.zone + ')' : d.zone) + '</b> · Delivery fee <b>' + money(d.fee) + '</b></span>' +
@@ -127,19 +151,78 @@
   }
   const refreshDrops = () => { G.locs.forEach(g => { const el = delivEl && $('[data-drops="' + g.id + '"]', delivEl); if (el) el.innerHTML = dropsHtml(g); }); };
 
+  const maps = {};
   function drawDeliv() {
     if (!delivEl) return;
     const on = anyDelivery();
     $('#delivWrap').hidden = !on;
+    Object.keys(maps).forEach(k => { if (maps[k]) maps[k].remove(); delete maps[k]; });
     if (!on) return;
     delivEl.innerHTML = '<label class="switch mb-2"><input type="checkbox" data-multi' + (G.multi ? ' checked' : '') + '><span class="sw"></span>Deliver to more than one location</label>' +
       (G.multi ? '<p class="small muted mt-0">Add each place, then in the store sections above choose where each item goes (or split an item\'s quantity). Each location gets its own delivery zone and fee.</p>' : '') +
       '<div class="stack-sm">' + G.locs.map(locCard).join('') + '</div>' +
       (G.multi ? '<button type="button" class="btn btn-sm mt-1" data-addloc>' + svg('plus') + 'Add another location</button>' : '');
+    // each location's map and search
+    G.locs.forEach(g => {
+      const el = $('[data-pinmap="' + g.id + '"]', delivEl); if (!el || !window.PRGeo) return;
+      const c = T && T.byCode[g.addr.cityCode];
+      const at = g.mapLat != null ? [g.mapLat, g.mapLng] : g.lat != null ? [g.lat, g.lng] : null;
+      maps[g.id] = window.PRGeo.pinMap(el, at ? { lat: at[0], lng: at[1], zoom: 17, onMove: (lat, lng) => pinMoved(g, lat, lng) }
+        : { lat: null, onMove: (lat, lng) => pinMoved(g, lat, lng) });
+      if (maps[g.id] && !at && c && c.lat != null) maps[g.id].map.setView([c.lat, c.lng], 13);
+      if (maps[g.id] && g.pin === 'stale') maps[g.id].setFaded(true);
+      const q = $('#' + g.id + '-q', delivEl); if (q) window.PRGeo.attachSearch(q, h => placePicked(g, h));
+    });
   }
+  const setNote = g => { const el = delivEl && $('[data-loc="' + g.id + '"] [data-pinnote]', delivEl); if (el) el.innerHTML = pinNote(g); };
   let aTimer = null;
   const addrChanged = now => { syncOrders(); clearTimeout(aTimer); aTimer = setTimeout(() => { draw(); requote(); }, now ? 0 : 450); };
-  async function setCityOf(g, code) { await getTree(); const ch = chainOf(code); if (!ch) return; Object.assign(g.addr, ch); }
+  /** Any change to a location un-confirms it (shown at once). */
+  const changed = g => {
+    g.confirmed = false;
+    const c = delivEl && $('[data-loc="' + g.id + '"]', delivEl); if (!c) return;
+    c.classList.remove('is-ok'); const box = $('.loc-confirm', c); if (box) box.innerHTML = confirmHtml(g);
+  };
+  const redraw = () => { syncOrders(); drawDeliv(); draw(); requote(); };
+
+  /** A search result: the pin goes there and the details fill in. */
+  function placePicked(g, h) {
+    Object.assign(g.addr, h.parts);
+    g.streetTyped = false; g.lat = h.lat; g.lng = h.lng; g.mapLat = h.lat; g.mapLng = h.lng;
+    g.pin = h.precise ? 'exact' : 'area'; g.status = ''; changed(g);
+    redraw();
+    const el = document.getElementById(g.id + (g.addr.barangay ? (g.addr.street ? '-street' : '-street') : '-barangay')); if (el) el.focus();
+  }
+  /** The pin moved (drag, tap, current location): look up the address there. */
+  async function pinMoved(g, lat, lng) {
+    g.lat = +(+lat).toFixed(7); g.lng = +(+lng).toFixed(7); g.mapLat = g.lat; g.mapLng = g.lng;
+    g.pin = 'exact'; g.status = 'loading'; changed(g); setNote(g);
+    try {
+      const r = await window.PRGeo.reverse(g.lat, g.lng);
+      const keepStreet = g.streetTyped && (g.addr.street || '').trim();
+      Object.assign(g.addr, r.parts, keepStreet ? { street: g.addr.street } : {});
+      if (!r.parts.barangay && !keepStreet) g.addr.barangay = g.addr.barangay || '';
+      g.pin = r.precise ? 'exact' : 'area';
+      g.status = r.precise ? '' : 'We placed this pin in ' + (r.label || 'this area') + '. Add the barangay and street, and drag the pin if needed.';
+    } catch (e) { g.status = e.message; }
+    redraw();
+  }
+  /** The customer typed the address: find it and move the pin, or say the pin no longer matches. */
+  let geoTimer = null;
+  function addressEdited(g) {
+    clearTimeout(geoTimer);
+    geoTimer = setTimeout(async () => {
+      if (!complete(g)) { if (g.lat != null) { g.pin = 'stale'; setNote(g); if (maps[g.id]) maps[g.id].setFaded(true); syncOrders(); requote(); } return; }
+      g.status = 'loading'; setNote(g);
+      try {
+        const d = await window.PRGeo.search(textOf(g));
+        const hit = (d.results || []).find(h => h.parts.cityCode === g.addr.cityCode && h.precise);
+        if (hit) { g.lat = hit.lat; g.lng = hit.lng; g.mapLat = hit.lat; g.mapLng = hit.lng; g.pin = 'exact'; g.status = ''; if (maps[g.id]) { maps[g.id].setPin(hit.lat, hit.lng, 17); maps[g.id].setFaded(false); } }
+        else { g.pin = g.lat != null ? 'stale' : 'notfound'; g.status = ''; if (maps[g.id]) maps[g.id].setFaded(true); }
+      } catch (e) { if (e.name === 'AbortError') return; g.pin = g.lat != null ? 'stale' : 'none'; g.status = e.message; }
+      setNote(g); syncOrders(); requote();
+    }, 900);
+  }
 
   if (delivEl) {
     delivEl.addEventListener('change', async e => {
@@ -150,92 +233,77 @@
           if (G.locs.length > 1 && !await confirmDialog({ title: 'Deliver to one location only?', message: 'Every item goes to the first address and the other locations are removed.', ok: 'Use one location' })) { t.checked = true; return; }
           G.multi = false; G.locs = [G.locs[0]];
         }
-        syncOrders(); drawDeliv(); draw(); requote(); return;
+        redraw(); return;
       }
       if (!card) return;
       const g = G.locs.find(x => x.id === card.dataset.loc);
-      if (t.dataset.af) {
+      if (t.dataset.af && t.tagName === 'SELECT') {
         const n = t.dataset.af; g.addr[n] = t.value;
         await getTree();
         if (n === 'regionCode') { g.addr.provinceCode = ''; g.addr.cityCode = ''; }
         if (n === 'provinceCode') g.addr.cityCode = '';
-        if (n === 'regionCode' || n === 'provinceCode') { const keep = document.activeElement && document.activeElement.id; drawDeliv(); const el = keep && document.getElementById(keep); if (el) el.focus(); }
-        t.closest('.field') && t.closest('.field').classList.remove('invalid');
-        addrChanged(true);
+        changed(g);
+        if (g.lat != null) g.pin = 'stale'; // a new city: the old pin no longer matches until the address is found again
+        const keep = t.id; drawDeliv(); const el = document.getElementById(keep); if (el) el.focus();
+        addrChanged(true); addressEdited(g);
       }
+      if (t.dataset.af === 'street' || t.dataset.af === 'barangay') addressEdited(g);
       if (t.dataset.lf) { g[t.dataset.lf] = t.value; addrChanged(true); }
       if (t.dataset.dt) { const [sid, gid] = t.dataset.dt.split('|'); const o = orders.find(x => String(x.supplier_id) === sid); o.dt[gid] = t.value; syncOrders(); requote(); }
     });
     delivEl.addEventListener('input', e => {
       const t = e.target, card = t.closest('[data-loc]'); if (!card) return;
       const g = G.locs.find(x => x.id === card.dataset.loc);
-      if (t.dataset.af && t.tagName === 'INPUT') { g.addr[t.dataset.af] = t.value; t.closest('.field').classList.remove('invalid'); addrChanged(false); }
-      if (t.dataset.lf) { g[t.dataset.lf] = t.value; if (t.dataset.lf === 'label') { const h = $('.loc-head b', card); if (h) h.lastChild.textContent = ' ' + (t.value || 'Location ' + (G.locs.indexOf(g) + 1)); } addrChanged(false); }
-      if (t.matches('[data-place]')) placeSearch(t, g);
+      if (t.dataset.af && t.tagName === 'INPUT') {
+        g.addr[t.dataset.af] = t.value; if (t.dataset.af === 'street') g.streetTyped = true;
+        t.closest('.field').classList.remove('invalid'); changed(g);
+
+        addrChanged(false);
+      }
+      if (t.dataset.lf) { g[t.dataset.lf] = t.value; if (t.dataset.lf === 'label') { const h = $('.loc-head b', card); if (h) h.textContent = t.value || 'Location ' + (G.locs.indexOf(g) + 1); } addrChanged(false); }
     });
     delivEl.addEventListener('click', async e => {
-      const b = e.target.closest('button, li[data-i]'); if (!b) return;
+      const b = e.target.closest('button'); if (!b) return;
       const card = b.closest('[data-loc]'), g = card && G.locs.find(x => x.id === card.dataset.loc);
-      if (b.matches('[data-addloc]')) { G.locs.push(newLoc(Math.max(...G.locs.map(x => +x.id.slice(1))) + 1)); syncOrders(); drawDeliv(); draw(); requote(); return; }
+      if (b.matches('[data-addloc]')) { G.locs.push(newLoc(Math.max(...G.locs.map(x => +x.id.slice(1))) + 1)); redraw(); return; }
       if (!g) return;
-      if (b.matches('[data-rmloc]')) { G.locs = G.locs.filter(x => x !== g); if (G.locs.length < 2) G.multi = false; syncOrders(); drawDeliv(); draw(); requote(); return; }
-      if (b.matches('[data-saved]')) { await setCityOf(g, S.saved.cityCode); g.addr.barangay = S.saved.barangay || ''; g.addr.street = S.saved.street || ''; g.lat = null; g.lng = null; syncOrders(); drawDeliv(); draw(); requote(); return; }
+      if (b.matches('[data-rmloc]')) { G.locs = G.locs.filter(x => x !== g); if (G.locs.length < 2) G.multi = false; redraw(); return; }
+      if (b.matches('[data-saved]')) {
+        await getTree(); Object.assign(g.addr, chainOf(S.saved.cityCode) || {}, { barangay: S.saved.barangay || '', street: S.saved.street || '' });
+        g.streetTyped = true; g.lat = null; g.lng = null; g.mapLat = null; g.mapLng = null; g.pin = 'none'; changed(g); redraw(); addressEdited(g); return;
+      }
       if (b.matches('[data-locate]')) {
-        if (!navigator.geolocation) return toast('Your browser cannot share its location. Search your city instead.', 'warn');
-        b.disabled = true;
-        navigator.geolocation.getCurrentPosition(async p => {
-          await getTree(); g.lat = +p.coords.latitude.toFixed(7); g.lng = +p.coords.longitude.toFixed(7);
-          const c = nearestCity(g.lat, g.lng); if (c) Object.assign(g.addr, chainOf(c.code));
-          syncOrders(); drawDeliv(); draw(); requote(); toast('Pinned at your location' + (c ? ' in ' + c.name : '') + '. Add the barangay and street.', 'success');
-        }, err => { b.disabled = false; toast('Could not get your location (' + err.message + '). Search your city instead.', 'warn'); }, { enableHighAccuracy: true, timeout: 10000 });
-        return;
+        // asked only when the customer taps the button, with the reason
+        if (!await confirmDialog({ title: 'Use your current location?', message: 'Your browser will ask to share your location. We only use it to put the pin on your delivery spot; it is not shown to anyone else.', ok: 'Share my location' })) return;
+        b.disabled = true; g.status = 'Getting your location…'; setNote(g);
+        try { const p = await window.PRGeo.locate(); await pinMoved(g, p.lat, p.lng); if (maps[g.id]) maps[g.id].setPin(p.lat, p.lng, 17); }
+        catch (err) { g.status = err.message; setNote(g); toast(err.message, 'warn'); }
+        b.disabled = false; return;
       }
-      if (b.matches('[data-pinloc]')) {
-        pinDialog(g, async pos => {
-          await getTree(); g.lat = +pos[0].toFixed(7); g.lng = +pos[1].toFixed(7);
-          if (!g.addr.cityCode) { const c = nearestCity(g.lat, g.lng); if (c) Object.assign(g.addr, chainOf(c.code)); }
-          syncOrders(); drawDeliv(); draw(); requote();
-        });
-        return;
+      if (b.matches('[data-confirmloc]')) {
+        if (!complete(g)) return toast('Fill in the city, barangay and street first.', 'warn');
+        if (window.L && (g.lat == null || g.pin === 'stale')) {
+          g.status = ''; setNote(g);
+          return toast('Drag the pin to your exact spot first, so the driver and the delivery fee use the right place.', 'warn');
+        }
+        g.confirmed = true; redraw(); return;
       }
-      if (b.matches('li[data-i]')) { e.preventDefault(); const c = (b.closest('.place-search')._hits || [])[+b.dataset.i]; if (c) pickPlace(g, c); }
+      if (b.matches('[data-editloc]')) { changed(g); const el = document.getElementById(g.id + '-q'); if (el) el.focus(); return; }
     });
-    delivEl.addEventListener('keydown', e => {
-      const t = e.target; if (!t.matches('[data-place]')) return;
-      const box = t.closest('.place-search'), list = $('.place-sugg', box), hits = box._hits || [];
-      if (list.hidden || !hits.length) return;
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); box._cur = ((box._cur == null ? -1 : box._cur) + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length; $$('li', list).forEach((li, i) => li.classList.toggle('on', i === box._cur)); }
-      if (e.key === 'Enter') { e.preventDefault(); const g = G.locs.find(x => x.id === t.closest('[data-loc]').dataset.loc); pickPlace(g, hits[box._cur == null || box._cur < 0 ? 0 : box._cur]); }
-      if (e.key === 'Escape') { list.hidden = true; }
-    });
-    delivEl.addEventListener('focusout', e => { if (e.target.matches('[data-place]')) setTimeout(() => { const l = $('.place-sugg', e.target.closest('.place-search')); if (l) l.hidden = true; }, 180); });
-  }
-  /** Search: type part of a city or municipality and pick it; region, province and city fill in by themselves. */
-  async function placeSearch(input, g) {
-    const box = input.closest('.place-search'), list = $('.place-sugg', box), v = input.value.trim().toLowerCase();
-    if (v.length < 2) { list.hidden = true; return; }
-    await getTree();
-    const hits = T.cities.filter(c => c.key.includes(v) || c.label.toLowerCase().includes(v)).sort((a, b) => (b.key.startsWith(v) - a.key.startsWith(v)) || a.name.localeCompare(b.name)).slice(0, 8);
-    box._hits = hits; box._cur = null;
-    list.innerHTML = hits.length ? hits.map((c, i) => '<li role="option" data-i="' + i + '">' + esc(c.name) + '<span class="small muted">' + esc(c.label.slice(c.name.length + 2)) + '</span></li>').join('') : '<li class="muted small" aria-disabled="true">No city or municipality matches "' + esc(input.value) + '"</li>';
-    list.hidden = false;
-  }
-  function pickPlace(g, c) {
-    Object.assign(g.addr, chainOf(c.code));
-    syncOrders(); drawDeliv(); draw(); requote();
-    const el = document.getElementById(g.id + '-barangay'); if (el) el.focus();
   }
   async function initDeliv() {
     await getTree();
     const kept = store.get();
     if (kept && Array.isArray(kept.locs) && kept.locs.length && kept.locs[0].addr && kept.locs[0].addr.cityCode) {
-      G.multi = !!kept.multi && kept.locs.length > 1; G.locs = kept.locs.map(l => Object.assign(newLoc(1), l, { addr: Object.assign(newLoc(1).addr, l.addr || {}) }));
+      G.multi = !!kept.multi && kept.locs.length > 1; G.locs = kept.locs.map(l => Object.assign(newLoc(1), l, { addr: Object.assign(newLoc(1).addr, l.addr || {}), status: '' }));
       if (!G.multi) G.locs = [G.locs[0]];
     } else if (S.saved && S.saved.cityCode) {
       Object.assign(G.locs[0].addr, chainOf(S.saved.cityCode) || {}, { barangay: S.saved.barangay || '', street: S.saved.street || '' });
+      G.locs[0].streetTyped = true;
+      addressEdited(G.locs[0]); // place the saved address on the map (to be confirmed)
     }
     if (kept && kept.instructions) { shared.instructions = kept.instructions; const ta = $('#ev-in'); if (ta) ta.value = kept.instructions; }
-    syncOrders(); drawDeliv(); draw(); requote();
+    redraw();
   }
 
   /** Lines of the same cart item, time and location are combined again (never across locations). */
@@ -569,7 +637,7 @@
     if (!bad && anyDelivery()) {
       const need = [['cityCode', 'City / municipality', 1], ['barangay', 'Barangay', 1], ['street', 'House no., building and street', 3]];
       for (const g of G.locs) {
-        if (G.multi && !orders.some(o => o.fulfillment === 'delivery' && o.lines.some(l => l.destId === g.id))) continue;
+        if (G.multi && !used(g)) continue;
         for (const [n, label, min] of need) {
           const ok = (g.addr[n] || '').trim().length >= min, el = document.getElementById(g.id + '-' + n);
           if (el) el.closest('.field').classList.toggle('invalid', !ok);
@@ -577,6 +645,11 @@
         }
       }
       if (bad) return;
+      const open = G.locs.find(g => (!G.multi || used(g)) && !g.confirmed);
+      if (open) {
+        const c = $('[data-loc="' + open.id + '"]', delivEl); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return toast('Confirm ' + (G.multi ? '"' + locName(open, G.locs.indexOf(open)) + '"' : 'your delivery location') + ': check the pin and the address, then tap "Use this location".', 'warn');
+      }
     }
     if (bad) {
       // say which field, and take the customer there

@@ -36,7 +36,7 @@
 <main class="mk-main" id="main" tabindex="-1"><div class="container">
   @unless(request()->routeIs('near'))
     @php($nearNow = \App\Support\Near::get())
-    @unless(request()->routeIs('home'))<div class="near-row"><a class="near-chip" href="{{ route('near', ['back' => request()->fullUrl()]) }}">{{ icon('map') }}@if($nearNow)<span>{{ __('Showing shops near') }}</span> <b>{{ $nearNow['label'] }}</b> · <span class="link">{{ __('Change') }}</span>@else<span>{{ __('Set where you are renting to see shops near you') }}</span>@endif</a></div>@endunless
+    @unless(request()->routeIs('home', 'suppliers.index'))<div class="near-row"><a class="near-chip" href="{{ route('near', ['back' => request()->fullUrl()]) }}">{{ icon('map') }}@if($nearNow)<span>{{ __('Showing shops near') }}</span> <b>{{ $nearNow['label'] }}</b> · <span class="link">{{ __('Change') }}</span>@else<span>{{ __('Set where you are renting to see shops near you') }}</span>@endif</a></div>@endunless
     @if(! empty($outOfArea))
       <div class="alert alert-warn mb-2">{{ icon('map') }}<div><b>{{ __('This shop does not serve :place.', ['place' => $outOfArea]) }}</b> {{ __('None of its branches reach you, so you cannot rent from it there.') }} <a href="{{ route('near', ['back' => request()->fullUrl()]) }}">{{ __('Change place') }}</a></div></div>
     @endif

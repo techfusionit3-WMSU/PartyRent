@@ -206,8 +206,35 @@ class MarketController extends Controller
         // rental shops (1-to-1 item rentals) and event companies (book a whole event by quotation)
         $type = \App\Models\Supplier::eventCompanies() &&in_array($request->query('type'), ['shops', 'business'], true) ? $request->query('type') : '';
         $list = $list->filter(fn ($s) => ! $type || ($type === 'business') === $s->isOrganization());
+        // map of the shops near the browsing location: one marker per open branch (home-based shops: their city only)
+        $point = \App\Support\Near::point();
+        $pins = [];
+        foreach ($list as $s) {
+            if ($s->isOrganization()) {
+                continue;
+            }
+            foreach (Branches::active($s) as $b) {
+                $c = $b->city_code ? Locations::get($b->city_code) : null;
+                $pt = $s->isPublicLocation() ? $b->point() : ($c && $c['lat'] !== null ? [(float) $c['lat'], (float) $c['lng']] : null);
+                if (! $pt) {
+                    continue;
+                }
+                $pins[] = ['lat' => round($pt[0], 6), 'lng' => round($pt[1], 6), 'exact' => $s->isPublicLocation(), 'shop' => $s->name, 'logo' => $s->logo, 'color' => $s->color,
+                    'branch' => $b->name, 'city' => $b->cityName(), 'rating' => $s->rating ? number_format((float) $s->rating, 1) : null, 'items' => $s->products->count(),
+                    'km' => Branches::km($b, $point), 'url' => route('suppliers.show', $s), 'sid' => $s->id];
+            }
+        }
+        // nearest first (by the closest branch) when a place is known
+        $kmOf = fn ($s) => collect($pins)->where('sid', $s->id)->pluck('km')->filter(fn ($k) => $k !== null)->min() ?? PHP_FLOAT_MAX;
+        $sort = $point && $request->query('sort', 'near') === 'near' ? 'near' : 'rating';
+        if ($sort === 'near') {
+            $list = $list->sortBy($kmOf)->values();
+        }
 
-        return view('market.suppliers', ['list' => $list, 'q' => $request->query('q', ''), 'f' => $f, 'type' => $type]);
+        return view('market.suppliers', ['list' => $list, 'q' => $request->query('q', ''), 'f' => $f, 'type' => $type, 'pins' => $pins, 'sort' => $sort,
+            'view' => $request->query('view') === 'map' ? 'map' : 'list', 'kmOf' => $kmOf,
+            // the map starts on the browsing place, rounded (about 1 km) — never a precise spot in the page
+            'center' => $point ? [round($point[0], 2), round($point[1], 2)] : null]);
     }
 
     public function supplier(Request $request, Supplier $supplier)

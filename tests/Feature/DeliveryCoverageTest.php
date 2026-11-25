@@ -147,7 +147,7 @@ class DeliveryCoverageTest extends TestCase
             $this->assertNotNull($o['branchId']);
         }
         $this->get(route('checkout'))->assertOk()->assertSee('Delivery information')->assertSee('Special Instructions')
-            ->assertSee('Anything the stores should know', false)->assertDontSee('General Instructions');
+            ->assertSee('Provide any additional information or instructions for your delivery (e.g., nearby landmarks, gate details, or directions).', false)->assertDontSee('General Instructions');
     }
 
     /** Maria's cart: chairs from Happy Moments and from Celebration Hub (zone-priced shops), both delivered. */

@@ -218,6 +218,37 @@ class Locations
         return null;
     }
 
+    /**
+     * Our city / municipality for a name from a map service ("Zamboanga City", "City of Zamboanga"), told apart by its
+     * province or region when several places share the name. Null when we do not know it.
+     */
+    public static function matchCity(?string $name, ?string $province = null, ?string $region = null): ?array
+    {
+        $n = self::norm((string) $name);
+        if ($n === '') {
+            return null;
+        }
+        $same = array_values(array_filter(self::cities(), fn ($c) => self::norm($c['name']) === $n));
+        if (count($same) <= 1) {
+            return $same[0] ?? null;
+        }
+        foreach ([$province, $region] as $hint) {
+            $h = self::norm((string) $hint);
+            if ($h === '') {
+                continue;
+            }
+            foreach ($same as $c) {
+                foreach (self::path($c['code']) as $up) {
+                    if (self::norm($up['name']) === $h || str_contains(self::norm($up['name']), $h)) {
+                        return $c;
+                    }
+                }
+            }
+        }
+
+        return $same[0];
+    }
+
     /** A city from its full label ("Zamboanga City, Zamboanga del Sur"), as shown in pickers. */
     public static function cityByLabel(string $label): ?array
     {

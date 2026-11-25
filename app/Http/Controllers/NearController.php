@@ -17,10 +17,14 @@ class NearController extends Controller
     public function store(Request $request)
     {
         $v = $request->validate([
-            'near' => 'required|array', 'near.cityCode' => 'required|string|max:20',
-            'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180',
-        ], ['near.cityCode.required' => 'Choose your city or municipality.']);
-        $set = Near::set($v['near']['cityCode'], isset($v['lat']) ? (float) $v['lat'] : null, isset($v['lng']) ? (float) $v['lng'] : null);
+            'near' => 'nullable|array', 'near.cityCode' => 'nullable|string|max:20',
+            'lat' => 'nullable|numeric|between:-90,90|required_without:near.cityCode', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
+        ], ['lat.required_without' => 'Choose your city or municipality, or use your current location.']);
+        $city = $v['near']['cityCode'] ?? null;
+        if (! $city && isset($v['lat'], $v['lng'])) {
+            $city = \App\Domain\Locations::nearestCity([(float) $v['lat'], (float) $v['lng']])['code'] ?? null; // a pin: its city
+        }
+        $set = $city ? Near::set($city, isset($v['lat']) ? (float) $v['lat'] : null, isset($v['lng']) ? (float) $v['lng'] : null) : null;
         if (! $set) {
             return back()->withErrors(['near.cityCode' => 'Choose a city or municipality from the list.'])->withInput();
         }

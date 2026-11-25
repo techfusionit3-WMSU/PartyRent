@@ -678,3 +678,31 @@ main:focus { outline: none; }
 .gal-add { display: grid; place-items: center; align-content: center; gap: 4px; aspect-ratio: 1; border: 2px dashed var(--line); border-radius: 12px; cursor: pointer; color: var(--muted); font-size: .8rem; font-weight: 600; }
 .gal-add:hover { border-color: var(--brand); color: var(--brand); }
 .gal-add svg { width: 22px; height: 22px; }
+
+/* time fields: type the time or pick it on a clock (public/js/timefield.js) */
+.tf { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; width: 100%; max-width: 220px; vertical-align: middle; }
+.tf .tf-box { width: 100%; padding-right: 40px; font-variant-numeric: tabular-nums; }
+.tf .tf-box.is-bad { border-color: var(--red); }
+.tf-clock-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--brand); cursor: pointer; }
+.tf-sm .tf-clock-btn { width: 28px; height: 28px; }
+.tf-clock-btn:hover, .tf-clock-btn:focus-visible { background: var(--brand-50); }
+.tf .tf-box[style*="top"] ~ .tf-clock-btn { top: 18px; }
+.tf-src { display: none !important; }
+.tf-msg { flex-basis: 100%; font-size: .75rem; color: var(--muted); }
+.tf-msg:empty { display: none; }
+.tf .tf-box.is-bad ~ .tf-msg { color: var(--red); }
+.tf-pop { position: absolute; z-index: 2000; width: 248px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+.tf-head { display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 1.6rem; font-weight: 800; margin-bottom: 8px; }
+.tf-part { border: 0; background: transparent; font: inherit; padding: 2px 6px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+.tf-part.on { color: var(--brand); background: var(--brand-50); }
+.tf-ap { display: inline-flex; flex-direction: column; margin-left: 8px; gap: 2px; }
+.tf-ap button { border: 1px solid var(--line); background: var(--surface); font-size: .7rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; cursor: pointer; }
+.tf-ap button.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+.tf-dial { position: relative; width: 200px; height: 200px; margin: 0 auto; border-radius: 50%; background: var(--surface-2, #f4f4f5); }
+.tf-n { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 0; background: transparent; font-weight: 700; cursor: pointer; }
+.tf-n:hover:not([disabled]) { background: var(--brand-50); }
+.tf-n.on { background: var(--brand); color: #fff; }
+.tf-n[disabled] { color: var(--line); cursor: not-allowed; }
+.tf-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: .72rem; color: var(--muted); }
+.tf-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.time-pair .tf { max-width: none; flex: 1 1 0; min-width: 0; }

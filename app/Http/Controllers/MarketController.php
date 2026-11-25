@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Ai;
+use App\Domain\Branches;
 use App\Domain\Finance;
 use App\Domain\Locations;
 use App\Domain\Notifier;
@@ -25,7 +26,8 @@ class MarketController extends Controller
 
     private function live()
     {
-        $list = Product::live()->with(['supplier', 'category'])->get();
+        // only shops that serve where the customer is renting (App\Support\Near; everything when unknown)
+        $list = Branches::limitToNear(Product::live())->with(['supplier', 'category'])->get();
         inv()->primeProducts($list);
 
         return $list;
@@ -73,10 +75,10 @@ class MarketController extends Controller
         $matchText = fn (string $hay) => ! $words || collect($words)->every(fn ($w) => str_contains($hay, $w)) || ($ai && $ai['items'] && collect($words)->contains(fn ($w) => str_contains($hay, $w)));
 
         $prods = $this->live();
-        $sups = Supplier::approved()->get();
+        $sups = Branches::limitToNear(Supplier::approved(), 'id')->get();
 
         if ($st['view'] === 'packages') {
-            $list = Package::live()->with('supplier')->get()->filter(function ($k) use ($st, $dates, $need, $matchText, $to, $guests) {
+            $list = Branches::limitToNear(Package::live())->with('supplier')->get()->filter(function ($k) use ($st, $dates, $need, $matchText, $to, $guests) {
                 if (\App\Domain\Packages::fitsGuests($k, $guests) === false) return false; // too small for the event
                 $s = $k->supplier;
                 if (! $matchText(mb_strtolower($k->name.' '.$k->description.' '.$s->name.' '.implode(' ', $k->events ?? [])))) {
@@ -156,7 +158,7 @@ class MarketController extends Controller
                 'topSuppliers' => $sups->sortByDesc('rating')->take(3),
             ];
         }
-        $pkgs = $landing ? Package::live()->with('supplier')->get() : collect();
+        $pkgs = $landing ? Branches::limitToNear(Package::live())->with('supplier')->get() : collect();
         // Rental dates picked (post-login prompt or the date bar): suggest what is actually free on every one of those days.
         $forDates = null;
         if ($dates && $landing) {
@@ -173,7 +175,7 @@ class MarketController extends Controller
         $notifs = $u && $landing ? Notifier::for($u, session('mode'))->filter(fn ($n) => ! $n->isReadBy($u->id))->take(3) : collect();
 
         return view('market.browse', [
-            'landing' => $landing, 'home' => $home, 'forDates' => $forDates, 'pkgs' => $pkgs, 'pkgCount' => Package::live()->count(), 'active' => $active, 'notifs' => $notifs, 'themes' => self::EVENT_THEMES,
+            'landing' => $landing, 'home' => $home, 'forDates' => $forDates, 'pkgs' => $pkgs, 'pkgCount' => Branches::limitToNear(Package::live())->count(), 'active' => $active, 'notifs' => $notifs, 'themes' => self::EVENT_THEMES,
             'prodCount' => $prods->count(), 'supCount' => $sups->count(),
             'st' => $st, 'list' => $list->values(), 'dates' => $dates, 'ai' => $ai, 'compare' => $compare,
             'cats' => Category::where('active', true)->orderBy('sort')->get(), 'sups' => $sups,
@@ -199,7 +201,7 @@ class MarketController extends Controller
     {
         $q = mb_strtolower((string) $request->query('q', ''));
         $f = (string) $request->query('f', '');
-        $list = Supplier::approved()->with(['products' => fn ($p) => $p->where('status', 'active')->where('package_only', false)->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
+        $list = Branches::limitToNear(Supplier::approved(), 'id')->with(['products' => fn ($p) => $p->where('status', 'active')->where('package_only', false)->with('category')])->withCount(['packages' => fn ($k) => $k->where('active', true)])->orderByDesc('rating')->get()
             ->filter(fn ($s) => (! $q || str_contains(mb_strtolower($s->name.' '.$s->city.' '.$s->description), $q)) && (! $f || $s->isOrganization() || $s->fulfillment === 'both' || $s->fulfillment === $f));
         // rental shops (1-to-1 item rentals) and event companies (book a whole event by quotation)
         $type = \App\Models\Supplier::eventCompanies() &&in_array($request->query('type'), ['shops', 'business'], true) ? $request->query('type') : '';
@@ -221,7 +223,16 @@ class MarketController extends Controller
             'reviews' => Review::visible()->where('supplier_id', $supplier->id)->with(['customer', 'product', 'package'])->latest()->get(),
             'tab' => $request->query('tab', $supplier->isOrganization() ? 'packages' : 'items'), 'catFilter' => $request->query('category'),
             'branchInfo' => $supplier->isOrganization() ? [] : self::branchInfo($supplier),
+            'outOfArea' => self::outOfArea($supplier),
         ]);
+    }
+
+    /** The customer's place when this shop does not serve it (its pages stay open from old links), else null. */
+    public static function outOfArea(?Supplier $s): ?string
+    {
+        $ids = Branches::supplierIdsNear();
+
+        return $s && $ids !== null && ! in_array($s->id, $ids, true) ? (\App\Support\Near::label() ?? 'your area') : null;
     }
 
     /** The shop's branches for its public page (information only): distance from the customer and whether it serves them. */
@@ -259,6 +270,7 @@ class MarketController extends Controller
             'own' => $u && $product->supplier->owner_id === $u->id,
             'siblings' => $u ? \App\Domain\Rentals::cartLinesFor($u, $product->supplier_id) : [],
             'nearAvail' => $product->isSale() ? null : \App\Domain\Branches::availableNear($product->supplier, 'item', $product->id, $start),
+            'outOfArea' => self::outOfArea($product->supplier),
         ]);
     }
 
@@ -274,7 +286,7 @@ class MarketController extends Controller
 
     public function packages(Request $request)
     {
-        $all = Package::live()->with('supplier')->get();
+        $all = Branches::limitToNear(Package::live())->with('supplier')->get();
         $ev = (string) $request->query('event', '');
 
         return view('market.packages', [
@@ -298,7 +310,7 @@ class MarketController extends Controller
         $u = $request->user();
 
         return view('market.package', [
-            'k' => $package, 'sup' => $package->supplier, 'def' => $def, 'pp' => $pp, 'lead' => $lead,
+            'k' => $package, 'sup' => $package->supplier, 'def' => $def, 'pp' => $pp, 'lead' => $lead, 'outOfArea' => self::outOfArea($package->supplier),
             'start' => $start, 'end' => $end, 'days' => array_fill_keys(date_range($start, $end), 1),
             'own' => $u && $package->supplier->owner_id === $u->id,
             'reviews' => $package->reviews()->visible()->with(['customer', 'package', 'supplier'])->latest()->get(),

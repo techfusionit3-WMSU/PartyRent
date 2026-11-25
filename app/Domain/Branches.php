@@ -99,6 +99,41 @@ class Branches
         return $from && $point ? Locations::roadKm($from, $point) : null;
     }
 
+    /**
+     * Approved shops that serve the customer's place: at least one active branch within its service distance (a shop
+     * with no branch yet: its own address). Null = place unknown, show every shop.
+     */
+    public static function supplierIdsNear(?array $point = null): ?array
+    {
+        $point ??= Near::point();
+        if (! $point) {
+            return null;
+        }
+        $ids = [];
+        foreach (InventoryLocation::where('active', true)->whereHas('supplier', fn ($q) => $q->where('status', 'approved'))->with('supplier')->get() as $b) {
+            if (! isset($ids[$b->supplier_id]) && self::serves($b, $point)) {
+                $ids[$b->supplier_id] = true;
+            }
+        }
+        foreach (Supplier::approved()->whereDoesntHave('locations')->get() as $s) {
+            $c = $s->city_code ? Locations::get($s->city_code) : null;
+            $from = $s->lat !== null && $s->lng !== null ? [(float) $s->lat, (float) $s->lng] : ($c && $c['lat'] !== null ? [(float) $c['lat'], (float) $c['lng']] : null);
+            if (! $from || Locations::roadKm($from, $point) <= (float) $s->branchSettings()['serviceKm']) {
+                $ids[$s->id] = true;
+            }
+        }
+
+        return array_keys($ids);
+    }
+
+    /** Limit a query of shop listings (products, packages, suppliers) to the shops that serve the customer. */
+    public static function limitToNear($q, string $col = 'supplier_id')
+    {
+        $ids = self::supplierIdsNear();
+
+        return $ids === null ? $q : $q->whereIn($col, $ids ?: [0]);
+    }
+
     /** Does the branch serve this point? Unknown distance counts as served (no limit we can check). */
     public static function serves(InventoryLocation $b, ?array $point): bool
     {

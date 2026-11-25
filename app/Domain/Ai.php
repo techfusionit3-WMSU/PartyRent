@@ -225,7 +225,7 @@ class Ai
     public static function liveProducts(): Collection
     {
         if (self::$live === null) {
-            self::$live = Product::live()->with('supplier')->get();
+            self::$live = Branches::limitToNear(Product::live())->with('supplier')->get(); // shops near the customer only
             inv()->primeProducts(self::$live);
         }
 
@@ -338,7 +338,7 @@ class Ai
         }
         $dates = self::datesOf($f);
         $pkgs = [];
-        foreach (Package::live()->with('supplier')->get() as $k) {
+        foreach (Branches::limitToNear(Package::live())->with('supplier')->get() as $k) {
             if (! empty($f['eventType']) && ! in_array($f['eventType'], $k->events ?? [], true)) {
                 continue;
             }
@@ -377,7 +377,7 @@ class Ai
             $out[] = ['product' => $x, 'supplier' => $x->supplier, 'reason' => $reason.($sameTheme ? ', matches your theme' : ''), 'score' => ($sameColor ? 3 : 0) + ($sameTheme ? 2 : 0) + $x->rating, 'unit' => Pricing::unitPrice($x, max(array_map('intval', $days) ?: [1]))];
         }
         $catName = mb_strtolower(Category::find($p->category_id)?->name ?? 'items');
-        foreach (Package::live()->with('supplier')->get() as $k) {
+        foreach (Branches::limitToNear(Package::live())->with('supplier')->get() as $k) {
             $hasCat = false;
             foreach ($k->items as $it) {
                 if (inv()->product($it['product_id'])?->category_id === $p->category_id) {
@@ -458,7 +458,7 @@ class Ai
 
         // product / supplier lookup
         $cats = array_keys(array_filter(self::ITEMS, fn ($w) => self::has($t, $w)));
-        $sup = Supplier::approved()->get()->first(function ($s) use ($t) {
+        $sup = Branches::limitToNear(Supplier::approved(), 'id')->get()->first(function ($s) use ($t) {
             $first = explode(' ', $s->name)[0];
 
             return mb_strlen($first) > 3 && str_contains($t, mb_strtolower($first));
@@ -492,7 +492,7 @@ class Ai
             return $reply('Each supplier sets its own payment plans: <b>Full Payment</b>, <b>Down Payment</b> + final balance (e.g. 30% down), or <b>Installments</b>. There is no separate reservation fee — once your down payment (or full payment) is verified, your booking is reserved and marked Partially Paid. The down payment is credited to your total, never charged twice. Ask me about a specific shop, e.g. "Happy Moments payment policy".', ['Happy Moments payment policy', 'Elegant Occasion payment policy']);
         }
         if (preg_match('/(deliver|delivery|pickup|pick up|hatid|kunin)/', $t)) {
-            $show = $sup ? collect([$sup]) : Supplier::approved()->get();
+            $show = $sup ? collect([$sup]) : Branches::limitToNear(Supplier::approved(), 'id')->get();
 
             return $reply($show->map(fn ($s) => '• <b>'.e($s->name).'</b> ('.e($s->city).'): '.e($s->fulfillmentLabel()).($s->offersDelivery() ? ' — '.e($s->deliverySummary()) : ''))->implode('<br>'));
         }

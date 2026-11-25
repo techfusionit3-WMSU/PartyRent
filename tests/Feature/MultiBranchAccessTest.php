@@ -85,7 +85,7 @@ class MultiBranchAccessTest extends TestCase
         $this->actingAs($this->maria());
         // Quezon City: every Metro Manila branch serves her; the chairs near her = the best single branch (100)
         $this->assertSame(100, Branches::availableNear($this->eo, 'item', $this->chair->id, $this->day()));
-        $this->get(route('products.show', $this->chair))->assertOk()->assertSee('available near')->assertSee('Renting near');
+        $this->get(route('products.show', $this->chair))->assertOk()->assertSee('available near')->assertSee('Showing shops near');
 
         // she now rents in Davao City: no Elegant branch serves her
         $this->post(route('near.store'), ['near' => ['cityCode' => '112402000']])->assertRedirect();
@@ -99,6 +99,31 @@ class MultiBranchAccessTest extends TestCase
         $res = $this->rentChairs(5);
         $this->assertFalse((bool) $res->json('ok'));
         $this->assertStringContainsString('Outside the area', json_encode($res->json()));
+    }
+
+    public function test_only_shops_and_items_that_serve_the_customer_are_listed(): void
+    {
+        $this->actingAs($this->maria())->withSession(['mode' => 'customer']);
+        // Quezon City: Metro Manila shops are listed
+        $this->get(route('home', ['q' => 'Chiavari']))->assertOk()->assertSee('Gold Chiavari Chair');
+        $this->get(route('suppliers.index'))->assertOk()->assertSee('Elegant Occasion Rentals');
+        // Davao City: no demo shop serves it, so none of their shops, items or packages are listed
+        $this->post(route('near.store'), ['near' => ['cityCode' => '112402000']]);
+        $this->assertNotContains($this->eo->id, Branches::supplierIdsNear());
+        $this->get(route('home', ['q' => 'Chiavari']))->assertOk()->assertDontSee('Gold Chiavari Chair');
+        $this->get(route('suppliers.index'))->assertOk()->assertDontSee('Elegant Occasion Rentals')->assertSee('No shop near');
+        $this->get(route('packages.index'))->assertOk()->assertDontSee('Elegant Occasion Rentals');
+        // an old link still opens, and says the shop does not serve them
+        $this->get(route('products.show', $this->chair))->assertOk()->assertSee('This shop does not serve');
+        $this->get(route('suppliers.show', $this->eo))->assertOk()->assertSee('This shop does not serve');
+        // a branch that reaches Davao brings the shop back
+        $this->makati->update(['lat' => 7.07, 'lng' => 125.61, 'service_km' => 50]);
+        $this->assertContains($this->eo->id, Branches::supplierIdsNear());
+        $this->get(route('suppliers.index'))->assertOk()->assertSee('Elegant Occasion Rentals');
+        // no place known (guest): everything, as before
+        auth()->logout();
+        session()->forget('near');
+        $this->assertNull(Branches::supplierIdsNear());
     }
 
     public function test_pickup_goes_to_the_nearest_branch_with_stock(): void

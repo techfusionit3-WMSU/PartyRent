@@ -119,6 +119,10 @@ class DemoSeeder extends Seeder
                 $r->forceFill(['pricing' => $p])->saveQuietly();
             }
         });
+        // the demo shops are in Zamboanga City (the automated tests keep the Metro Manila originals)
+        if (! app()->runningUnitTests()) {
+            $this->call(ZamboangaDemoSeeder::class);
+        }
     }
 
     /**

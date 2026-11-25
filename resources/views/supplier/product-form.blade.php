@@ -26,7 +26,7 @@
 <div class="crumbs"><a href="{{ route('supplier.products') }}">Products</a> / {{ $p->exists ? $p->name : 'New product' }}</div>
 <div class="page-head"><div><h1>{{ $p->exists ? 'Edit product' : ($lt === 'sale' ? 'Add an item for sale' : 'Add product') }}</h1><p>{{ $p->exists ? '#'.$p->id.' · created '.fmt_date($p->created_at) : 'Prices you set here are the only prices customers and the AI assistant ever see.' }}</p></div>
   @if($p->exists)<a class="btn btn-sm" href="{{ route('products.show', $p) }}" target="_blank">{{ icon('eye') }}View listing</a>@endif</div>
-<form method="POST" action="{{ $p->exists ? route('supplier.products.update', $p) : route('supplier.products.store') }}" enctype="multipart/form-data" class="grid grid-side" id="productForm" data-wizard data-draft="{{ $p->exists ? 'product-'.$p->id : 'product-new' }}">
+<form method="POST" action="{{ $p->exists ? route('supplier.products.update', $p) : route('supplier.products.store') }}" data-no-enter enctype="multipart/form-data" class="grid grid-side" id="productForm" data-wizard data-draft="{{ $p->exists ? 'product-'.$p->id : 'product-new' }}">
   @csrf @if($p->exists) @method('PUT') @endif
   <div class="stack">
     {{-- Specs --}}
@@ -43,9 +43,7 @@
         <div class="field" data-for="rent"><label>Condition</label><select class="input" name="condition">@foreach(\App\Domain\Damage::CONDITIONS as $k => $l)<option value="{{ $k }}" @selected(old('condition', $p->condition ?: 'brand_new') === $k)>{{ $l }}</option>@endforeach</select><div class="hint">Used for "Lost or Not Returned" compensation.</div></div>
       </div>
       <div class="field"><label>Description</label><textarea class="input" name="description" required rows="4">{{ old('description', $p->description) }}</textarea></div>
-      <div class="field"><label>Product images</label>
-        @if($p->images)<div class="thumbs mb-1">@foreach($p->images as $im)<img src="{{ asset('storage/'.$im) }}" alt="Product photo">@endforeach</div><label class="check mb-1"><input type="checkbox" name="clear_images" value="1"> Remove current photos</label>@endif
-        <input class="input" type="file" name="images[]" accept="image/*" multiple><div class="hint">Upload up to 5 photos (JPG/PNG, 8 MB each). Without photos, a category illustration is shown.</div></div>
+      @include('partials.image-gallery', ['name' => 'images', 'current' => $p->images ?? [], 'max' => 8, 'label' => 'Product photos'])
       <h4 class="mt-2">Tags</h4>
       <div class="field"><label>Colors</label>@include('partials.tag-input', ['name' => 'colors', 'values' => $colors, 'suggest' => CC::COLORS, 'swatch' => true, 'placeholder' => 'Type a color, e.g. Lavender'])</div>
       <div class="field"><label>Themes</label>@include('partials.tag-input', ['name' => 'themes', 'values' => $themes, 'suggest' => CC::THEMES, 'placeholder' => 'Type a theme, e.g. Boho'])</div>
@@ -56,8 +54,11 @@
     <div class="card" data-wiz-step="{{ __('Price') }}"><h3>Pricing</h3>
       <div class="form-grid">
         <div class="field" data-for="rent"><label>How is it rented?</label><select class="input" name="rental_mode" id="rentalMode"><option value="day" @selected($mode === 'day')>Per day</option><option value="hour" @selected($mode === 'hour')>By the hour</option></select></div>
-        <div class="field" data-for="rent"><label>Pricing unit</label><select class="input" name="unit">@foreach(['piece', 'set', 'unit', 'pair', 'panel', 'kit', 'system'] as $un)<option value="{{ $un }} / day" @selected(explode(' /', old('unit', $p->unit ?? 'piece'))[0] === $un)>{{ $un }}</option>@endforeach</select></div>
-        <div class="field" data-for="sale"><label>Sold per</label><select class="input" name="unit">@foreach(\App\Models\Product::SALE_UNITS as $un)<option @selected(old('unit', $p->unit) === $un)>{{ $un }}</option>@endforeach</select></div>
+        @php($uw = old('unit_custom') ? 'other' : trim(explode('/', old('unit', $p->unit ?? 'piece'))[0]))
+        @php($uCustom = old('unit_custom', in_array($uw, array_merge(\App\Models\Product::STOCK_UNITS, \App\Models\Product::SALE_UNITS), true) ? '' : $uw))
+        <div class="field" data-for="rent"><label for="stockUnitR">Stock unit</label><select class="input" id="stockUnitR" name="unit" data-unit-sel>@foreach(\App\Models\Product::STOCK_UNITS as $un)<option value="{{ $un }}" @selected($uw === $un)>{{ $un === 'piece' ? 'Piece (pc)' : ucfirst($un) }}</option>@endforeach<option value="other" @selected($uCustom !== '' || $uw === 'other')>Other (type your own)</option></select><div class="hint">How you count this item, e.g. 50 pcs or 12 sets. It is also the unit of the price.</div></div>
+        <div class="field" data-for="sale"><label for="stockUnitS">Stock unit</label><select class="input" id="stockUnitS" name="unit" data-unit-sel>@foreach(\App\Models\Product::SALE_UNITS as $un)<option value="{{ $un }}" @selected($uw === $un)>{{ $un === 'pc' ? 'Piece (pc)' : ucfirst($un) }}</option>@endforeach<option value="other" @selected($uCustom !== '' || $uw === 'other')>Other (type your own)</option></select><div class="hint">How you count and sell it, e.g. 20 packs.</div></div>
+        <div class="field" data-unit-custom @if($uCustom === '' && $uw !== 'other') hidden @endif><label for="unitCustom">Your stock unit</label><input class="input" id="unitCustom" name="unit_custom" maxlength="20" value="{{ $uCustom }}" placeholder="e.g. roll, meter, tray">@error('unit_custom')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
       </div>
       <div class="field"><label>Base price (₱ per unit<span data-for="rent"> per <span data-unit-word>{{ $mode === 'hour' ? 'hour' : 'day' }}</span></span>)</label><input class="input" type="number" min="0.01" step="0.01" name="base_price" required value="{{ $base }}" style="max-width:300px">@error('base_price')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
       <div class="mt-2">@include('partials.bulk-editor', ['rows' => $bulk, 'stock' => null, 'errorText' => $errors->first('bulk') ?: $errors->first('bulk.*')])</div>
@@ -88,15 +89,6 @@
       </div>
       @endif
 
-    {{-- Sale-only: ordering & freshness --}}
-    <div class="card" data-for="sale" data-wiz-step="{{ __('Price') }}"><h3>Ordering & freshness</h3>
-      <div class="form-grid">
-        <div class="field"><label>Order lead time (days)</label><input class="input" type="number" min="0" max="60" name="lead_days" value="{{ old('lead_days', $p->lead_days ?? 0) }}"><div class="hint">Customers must order at least this many days before the event.</div></div>
-        <div class="field"><label>Low-stock alert at</label><input class="input" type="number" min="0" name="low_stock_at" value="{{ old('low_stock_at', $p->low_stock_at) }}" placeholder="No alert"></div>
-      </div>
-      <label class="check mb-1"><input type="checkbox" name="perishable" value="1" id="perishable" @checked(old('perishable', $p->perishable))> Perishable (food, fresh flowers)</label>
-      <div class="field" id="shelfLife"><label>Shelf life (days)</label><input class="input" type="number" min="1" name="shelf_life_days" value="{{ old('shelf_life_days', $p->shelf_life_days) }}"></div>
-    </div>
   </div>
 
   <aside class="stack">
@@ -122,6 +114,16 @@
       @endif
     </div>
 
+    {{-- Sale-only: ordering & freshness --}}
+    <div class="card" data-for="sale" data-wiz-step="{{ __('Stock & listing') }}"><h3>Ordering & freshness</h3>
+      <div class="form-grid">
+        <div class="field"><label>Order lead time (days)</label><input class="input" type="number" min="0" max="60" name="lead_days" value="{{ old('lead_days', $p->lead_days ?? 0) }}"><div class="hint">Customers must order at least this many days before the event.</div></div>
+        <div class="field"><label>Low-stock alert at</label><input class="input" type="number" min="0" name="low_stock_at" value="{{ old('low_stock_at', $p->low_stock_at) }}" placeholder="No alert"></div>
+      </div>
+      <label class="check mb-1"><input type="checkbox" name="perishable" value="1" id="perishable" @checked(old('perishable', $p->perishable))> Perishable (food, fresh flowers)</label>
+      <div class="field" id="shelfLife"><label>Shelf life (days)</label><input class="input" type="number" min="1" name="shelf_life_days" value="{{ old('shelf_life_days', $p->shelf_life_days) }}"></div>
+    </div>
+
     {{-- Listing --}}
     <div class="card" data-wiz-step="{{ __('Stock & listing') }}"><h3>Listing</h3>
       <div class="field"><label>Status</label><select class="input" name="status">@foreach(['active' => 'Active (visible to customers)', 'inactive' => 'Inactive (hidden)'] as $k => $l)<option value="{{ $k }}" @selected(old('status', $p->status ?: 'active') === $k)>{{ $l }}</option>@endforeach</select></div>
@@ -145,6 +147,10 @@
             @foreach(['time_from' => $p->time_from ?: $ts['open'], 'time_to' => $p->time_to ?: $ts['close']] as $k => $val)<select class="input" name="{{ $k }}" aria-label="{{ $k === 'time_from' ? 'From' : 'To' }}">@foreach(\App\Domain\Slots::options($sup) as $o)<option value="{{ $o }}" @selected(old($k, $val) === $o)>{{ \App\Domain\Slots::fmt12($o) }}</option>@endforeach</select>@endforeach
           </div>@error('time_to')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
           <label class="check mt-1"><input type="checkbox" name="allow_overnight" value="1" @checked(old('allow_overnight', $p->allow_overnight))> Allow overnight rental</label></div>
+        <div class="field"><label for="setupMin">Allocated setup time <span class="muted">(optional)</span></label>
+          <div class="row" style="gap:8px;align-items:center"><input class="input" type="number" id="setupMin" name="setup_minutes" min="0" max="1440" step="5" value="{{ old('setup_minutes', $p->setup_minutes) }}" placeholder="0" style="width:120px" data-setup-min><span class="small muted">minutes</span></div>
+          <div class="hint" data-setup-hint>How long before the rental start this item must arrive to be set up. Example: rental at 8:00 AM with 60 minutes → delivered by 7:00 AM. Checkout works it out for the customer.</div>
+          @error('setup_minutes')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div>
         <div class="field"><label>Item rental policy <span class="muted">(optional)</span></label><textarea class="input" name="rental_policy" rows="3" placeholder="e.g. Indoor use only">{{ old('rental_policy', $p->rental_policy) }}</textarea></div>
       </div>
     </div>
@@ -183,11 +189,19 @@
     if ($('perishable')) $('shelfLife').hidden = !$('perishable').checked;
     var word = ($('rentalMode') || {}).value === 'hour' ? 'hour' : 'day';
     f.querySelectorAll('[data-unit-word]').forEach(function (s) { s.textContent = word; });
+    // stock unit "Other": type your own
+    var us = Array.prototype.find.call(f.querySelectorAll('[data-unit-sel]'), function (x) { return !x.disabled; });
+    var uc = f.querySelector('[data-unit-custom]');
+    if (uc && us) { uc.hidden = us.value !== 'other'; uc.querySelector('input').required = us.value === 'other'; }
+    // setup time: show what it means
+    var sm = f.querySelector('[data-setup-min]'), sh = f.querySelector('[data-setup-hint]');
+    if (sm && sh) { var m = Math.max(0, parseInt(sm.value, 10) || 0), h = Math.floor(m / 60), r = m % 60; sh.textContent = m ? 'Set up time: ' + (h ? h + ' h ' : '') + (r ? r + ' min' : '') + '. A rental starting at 8:00 AM is delivered by ' + (function () { var t = 8 * 60 - m; t = (t + 1440) % 1440; var hh = Math.floor(t / 60), mm = t % 60; return ((hh % 12) || 12) + ':' + String(mm).padStart(2, '0') + (hh < 12 ? ' AM' : ' PM'); })() + '. Checkout works it out for the customer.' : 'How long before the rental start this item must arrive to be set up. Example: rental at 8:00 AM with 60 minutes → delivered by 7:00 AM. Checkout works it out for the customer.'; }
   }
   f.addEventListener('change', function (e) {
-    if (e.target.matches('[name=listing_type], #perishable, #rentalMode')) sync();
+    if (e.target.matches('[name=listing_type], #perishable, #rentalMode, [data-unit-sel]')) sync();
     if (e.target.id === 'tfOn') $('tfBox').hidden = !e.target.checked;
   });
+  f.addEventListener('input', function (e) { if (e.target.matches('[data-setup-min]')) sync(); });
   f.addEventListener('input', function (e) { if (e.target.matches('[data-loc]')) { var t = 0; f.querySelectorAll('[data-loc]').forEach(function (i) { t += Math.max(0, Math.floor(+i.value || 0)); }); f.querySelector('[data-tot]').textContent = t; } });
   f.addEventListener('click', function (e) {
     if (e.target.closest('#addMax')) { $('addMax').hidden = true; $('maxBox').hidden = false; $('hasMax').value = 1; $('maxBox').querySelector('input').focus(); }

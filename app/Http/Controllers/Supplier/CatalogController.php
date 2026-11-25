@@ -92,7 +92,9 @@ class CatalogController extends Controller
             'min_hours' => 'nullable|numeric|min:0.5|max:720', 'max_hours' => 'nullable|numeric|min:0.5|max:720',
             'time_frame' => 'nullable|boolean', 'time_from' => $time, 'time_to' => $time, 'allow_overnight' => 'nullable|boolean',
             'rental_policy' => 'nullable|string|max:1000',
-            'images' => 'nullable|array|max:5', 'images.*' => 'image|max:8192',
+            'images' => 'nullable|array|max:8', 'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:8192',
+            'keep_images' => 'nullable|array', 'keep_images.*' => 'string|max:255', 'primary_image' => 'nullable|string|max:300',
+            'unit_custom' => 'nullable|string|max:20|regex:/^[\pL][\pL .\-]*$/u', 'setup_minutes' => 'nullable|integer|min:0|max:1440',
             'perishable' => 'nullable|boolean',
             'lead_days' => 'nullable|integer|min:0|max:60',
             'shelf_life_days' => 'nullable|integer|min:1|max:3650',
@@ -114,9 +116,17 @@ class CatalogController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(['value_reason' => 'The replacement value is above the price you paid ('.money($buy).'). Say why, e.g. the current store price.']);
         }
         $hourly = ! $sale && ($v['rental_mode'] ?? 'day') === 'hour';
+        // stock unit: one of the list, or the supplier's own ("Other")
+        $word = trim(explode('/', (string) $v['unit'])[0]);
+        if ($word === 'other') {
+            $word = mb_strtolower(trim((string) ($v['unit_custom'] ?? '')));
+            if ($word === '') {
+                throw \Illuminate\Validation\ValidationException::withMessages(['unit_custom' => 'Type the stock unit, e.g. roll or meter.']);
+            }
+        }
         $unit = $sale
-            ? (in_array($v['unit'], Product::SALE_UNITS, true) ? $v['unit'] : 'pc')
-            : trim(explode('/', $v['unit'])[0]).' / '.($hourly ? 'hour' : 'day');
+            ? ($word !== '' && ! str_contains((string) $v['unit'], '/') ? $word : 'pc') // a rental unit ("set / day") on a sale item → pc
+            : ($word !== '' ? $word : 'piece').' / '.($hourly ? 'hour' : 'day');
 
         // base price + bulk discount tiers (optional, % off) → continuous tiers 1…, last open-ended; no tier above the stock
         $qty = array_map('intval', array_filter((array) ($v['qty'] ?? []), fn ($q) => $q !== null && $q !== ''));
@@ -170,6 +180,7 @@ class CatalogController extends Controller
             'min_hours' => ! $sale && ($v['min_hours'] ?? null) ? (float) $v['min_hours'] : ($hourly ? 1.0 : 0.0), // 0 = no minimum
             'max_hours' => $sale || empty($v['max_hours']) ? null : (float) $v['max_hours'],
             'max_rental_days' => $sale || ! $request->boolean('has_max_days') ? null : ($v['max_rental_days'] ?? null),
+            'setup_minutes' => $sale ? null : (($v['setup_minutes'] ?? null) !== null && $v['setup_minutes'] !== '' ? (int) $v['setup_minutes'] : null),
             'time_from' => $frame ? $v['time_from'] : null, 'time_to' => $frame ? $v['time_to'] : null,
             'allow_overnight' => ! $sale && $request->boolean('allow_overnight'),
             'rental_policy' => trim((string) ($v['rental_policy'] ?? '')) ?: null,
@@ -201,17 +212,32 @@ class CatalogController extends Controller
         inv()->flush();
     }
 
+    /**
+     * Product photos (up to 8): the current ones the supplier kept (keep_images[]), then the new uploads, with the photo
+     * marked primary moved to the front (it is the one shown in listings). primary_image = "keep:<path>" or "new:<n>".
+     */
     private function storeImages(Request $request, ?Product $p): array
     {
-        $paths = $p?->images ?? [];
-        foreach ((array) $request->file('images', []) as $file) {
-            $paths[] = $file->store('products', 'public');
-        }
+        $old = $p?->images ?? [];
+        $keep = $request->has('keep_images') || $p === null ? array_values(array_intersect($old, (array) $request->input('keep_images', []))) : $old;
         if ($request->boolean('clear_images')) {
-            $paths = [];
+            $keep = [];
+        }
+        $new = [];
+        foreach ((array) $request->file('images', []) as $i => $file) {
+            $new[$i] = $file->store('products', 'public');
+        }
+        $paths = array_merge($keep, array_values($new));
+        $primary = (string) $request->input('primary_image', '');
+        $first = str_starts_with($primary, 'keep:') ? substr($primary, 5) : (str_starts_with($primary, 'new:') ? ($new[(int) substr($primary, 4)] ?? null) : null);
+        if ($first !== null && in_array($first, $paths, true)) {
+            $paths = array_values(array_merge([$first], array_diff($paths, [$first])));
+        }
+        foreach (array_diff($old, $paths) as $gone) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($gone); // photos the supplier removed
         }
 
-        return array_slice($paths, -5);
+        return array_slice($paths, 0, 8);
     }
 
     /** Purchase receipt (individual shops): kept on the private disk, never public. */
@@ -417,6 +443,7 @@ class CatalogController extends Controller
             'def' => 'required', 'draft' => 'nullable|boolean',
             'tier_group' => 'nullable|string|max:60', 'tier_label' => 'nullable|string|max:30',
             'min_hours' => 'nullable|numeric|min:0.5|max:720', 'max_hours' => 'nullable|numeric|min:0.5|max:720',
+            'setup_minutes' => 'nullable|integer|min:0|max:1440',
             'photo' => 'nullable|string|max:3000000', 'clear_photo' => 'nullable|boolean',
         ]);
         if (($v['min_hours'] ?? null) && ($v['max_hours'] ?? null) && $v['max_hours'] < $v['min_hours']) {
@@ -430,6 +457,7 @@ class CatalogController extends Controller
             'events' => $events, 'draft' => $request->boolean('draft'),
             'tier_group' => trim((string) ($v['tier_group'] ?? '')) ?: null, 'tier_label' => trim((string) ($v['tier_label'] ?? '')) ?: null,
             'min_hours' => ($v['min_hours'] ?? null) ? (float) $v['min_hours'] : null, 'max_hours' => ($v['max_hours'] ?? null) ? (float) $v['max_hours'] : null,
+            'setup_minutes' => isset($v['setup_minutes']) && $v['setup_minutes'] !== '' ? (int) $v['setup_minutes'] : null,
         ]);
     }
 

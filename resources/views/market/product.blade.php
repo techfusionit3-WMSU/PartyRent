@@ -134,7 +134,7 @@
       @if(! $p->isSale())
         <dt>Stock</dt><dd>
           @if($nearAvail === null)
-            {{ $p->total_stock }} {{ $p->unitWord() }}{{ $p->total_stock === 1 ? '' : 's' }} in total
+            {{ $p->stockText($p->total_stock) }} in total
           @elseif($nearAvail > 0)
             <b>{{ $nearAvail }}</b> available{{ \App\Support\Near::label() ? ' near '.\App\Support\Near::label() : '' }} on {{ fmt_date($start) }}
           @else

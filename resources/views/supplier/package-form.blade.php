@@ -16,7 +16,7 @@
 @if($prods->isEmpty())
   <div class="alert alert-warn">{{ icon('alert') }}<div>Add some products first: a package is built from your own listings. <a href="{{ route('supplier.products.create') }}">Add a product</a></div></div>
 @endif
-<form method="POST" action="{{ $k->exists ? route('supplier.packages.update', $k) : route('supplier.packages.store') }}" class="grid grid-side" id="pkgForm">
+<form method="POST" action="{{ $k->exists ? route('supplier.packages.update', $k) : route('supplier.packages.store') }}" class="grid grid-side" id="pkgForm" data-no-enter>
   @csrf @if($k->exists) @method('PUT') @endif
   <input type="hidden" name="def" id="defInput" value="{{ json_encode($startDef) }}">
   <div class="stack">
@@ -32,6 +32,8 @@
       <div class="field"><label for="pkCond">Package conditions</label><textarea class="input" id="pkCond" name="conditions" placeholder="e.g. Price is per day. Setup included with delivery.">{{ old('conditions', $k->conditions) }}</textarea></div>
       <div class="form-grid"><div class="field"><label for="pkMinH">Minimum rental hours <span class="muted">(optional)</span></label><input class="input" type="number" id="pkMinH" name="min_hours" min="0.5" max="720" step="0.5" value="{{ old('min_hours', $k->min_hours ?: '') }}"></div>
         <div class="field"><label for="pkMaxH">Maximum rental hours <span class="muted">(optional)</span></label><input class="input" type="number" id="pkMaxH" name="max_hours" min="0.5" max="720" step="0.5" value="{{ old('max_hours', $k->max_hours ?: '') }}">@error('max_hours')<div class="error-text" style="display:block">{{ $message }}</div>@enderror</div></div>
+      <div class="field"><label for="pkSetup">Allocated setup time <span class="muted">(optional)</span></label><div class="row" style="gap:8px;align-items:center"><input class="input" type="number" id="pkSetup" name="setup_minutes" min="0" max="1440" step="5" value="{{ old('setup_minutes', $k->setup_minutes) }}" placeholder="0" style="width:120px"><span class="small muted">minutes</span></div>
+        <div class="hint">How long before the rental start the whole package must arrive to be set up. If left blank, the longest setup time of its items is used (never added up).</div></div>
       @php($photo = ($k->images ?? [])[0] ?? null)
       <div class="field"><label for="pkPhoto">Package photo</label>
         <div class="row gap-sm top"><div id="photoPrev" class="thumb" style="width:96px;height:96px;border-radius:12px;overflow:hidden;background:var(--surface-2);flex:none;display:grid;place-items:center">@if($photo)<img src="{{ asset('storage/'.$photo) }}" alt="Package photo" style="width:100%;height:100%;object-fit:cover">@else<span class="small muted">No photo</span>@endif</div>

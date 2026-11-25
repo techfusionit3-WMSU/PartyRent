@@ -10,7 +10,7 @@
       <div class="row pkg-row">
         @if(isset($r['productId']) && ($ip = inv()->product($r['productId'])))@include('partials.thumb', ['item' => $ip, 'cls' => 'sm'])@endif
         <div class="grow">@if($simple && isset($r['productId']) && ! inv()->product($r['productId'])?->package_only)<a href="{{ route('products.show', $r['productId']) }}">{{ $r['name'] }}</a>@else{{ $r['name'] }}@endif {!! $kindBadge[$r['kind']] ?? '' !!}@if(! empty($r['perGuest']))<div class="small muted">{{ rtrim(rtrim(number_format($r['perGuest'], 2), '0'), '.') }} per guest</div>@endif</div>
-        <b>× {{ $r['qty'] }}</b>
+        <b>{{ isset($r['productId']) && ($ipu = inv()->product($r['productId'])) ? $ipu->stockText($r['qty']) : '× '.$r['qty'] }}</b>
       </div>
     @endforeach
   </div>

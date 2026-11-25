@@ -26,7 +26,7 @@
             @if($k->max_guests)<div class="small muted">Good for up to {{ $k->max_guests }} guests</div>@endif
           </div>
         </div>
-        <div class="mt-1 small">@foreach($inc as $r)<span class="tag">{{ $r['qty'] }}× {{ $r['name'] }}</span> @endforeach</div>
+        <div class="mt-1 small">@foreach($inc as $r)<span class="tag">{{ isset($r['productId']) && ($ipu = inv()->product($r['productId'])) ? $ipu->stockText($r['qty']) : $r['qty'].'×' }} {{ $r['name'] }}</span> @endforeach</div>
         @if(count($def['components']) > count($inc))<div class="small muted mt-1">@foreach(array_slice(\App\Domain\Packages::describe($def), 1) as $line)<div>{{ $line }}</div>@endforeach</div>@endif
         <div class="row between mt-2 wrap">
           <div class="small">@unless($k->is_draft)<b>{{ inv()->packageAvailableOn($k->id, $today) }}</b> available today · min <b>{{ min(array_map(fn ($d) => inv()->packageAvailableOn($k->id, $d), $next30)) }}</b> next 30 days @if($limiting)<div class="muted">Limited by {{ $limiting['name'] }}</div>@endif @endunless</div>

@@ -46,7 +46,7 @@
     @foreach($prods as $p)
       <tr><td data-label="Item"><div><b>{{ $p->name }}</b><div class="small muted">#{{ $p->id }}</div></div></td>
         @foreach($locs as $l)@php($st = inv()->stockAt($p->id, $l->id))<td data-label="{{ $l->name }}" class="num">@if($st)<div><b>{{ $st }}</b><div class="small muted">{{ inv()->availableAtLocation($p->id, $l->id, $today) }} free{{ $today === today_iso() ? ' today' : '' }}</div></div>@else<span class="muted">0</span>@endif</td>@endforeach
-        <td data-label="Total" class="num"><b>{{ $p->total_stock }}</b></td>
+        <td data-label="Total" class="num"><b>{{ $p->stockText($p->total_stock) }}</b></td>
         <td>@if($locs->count() > 1)<button class="btn btn-xs" data-modal="tr{{ $p->id }}">Move stock</button>@endif</td></tr>
     @endforeach
     @foreach($pkgs as $k)

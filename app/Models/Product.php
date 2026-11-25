@@ -39,6 +39,43 @@ class Product extends Model
     /** Units a sale item can be sold in. Rental items use "x / day" units. */
     public const SALE_UNITS = ['pc', 'set', 'bundle', 'bouquet', 'pack', 'box', 'bag', 'kg', 'sack', 'tray'];
 
+    /** Stock units offered for rental items (the unit the stock is counted and priced in); "Other" allows a custom one. */
+    public const STOCK_UNITS = ['piece', 'set', 'unit', 'bundle', 'box', 'pair', 'pack', 'panel', 'kit', 'system'];
+
+    /** Short forms shown with quantities ("50 pcs"). */
+    private const UNIT_SHORT = ['piece' => ['pc', 'pcs'], 'pc' => ['pc', 'pcs']];
+
+    /** "50 pcs", "1 set", "12 sets", "8 bundles", "3 kg": a quantity with this item's stock unit. */
+    public function stockText(int|float $n): string
+    {
+        return self::qtyWithUnit($n, $this->unitWord());
+    }
+
+    public static function qtyWithUnit(int|float $n, string $unit): string
+    {
+        $u = mb_strtolower(trim($unit)) ?: 'piece';
+        $one = abs((float) $n) == 1;
+        if (isset(self::UNIT_SHORT[$u])) {
+            $w = self::UNIT_SHORT[$u][$one ? 0 : 1];
+        } elseif (in_array($u, ['kg', 'g', 'l', 'ml'], true) || $one) {
+            $w = $u;
+        } else {
+            $w = \Illuminate\Support\Str::plural($u);
+        }
+
+        return (fmod((float) $n, 1.0) ? rtrim(rtrim(number_format((float) $n, 2), '0'), '.') : number_format((float) $n)).' '.$w;
+    }
+
+    /** Allocated setup time as text ("1 h 30 min"), or null when none is set. */
+    public static function minutesText(?int $m): ?string
+    {
+        if (! $m) {
+            return null;
+        }
+
+        return trim((intdiv($m, 60) ? intdiv($m, 60).' h ' : '').($m % 60 ? ($m % 60).' min' : ''));
+    }
+
     /** Categories whose new listings default to "For sale". */
     public const SALE_CATEGORIES = ['catering', 'flowers', 'favors', 'balloons'];
 

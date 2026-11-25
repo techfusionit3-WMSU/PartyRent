@@ -1003,9 +1003,71 @@
     nav.querySelector('[data-wb]').addEventListener('click', () => go(cur - 1));
     // a field the browser refuses on submit (in a hidden step): open its step
     f.addEventListener('invalid', e => { const b = e.target.closest('[data-wiz-step]'); if (b) { const i = titles.indexOf(b.dataset.wizStep); if (i !== cur) go(i, false); } }, true);
-    const bad = f.querySelector('.invalid, .error-text');
+    const bad = Array.from(f.querySelectorAll('.invalid, .error-text')).find(el => el.classList.contains('invalid') || (!el.hidden && el.textContent.trim() !== ''));
     const start = bad && bad.closest('[data-wiz-step]') ? titles.indexOf(bad.closest('[data-wiz-step]').dataset.wizStep) : 0;
     go(start, false);
+  });
+})();
+
+/*
+ * <form data-no-enter>: Enter in a one-line box never submits the form (it moves to the next field instead), so a
+ * product is only saved with its Save button. Text areas, buttons, and boxes that use Enter themselves (tag input,
+ * search suggestions) keep working.
+ */
+(function () {
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing) return;
+    const t = e.target, f = t.form;
+    if (!f || !f.hasAttribute('data-no-enter') || t.tagName !== 'INPUT' || ['submit', 'button', 'checkbox', 'radio', 'file'].includes(t.type)) return;
+    e.preventDefault();
+    const list = Array.from(f.querySelectorAll('input,select,textarea,button')).filter(x => !x.disabled && x.type !== 'hidden' && x.offsetParent !== null && x.tabIndex !== -1);
+    const next = list[list.indexOf(t) + 1];
+    if (next && next.type !== 'submit') next.focus();
+  });
+})();
+
+/*
+ * Photo gallery (partials/image-gallery): pick several photos at once, see them at once, remove any, choose the main
+ * one (moved first). New files are kept in a hidden file input that is rebuilt as photos are added or removed.
+ */
+(function () {
+  document.querySelectorAll('[data-gallery]').forEach(function (box) {
+    const max = +box.dataset.max || 8, grid = box.querySelector('[data-gal-grid]'), add = box.querySelector('[data-gal-add]');
+    const picker = box.querySelector('[data-gal-input]'), files = box.querySelector('[data-gal-files]'), primary = box.querySelector('[data-primary]'), hint = box.querySelector('[data-gal-hint]');
+    let picked = []; // new File objects, in order
+    const toast = (window.PRUI && window.PRUI.toast) || (m => alert(m));
+    const count = () => grid.querySelectorAll('.gal-item').length;
+    function rebuild() {
+      const dt = new DataTransfer(); picked.forEach(f => dt.items.add(f)); files.files = dt.files;
+      grid.querySelectorAll('.gal-item[data-new]').forEach((el, i) => { el.dataset.key = 'new:' + i; });
+      const items = Array.from(grid.querySelectorAll('.gal-item'));
+      if (!items.some(el => el.dataset.key === primary.value)) primary.value = items[0] ? items[0].dataset.key : '';
+      items.forEach(el => { const on = el.dataset.key === primary.value; el.classList.toggle('is-primary', on); el.querySelector('[data-gal-primary] span').textContent = on ? 'Main photo' : 'Make main'; });
+      add.hidden = count() >= max;
+    }
+    picker.addEventListener('change', function () {
+      Array.from(picker.files).forEach(function (f) {
+        if (count() >= max) return toast('Up to ' + max + ' photos. Remove one to add another.', 'warn');
+        if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return toast(f.name + ' is not a JPG, PNG or WebP photo.', 'error');
+        if (f.size > 8 * 1024 * 1024) return toast(f.name + ' is larger than 8 MB.', 'error');
+        picked.push(f);
+        const fig = document.createElement('figure');
+        fig.className = 'gal-item'; fig.dataset.new = '1';
+        fig.innerHTML = '<img alt=""><figcaption><button type="button" class="gal-btn" data-gal-primary title="Make this the main photo">★<span>Make main</span></button><button type="button" class="gal-btn gal-x" data-gal-remove aria-label="Remove this photo">×</button></figcaption><span class="gal-new">New</span>';
+        fig.querySelector('img').src = URL.createObjectURL(f);
+        fig._file = f;
+        grid.insertBefore(fig, add);
+      });
+      picker.value = '';
+      rebuild();
+    });
+    grid.addEventListener('click', function (e) {
+      const fig = e.target.closest('.gal-item'); if (!fig) return;
+      if (e.target.closest('[data-gal-remove]')) { if (fig._file) picked = picked.filter(f => f !== fig._file); fig.remove(); rebuild(); }
+      if (e.target.closest('[data-gal-primary]')) { primary.value = fig.dataset.key; rebuild(); }
+    });
+    rebuild();
+    if (hint) hint.textContent = 'JPG, PNG or WebP, up to 8 MB each. Tap ★ to choose the main photo (shown in listings), × to remove one.';
   });
 })();
 

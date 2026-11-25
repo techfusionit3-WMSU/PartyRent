@@ -47,6 +47,18 @@ class PayoutBatch extends Model
         return $this->isOwed() ? 'You owe PartyRent' : (self::STATUS_LABEL[$this->status] ?? ucfirst($this->status));
     }
 
+    /** The status a shop sees: [label, badge]. Pending | Processing | Completed | Failed (a failed send goes back to pending). */
+    public function payoutStatus(): array
+    {
+        return match (true) {
+            $this->status === 'pending' && (bool) $this->failure => ['Failed', 'b-red'],
+            $this->status === 'pending' => ['Pending', 'b-gold'],
+            $this->status === 'sending' => ['Processing', 'b-sky'],
+            in_array($this->status, ['paid', 'settled'], true) => ['Completed', 'b-green'],
+            default => [self::STATUS_LABEL[$this->status] ?? ucfirst($this->status), self::STATUS_BADGE[$this->status] ?? 'b-gray'],
+        };
+    }
+
     public function periodLabel(): string
     {
         return fmt_range($this->period_start->toDateString(), $this->period_end->toDateString());

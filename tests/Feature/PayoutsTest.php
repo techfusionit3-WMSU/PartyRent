@@ -207,7 +207,7 @@ class PayoutsTest extends TestCase
 
         $this->put('/supplier/payouts/account', ['payout_method' => 'bank', 'payout_account_name' => 'Juan', 'payout_account_no' => '1234'])->assertSessionHasErrors('payout_bank');
         $this->put('/supplier/payouts/account', ['payout_method' => 'gcash', 'payout_bank' => 'BPI', 'payout_account_name' => 'Juan Dela Cruz', 'payout_account_no' => '0917 123 4567'])->assertSessionHas('success');
-        $this->assertSame('GCash · Juan Dela Cruz · 0917 123 4567', $s->fresh()->payoutAccountLabel());
+        $this->assertSame('GCash · Juan Dela Cruz · •••• 4567', $s->fresh()->payoutAccountLabel());
     }
 
     public function test_cancelled_request_with_money_kept_is_released_by_an_admin(): void

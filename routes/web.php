@@ -155,6 +155,9 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/payments/{payment}/reject', [SupplierController::class, 'rejectPayment'])->name('payments.reject');
     Route::get('/payouts', [\App\Http\Controllers\Supplier\PayoutController::class, 'index'])->name('payouts');
     Route::put('/payouts/account', [\App\Http\Controllers\Supplier\PayoutController::class, 'updateAccount'])->name('payouts.account');
+    Route::post('/payouts/accounts', [\App\Http\Controllers\Supplier\PayoutController::class, 'storeAccount'])->name('payouts.accounts.store');
+    Route::put('/payouts/accounts/{account}/default', [\App\Http\Controllers\Supplier\PayoutController::class, 'defaultAccount'])->name('payouts.accounts.default');
+    Route::delete('/payouts/accounts/{account}', [\App\Http\Controllers\Supplier\PayoutController::class, 'destroyAccount'])->name('payouts.accounts.destroy');
     Route::put('/payouts/schedule', [\App\Http\Controllers\Supplier\PayoutController::class, 'updateSchedule'])->name('payouts.schedule');
     Route::get('/reviews', [ReviewController::class, 'supplierIndex'])->name('reviews');
     Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])->name('reviews.reply');

@@ -37,12 +37,27 @@
   </div>
 </div>
 
-<details class="card mb-3" @if($batches->isEmpty() && $upcoming->isEmpty()) open @endif>
+<details class="card mb-3" id="how" @if($batches->isEmpty() && $upcoming->isEmpty()) open @endif>
   <summary class="strong" style="cursor:pointer">How payouts work</summary>
+  <p class="small mt-2">A <b>payout</b> is PartyRent sending you the money you earned. It is not the same as the day the customer pays: customers pay PartyRent first, PartyRent holds it while the rental runs, and pays you after the rental is completed, on your payout date.</p>
   <div class="grid grid-3 mt-2" style="gap:12px">
-    <div class="card card-flat soft" style="padding:14px"><div class="strong">1 · Customer pays</div><p class="small muted mb-0">Online, bank transfer or debit payments go to PartyRent and are confirmed by PartyRent. Cash is handed to you and you record it.</p></div>
-    <div class="card card-flat soft" style="padding:14px"><div class="strong">2 · Rental completed</div><p class="small muted mb-0">Your earnings are added to the next payout: items minus the {{ $pctTxt }}% commission, plus delivery fees and damage charges in full.</p></div>
-    <div class="card card-flat soft" style="padding:14px"><div class="strong">3 · Payout sent</div><p class="small muted mb-0">{{ \App\Domain\Payouts::SCHEDULE_HINT[$schedule] }} Cash you already collected is yours, so it is taken off the amount sent.</p></div>
+    <div class="card card-flat soft" style="padding:14px"><div class="strong">1 · Customer payment date</div><p class="small muted mb-0">The day the customer pays (online, bank transfer or debit). PartyRent confirms it and holds it. Cash is handed to you and you record it.</p></div>
+    <div class="card card-flat soft" style="padding:14px"><div class="strong">2 · Rental completed</div><p class="small muted mb-0">Your earnings join the next payout: items minus the {{ $pctTxt }}% commission, plus delivery fees and damage charges in full.</p></div>
+    <div class="card card-flat soft" style="padding:14px"><div class="strong">3 · Payout date</div><p class="small muted mb-0">{{ \App\Domain\Payouts::SCHEDULE_HINT[$schedule] }} Cash you already collected is yours, so it is taken off the amount sent.</p></div>
+  </div>
+  <h4 class="mt-2 mb-1">Expected timing</h4>
+  <ul class="small mt-0">
+    <li>On your payout date the payout is <b>prepared</b>. PartyRent then sends it, usually within <b>2 business days</b>.</li>
+    <li>After it is sent, when the money shows up depends on your bank or e-wallet: e-wallets are usually quick; bank transfers can take <b>1–3 business days</b>, longer over weekends and holidays.</li>
+    <li>A payment the customer made close to the payout date may still be <b>settling</b> (being confirmed by the bank or payment provider). It is paid in the next payout once confirmed.</li>
+    <li>These are estimates, not guarantees: bank cut-offs, provider maintenance or a wrong account number can delay a payout.</li>
+  </ul>
+  <h4 class="mt-2 mb-1">Payout status</h4>
+  <div class="row wrap small" style="gap:8px">
+    <span><span class="badge b-gold">Pending</span> being prepared or waiting to be sent</span>
+    <span><span class="badge b-sky">Processing</span> sent, waiting for the bank or e-wallet</span>
+    <span><span class="badge b-green">Completed</span> received by your account</span>
+    <span><span class="badge b-red">Failed</span> the transfer was refused (often a wrong account); it is sent again after the account is checked</span>
   </div>
   <p class="small muted mt-2 mb-0">Security deposits are not income: PartyRent (or you, if the customer paid it in cash) returns them to the customer.</p>
 </details>
@@ -98,9 +113,11 @@
               <div class="muted mt-1">Commission included above: {{ money($b->commission) }}</div>
             </div>
           </details></td>
-        <td data-label="Status"><span class="badge {{ $b->isOwed() ? 'b-red' : (\App\Models\PayoutBatch::STATUS_BADGE[$b->status] ?? 'b-gray') }}">{{ $b->isOwed() && $b->carried_to_id ? 'Taken from '.optional($batches->firstWhere('id', $b->carried_to_id))->code : $b->statusLabel() }}</span>
+        <td data-label="Status">@php($st = $b->payoutStatus())<span class="badge {{ $b->isOwed() ? 'b-red' : $st[1] }}">{{ $b->isOwed() && $b->carried_to_id ? 'Taken from '.optional($batches->firstWhere('id', $b->carried_to_id))->code : ($b->isOwed() ? $b->statusLabel() : $st[0]) }}</span>
+          @if($b->status === 'pending' && $b->failure)<div class="small" style="color:var(--red)">Last attempt failed: {{ $b->failure }}. PartyRent will check your account and send it again.</div>@endif
           @if($b->isPaid())<div class="small muted">{{ $b->methodLabel() }} · {{ $b->reference }}<br>{{ fmt_date($b->paid_at->toDateString()) }}</div>
-          @elseif($b->status === 'pending')<div class="small muted">{{ $acct ? 'Sending within 2 business days' : 'Waiting for your payout account' }}</div>@endif</td>
+          @elseif($b->status === 'pending' && ! $b->failure)<div class="small muted">{{ $acct ? 'Usually sent within 2 business days' : 'Waiting for your payout account' }}</div>
+          @elseif($b->status === 'sending')<div class="small muted">Sent{{ $b->reference ? ' · '.$b->reference : '' }}. Arrival depends on your bank or e-wallet (usually 1–3 business days).</div>@endif</td>
       </tr>@endforeach
     </tbody></table></div>
   @endif
@@ -121,18 +138,74 @@
     @endif
   </div>
   <div class="card" id="account">
-    <h3>Payout account</h3>
-    <p class="small muted">Where PartyRent sends your money.</p>
+    <h3>Payout accounts</h3>
+    <p class="small muted">Where PartyRent sends your money. You can keep several; payouts go to the <b>default</b> one. Account numbers are stored encrypted and shown masked.</p>
+    @forelse($accounts as $a)
+      <div class="row between wrap" style="gap:8px;padding:10px 0;border-top:1px solid var(--line)">
+        <div><b>{{ $a->provider_name }}</b> <span class="small muted">{{ \App\Models\PayoutAccount::CATEGORY_LABEL[$a->category] }}{{ $a->category === 'bank' && ! empty($a->details['accountType']) ? ' · '.ucfirst($a->details['accountType']) : '' }}</span>
+          @if($a->is_default)<span class="badge b-green">Default</span>@endif
+          <div class="small">{{ $a->account_name }} · <span class="mono">{{ $a->masked() }}</span>{{ ! empty($a->details['branch']) ? ' · '.$a->details['branch'] : '' }}</div></div>
+        @if($canManage)
+          <div class="btn-group">
+            @unless($a->is_default)<form method="POST" action="{{ route('supplier.payouts.accounts.default', $a) }}">@csrf @method('PUT')<button class="btn btn-xs">Make default</button></form>@endunless
+            <form method="POST" action="{{ route('supplier.payouts.accounts.destroy', $a) }}" data-confirm-title="Remove this payout account?" data-confirm="{{ $a->label() }} will be removed.">@csrf @method('DELETE')<button class="btn btn-xs btn-ghost" style="color:var(--red)">Remove</button></form>
+          </div>
+        @endif
+      </div>
+    @empty
+      <p class="small mb-2">No payout account yet.</p>
+    @endforelse
     @if($canManage)
-      <form method="POST" action="{{ route('supplier.payouts.account') }}">@csrf @method('PUT')
-        <div class="field"><label>Receive by</label><div class="row wrap">@foreach(\App\Models\Payout::METHOD_LABEL as $k => $l)<label class="row" style="gap:6px"><input type="radio" name="payout_method" value="{{ $k }}" data-payout-method @checked(old('payout_method', $s->payout_method ?? 'gcash') === $k)> {{ $l }}</label>@endforeach</div></div>
-        <div class="field" data-for-bank @if(old('payout_method', $s->payout_method ?? 'gcash') !== 'bank') hidden @endif><label for="payout_bank">Bank</label>@php($curBank = old('payout_bank', $s->payout_bank))<select class="input" id="payout_bank" name="payout_bank"><option value="">Choose your bank…</option>@foreach(array_keys(\App\Domain\XenditPayouts::BANKS) as $bk)<option @selected($curBank === $bk)>{{ $bk }}</option>@endforeach @if($curBank && ! array_key_exists($curBank, \App\Domain\XenditPayouts::BANKS))<option selected>{{ $curBank }}</option>@endif</select>@error('payout_bank')<div class="error-text">{{ $message }}</div>@enderror</div>
-        <div class="field"><label for="payout_account_name">Account name</label><input class="input" id="payout_account_name" name="payout_account_name" required maxlength="120" value="{{ old('payout_account_name', $s->payout_account_name) }}">@error('payout_account_name')<div class="error-text">{{ $message }}</div>@enderror</div>
-        <div class="field"><label for="payout_account_no">Account / mobile number</label><input class="input" id="payout_account_no" name="payout_account_no" required maxlength="40" inputmode="numeric" value="{{ old('payout_account_no', $s->payout_account_no) }}">@error('payout_account_no')<div class="error-text">{{ $message }}</div>@enderror</div>
-        <button class="btn btn-primary">Save payout account</button>
-      </form>
-    @else
-      <p class="mb-0">{{ $acct ?: 'Not added yet.' }}</p>
+      <details class="mt-2" data-payout-add @if($accounts->isEmpty() || $errors->hasAny(['category', 'provider', 'provider_name', 'account_name', 'account_number', 'account_type'])) open @endif>
+        <summary class="btn btn-sm">{{ icon('plus') }} Add a payout account</summary>
+        <form method="POST" action="{{ route('supplier.payouts.accounts.store') }}" class="mt-2" data-no-enter autocomplete="off">@csrf
+          @php($cat = old('category', 'ewallet'))
+          <div class="field"><label>Type</label><div class="row wrap" style="gap:10px">
+            @foreach(\App\Models\PayoutAccount::CATEGORY_LABEL as $k => $l)<label class="row" style="gap:6px"><input type="radio" name="category" value="{{ $k }}" data-pa-cat @checked($cat === $k)> {{ $l }}</label>@endforeach
+          </div>@error('category')<div class="error-text">{{ $message }}</div>@enderror</div>
+          <div data-pa-for="card" @if($cat !== 'card') hidden @endif>
+            <div class="alert alert-info small">{{ icon('info') }}<div>@if($cardsEnabled)Debit cards are added on the card provider's secure form: PartyRent only keeps the provider's token and the last 4 digits, never the card number or CVV.@else<b>Not available yet.</b> Debit card payouts need a card-payout provider (card tokenization), which PartyRent has not connected. PartyRent never asks for your card number or CVV here. Use an e-wallet or bank account for now.@endif</div></div>
+          </div>
+          <div data-pa-for="ewallet bank" @if($cat === 'card') hidden @endif>
+            @php($prov = old('provider', $cat === 'bank' ? 'bpi' : 'gcash'))
+            <div class="field" data-pa-for="ewallet" @if($cat !== 'ewallet') hidden @endif><label for="pa-wallet">E-wallet</label>
+              <select class="input" id="pa-wallet" data-pa-prov="ewallet" @if($cat === 'ewallet') name="provider" @endif>@foreach(\App\Models\PayoutAccount::PROVIDERS['ewallet'] as $k => $l)<option value="{{ $k }}" @selected($prov === $k)>{{ $l }}</option>@endforeach</select></div>
+            <div class="field" data-pa-for="bank" @if($cat !== 'bank') hidden @endif><label for="pa-bank">Bank</label>
+              <select class="input" id="pa-bank" data-pa-prov="bank" @if($cat === 'bank') name="provider" @endif>@foreach(\App\Models\PayoutAccount::PROVIDERS['bank'] as $k => $l)<option value="{{ $k }}" @selected($prov === $k)>{{ $l }}</option>@endforeach</select></div>
+            @error('provider')<div class="error-text">{{ $message }}</div>@enderror
+            <div class="field" data-pa-other @if(! in_array($prov, ['other_ewallet', 'other_bank'], true)) hidden @endif><label for="pa-pname" data-pa-pname-label>{{ $cat === 'bank' ? 'Bank name' : 'E-wallet name' }}</label>
+              <input class="input" id="pa-pname" name="provider_name" maxlength="60" value="{{ old('provider_name') }}" list="pa-banks" placeholder="e.g. Metrobank, ShopeePay">
+              <datalist id="pa-banks">@foreach(array_keys(\App\Domain\XenditPayouts::BANKS) as $bk)@unless(in_array($bk, ['BPI', 'BDO'], true))<option value="{{ $bk }}">@endunless @endforeach</datalist>
+              @error('provider_name')<div class="error-text">{{ $message }}</div>@enderror</div>
+            <div class="field"><label for="pa-name">Account name</label><input class="input" id="pa-name" name="account_name" maxlength="120" value="{{ old('account_name') }}" placeholder="As registered with the bank or e-wallet">@error('account_name')<div class="error-text">{{ $message }}</div>@enderror</div>
+            <div class="field"><label for="pa-no" data-pa-no-label>{{ $cat === 'bank' ? 'Account number' : 'Mobile number' }}</label><input class="input" id="pa-no" name="account_number" maxlength="24" inputmode="numeric" autocomplete="off" value="{{ old('account_number') }}">
+              <div class="small muted" data-pa-hint></div>@error('account_number')<div class="error-text">{{ $message }}</div>@enderror</div>
+            <div class="form-grid" data-pa-for="bank" @if($cat !== 'bank') hidden @endif>
+              <div class="field"><label for="pa-type">Account type</label><select class="input" id="pa-type" name="account_type"><option value="savings" @selected(old('account_type') !== 'checking')>Savings</option><option value="checking" @selected(old('account_type') === 'checking')>Checking</option></select>@error('account_type')<div class="error-text">{{ $message }}</div>@enderror</div>
+              <div class="field"><label for="pa-branch">Branch <span class="muted small">(optional)</span></label><input class="input" id="pa-branch" name="branch" maxlength="80" value="{{ old('branch') }}"></div>
+            </div>
+            @if($accounts->isNotEmpty())<label class="check small mb-2"><input type="checkbox" name="make_default" value="1" @checked(old('make_default'))> Send my payouts here (make it the default)</label>@endif
+            <button class="btn btn-primary">Save payout account</button>
+          </div>
+        </form>
+      </details>
+      <script>
+        (() => {
+          const f = document.querySelector('[data-payout-add] form'); if (!f) return;
+          const hints = @json(collect(\App\Models\PayoutAccount::NUMBER_RULES)->map(fn ($r) => 'Enter '.$r[1].'.'));
+          const sync = () => {
+            const cat = (f.querySelector('[data-pa-cat]:checked') || {}).value || 'ewallet';
+            f.querySelectorAll('[data-pa-for]').forEach(el => { el.hidden = !el.dataset.paFor.split(' ').includes(cat); });
+            f.querySelectorAll('[data-pa-prov]').forEach(sel => { if (sel.dataset.paProv === cat) sel.setAttribute('name', 'provider'); else sel.removeAttribute('name'); });
+            const sel = f.querySelector('[data-pa-prov="' + cat + '"]'), prov = sel ? sel.value : '';
+            f.querySelector('[data-pa-other]').hidden = !(prov === 'other_ewallet' || prov === 'other_bank') || cat === 'card';
+            f.querySelector('[data-pa-pname-label]').textContent = cat === 'bank' ? 'Bank name' : 'E-wallet name';
+            f.querySelector('[data-pa-no-label]').textContent = cat === 'bank' ? 'Account number' : (prov === 'other_ewallet' ? 'Account or mobile number' : 'Mobile number');
+            f.querySelector('[data-pa-hint]').textContent = hints[prov] || '';
+          };
+          f.addEventListener('change', sync); sync();
+        })();
+      </script>
     @endif
   </div>
 </div>

@@ -135,7 +135,7 @@ class ShopStaff extends Model
         'locations' => 'locations.manage', 'locations.*' => 'locations.manage',
         'damages' => 'returns.inspect', 'damages.*' => 'returns.inspect',
         'payments' => 'payments.view', 'payments.*' => 'payments.verify',
-        'payouts' => 'payments.view', 'payouts.account' => 'shop.manage', 'payouts.schedule' => 'shop.manage',
+        'payouts' => 'payments.view', 'payouts.account' => 'shop.manage', 'payouts.accounts.store' => 'shop.manage', 'payouts.accounts.default' => 'shop.manage', 'payouts.accounts.destroy' => 'shop.manage', 'payouts.schedule' => 'shop.manage',
         'reports' => 'reports.view', 'reports.*' => 'reports.view', 'records' => 'reports.view', 'activity' => 'team.manage',
         'shop' => 'shop.manage', 'shop.*' => 'shop.manage', 'business' => 'shop.manage',
         'transfers.*' => null, // each step is checked against the user's branch (App\Domain\Transfers::can)

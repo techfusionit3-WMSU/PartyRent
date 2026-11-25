@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Supplier;
 
 use App\Domain\Finance;
 use App\Domain\Notifier;
+use App\Domain\PayoutAccounts;
 use App\Domain\Payouts;
 use App\Http\Controllers\Controller;
 use App\Models\Payout;
+use App\Models\PayoutAccount;
 use App\Models\PayoutBatch;
 use App\Models\RentalRequest;
 use Illuminate\Http\Request;
@@ -33,6 +35,8 @@ class PayoutController extends Controller
             'sum' => Payouts::summary($s->id),
             'pct' => Payouts::pct(),
             'schedule' => $schedule,
+            'accounts' => $s->ensurePayoutAccounts(),
+            'cardsEnabled' => PayoutAccounts::cardsEnabled(),
             'period' => Payouts::period(today_iso(), $schedule),
             'nextDate' => Payouts::nextPayoutDate($s),
             'owed' => Payouts::owed($s),
@@ -57,13 +61,38 @@ class PayoutController extends Controller
             'payout_account_name' => 'required|string|max:120',
             'payout_account_no' => ['required', 'string', 'max:40', 'regex:/^[0-9 \-]+$/'],
         ], ['payout_bank.required_if' => 'Enter the bank name.', 'payout_account_no.regex' => 'Use digits only.']);
-        if ($data['payout_method'] === 'gcash') {
-            $data['payout_bank'] = null;
-        }
-        $s->update($data);
-        Notifier::audit('Updated payout account', $s->name.' · '.$s->payoutAccountLabel());
+        // the older one-account form: saved as a payout account and made the default
+        $bank = strtoupper(trim((string) $data['payout_bank']));
+        PayoutAccounts::add($s, ['category' => $data['payout_method'] === 'gcash' ? 'ewallet' : 'bank',
+            'provider' => $data['payout_method'] === 'gcash' ? 'gcash' : (in_array($bank, ['BPI', 'BDO'], true) ? strtolower($bank) : 'other_bank'),
+            'provider_name' => $data['payout_bank'], 'account_name' => $data['payout_account_name'], 'account_number' => $data['payout_account_no'],
+            'account_type' => 'savings', 'make_default' => true], $request->user());
 
-        return back()->with('success', 'Payout account saved. Future payouts go to '.$s->payoutAccountLabel().'.');
+        return back()->with('success', 'Payout account saved. Future payouts go to '.$s->fresh()->payoutAccountLabel().'.');
+    }
+
+    /** Add a payout account (e-wallet or bank; debit cards only through the card provider's secure form). */
+    public function storeAccount(Request $request)
+    {
+        $s = $request->user()->shop();
+        $a = PayoutAccounts::add($s, $request->only(['category', 'provider', 'provider_name', 'account_name', 'account_number', 'account_type', 'branch', 'make_default']), $request->user());
+
+        return redirect(route('supplier.payouts').'#account')->with('success', 'Saved '.$a->label().'.'.($a->is_default ? ' Your payouts go here.' : ''));
+    }
+
+    public function defaultAccount(Request $request, PayoutAccount $account)
+    {
+        $s = $request->user()->shop();
+        PayoutAccounts::makeDefault($s, $account, $request->user());
+
+        return redirect(route('supplier.payouts').'#account')->with('success', 'Future payouts go to '.$account->label().'. Payouts already on the way are not changed.');
+    }
+
+    public function destroyAccount(Request $request, PayoutAccount $account)
+    {
+        $res = PayoutAccounts::remove($request->user()->shop(), $account, $request->user());
+
+        return redirect(route('supplier.payouts').'#account')->with($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Payout account removed.' : $res['error']);
     }
 
     public function updateSchedule(Request $request)

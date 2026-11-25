@@ -65,6 +65,7 @@ class RecordStaffAction
         'supplier.discounts.delete' => 'Deleted a discount',
         'supplier.shop.update' => 'Changed the shop settings',
         'supplier.payouts.account' => 'Changed the payout account',
+        'supplier.payouts.accounts.store' => 'Added a payout account', 'supplier.payouts.accounts.default' => 'Changed the default payout account', 'supplier.payouts.accounts.destroy' => 'Removed a payout account',
         'supplier.payouts.schedule' => 'Changed the payout schedule',
         'supplier.team.store' => 'Added a team member',
         'supplier.team.update' => 'Changed a team member\'s roles or access',

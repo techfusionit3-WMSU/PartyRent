@@ -97,9 +97,38 @@ class Supplier extends Model
 
     public function hasPayoutAccount(): bool { return (bool) $this->payout_method && $this->payout_account_name && $this->payout_account_no; }
 
+    /** Where payouts go, with the number masked: "GCash · Juan Dela Cruz · •••• 4567". */
     public function payoutAccountLabel(): string
     {
-        return $this->hasPayoutAccount() ? ($this->payout_method === 'gcash' ? 'GCash' : ($this->payout_bank ?: 'Bank')).' · '.$this->payout_account_name.' · '.$this->payout_account_no : 'Not set';
+        if (! $this->hasPayoutAccount()) {
+            return 'Not set';
+        }
+        $digits = preg_replace('/\D/', '', (string) $this->payout_account_no);
+
+        $where = in_array($this->payout_method, ['gcash', 'maya'], true) ? Payout::METHOD_LABEL[$this->payout_method] : ($this->payout_bank ?: (Payout::METHOD_LABEL[$this->payout_method] ?? 'Bank'));
+
+        return $where.' · '.$this->payout_account_name.' · •••• '.substr($digits, -4);
+    }
+
+    public function payoutAccounts(): HasMany { return $this->hasMany(PayoutAccount::class)->orderByDesc('is_default')->orderBy('id'); }
+
+    /** The shop's payout accounts; an account saved the older way (payout_* columns only) becomes the first one. */
+    public function ensurePayoutAccounts(): \Illuminate\Support\Collection
+    {
+        $list = $this->payoutAccounts()->get();
+        if ($list->isEmpty() && $this->hasPayoutAccount()) {
+            $digits = preg_replace('/\D/', '', (string) $this->payout_account_no);
+            $wallet = $this->payout_method !== 'bank';
+            $bank = trim((string) $this->payout_bank);
+            $provider = $wallet ? ($this->payout_method === 'maya' ? 'maya' : ($this->payout_method === 'gcash' ? 'gcash' : 'other_ewallet'))
+                : (in_array(strtoupper($bank), ['BPI', 'BDO'], true) ? strtolower($bank) : 'other_bank');
+            $this->payoutAccounts()->create(['category' => $wallet ? 'ewallet' : 'bank', 'provider' => $provider,
+                'provider_name' => $wallet ? ($provider === 'other_ewallet' ? ($bank ?: 'E-wallet') : PayoutAccount::PROVIDERS['ewallet'][$provider]) : ($bank ?: 'Bank'),
+                'account_name' => $this->payout_account_name, 'account_number' => $digits, 'last4' => substr($digits, -4), 'details' => $wallet ? [] : ['accountType' => 'savings'], 'is_default' => true]);
+            $list = $this->payoutAccounts()->get();
+        }
+
+        return $list;
     }
     public function packages(): HasMany { return $this->hasMany(Package::class); }
     public function rentalRequests(): HasMany { return $this->hasMany(RentalRequest::class); }

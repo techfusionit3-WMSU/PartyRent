@@ -43,6 +43,12 @@ class XenditPayouts
         if ($s->payout_method === 'gcash') {
             return 'PH_GCASH';
         }
+        if ($s->payout_method === 'maya') {
+            return 'PH_PAYMAYA';
+        }
+        if ($s->payout_method !== 'bank') {
+            return null; // other e-wallets and debit cards: sent by hand (or by the card-payout provider)
+        }
         $key = fn ($v) => strtolower(preg_replace('/[^a-z]/i', '', (string) $v));
         foreach (self::BANKS as $name => $code) {
             if ($key($name) === $key($s->payout_bank)) {
@@ -90,7 +96,7 @@ class XenditPayouts
             $res = self::http()->withHeaders(['Idempotency-key' => $p->code.'-'.now()->format('YmdHis')])->post('/v2/payouts', [
                 'reference_id' => $p->code,
                 'channel_code' => $channel,
-                'channel_properties' => ['account_holder_name' => $s->payout_account_name, 'account_number' => preg_replace('/\D/', '', $s->payout_account_no)],
+                'channel_properties' => ['account_holder_name' => $s->payout_account_name, 'account_number' => preg_replace('/\D/', '', (string) $s->payout_account_no)],
                 'amount' => round($p->net, 2),
                 'currency' => 'PHP',
                 'description' => Settings::get('platformName').' payout '.$p->code.' for '.$p->periodLabel(),

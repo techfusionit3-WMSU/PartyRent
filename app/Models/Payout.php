@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Payout extends Model
 {
-    public const METHOD_LABEL = ['gcash' => 'GCash', 'bank' => 'Bank transfer'];
+    public const METHOD_LABEL = ['gcash' => 'GCash', 'maya' => 'Maya', 'ewallet' => 'E-wallet', 'bank' => 'Bank transfer', 'card' => 'Debit card'];
 
     protected $guarded = ['id'];
 

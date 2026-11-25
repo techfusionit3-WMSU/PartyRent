@@ -61,7 +61,7 @@ class CheckoutQuantityTest extends TestCase
     {
         [$maria, $shop, , $line, $d1, $d2] = $this->setUpLine();
         $this->postJson('/checkout/qty', ['cart_id' => $line->id, 'days' => [$d1 => 5, $d2 => 5]])->assertOk();
-        $dest = fn ($id, $label) => ['id' => $id, 'label' => $label, 'address' => '12 Sampaguita St., Brgy. Holy Spirit, Quezon City', 'zoneId' => ''];
+        $dest = fn ($id, $label) => ['id' => $id, 'label' => $label, 'address' => '12 Sampaguita St., Brgy. Holy Spirit, Quezon City', 'zoneId' => '', 'contactName' => 'Ana Cruz', 'contactPhone' => '0917 555 0303'];
 
         // the parts must add up to the (new) quantity
         $order = ['supplier_id' => $shop->id, 'cart_line_ids' => [$line->id], 'eventDate' => $d1, 'fulfillment' => 'delivery', 'plan' => 'full', 'method' => 'online',

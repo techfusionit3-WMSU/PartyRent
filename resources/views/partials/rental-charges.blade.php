@@ -30,6 +30,9 @@
       <div class="sum-line"><span>Delivery Fee <span class="small muted">({{ count($del) }} locations)</span></span><span>{{ money($q['deliveryFee']) }}</span></div>
       @foreach($del as $d)<div class="sum-line small ch-sub"><span>{{ $d['label'] }}<div class="muted">{{ $d['zone'] }}</div></span><span>{{ money($d['fee']) }}</span></div>@endforeach
     @endif
+    @if(($q['earlyDeliveryFee'] ?? 0) > 0)
+      <div class="sum-line"><span>Earlier delivery<div class="small muted">accepted by the shop</div></span><span>{{ money($q['earlyDeliveryFee']) }}</span></div>
+    @endif
     @foreach(array_filter($q['services'] ?? [], fn ($x) => $x['amount'] > 0) as $x)
       <div class="sum-line"><span>Service Fee – {{ $x['name'] }}<div class="small muted">{{ $x['description'] }}{{ $x['qty'] > 1 ? ' · '.money($x['unit']).' × '.$x['qty'].' visits' : '' }}{{ $x['required'] ? '' : ' · optional' }}</div></span><span>{{ money($x['amount']) }}</span></div>
     @endforeach

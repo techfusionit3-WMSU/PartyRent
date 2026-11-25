@@ -33,6 +33,7 @@ class DeliveryInput
             'delivery.freeOver' => 'nullable|numeric|min:0|max:100000000',
             'delivery.roundTrip' => 'nullable|in:0,1',
             'delivery.chargePerTrip' => 'nullable|in:0,1',
+            'delivery.earlyPerHour' => 'nullable|numeric|min:0|max:100000',
         ];
     }
 
@@ -83,6 +84,7 @@ class DeliveryInput
             'baseFee' => $num('baseFee'), 'perKm' => $num('perKm'), 'freeKm' => $num('freeKm'), 'maxKm' => $num('maxKm'),
             'freeOver' => $num('freeOver'),
             'roundTrip' => ($in['roundTrip'] ?? '1') === '1', 'chargePerTrip' => ($in['chargePerTrip'] ?? '0') === '1',
+            'earlyPerHour' => isset($in['earlyPerHour']) && $in['earlyPerHour'] !== '' ? $num('earlyPerHour') : \App\Domain\DeliverySchedule::DEFAULT_EARLY_PER_HOUR,
         ]);
     }
 }

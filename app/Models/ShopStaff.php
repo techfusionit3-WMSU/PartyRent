@@ -120,7 +120,7 @@ class ShopStaff extends Model
         // module home pages (App\Support\CompanyModules)
         'desk' => 'orders.manage', 'stock' => 'inventory.manage', 'crew' => 'fulfillment.update',
         'requests.accept' => 'orders.manage', 'requests.decline' => 'orders.manage', 'requests.notes' => 'orders.manage',
-        'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage', 'requests.replan' => 'orders.manage',
+        'requests.schedule' => 'orders.manage', 'requests.source' => 'orders.manage', 'requests.replan' => 'orders.manage', 'requests.early' => 'orders.manage',
         'requests.custom-discount*' => 'shop.manage', // custom discounts: owner-level money decisions
         'requests.advance' => 'fulfillment.update', 'requests.complete' => 'fulfillment.update',
         'requests.inspection' => 'returns.inspect', 'requests.settle' => 'returns.inspect',

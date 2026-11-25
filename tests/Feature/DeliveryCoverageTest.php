@@ -207,14 +207,27 @@ class DeliveryCoverageTest extends TestCase
         [$m, $hm, $hub] = $this->twoShops();
         $line = CartLine::where('user_id', $m->id)->where('supplier_id', $hm->id)->firstOrFail();
         $d1 = $this->dest('137404000', 'Kamuning', '23 Mabini St.') + ['id' => 'd1', 'label' => 'Home'];
-        $d2 = array_merge($this->dest('137402000', 'Concepcion', '7 Gil Fernando Ave.'), ['id' => 'd2', 'label' => 'Reception']);
+        $contact = ['contactName' => 'Ana Cruz', 'contactPhone' => '0917 555 0303'];
+        // a second location in ANOTHER of Happy Moments' zones (Marikina): refused, the first location's zone rules
+        $far = array_merge($this->dest('137402000', 'Concepcion', '7 Gil Fernando Ave.'), ['id' => 'd2'], $contact);
+        $hmLines = [['cart_id' => $line->id, 'type' => 'item', 'days' => [$this->day() => 1], 'destId' => 'd1'], ['cart_id' => $line->id, 'type' => 'item', 'days' => [$this->day() => 1], 'destId' => 'd2']];
+        $bad = $this->quote($m, [$hm], [$d1, $far], [$hm->id => ['lines' => $hmLines]]);
+        $this->assertFalse($bad[$hm->id]['ok']);
+        $this->assertStringContainsString('outside the delivery zone of your first location', $bad[$hm->id]['error']);
+        // no on-site contact at the second location: refused
+        $noContact = array_merge($this->dest('137404000', 'Teachers Village East', '9 Maginhawa St.'), ['id' => 'd2']);
+        $this->assertStringContainsString('on-site contact name', (string) $this->quote($m, [$hm], [$d1, $noContact], [$hm->id => ['lines' => $hmLines]])[$hm->id]['error']);
+        // same zone (another Quezon City barangay), contact given: fine, and each location gets a name from its address
+        $d2 = array_merge($this->dest('137404000', 'Teachers Village East', '9 Maginhawa St.'), ['id' => 'd2', 'label' => 'typed name is ignored'], $contact);
         // Happy Moments: one chair to each location; Celebration Hub: everything to the first one only
         $hmLines = [['cart_id' => $line->id, 'type' => 'item', 'days' => [$this->day() => 1], 'destId' => 'd1'], ['cart_id' => $line->id, 'type' => 'item', 'days' => [$this->day() => 1], 'destId' => 'd2']];
         $q = $this->quote($m, [$hm, $hub], [$d1, $d2], [$hm->id => ['lines' => $hmLines], $hub->id => ['destinations' => [$d1]]]);
         $this->assertTrue($q[$hm->id]['ok'], (string) $q[$hm->id]['error']);
         $drops = collect($q[$hm->id]['drops'])->keyBy('destId');
         $this->assertSame('Quezon City', $drops['d1']['zone']);
-        $this->assertSame('Marikina / San Juan', $drops['d2']['zone']);
+        $this->assertSame('Quezon City', $drops['d2']['zone']);
+        $this->assertSame('23 Mabini St., Brgy. Kamuning', $drops['d1']['label']);
+        $this->assertSame('9 Maginhawa St., Brgy. Teachers Village East', $drops['d2']['label']);
         $this->assertEquals($drops['d1']['fee'] + $drops['d2']['fee'], $q[$hm->id]['summary']['q']['deliveryFee']);
         $this->assertCount(1, $q[$hub->id]['drops']); // a store with nothing for the second location is not charged for it
     }

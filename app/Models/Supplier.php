@@ -164,7 +164,7 @@ class Supplier extends Model
     }
 
     /** Legacy delivery editor defaults (old Shop settings form; replaced by the v4 zone editor). */
-    public const DELIVERY_DEFAULTS = ['mode' => 'zones', 'reach' => 'island', 'zones' => [], 'baseFee' => 0, 'perKm' => 0, 'freeKm' => 0, 'maxKm' => 0, 'freeOver' => 0, 'roundTrip' => true, 'chargePerTrip' => false];
+    public const DELIVERY_DEFAULTS = ['mode' => 'zones', 'reach' => 'island', 'zones' => [], 'baseFee' => 0, 'perKm' => 0, 'freeKm' => 0, 'maxKm' => 0, 'freeOver' => 0, 'roundTrip' => true, 'chargePerTrip' => false, 'earlyPerHour' => 100];
 
     /** Legacy delivery settings (kept only so old data still reads). v4 uses delivery_zones + delivery_fee. */
     public function deliverySettings(): array

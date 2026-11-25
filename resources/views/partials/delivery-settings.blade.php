@@ -73,6 +73,7 @@
   </div>
 
   <div class="form-grid mt-1">
+    <div class="field"><label>Earlier-delivery fee per hour ({{ $cur }})</label><input class="input" type="number" min="0" step="1" name="delivery[earlyPerHour]" value="{{ $dv('earlyPerHour') ?? 100 }}"><div class="hint">When a customer asks for delivery before the standard time (rental start − setup time), per started hour earlier. You accept or reject each request; nothing is charged unless you accept.</div></div>
     <div class="field"><label>Free delivery when items total at least ({{ $cur }})</label><input class="input" type="number" min="0" step="0.01" name="delivery[freeOver]" value="{{ $dv('freeOver') }}"><div class="hint">0 = never free. Handling fees still apply.</div></div>
     <div class="field"><label>Fee covers</label><select class="input" name="delivery[roundTrip]"><option value="1" @selected((string) (int) $dv('roundTrip') === '1')>Drop-off and retrieval (round trip)</option><option value="0" @selected((string) (int) $dv('roundTrip') === '0')>One way — retrieval is charged again</option></select></div>
     <div class="field full"><label class="check"><input type="hidden" name="delivery[chargePerTrip]" value="0"><input type="checkbox" name="delivery[chargePerTrip]" value="1" @checked((string) (int) $dv('chargePerTrip') === '1')> Charge a separate trip for each block of non-consecutive rental dates</label></div>

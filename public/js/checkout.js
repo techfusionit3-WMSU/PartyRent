@@ -49,10 +49,19 @@
   const store = { get() { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }, set(v) { try { sessionStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* private mode: nothing kept */ } } };
   const anyDelivery = () => orders.some(o => o.fulfillment === 'delivery');
   const newLoc = n => ({ id: 'd' + n, label: '', addr: { regionCode: '', provinceCode: '', cityCode: '', barangay: '', street: '' }, text: '', lat: null, lng: null,
-    mapLat: null, mapLng: null, pin: 'none', confirmed: false, streetTyped: false, status: '', contactName: '' });
+    mapLat: null, mapLng: null, pin: 'none', confirmed: false, streetTyped: false, status: '', contactName: '', contactPhone: '' });
   const G = { multi: false, locs: [newLoc(1)] };
   const saveState = () => store.set({ multi: G.multi, locs: G.locs.map(g => Object.assign({}, g, { status: '' })), instructions: shared.instructions || '' });
-  const locName = (g, i) => G.multi ? (g.label || 'Location ' + (i + 1)) : 'Delivery address';
+  /** A location's name from its address ("Pilar Building, Brgy. Zone IV"), never typed; duplicates get (2), (3). */
+  function autoLabel(g, i) {
+    const first = ((g.addr.street || '').split(',')[0] || '').trim(), b = (g.addr.barangay || '').trim().replace(/^(brgy\.?|barangay)\s+/i, '');
+    return [first, b ? 'Brgy. ' + b : ''].filter(Boolean).join(', ') || 'Location ' + (i + 1);
+  }
+  function labels() {
+    const seen = {};
+    return G.locs.map((g, i) => { let l = autoLabel(g, i); const k = l.toLowerCase(); seen[k] = (seen[k] || 0) + 1; if (seen[k] > 1) l += ' (' + seen[k] + ')'; return l; });
+  }
+  const locName = (g, i) => { if (!G.multi) return 'Delivery address'; const l = labels()[i], n = 'Location ' + (i + 1); return l === n ? n : n + ': ' + l; };
   const used = g => orders.some(o => o.fulfillment === 'delivery' && o.lines.some(l => l.destId === g.id));
   const complete = g => !!(g.addr.cityCode && (g.addr.barangay || '').trim() && (g.addr.street || '').trim().length >= 3);
 
@@ -82,8 +91,9 @@
       o.dt = o.dt || {};
       if (o.fulfillment !== 'delivery') return;
       // the pin is sent only while it matches the address (never a stale one)
-      o.destinations = G.locs.map((g, i) => Object.assign({ id: g.id, label: locName(g, i), address: g.text, addr: Object.assign({}, g.addr), contactName: g.contactName || '', contactPhone: '',
-        deliveryTime: o.dt[g.id] || o.shop.times[0] }, g.lat != null && g.pin !== 'stale' ? { lat: g.lat, lng: g.lng } : {}));
+      const names = labels(); o.early = o.early || {};
+      o.destinations = G.locs.map((g, i) => Object.assign({ id: g.id, label: names[i], address: g.text, addr: Object.assign({}, g.addr), contactName: g.contactName || '', contactPhone: g.contactPhone || '' },
+        o.early[g.id] ? { earlyTime: o.early[g.id] } : {}, g.lat != null && g.pin !== 'stale' ? { lat: g.lat, lng: g.lng } : {}));
       const ids = G.locs.map(g => g.id);
       o.lines.forEach(l => { if (!G.multi || !ids.includes(l.destId)) l.destId = ids[0]; });
       if (!G.multi) mergeSame(o);
@@ -108,7 +118,7 @@
     const ready = complete(g);
     return '<div class="loc-card' + (g.confirmed ? ' is-ok' : '') + '" data-loc="' + g.id + '">' +
       '<div class="loc-head"><b>' + esc(locName(g, i)) + '</b>' + (G.multi && i > 0 ? '<button type="button" class="btn btn-xs btn-ghost" data-rmloc>' + svg('trash') + 'Remove</button>' : '') + '</div>' +
-      (G.multi ? f('label', 'Name of this location <span class="muted small">(optional)</span>', '<input class="input" id="' + g.id + '-label" data-lf="label" value="' + esc(g.label) + '" placeholder="e.g. Church, Reception hall">') : '') +
+      (G.multi ? '<p class="small muted mt-0">Named from its address. ' + (i > 0 ? 'It must be in the same delivery zone as location 1.' : 'Every other location must be in this location\'s delivery zone.') + '</p>' : '') +
       '<div class="field place-find"><label for="' + g.id + '-q">Search for your address</label><div class="place-search"><input class="input" id="' + g.id + '-q" type="search" data-place placeholder="Street, building, landmark or barangay, e.g. Pilar St. Zamboanga" aria-expanded="false"><ul class="place-sugg" role="listbox" hidden></ul></div></div>' +
       '<div class="loc-map-wrap"><div class="pr-map loc-map" data-pinmap="' + g.id + '" role="application" aria-label="Map: tap or drag the pin to your delivery spot"></div>' +
         '<button type="button" class="btn btn-sm loc-locate" data-locate title="Use my current location">' + svg('map') + 'Use my current location</button></div>' +
@@ -123,7 +133,10 @@
       '</div>' +
       (S.saved && S.saved.cityCode && i === 0 ? '<button type="button" class="link-btn small" data-saved>Use my saved address instead</button>' : '') +
       '<div class="loc-confirm mt-2">' + confirmHtml(g) + '</div>' +
-      f('contactName', 'On-site contact <span class="muted small">(optional)</span>', '<input class="input" id="' + g.id + '-contactName" data-lf="contactName" value="' + esc(g.contactName) + '" placeholder="Name and number of who receives the items">', 'mt-2') +
+      '<div class="form-grid mt-2">' +
+        f('contactName', 'On-site contact name ' + (i > 0 ? '<span class="req">*</span>' : '<span class="muted small">(optional)</span>'), '<input class="input" id="' + g.id + '-contactName" data-lf="contactName" value="' + esc(g.contactName) + '" placeholder="Who receives the items here"' + (i > 0 ? ' required' : '') + '>') +
+        f('contactPhone', 'On-site contact number ' + (i > 0 ? '<span class="req">*</span>' : '<span class="muted small">(optional)</span>'), '<input class="input" id="' + g.id + '-contactPhone" data-lf="contactPhone" inputmode="tel" value="' + esc(g.contactPhone) + '" placeholder="0917 555 0101"' + (i > 0 ? ' required' : '') + '>') +
+      '</div>' +
       '<div class="drops" data-drops="' + g.id + '">' + dropsHtml(g) + '</div>' +
     '</div>';
   }
@@ -145,8 +158,16 @@
       else info = '<span>Zone: <b>' + esc(d.basis === 'distance' ? 'By distance (' + d.zone + ')' : d.zone) + '</b> · Delivery fee <b>' + money(d.fee) + '</b></span>' +
         (d.matched ? '' : '<span class="drop-warn">' + svg('info') + ' This address is not in any of this store\'s delivery zones, so its standard rate applies. If that looks wrong, check the barangay and city.</span>') +
         (q.branchName ? '<span class="muted">Delivered by ' + esc(q.branchName) + ' (its delivery area covers this address)</span>' : '');
-      return '<div class="drop-row"><div class="drop-store"><b>' + esc(o.shop.name) + '</b></div><div class="drop-info">' + info + '</div>' +
-        '<label class="drop-time"><span class="small">Deliver by</span>' + sel(o, (o.dt || {})[g.id] || o.shop.times[0], 'data-dt="' + o.supplier_id + '|' + g.id + '"') + '</label></div>';
+      const key = o.supplier_id + '|' + g.id, want = (o.early || {})[g.id];
+      let time = '';
+      if (d && d.deliverBy) {
+        time = '<div class="drop-when"><span class="small">Deliver by</span><b>' + fmt12(d.deliverBy) + '</b><span class="small muted">from your rental start time and the items\' setup time</span>' +
+          '<label class="check small mt-1"><input type="checkbox" data-early-on="' + key + '"' + (want ? ' checked' : '') + '> Ask for earlier delivery</label>' +
+          (want ? '<div class="early-ask"><input class="input input-sm" type="time" step="900" max="' + d.deliverBy + '" value="' + esc(want) + '" data-early="' + key + '" aria-label="Earlier delivery time">' +
+            (d.early ? '<div class="small">' + fmt12(d.early.time) + ' instead of ' + fmt12(d.deliverBy) + ' · <b>+' + money(d.early.fee) + '</b> if the shop accepts</div>' : '<div class="small muted">' + money(q.earlyPerHour || 0) + ' per hour earlier, only if the shop accepts</div>') +
+            '<div class="small muted">Sent to the shop with your request; not confirmed until they accept. If they can\'t, the standard time stays and nothing extra is charged.</div></div>' : '') + '</div>';
+      }
+      return '<div class="drop-row"><div class="drop-store"><b>' + esc(o.shop.name) + '</b></div><div class="drop-info">' + info + '</div>' + time + '</div>';
     }).join('');
   }
   const refreshDrops = () => { G.locs.forEach(g => { const el = delivEl && $('[data-drops="' + g.id + '"]', delivEl); if (el) el.innerHTML = dropsHtml(g); }); };
@@ -176,7 +197,8 @@
   }
   const setNote = g => { const el = delivEl && $('[data-loc="' + g.id + '"] [data-pinnote]', delivEl); if (el) el.innerHTML = pinNote(g); };
   let aTimer = null;
-  const addrChanged = now => { syncOrders(); clearTimeout(aTimer); aTimer = setTimeout(() => { draw(); requote(); }, now ? 0 : 450); };
+  const refreshHeads = () => G.locs.forEach((g, i) => { const h = delivEl && $('[data-loc="' + g.id + '"] .loc-head b', delivEl); if (h) h.textContent = locName(g, i); });
+  const addrChanged = now => { syncOrders(); refreshHeads(); clearTimeout(aTimer); aTimer = setTimeout(() => { draw(); requote(); }, now ? 0 : 450); };
   /** Any change to a location un-confirms it (shown at once). */
   const changed = g => {
     g.confirmed = false;
@@ -249,7 +271,13 @@
       }
       if (t.dataset.af === 'street' || t.dataset.af === 'barangay') addressEdited(g);
       if (t.dataset.lf) { g[t.dataset.lf] = t.value; addrChanged(true); }
-      if (t.dataset.dt) { const [sid, gid] = t.dataset.dt.split('|'); const o = orders.find(x => String(x.supplier_id) === sid); o.dt[gid] = t.value; syncOrders(); requote(); }
+      if (t.dataset.earlyOn || t.dataset.early) {
+        const [sid, gid] = (t.dataset.earlyOn || t.dataset.early).split('|'); const o = orders.find(x => String(x.supplier_id) === sid); o.early = o.early || {};
+        const d = ((lastQuote[o.supplier_id] || {}).drops || []).find(x => x.destId === gid);
+        if (t.dataset.earlyOn) { if (t.checked && d && d.deliverBy) { const [h, m] = d.deliverBy.split(':').map(Number); const n = Math.max(0, h * 60 + m - 60); o.early[gid] = String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); } else delete o.early[gid]; }
+        else o.early[gid] = t.value;
+        syncOrders(); requote(); refreshDrops();
+      }
     });
     delivEl.addEventListener('input', e => {
       const t = e.target, card = t.closest('[data-loc]'); if (!card) return;
@@ -260,7 +288,7 @@
 
         addrChanged(false);
       }
-      if (t.dataset.lf) { g[t.dataset.lf] = t.value; if (t.dataset.lf === 'label') { const h = $('.loc-head b', card); if (h) h.textContent = t.value || 'Location ' + (G.locs.indexOf(g) + 1); } addrChanged(false); }
+      if (t.dataset.lf) { g[t.dataset.lf] = t.value; t.closest('.field').classList.remove('invalid'); addrChanged(false); }
     });
     delivEl.addEventListener('click', async e => {
       const b = e.target.closest('button'); if (!b) return;
@@ -645,6 +673,15 @@
         }
       }
       if (bad) return;
+      for (const [i, g] of G.locs.entries()) {
+        if (!G.multi || i === 0 || !used(g)) continue;
+        for (const [n, label, ok] of [['contactName', 'on-site contact name', v => v.trim().length >= 2], ['contactPhone', 'on-site contact number', v => /^(\+?63|0)\d{9,10}$/.test(v.replace(/[\s\-()]/g, ''))]]) {
+          if (!ok(g[n] || '')) {
+            const el = document.getElementById(g.id + '-' + n); if (el) { el.closest('.field').classList.add('invalid'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus({ preventScroll: true }); }
+            return toast('Add the ' + label + ' for ' + locName(g, i) + ': someone else may receive the items there.', 'error');
+          }
+        }
+      }
       const open = G.locs.find(g => (!G.multi || used(g)) && !g.confirmed);
       if (open) {
         const c = $('[data-loc="' + open.id + '"]', delivEl); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' });

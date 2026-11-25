@@ -383,7 +383,13 @@ class CartController extends Controller
                 'branches' => $branches, 'branchId' => $branchId,
                 'branchName' => isset($prep['branch']) ? $prep['branch']->name : (collect($branches)->firstWhere('id', $branchId)['name'] ?? null),
                 // per delivery location: the detected zone and its fee (read-only for the customer)
-                'drops' => $prep['ok'] ? array_map(fn ($x) => ['destId' => $x['destId'], 'zone' => $x['zone'], 'fee' => $x['fee'], 'matched' => $x['matched'] ?? true, 'basis' => $x['basis'] ?? 'zone'], $q['delivery'] ?? []) : [],
+                'drops' => $prep['ok'] ? array_map(function ($x) use ($prep) {
+                    $d = collect($prep['attrs']['destinations'] ?? [])->firstWhere('id', $x['destId']) ?? [];
+
+                    return ['destId' => $x['destId'], 'zone' => $x['zone'], 'fee' => $x['fee'], 'matched' => $x['matched'] ?? true, 'basis' => $x['basis'] ?? 'zone',
+                        'label' => $d['label'] ?? null, 'deliverBy' => $d['standardTime'] ?? null, 'early' => $d['early'] ?? null];
+                }, $q['delivery'] ?? []) : [],
+                'earlyPerHour' => (float) (((array) ($s->delivery ?? []))['earlyPerHour'] ?? \App\Domain\DeliverySchedule::DEFAULT_EARLY_PER_HOUR),
                 // a combined order: the nearby branches that bring some of the items to the home branch
                 'lenders' => $prep['ok'] ? \App\Models\InventoryLocation::whereIn('id', collect($prep['attrs']['lines'])->flatMap(fn ($l) => collect((array) ($l['from'] ?? []))->flatMap(fn ($m) => array_keys($m)))->unique()->all())->pluck('name')->all() : [],
                 'suggest' => $suggest, 'installmentOk' => $elig['ok'], 'installmentMsg' => $elig['message'] ?? '',

@@ -446,6 +446,7 @@ class Rentals
             if (! $destinations) {
                 return self::fail('Add a delivery address.');
             }
+            $destinations = DeliverySchedule::labels($destinations); // names come from the address, never typed
             // the delivery zone (and so the fee) comes from the address, never from what the browser sent
             foreach ($destinations as &$dz) {
                 $dz['zoneId'] = Pricing::zoneForAddress($s, $dz);
@@ -480,6 +481,12 @@ class Rentals
                     return self::fail('"'.$d['label'].'" has no items assigned. Assign items to it or remove it.');
                 }
             }
+            // deliver-by times (rental start − setup time), earlier-delivery requests (pending), several-location rules
+            $sch = DeliverySchedule::prepare($s, $destinations, $lines, array_values($o['destinations'] ?? []));
+            if (! $sch['ok']) {
+                return self::fail($s->name.': '.$sch['error']);
+            }
+            $destinations = $sch['destinations'];
         } else {
             foreach ($lines as &$l) {
                 $l['destId'] = null;

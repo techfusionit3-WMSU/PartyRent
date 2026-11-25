@@ -23,6 +23,7 @@
         <div class="mt-1"><b>{{ $r->contact_name ?: $r->customer->name }}</b> <span class="small muted">· {{ $r->event_name }}</span></div>
         <div class="small muted">{{ collect($r->lines)->map(fn ($l) => inv()->itemName($l))->implode(', ') }}</div>
         @if($r->branch && $r->supplier->locations()->count() > 1)<div class="small mt-1">{{ icon('store') }} {{ $road ? __('Delivered by') : __('Pick up at') }} <b>{{ $r->branch->name }}</b></div>@endif
+        @if($road && ($dby = collect($r->destinations ?? [])->pluck('deliveryTime')->filter()->min()))<div class="small mt-1">{{ icon('clock') }} {{ __('Deliver by') }} <b>{{ \App\Domain\Slots::fmt12($dby) }}</b></div>@endif
         @if($road && $r->address)<div class="small mt-1">{{ icon('map') }} {{ $r->address }}</div>@elseif(! $road)<div class="small muted mt-1">{{ icon('store') }} {{ __('Customer comes to the shop') }}</div>@endif
         @if($r->instructions)<div class="small mt-1"><b>{{ __('Special Instructions') }}:</b> {{ $r->instructions }}</div>@endif
 

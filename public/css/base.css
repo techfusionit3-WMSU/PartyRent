@@ -706,3 +706,13 @@ main:focus { outline: none; }
 .tf-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: .72rem; color: var(--muted); }
 .tf-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
 .time-pair .tf { max-width: none; flex: 1 1 0; min-width: 0; }
+
+.early-box { padding: 8px 10px; border-radius: 10px; font-size: .84rem; background: var(--gold-50, #fef3c7); }
+.early-box.accepted { background: var(--green-50, #dcfce7); }
+.early-box.rejected { background: var(--surface-2, #f4f4f5); }
+
+.drops .drop-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1.4fr); }
+.drop-when { display: flex; flex-direction: column; gap: 2px; }
+.drop-when > b { font-size: 1rem; }
+.early-ask { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; padding: 8px; border-radius: 10px; background: var(--gold-50, #fef3c7); }
+.req { color: var(--red); }

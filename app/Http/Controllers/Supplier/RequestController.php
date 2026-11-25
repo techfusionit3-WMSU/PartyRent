@@ -134,6 +134,15 @@ class RequestController extends Controller
         return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? $r->code.' is now fulfilled by '.($r->fresh()->branch?->name ?? 'the new branch').'.' : $res['error']);
     }
 
+    /** Accept or reject a customer's earlier-delivery request for one location (App\Domain\DeliverySchedule). */
+    public function early(Request $request, RentalRequest $rentalRequest, string $dest, string $decision)
+    {
+        $r = $this->own($request, $rentalRequest);
+        $res = \App\Domain\DeliverySchedule::decide($r, $dest, $decision === 'accept', $request->user());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? ($decision === 'accept' ? 'Earlier delivery accepted. The customer was told.' : 'Earlier delivery rejected. The standard time stays; the customer was told.') : $res['error']);
+    }
+
     /** Work out again where a combined rental's items come from (a lending branch closed or ran short). */
     public function replan(Request $request, RentalRequest $rentalRequest)
     {

@@ -239,6 +239,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(['auth', 'verified', 'r
     Route::post('/transfers/{transfer}/{step}', [\App\Http\Controllers\Supplier\TransferController::class, 'step'])->whereIn('step', ['send', 'receive', 'return', 'keep'])->name('transfers.step');
     Route::get('/transfers/{transfer}/slip', [\App\Http\Controllers\Supplier\TransferController::class, 'slip'])->name('transfers.slip');
     Route::post('/requests/{rentalRequest}/replan', [SupplierRequestController::class, 'replan'])->name('requests.replan');
+    Route::post('/requests/{rentalRequest}/early/{dest}/{decision}', [SupplierRequestController::class, 'early'])->whereIn('decision', ['accept', 'reject'])->name('requests.early');
 
     Route::get('/calendar', [SupplierReportController::class, 'calendar'])->name('calendar');
     Route::get('/damages', [SupplierReportController::class, 'damages'])->name('damages');

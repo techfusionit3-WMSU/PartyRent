@@ -381,6 +381,9 @@ class CartController extends Controller
                 'supplier_id' => $s->id, 'ok' => $prep['ok'], 'error' => $prep['error'] ?? null, 'total' => $q['total'], 'finalBalance' => $q['finalBalance'],
                 'avail' => self::availability($u->id, $o, $branchId),
                 'branches' => $branches, 'branchId' => $branchId,
+                'branchName' => isset($prep['branch']) ? $prep['branch']->name : (collect($branches)->firstWhere('id', $branchId)['name'] ?? null),
+                // per delivery location: the detected zone and its fee (read-only for the customer)
+                'drops' => $prep['ok'] ? array_map(fn ($x) => ['destId' => $x['destId'], 'zone' => $x['zone'], 'fee' => $x['fee'], 'matched' => $x['matched'] ?? true, 'basis' => $x['basis'] ?? 'zone'], $q['delivery'] ?? []) : [],
                 // a combined order: the nearby branches that bring some of the items to the home branch
                 'lenders' => $prep['ok'] ? \App\Models\InventoryLocation::whereIn('id', collect($prep['attrs']['lines'])->flatMap(fn ($l) => collect((array) ($l['from'] ?? []))->flatMap(fn ($m) => array_keys($m)))->unique()->all())->pluck('name')->all() : [],
                 'suggest' => $suggest, 'installmentOk' => $elig['ok'], 'installmentMsg' => $elig['message'] ?? '',

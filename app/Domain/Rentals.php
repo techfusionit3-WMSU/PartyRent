@@ -446,6 +446,11 @@ class Rentals
             if (! $destinations) {
                 return self::fail('Add a delivery address.');
             }
+            // the delivery zone (and so the fee) comes from the address, never from what the browser sent
+            foreach ($destinations as &$dz) {
+                $dz['zoneId'] = Pricing::zoneForAddress($s, $dz);
+            }
+            unset($dz);
             foreach ($destinations as $d) {
                 if ($d['addr'] && ($d['addr']['barangay'] === '' || mb_strlen($d['addr']['street']) < 3)) {
                     return self::fail('Add the barangay and the house no. / street of '.(count($destinations) > 1 ? '"'.$d['label'].'"' : 'your delivery address').'.');

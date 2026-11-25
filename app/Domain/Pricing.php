@@ -332,6 +332,47 @@ class Pricing
         return (float) ($s?->delivery_fee ?? 0);
     }
 
+    /**
+     * The shop's delivery zone for an address, worked out by the system (never chosen by the customer).
+     * A zone's name lists its places separated by "/" ("Sta. Maria / Tetuan"). The barangay is compared first, then
+     * the city / municipality; only an address typed without a known city is searched for place names.
+     * '' = not in a listed zone (standard rate).
+     */
+    public static function zoneForAddress(?Supplier $s, array $d): string
+    {
+        $zones = self::zones($s);
+        if (! $zones) {
+            return '';
+        }
+        $places = fn ($z) => array_values(array_filter(array_map(fn ($p) => Locations::normBarangay(Locations::norm(trim($p))), explode('/', (string) ($z['name'] ?? '')))));
+        $brgy = Locations::normBarangay($d['addr']['barangay'] ?? ($d['barangay'] ?? ''));
+        $cityCode = $d['cityCode'] ?? ($d['addr']['cityCode'] ?? null);
+        $city = $cityCode ? Locations::normBarangay(Locations::norm(Locations::name($cityCode))) : '';
+        foreach ([$brgy, $city] as $want) {
+            if ($want === '') {
+                continue;
+            }
+            foreach ($zones as $z) {
+                if (in_array($want, $places($z), true)) {
+                    return (string) $z['id'];
+                }
+            }
+        }
+        if ($cityCode) {
+            return ''; // a known barangay and city that no zone names: not in a listed zone (never guessed from the text)
+        }
+        $text = ' '.Locations::normBarangay((string) ($d['address'] ?? '')).' ';
+        foreach ($zones as $z) {
+            foreach ($places($z) as $p) {
+                if (mb_strlen($p) >= 3 && str_contains($text, ' '.$p.' ')) {
+                    return (string) $z['id'];
+                }
+            }
+        }
+
+        return '';
+    }
+
     public static function zoneName(?Supplier $s, ?string $zoneId): string
     {
         foreach (self::zones($s) as $z) {
@@ -473,7 +514,9 @@ class Pricing
             return [
                 'destId' => $d['id'], 'label' => ($d['label'] ?? '') ?: 'Delivery address', 'zoneId' => $d['zoneId'] ?? '',
                 'zone' => $f['basis'] === 'distance' ? $f['km'].' km from '.($branch?->name ?? $s?->name) : self::zoneName($s, $d['zoneId'] ?? null),
-                'fee' => $f['fee'], 'km' => $f['km'],
+                'fee' => $f['fee'], 'km' => $f['km'], 'basis' => $f['basis'],
+                // false = the address is in none of the shop's listed zones (standard rate): the customer is told
+                'matched' => $f['basis'] === 'distance' || ($d['zoneId'] ?? '') !== '' || ! self::zones($s),
             ];
         }, $dests);
         $deliveryFee = r2(array_sum(array_column($delivery, 'fee')));

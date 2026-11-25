@@ -33,24 +33,32 @@ next checkout; existing rentals keep their branch. Each change is in the Store H
 - The figure is the best single branch that serves them, or, if the shop combines branches, the nearest branch plus
   what branches near it can lend. The quantity check, calendar and "free" counts use the same figure.
 
-## 4. Checkout: one address, branch assigned automatically
+## 4. Checkout: one delivery address, zone / fee / branch worked out by the system
 
-- Checkout has one section per shop (its items, dates, prices, delivery or pickup, payment plan) and then a single
-  **Delivery information** section: the address is entered **once** for every shop that delivers, with contact person,
-  contact number and **General Instructions** (optional; landmarks, gate details, directions).
-- The address: *Find your city or municipality* (type to search; picking one fills region, province and city), or
-  *Use my current location* (pins you and fills the city), or *Use my saved address*; then barangay and house no. /
-  street; optional *Pin on map* for the exact spot. It is kept if the customer leaves checkout and comes back.
-- The server checks it: city, barangay and street are required; a typed address must name a known city or be pinned.
-  It never guesses: "We cannot tell where … is".
-- **Delivery: the branch is assigned by the server** from the address and the coverage above; the customer cannot
-  choose or override it (a branch id sent by the browser is ignored). If several branches cover the address: the one
-  with every item for the dates, then the lowest delivery fee, then the nearest, then the main branch. If none covers
-  it, that shop says *None of its branches delivers to Davao City … Choose Pickup or another address*; other shops in
-  the same checkout are not affected.
-- **Pickup**: the nearest branch that has everything is suggested; the customer may pick another one near them.
-- The assigned branch is shown on the shop section, the rental, the receipt, the shop's Rentals list,
-  Fulfillment & Returns and the crew's jobs ("Delivered by …").
+- Checkout keeps one section per store (its items, dates, prices, services, payment plan and subtotal), with a
+  *Delivery / Pickup at shop* choice for that store. Below the stores there is **one Delivery information section**.
+- **One location (default):** one address for every store set to Delivery. **More locations** only when the customer
+  turns on *Deliver to more than one location*: then each location has its own address card, and in the store sections
+  each item says which location it goes to (or splits its quantity). A store is only charged for locations its items go to.
+- The address: *Find your city or municipality* (type to search; picking one fills region, province and city), *Use my
+  current location*, or *Use my saved address*; then barangay and house no. / building / street; optional *Pin on map*;
+  optional on-site contact. Kept if the customer leaves checkout and comes back. Contact person, contact number and
+  **Special Instructions** (optional) follow once for the whole checkout.
+- For each location the system shows, read-only, per store delivering there: the **detected delivery zone**, the
+  **delivery fee**, the **branch that delivers**, and the *Deliver by* time (the store's hours). They are worked out again
+  whenever the address changes.
+- **Zone detection** (Pricing::zoneForAddress): a zone's name lists its places separated by "/" ("Sta. Maria / Tetuan");
+  the barangay is matched first, then the city / municipality. No zone names them: the store's standard rate applies and
+  the customer is told ("This address is not in any of this store's delivery zones … check the barangay and city").
+  Shops that price delivery by distance show "By distance (… km from the branch)".
+- **Branch:** from the address and each branch's coverage (section 2); several cover it: every item available there,
+  then the lowest fee, then the nearest, then the main branch. None covers it: that store says so; other stores are
+  not affected. **Everything is decided on the server**; a zone or branch sent by the browser is ignored.
+- The server checks the address: city, barangay and street are required; a typed address must name a known city or
+  be pinned. It never guesses ("We cannot tell where … is").
+- **Pickup:** the nearest branch that has everything is suggested in the store section; the customer may pick another
+  one near them.
+- The assigned branch is shown on the rental, the receipt, the shop's Rentals list, Fulfillment & Returns and the crew's jobs.
 
 ## 4b. Older notes: the branch at checkout
 

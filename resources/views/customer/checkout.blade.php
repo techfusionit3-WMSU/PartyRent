@@ -39,24 +39,18 @@
   <div class="stack">
     {{-- one section per shop (its items, delivery or pickup, payment plan), then the delivery information once --}}
     <div class="stack" id="shops"></div>
+    {{-- ONE delivery section for the whole checkout (more locations only when asked): the customer enters the address;
+         the server finds each store's delivery zone, fee and branch (shown read-only under the address). --}}
     <div class="card deliv-card" id="delivCard">
       <h3 class="mb-1">{{ icon('map') }} Delivery information</h3>
-      <div data-deliv-addr>
-        <p class="small muted mt-0">Enter your address once: every store set to <b>Delivery</b> below delivers here, from its branch that covers this address (picked for you).</p>
-        <div class="field place-find"><label for="dvSearch">Find your city or municipality</label>
-          <div class="place-search"><input class="input" id="dvSearch" type="search" autocomplete="off" placeholder="Type to search, e.g. Zamboanga City" data-place-search aria-controls="dvSugg" aria-expanded="false"><ul class="place-sugg" id="dvSugg" role="listbox" hidden></ul></div>
-          <div class="row wrap mt-1" style="gap:6px"><button type="button" class="btn btn-sm" data-dv-locate>{{ icon('map') }}Use my current location</button>@if($saved && ! empty($saved['cityCode']))<button type="button" class="btn btn-sm" data-dv-saved>{{ icon('user') }}Use my saved address</button>@endif</div>
-        </div>
-        <div data-deliv-fields>@include('partials.address-fields', ['key' => 'deliv', 'value' => [], 'full' => true, 'required' => true, 'landmark' => false])</div>
-        <div class="row wrap mt-1" style="gap:8px;align-items:center"><button type="button" class="btn btn-sm" data-dv-pin>{{ icon('map') }}<span data-dv-pinlbl>Pin on map</span></button><span class="small muted" data-dv-pinst>Optional: pin the exact spot. It also picks the branch more precisely.</span></div>
-        <div class="alert alert-danger mt-1 hidden" data-dv-err role="alert"></div>
+      <div id="delivWrap">
+        <p class="small muted mt-0">Enter the delivery address once for every store set to <b>Delivery</b>. We work out the delivery zone, the fee and the branch that delivers for each store from it.</p>
+        <div id="deliv"></div>
       </div>
-      <div class="label mt-2 mb-1">How each store gets your items to you</div>
-      <div class="stack-sm" id="fulfil"></div>
       <div class="form-grid mt-2">
         <div class="field"><label for="ev-cn">Contact person</label><input class="input" id="ev-cn" data-s="contactName" required value="{{ $u->name }}"></div>
         <div class="field"><label for="ev-cp">Contact number</label><input class="input" id="ev-cp" data-s="contactPhone" data-phone required value="{{ $u->phone }}"></div>
-        <div class="field full"><label for="ev-in">General Instructions <span class="muted small">(optional)</span></label><textarea class="input" id="ev-in" data-s="instructions" rows="3" maxlength="1000" placeholder="Provide any additional information or instructions for your delivery (e.g., nearby landmarks, gate details, or directions)."></textarea><div class="hint">Shared with every shop in this checkout.</div></div>
+        <div class="field full"><label for="ev-in">Special Instructions <span class="muted small">(optional)</span></label><textarea class="input" id="ev-in" data-s="instructions" rows="3" maxlength="1000" placeholder="Anything the stores should know, e.g. nearby landmarks, gate or parking details, directions, or where to set up."></textarea><div class="hint">Shared with every store in this checkout.</div></div>
       </div>
     </div>
     {{-- damage fees: not part of the price; only if something comes back damaged or missing --}}

@@ -626,3 +626,16 @@ main:focus { outline: none; }
 .ful-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .ful-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--brand-50); color: var(--brand); font-size: .75rem; font-weight: 800; flex: none; }
 @media (max-width: 640px) { .shop-sec-head { flex-wrap: wrap; } .shop-sec-sub { text-align: left; width: 100%; flex-direction: row; justify-content: space-between; } }
+
+/* checkout delivery: location cards, then what the system found per store */
+.loc-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface); }
+.loc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.loc-head b svg { width: 16px; height: 16px; vertical-align: -3px; color: var(--brand); }
+.drops .drop-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: .86rem; }
+.drop-info { display: flex; flex-direction: column; gap: 2px; }
+.drop-time { display: flex; flex-direction: column; gap: 2px; }
+.drop-bad { color: var(--red); }
+.drop-warn { color: #B45309; }
+.drop-bad svg, .drop-warn svg { width: 14px; height: 14px; vertical-align: -2px; }
+@media (max-width: 640px) { .drops .drop-row { grid-template-columns: 1fr; gap: 4px; } .drop-time { flex-direction: row; align-items: center; justify-content: space-between; } }
+.drop-time > span { white-space: nowrap; margin-right: 8px; }

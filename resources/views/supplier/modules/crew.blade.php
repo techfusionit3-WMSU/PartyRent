@@ -24,7 +24,7 @@
         <div class="small muted">{{ collect($r->lines)->map(fn ($l) => inv()->itemName($l))->implode(', ') }}</div>
         @if($r->branch && $r->supplier->locations()->count() > 1)<div class="small mt-1">{{ icon('store') }} {{ $road ? __('Delivered by') : __('Pick up at') }} <b>{{ $r->branch->name }}</b></div>@endif
         @if($road && $r->address)<div class="small mt-1">{{ icon('map') }} {{ $r->address }}</div>@elseif(! $road)<div class="small muted mt-1">{{ icon('store') }} {{ __('Customer comes to the shop') }}</div>@endif
-        @if($r->instructions)<div class="small mt-1"><b>{{ __('General Instructions') }}:</b> {{ $r->instructions }}</div>@endif
+        @if($r->instructions)<div class="small mt-1"><b>{{ __('Special Instructions') }}:</b> {{ $r->instructions }}</div>@endif
 
         <div class="job-quick">
           @if($phone)<a class="btn" href="tel:{{ $phone }}">{{ icon('user') }}{{ __('Call') }}</a>@else<span></span>@endif

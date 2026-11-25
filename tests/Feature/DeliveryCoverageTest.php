@@ -146,8 +146,77 @@ class DeliveryCoverageTest extends TestCase
             $this->assertTrue($o['ok'], (string) $o['error']);
             $this->assertNotNull($o['branchId']);
         }
-        $this->get(route('checkout'))->assertOk()->assertSee('Delivery information')->assertSee('General Instructions')
-            ->assertSee('Provide any additional information or instructions for your delivery', false)->assertDontSee('Special instructions');
+        $this->get(route('checkout'))->assertOk()->assertSee('Delivery information')->assertSee('Special Instructions')
+            ->assertSee('Anything the stores should know', false)->assertDontSee('General Instructions');
+    }
+
+    /** Maria's cart: chairs from Happy Moments and from Celebration Hub (zone-priced shops), both delivered. */
+    private function twoShops(): array
+    {
+        $m = User::where('email', 'maria@demo.ph')->firstOrFail();
+        $this->actingAs($m)->withSession(['mode' => 'customer']);
+        CartLine::where('user_id', $m->id)->delete();
+        $hm = Supplier::where('name', 'Happy Moments Party Rentals')->firstOrFail();
+        $hub = Supplier::where('name', 'Celebration Hub Rentals')->firstOrFail();
+        foreach ([$hm, $hub] as $s) {
+            $s->update(['delivery' => array_merge((array) $s->delivery, ['mode' => 'zones'])]); // fee by zone
+            $p = Product::where('supplier_id', $s->id)->where('listing_type', 'rent')->where('status', 'active')->where('package_only', false)->firstOrFail();
+            $this->post('/cart', ['type' => 'item', 'ref_id' => $p->id, 'days' => json_encode([$this->day() => 2])]);
+        }
+
+        return [$m, $hm, $hub];
+    }
+
+    private function quote(User $m, array $shops, array $dests, array $x = []): array
+    {
+        $orders = array_map(fn ($s) => array_merge(['supplier_id' => $s->id, 'cart_line_ids' => CartLine::where('user_id', $m->id)->where('supplier_id', $s->id)->pluck('id')->all(),
+            'fulfillment' => 'delivery', 'destinations' => $dests, 'plan' => 'full', 'eventDate' => $this->day()], $x[$s->id] ?? []), $shops);
+
+        return collect($this->postJson(route('checkout.quote'), ['shared' => [], 'orders' => $orders])->assertOk()->json('orders'))->keyBy('supplier_id')->all();
+    }
+
+    public function test_zone_and_fee_come_from_the_address_for_each_store(): void
+    {
+        [$m, $hm, $hub] = $this->twoShops();
+        // the same Pasig address: Celebration Hub has a "Pasig" zone, Happy Moments does not (its standard rate)
+        $dest = $this->dest(self::PASIG, 'Kapitolyo') + ['zoneId' => 'z3']; // a zone sent by the browser is ignored
+        $q = $this->quote($m, [$hm, $hub], [$dest]);
+        $this->assertTrue($q[$hub->id]['ok'], (string) $q[$hub->id]['error']);
+        $this->assertSame('Pasig', $q[$hub->id]['drops'][0]['zone']);
+        $this->assertEquals(collect($hub->delivery_zones)->firstWhere('name', 'Pasig')['fee'], $q[$hub->id]['drops'][0]['fee']);
+        $this->assertTrue($q[$hub->id]['drops'][0]['matched']);
+        $this->assertSame('Other areas (standard rate)', $q[$hm->id]['drops'][0]['zone']);
+        $this->assertFalse($q[$hm->id]['drops'][0]['matched']);
+        $this->assertEquals((float) $hm->delivery_fee, $q[$hm->id]['drops'][0]['fee']);
+        $this->assertNotNull($q[$hm->id]['branchName']);
+
+        // the customer changes the address to Quezon City: zones and fees are worked out again
+        $q2 = $this->quote($m, [$hm, $hub], [$this->dest('137404000', 'Kamuning', '23 Mabini St.')]);
+        $this->assertSame('Quezon City', $q2[$hm->id]['drops'][0]['zone']);
+        $this->assertTrue($q2[$hm->id]['drops'][0]['matched']);
+        $this->assertFalse($q2[$hub->id]['drops'][0]['matched']);
+
+        // submitted: the rental keeps the zone the system found, not the browser's
+        $this->checkout($hub->id, ['contactName' => 'Maria', 'contactPhone' => '0917 555 0101', 'fulfillment' => 'delivery', 'destinations' => [$dest]])->assertOk();
+        $r = RentalRequest::where('supplier_id', $hub->id)->latest('id')->firstOrFail();
+        $this->assertSame(collect($hub->delivery_zones)->firstWhere('name', 'Pasig')['id'], $r->destinations[0]['zoneId']);
+    }
+
+    public function test_several_delivery_locations_each_get_their_own_zone_and_fee(): void
+    {
+        [$m, $hm, $hub] = $this->twoShops();
+        $line = CartLine::where('user_id', $m->id)->where('supplier_id', $hm->id)->firstOrFail();
+        $d1 = $this->dest('137404000', 'Kamuning', '23 Mabini St.') + ['id' => 'd1', 'label' => 'Home'];
+        $d2 = array_merge($this->dest('137402000', 'Concepcion', '7 Gil Fernando Ave.'), ['id' => 'd2', 'label' => 'Reception']);
+        // Happy Moments: one chair to each location; Celebration Hub: everything to the first one only
+        $hmLines = [['cart_id' => $line->id, 'type' => 'item', 'days' => [$this->day() => 1], 'destId' => 'd1'], ['cart_id' => $line->id, 'type' => 'item', 'days' => [$this->day() => 1], 'destId' => 'd2']];
+        $q = $this->quote($m, [$hm, $hub], [$d1, $d2], [$hm->id => ['lines' => $hmLines], $hub->id => ['destinations' => [$d1]]]);
+        $this->assertTrue($q[$hm->id]['ok'], (string) $q[$hm->id]['error']);
+        $drops = collect($q[$hm->id]['drops'])->keyBy('destId');
+        $this->assertSame('Quezon City', $drops['d1']['zone']);
+        $this->assertSame('Marikina / San Juan', $drops['d2']['zone']);
+        $this->assertEquals($drops['d1']['fee'] + $drops['d2']['fee'], $q[$hm->id]['summary']['q']['deliveryFee']);
+        $this->assertCount(1, $q[$hub->id]['drops']); // a store with nothing for the second location is not charged for it
     }
 
     public function test_branch_admins_manage_their_own_branch_coverage_only(): void

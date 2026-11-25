@@ -138,7 +138,7 @@
     <div class="form-grid">
       <div class="field"><label>Business contact number</label><input class="input" name="phone" data-phone required value="{{ $o('phone') }}">{!! $err('phone') !!}</div>
       <div class="field"><label>Business email</label><input class="input" type="email" name="email" required value="{{ $o('email') }}">{!! $err('email') !!}</div>
-      <div class="field full"><label>Operating hours</label><input class="input" name="hours" required value="{{ $o('hours') }}"></div>
+      @include('partials.weekly-hours', ['value' => $d['weekly_hours'] ?? null])
     </div>
     @include('partials.location-fields', ['locFor' => 'either'])
     {{-- the address above is the main branch; more branches are optional (each keeps its own stock once approved) --}}
@@ -151,7 +151,9 @@
       <template data-branch-tpl>@include('partials.branch-fields', ['i' => '__i__', 'b' => []])</template>
       <button type="button" class="btn btn-sm" data-branch-add>{{ icon('plus') }}Add another branch</button>
     </div>
-    <div class="field"><label>Business logo</label><div class="row wrap gap-sm">@foreach($logos as $l)<label class="chip {{ $o('logo', '🎈') === $l ? 'active' : '' }}" style="font-size:1.3rem"><input type="radio" name="logo" value="{{ $l }}" @checked($o('logo', '🎈') === $l) hidden>{{ $l }}</label>@endforeach</div></div>
+    <div data-for="{{ $shopFor }}">@include('partials.logo-upload', ['emojis' => $logos, 'current' => $o('logo', '🎈'), 'path' => $existing?->logo_path])</div>
+    <div data-for="{{ $evtFor }}"><div class="field"><label>Business logo (emoji)</label><div class="row wrap gap-sm">@foreach($logos as $l)<label class="chip {{ $o('logo', '🎈') === $l ? 'active' : '' }}" style="font-size:1.3rem"><input type="radio" name="logo" value="{{ $l }}" @checked($o('logo', '🎈') === $l) hidden>{{ $l }}</label>@endforeach</div></div></div>
+    @include('partials.shop-policies', ['value' => $pol['custom'] ?? []])
   </section>
 
   {{-- 5 · Delivery & payments --}}

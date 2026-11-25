@@ -17,7 +17,7 @@ class Supplier extends Model
             'company' => 'array', 'application' => 'array', 'payment_plans' => 'array', 'time_settings' => 'array',
             'delivery_zones' => 'array', 'services' => 'array', 'damage_policy' => 'array',
             'arrangements' => 'array',
-            'policy' => 'array',
+            'policy' => 'array', 'weekly_hours' => 'array',
             'delivery' => 'array',
             'branch_settings' => 'array',
             'free_ship' => 'boolean',
@@ -143,7 +143,8 @@ class Supplier extends Model
 
     /** Where the supplier operates from: [label, explanation shown to the supplier]. */
     public const LOCATION_TYPES = [
-        'shop' => ['Physical shop or warehouse', 'Customers see your exact pin and address, and can pick up there.'],
+        'shop' => ['Physical shop', 'A store customers can visit. They see your exact pin and address, and can pick up there.'],
+        'warehouse' => ['Warehouse', 'A storage place customers pick up from. They see its exact pin and address.'],
         'home' => ['Home-based', 'Customers only see your city. Your exact pin and address are shared with a customer after you accept their pickup request.'],
         'none' => ['No pickup location', 'You deliver everything, so customers never come to you. A pin is optional and only used to measure delivery distance.'],
     ];
@@ -156,7 +157,7 @@ class Supplier extends Model
     /** Exact location may be shown to anyone. */
     public function isPublicLocation(): bool
     {
-        return $this->location_type === 'shop';
+        return in_array($this->location_type, ['shop', 'warehouse'], true);
     }
 
     public function offersPickup(): bool

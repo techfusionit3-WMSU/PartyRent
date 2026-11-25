@@ -42,13 +42,14 @@
     @case('profile')
       <div class="form-grid">
         <div class="field"><label>Business name</label><input class="input" name="name" required value="{{ $o('name') }}"></div>
-        <div class="field"><label>Logo (emoji)</label><input class="input" name="logo" maxlength="4" value="{{ $o('logo') }}" style="width:90px"></div>
+        @if($s->isOrganization())<div class="field"><label>Logo (emoji)</label><input class="input" name="logo" maxlength="4" value="{{ $o('logo') }}" style="width:90px"></div>@endif
         <div class="field full"><label>{{ $s->isOrganization() ? 'About us' : 'Business description' }}</label><textarea class="input" name="description" required>{{ $o('description') }}</textarea></div>
         <div class="field"><label>Contact number</label><input class="input" name="phone" data-phone required value="{{ $o('phone') }}"></div>
         <div class="field"><label>Email address</label><input class="input" type="email" name="email" required value="{{ $o('email') }}"></div>
-        <div class="field"><label>Operating hours</label><input class="input" name="hours" required value="{{ $o('hours') }}"></div>
         <div class="field"><label>Brand color</label><input class="input" type="color" name="color" value="{{ $o('color', '#E11D74') }}" style="height:44px;padding:4px"></div>
         <div class="field"><label>Supplier type</label><div><span class="badge b-purple">{{ \App\Domain\Applications::SUPPLIER_TYPES[$s->type] ?? 'Individual Supplier' }}</span></div></div>
+        @include('partials.weekly-hours', ['value' => $s->weekly_hours])
+        @unless($s->isOrganization())@include('partials.logo-upload', ['emojis' => \App\Http\Controllers\Customer\StartSellingController::LOGOS, 'current' => $o('logo', '🎈'), 'path' => $s->logo_path])@endunless
       </div>
       @if($s->isOrganization())
         @php($bp = (array) ($s->business_profile ?? []))
@@ -137,6 +138,7 @@
       <div class="field"><label>Cancellation policy</label><textarea class="input" name="cancellation" required>{{ old('cancellation', $p['cancellation'] ?? '') }}</textarea></div>
       <div class="field"><label>Return policy</label><textarea class="input" name="returns" required>{{ old('returns', $p['returns'] ?? '') }}</textarea></div>
       <div class="field"><label>Rental conditions / business policies</label><textarea class="input" name="conditions" required>{{ old('conditions', $p['conditions'] ?? '') }}</textarea></div>
+      @include('partials.shop-policies', ['value' => $p['custom'] ?? []])
       @break
   @endswitch
   @if($owner)<div class="row end mt-2"><button class="btn btn-primary">Save changes</button></div>@endif

@@ -34,7 +34,7 @@
     <div class="row wrap gap-sm"><span class="badge b-teal">{{ icon('truck', 'width:12px') }} {{ $s->fulfillmentLabel() }}{{ $s->fulfillment !== 'pickup' ? ' · '.money_short($s->delivery_fee).' delivery' : '' }}</span>{{-- what customers can actually use: online (automatic) plus cash if the shop takes it --}}@if(\App\Domain\OnlinePay::enabled())<span class="badge b-gray plain">Online: GCash, Maya, card</span>@if(in_array('cash', $s->acceptedMethods(), true))<span class="badge b-gray plain">Cash</span>@endif @else @foreach($s->acceptedMethods() as $m)<span class="badge b-gray plain">{{ \App\Domain\Finance::METHOD_LABEL[$m] ?? $m }}</span>@endforeach @endif</div>
     @endif
   </div>
-  <dl class="kv" style="min-width:260px;max-width:340px"><dt>Address</dt><dd>{{ $own ? $s->address : $s->publicAddress() }}</dd><dt>Contact</dt><dd>{{ $s->phone }}<br>{{ $s->email }}</dd><dt>Hours</dt><dd>{{ $s->hours }}</dd></dl>
+  <dl class="kv" style="min-width:260px;max-width:340px"><dt>Address</dt><dd>{{ $own ? $s->address : $s->publicAddress() }}</dd><dt>Contact</dt><dd>{{ $s->phone }}<br>{{ $s->email }}</dd><dt>Hours</dt><dd>@if($s->weekly_hours)<details class="wh-view"><summary>{{ $s->hours }}</summary><table class="small mt-1">@foreach(\App\Support\WeeklyHours::rows($s->weekly_hours) as [$dn, $dt])<tr><td class="muted" style="padding-right:10px">{{ $dn }}</td><td>{{ $dt }}</td></tr>@endforeach</table></details>@else{{ $s->hours }}@endif</dd></dl>
 </div></div>
 
 @if($branchInfo)
@@ -109,7 +109,8 @@
       <p><b>Rental hours:</b> {{ \App\Domain\Slots::fmt12($ts['open']) }} – {{ \App\Domain\Slots::fmt12($ts['close']) }} ({{ $ts['prepHours'] }}h preparation and {{ $ts['recoveryHours'] }}h recovery between bookings)</p>
       @if($s->fulfillment !== 'pickup')<p><b>Delivery fees:</b> {{ collect($s->delivery_zones ?? [])->map(fn ($z) => $z['name'].' '.money($z['fee']))->push('other areas '.money($s->delivery_fee))->implode(' · ') }} — charged per delivery location</p>@endif
       @if($s->services)<p><b>Services:</b> {{ collect($s->services)->map(fn ($x) => $x['name'].' '.money($x['amount']).(($x['per'] ?? '') === 'location' ? '/visit' : '').(! empty($x['required']) ? ' (included)' : ''))->implode(' · ') }}</p>@endif
-      <p><b>Cancellation:</b> {{ $pol['cancellation'] ?? '' }}</p><p><b>Returns:</b> {{ $pol['returns'] ?? '' }}</p><p class="mb-0"><b>Rental conditions:</b> {{ $pol['conditions'] ?? '' }}</p></div>
+      <p><b>Cancellation:</b> {{ $pol['cancellation'] ?? '' }}</p><p><b>Returns:</b> {{ $pol['returns'] ?? '' }}</p><p class="mb-0"><b>Rental conditions:</b> {{ $pol['conditions'] ?? '' }}</p>
+      @foreach((array) ($pol['custom'] ?? []) as $cp)<p class="mt-1 mb-0"><b>{{ $cp['title'] }}:</b> {!! nl2br(e($cp['body'])) !!}</p>@endforeach</div>
   </div>
 @elseif($tab === 'reviews')
   @include('partials.reviews-block', ['reviews' => $reviews, 'showItem' => true, 'emptyText' => 'Reviews appear here after customers complete a rental with this shop.'])

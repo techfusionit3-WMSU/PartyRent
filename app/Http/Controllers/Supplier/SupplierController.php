@@ -160,17 +160,28 @@ class SupplierController extends Controller
                 $request->validate($biz ? \App\Domain\BusinessProfile::rules() : [], \App\Domain\BusinessProfile::messages());
                 $v = $request->validate([
                     'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
-                    'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'], 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',
-                    'color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'location_type' => 'required|in:shop,home,none',
+                    'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'], 'email' => 'required|email|max:180', 'hours' => 'nullable|string|max:120',
+                    'weekly_hours' => 'nullable|array', 'logo_file' => \App\Support\ShopExtras::LOGO_RULES, 'logo_remove' => 'nullable|in:0,1',
+                    'color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'], 'location_type' => 'required|in:shop,warehouse,home,none',
                     ...\App\Support\AddressInput::rules('shop_addr', $request->input('location_type', 'shop') !== 'none'),
                     'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
-                ], StartSellingController::messages());
+                ], StartSellingController::messages() + \App\Support\ShopExtras::LOGO_MESSAGES);
                 $addr = \App\Support\AddressInput::attributes($v['shop_addr'] ?? []);
+                $weekly = $request->has('weekly_hours') ? \App\Support\WeeklyHours::fromInput((array) $request->input('weekly_hours')) : $s->weekly_hours;
+                $v['hours'] = $weekly ? \App\Support\WeeklyHours::summary($weekly) : (string) ($v['hours'] ?? $s->hours);
+                $logo = [];
+                if (! $biz && $request->hasFile('logo_file')) {
+                    $logo = ['logo_path' => \App\Support\ShopExtras::storeLogo($request->file('logo_file'), $s->owner_id)];
+                    \App\Support\ShopExtras::dropLogo($s->logo_path);
+                } elseif (! $biz && $request->input('logo_remove') === '1') {
+                    \App\Support\ShopExtras::dropLogo($s->logo_path);
+                    $logo = ['logo_path' => null];
+                }
                 if ($loc = StartSellingController::locationErrors($v + ['fulfillment' => $s->fulfillment], $addr['city_code'])) {
                     throw \Illuminate\Validation\ValidationException::withMessages($loc);
                 }
                 $pin = isset($v['lat'], $v['lng']) && $v['lat'] !== null ? [round((float) $v['lat'], 7), round((float) $v['lng'], 7)] : [null, null];
-                $s->update(['name' => trim($v['name']), 'description' => trim($v['description']), 'logo' => $v['logo'], 'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'],
+                $s->update(['name' => trim($v['name']), 'description' => trim($v['description']), 'logo' => $v['logo'], 'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'], 'weekly_hours' => $weekly, ...$logo,
                     'color' => $v['color'] ?? $s->color, 'city' => \App\Domain\Locations::name($addr['city_code']), ...$addr, 'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1],
                     ...($biz ? \App\Domain\BusinessProfile::photos($request, ['logo' => $s->logo_path, 'cover' => $s->cover_path, 'portfolio' => (array) ($s->portfolio ?? [])], $new)
                         + ['business_profile' => \App\Domain\BusinessProfile::profile($request->all())] : [])]);
@@ -265,7 +276,8 @@ class SupplierController extends Controller
                 break;
             case 'policies':
                 $v = $request->validate(['cancelDays' => 'nullable|integer|min:0|max:30', 'cancellation' => 'required|string|max:1000', 'returns' => 'required|string|max:1000', 'conditions' => 'required|string|max:1000']);
-                $s->update(['policy' => array_merge((array) $s->policy, ['cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions']])]);
+                $custom = \App\Support\ShopExtras::policies((array) $request->input('custom_policies', []));
+                $s->update(['policy' => array_merge((array) $s->policy, ['cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'], 'conditions' => $v['conditions'], 'custom' => $custom])]);
                 break;
             default:
                 return $back(false, 'Unknown settings section.');

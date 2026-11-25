@@ -13,7 +13,7 @@
   @if($s->location_type === 'none')
     <div class="small">{{ icon('truck', 'width:14px;vertical-align:-2px') }} <b>Online seller</b> based in {{ $area }}. No pickup location; everything is delivered.</div>
   @elseif($reveal && $s->hasPin())
-    <div class="small"><b>{{ $s->location_type === 'home' ? 'Pickup address (home-based seller)' : 'Shop / pickup address' }}:</b> {{ $s->address }}</div>
+    <div class="small"><b>{{ ['home' => 'Pickup address (home-based seller)', 'warehouse' => 'Warehouse / pickup address'][$s->location_type] ?? 'Shop / pickup address' }}:</b> {{ $s->address }}</div>
     <div class="pr-map" data-map-view data-lat="{{ $s->lat }}" data-lng="{{ $s->lng }}" role="img" aria-label="Map showing {{ $s->name }}"></div>
     <a class="btn btn-sm" href="{{ $s->directionsUrl() }}" target="_blank" rel="noopener">{{ icon('map') }}Get directions</a>
   @elseif($reveal)

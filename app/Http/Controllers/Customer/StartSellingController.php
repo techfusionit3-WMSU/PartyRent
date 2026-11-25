@@ -63,7 +63,7 @@ class StartSellingController extends Controller
             'd' => array_merge([
                 'name' => '', 'description' => '', 'logo' => '🎈', 'phone' => $u->phone, 'email' => $u->email,
                 'address_parts' => $u->address_parts, 'location_type' => 'shop', 'lat' => null, 'lng' => null, 'fulfillment' => 'both', 'methods' => ['cash', 'bank'],
-                'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM',
+                'hours' => 'Mon–Sat, 9:00 AM – 6:00 PM', 'weekly_hours' => \App\Support\WeeklyHours::defaults(),
                 'policy' => ['depositType' => 'fixed', 'depositValue' => 500, 'cancelDays' => 3, 'cancellation' => 'Free cancellation up to 3 days before the rental start date. The down payment is non-refundable.', 'returns' => 'Items must be returned clean and complete on the agreed date.', 'conditions' => 'Renter is responsible for damaged or missing items, charged according to our damage policy.'],
             ], $existing?->toArray() ?? []),
         ]);
@@ -115,8 +115,10 @@ class StartSellingController extends Controller
         $rules = [
             'app.type' => 'required|in:individual,organization',
             'name' => 'required|string|min:3|max:120', 'description' => 'required|string|min:20|max:2000', 'logo' => 'required|string|max:16',
-            'phone' => $phone, 'email' => 'required|email|max:180', 'hours' => 'required|string|max:120',
-            'location_type' => 'required|in:shop,home,none',
+            'phone' => $phone, 'email' => 'required|email|max:180', 'hours' => 'required_without:weekly_hours|nullable|string|max:120',
+            'weekly_hours' => 'required_without:hours|array', 'custom_policies' => 'nullable|array|max:'.\App\Support\ShopExtras::MAX_POLICIES,
+            'logo_file' => \App\Support\ShopExtras::LOGO_RULES, 'logo_remove' => 'nullable|in:0,1',
+            'location_type' => 'required|in:shop,warehouse,home,none',
             ...AddressInput::rules('shop_addr', $request->input('location_type', 'shop') !== 'none'),
             'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat',
             ...($evt ? [
@@ -160,6 +162,7 @@ class StartSellingController extends Controller
             'phone.regex' => $badPhone, 'app.personal.phone.regex' => $badPhone, 'app.company.phone.regex' => $badPhone, 'app.representative.phone.regex' => $badPhone,
             ...AddressInput::messages('shop_addr'),
             ...\App\Domain\BusinessProfile::messages(),
+            ...\App\Support\ShopExtras::LOGO_MESSAGES, 'weekly_hours.required' => 'Set your operating hours.',
         ];
 
         return [$rules, $messages];
@@ -174,6 +177,13 @@ class StartSellingController extends Controller
             $in['fulfillment'] = 'delivery'; // no customer pickup at an event company's workplace: the pin is optional
         }
         $errors += self::locationErrors($in, AddressInput::attributes((array) $request->input('shop_addr', []))['city_code']);
+        foreach ([fn () => $request->has('weekly_hours') ? \App\Support\WeeklyHours::fromInput((array) $request->input('weekly_hours', [])) : null, fn () => \App\Support\ShopExtras::policies((array) $request->input('custom_policies', []))] as $check) {
+            try {
+                $check();
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $errors += array_map(fn ($m) => is_array($m) ? $m[0] : $m, $e->errors());
+            }
+        }
 
         return $errors;
     }
@@ -287,6 +297,17 @@ class StartSellingController extends Controller
         if ($loc = self::locationErrors($v, $addr['city_code'])) {
             throw \Illuminate\Validation\ValidationException::withMessages($loc);
         }
+        $weekly = $request->has('weekly_hours') ? \App\Support\WeeklyHours::fromInput((array) $request->input('weekly_hours', [])) : null;
+        $v['hours'] = $weekly ? \App\Support\WeeklyHours::summary($weekly) : trim((string) $v['hours']);
+        $customPolicies = \App\Support\ShopExtras::policies((array) $request->input('custom_policies', []));
+        $logoPath = $existing?->logo_path;
+        if (! $evt) { // event companies upload their logo with their business photos
+            if ($request->hasFile('logo_file')) {
+                $logoPath = \App\Support\ShopExtras::storeLogo($request->file('logo_file'), $u->id);
+            } elseif ($request->input('logo_remove') === '1') {
+                $logoPath = null;
+            }
+        }
         $pin = isset($v['lat'], $v['lng']) && $v['lat'] !== null ? [round((float) $v['lat'], 7), round((float) $v['lng'], 7)] : [null, null];
         // Payment plans and the security deposit are not asked in the application (terms differ per event and package);
         // a new shop starts with the default plans and no deposit, and sets its own after approval.
@@ -309,13 +330,14 @@ class StartSellingController extends Controller
         $attrs = [
             'name' => trim($v['name']), 'description' => trim($v['description']), 'logo' => $v['logo'],
             'contact_person' => $org ? $app['representative']['name'] : $app['personal']['fullName'],
-            'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'],
+            'phone' => $v['phone'], 'email' => $v['email'], 'hours' => $v['hours'], 'weekly_hours' => $weekly,
             'city' => Locations::name($addr['city_code']), ...$addr,
             'location_type' => $v['location_type'], 'lat' => $pin[0], 'lng' => $pin[1],
             'fulfillment' => $v['fulfillment'], 'delivery_fee' => (float) ($existing?->delivery_fee ?? 0), // not asked in the application: set in Shop Settings (zones + standard rate)
             'delivery' => $existing?->delivery ?? \App\Models\Supplier::DELIVERY_DEFAULTS,
             'methods' => array_values(array_unique($v['methods'])), 'payment_plans' => $plans, 'arrangements' => [], // legacy column (v4 uses payment_plans)
-            'policy' => array_merge($oldPol, ['depositType' => $oldPol['depositType'] ?? 'fixed', 'depositValue' => (float) ($oldPol['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'] ?? '', 'conditions' => $v['conditions'] ?? ''] + ($evt ? ['rescheduling' => trim($v['rescheduling'])] : [])),
+            'policy' => array_merge($oldPol, ['depositType' => $oldPol['depositType'] ?? 'fixed', 'depositValue' => (float) ($oldPol['depositValue'] ?? 0), 'cancelDays' => (int) ($v['cancelDays'] ?? 0), 'cancellation' => $v['cancellation'], 'returns' => $v['returns'] ?? '', 'conditions' => $v['conditions'] ?? '', 'custom' => $customPolicies] + ($evt ? ['rescheduling' => trim($v['rescheduling'])] : [])),
+            ...(! $evt ? ['logo_path' => $logoPath] : []),
             'time_settings' => $existing?->time_settings ?: \App\Domain\Slots::DEFAULT,
             'damage_policy' => $existing?->damage_policy ?: \App\Domain\Damage::DEFAULT,
             'type' => $type, 'company' => $org ? ['legalName' => $app['company']['legalName'], 'companyType' => $app['company']['companyType']] : null,
@@ -381,7 +403,7 @@ class StartSellingController extends Controller
             'contact_person' => 'required|string|max:120',
             'phone' => ['required', 'regex:/^(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}$/'],
             'email' => 'required|email|max:180',
-            'location_type' => 'required|in:shop,home,none',
+            'location_type' => 'required|in:shop,warehouse,home,none',
             // Sellers without a pickup location only need to name their city.
             ...AddressInput::rules('shop_addr', request('location_type', 'shop') !== 'none'),
             'lat' => 'nullable|numeric|between:-90,90',

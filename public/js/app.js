@@ -478,7 +478,45 @@
     const map = mapBase(el);
     let marker = null;
     const status = () => { if (st) st.textContent = marker ? 'Pinned at ' + (+latI.value).toFixed(5) + ', ' + (+lngI.value).toFixed(5) + '. Drag the pin to adjust.' : 'No pin yet. Click the map at your location, or use your current location.'; };
-    const changed = () => box.dispatchEvent(new CustomEvent('pr:pin', { bubbles: true }));
+    const form = box.closest('form'), key = box.dataset.cityFrom, addrBox = form && $('[data-address="' + key + '"]', form);
+    const conf = $('[data-pin-confirm]', box), confBox = $('[data-pin-confirm-box]', box), addrNote = $('[data-pin-addr]', box);
+    const input = n => form && form.elements[key + '[' + n + ']'];
+    const unconfirm = () => { if (conf) conf.checked = false; if (confBox) confBox.hidden = !latI.value; };
+    /** Put a geocoded address into the structured fields (region → province → city, barangay, street). */
+    const fillAddress = parts => {
+      if (!addrBox || !parts || !parts.cityCode) return;
+      locationTree().then(t => {
+        const parentOf = code => Object.keys(t.kids).find(p => p && (t.kids[p] || []).some(x => x.code === code));
+        const chain = []; let c = parts.cityCode; while ((c = parentOf(c))) chain.unshift(c);
+        const sel = l => $('select[data-level="' + l + '"]', addrBox);
+        const put = (s, list, v) => { s.innerHTML = '<option value="">' + esc(s.options[0] ? s.options[0].text : '') + '</option>' + list.map(x => '<option value="' + esc(x.code) + '">' + esc(x.name) + '</option>').join(''); s.disabled = !list.length; s.value = v || ''; };
+        const region = chain[0] || '', prov = chain[1] || '';
+        sel('region').value = region;
+        put(sel('province'), t.kids[region] || [], prov);
+        put(sel('city'), t.kids[prov || region] || [], parts.cityCode);
+        ['barangay', 'street'].forEach(n => { const i = input(n); if (i && parts[n]) { i.value = parts[n]; i.closest('.field') && i.closest('.field').classList.remove('invalid'); } });
+        addrBox.dispatchEvent(new CustomEvent('pr:city', { bubbles: true, detail: { cityCode: parts.cityCode } }));
+      });
+    };
+    let revT = null;
+    const lookUp = (lat, lng) => {
+      if (!window.PRGeo || !addrNote) return;
+      clearTimeout(revT);
+      revT = setTimeout(() => {
+        addrNote.hidden = false; addrNote.textContent = 'Looking up this spot…';
+        window.PRGeo.reverse(lat, lng).then(d => {
+          if (!d || !d.parts) { addrNote.textContent = 'Could not name this spot. Fill in the address above.'; return; }
+          addrNote.innerHTML = 'At this pin: <b>' + esc(d.label) + '</b> <button type="button" class="btn btn-xs" data-use-pin-addr>Use this address</button>';
+          $('[data-use-pin-addr]', addrNote).addEventListener('click', () => { fillAddress(d.parts); addrNote.textContent = 'Address filled in from the pin. Check it above.'; });
+        }).catch(e => { addrNote.textContent = e.message; });
+      }, 500);
+    };
+    const changed = () => { unconfirm(); if (latI.value) lookUp(latI.value, lngI.value); else if (addrNote) addrNote.hidden = true; box.dispatchEvent(new CustomEvent('pr:pin', { bubbles: true })); };
+    const scope = box.closest('#locBox'), search = scope && $('[data-loc-search]', scope); // only the main location has the search box
+    if (search && window.PRGeo) window.PRGeo.attachSearch(search, h => { fillAddress(h.parts); set(h.lat, h.lng, true); });
+    else if (search) { const sb = search.closest('[data-loc-search-box]'); if (sb) sb.hidden = true; }
+    // typing a different street or barangay after confirming asks for a new confirmation
+    if (form) ['barangay', 'street'].forEach(n => { const i = input(n); if (i) i.addEventListener('input', unconfirm); });
     const set = (lat, lng, zoomIn) => {
       latI.value = (+lat).toFixed(7); lngI.value = (+lng).toFixed(7);
       if (!marker) {
@@ -497,8 +535,10 @@
     });
     $('[data-unpin]', box).addEventListener('click', () => { if (marker) { map.removeLayer(marker); marker = null; } latI.value = ''; lngI.value = ''; status(); changed(); });
     document.addEventListener('pr:city', e => { const a = e.target.closest && e.target.closest('[data-address]'); if (a && a.dataset.address === box.dataset.cityFrom && e.detail.cityCode) centreOnCity(e.detail.cityCode); });
-    if (latI.value && lngI.value) set(latI.value, lngI.value, true);
+    const wasConfirmed = conf && conf.checked;
+    if (latI.value && lngI.value) { set(latI.value, lngI.value, true); if (conf) conf.checked = wasConfirmed; if (addrNote) { clearTimeout(revT); addrNote.hidden = true; } }
     else if (box.dataset.city) centreOnCity(box.dataset.city);
+    if (confBox) confBox.hidden = !latI.value;
     status();
   }
 

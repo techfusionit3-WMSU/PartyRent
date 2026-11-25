@@ -719,3 +719,30 @@ main:focus { outline: none; }
 
 .ver-thumb { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface, #fff); text-decoration: none; }
 .ver-thumb img { width: 120px; height: 80px; object-fit: cover; border-radius: 6px; display: block; }
+
+/* operating hours per day */
+.wh-rows { display: flex; flex-direction: column; gap: 6px; }
+.wh-row { display: grid; grid-template-columns: 110px auto 1fr auto; align-items: center; gap: 6px 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; position: relative; }
+.wh-row.is-closed .wh-times { opacity: .45; }
+.wh-row.invalid { border-color: var(--red); }
+.wh-times { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wh-copy { position: relative; }
+.wh-pop { position: absolute; right: 0; top: 100%; z-index: 30; min-width: 220px; padding: 10px; box-shadow: var(--shadow); }
+.wh-pop-days { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.wh-err { grid-column: 1 / -1; }
+@media (max-width: 640px) {
+  .wh-row { grid-template-columns: 1fr auto; }
+  .wh-times { grid-column: 1 / -1; }
+  .wh-copy { grid-column: 2; grid-row: 1; justify-self: end; }
+  .wh-closed { grid-column: 1; }
+}
+.wh-view summary { cursor: pointer; }
+/* shop policies list */
+.pol-row { padding: 10px; margin-bottom: 8px; }
+.pol-row.invalid { border-color: var(--red); }
+/* logo upload */
+.logo-prev img { width: 100%; height: 100%; object-fit: cover; border-radius: 14px; }
+/* pickup address at the pin */
+.pin-addr { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2, #f4f4f5); }
+.wh-times .tf { width: 122px; flex: 0 0 auto; display: inline-flex; }
+.wh-times .tf .input, .wh-times > .input { width: 100%; }

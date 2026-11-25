@@ -14,6 +14,7 @@
     $city = old('shop_addr.cityCode', $d['address_parts']['cityCode'] ?? ($d['city_code'] ?? null));
 @endphp
 @include('partials.leaflet')
+@once<script src="{{ asset('js/geo.js') }}?v={{ filemtime(public_path('js/geo.js')) }}" defer></script>@endonce
 <div id="locBox">
   @if($locFor !== 'business')
   <div @if($locFor === 'either') data-for="individual" @endif>
@@ -29,8 +30,13 @@
   @if($locFor !== 'individual')<input type="hidden" name="location_type" value="shop" @if($locFor === 'either') data-for="organization" @endif>@endif
   @if($locFor === 'business')<h3 class="mt-2 mb-1">Your workplace</h3>@endif
 
-  <h3 class="mb-1" data-loc-title>{{ ['shop' => 'Shop / pickup address', 'home' => 'Your address (kept private)', 'none' => 'Where you are based'][$type] }}</h3>
+  <h3 class="mb-1" data-loc-title>{{ ['shop' => 'Shop / pickup address', 'warehouse' => 'Warehouse / pickup address', 'home' => 'Your address (kept private)', 'none' => 'Where you are based'][$type] ?? 'Shop / pickup address' }}</h3>
   <p class="small muted mt-0" data-loc-hint></p>
+  <div class="field place-search" data-loc-search-box>
+    <label for="locSearch">Search the address or a landmark</label>
+    <input class="input" id="locSearch" type="search" data-loc-search placeholder="e.g. Pilar Building, Zone IV, Zamboanga City" aria-autocomplete="list">
+    <div class="hint">Pick a result to fill in the address and place the pin, then check both below.</div>
+  </div>
   @include('partials.address-fields', ['key' => 'shop_addr', 'value' => $d['address_parts'] ?? [], 'full' => true, 'required' => true])
 
   <div class="field mt-1" data-map-picker data-city-from="shop_addr" data-city="{{ $city }}">
@@ -39,6 +45,8 @@
     <input type="hidden" name="lat" value="{{ $lat }}" data-lat><input type="hidden" name="lng" value="{{ $lng }}" data-lng>
     <div class="row wrap mt-1" style="gap:8px"><button type="button" class="btn btn-sm" data-locate>{{ icon('map') }}Use my current location</button><button type="button" class="btn btn-sm btn-ghost" data-unpin>{{ icon('x') }}Remove pin</button></div>
     <div class="hint" data-pin-status aria-live="polite"></div>
+    <div class="pin-addr small" data-pin-addr hidden></div>
+    <label class="check small mt-1" data-pin-confirm-box hidden><input type="checkbox" name="pin_confirmed" value="1" data-pin-confirm @checked(old('pin_confirmed', $lat ? 1 : 0))> The pin and the address above show the right place.</label>
     @error('lat')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
   </div>
 </div>
@@ -50,10 +58,11 @@
   var form = box.closest('form');
   var HINT = {
     shop: 'Customers see this address and pin, and pick up here. Distance-based delivery is measured from your pin.',
+    warehouse: 'Customers see this address and pin, and pick up at the warehouse. Distance-based delivery is measured from your pin.',
     home: 'Customers only see your city until you accept their pickup request. Then they get this address and your pin.',
     none: 'Only your city is needed. You deliver everything, so this is never shown as a pickup point. A pin is optional and only makes delivery distances more accurate.'
   };
-  var TITLE = { shop: 'Shop / pickup address', home: 'Your address (kept private)', none: 'Where you are based' };
+  var TITLE = { shop: 'Shop / pickup address', warehouse: 'Warehouse / pickup address', home: 'Your address (kept private)', none: 'Where you are based' };
   function sync() {
     // a business has no choice: an enabled hidden location_type=shop
     var hid = [].find.call(form.querySelectorAll('input[type=hidden][name="location_type"]'), function (i) { return !i.disabled; });

@@ -264,6 +264,24 @@ class MultiBranchAccessTest extends TestCase
         $this->get(route('supplier.reports.center', $q))->assertOk()->assertDontSee('whole organization');
     }
 
+    public function test_the_team_page_is_in_the_menu_for_the_people_who_manage_the_team(): void
+    {
+        // the owner
+        $this->actingAs($this->eo->owner)->withSession(['mode' => 'supplier'])->get(route('supplier.dashboard'))->assertOk()
+            ->assertSee('Team &amp; Roles', false)->assertSee(route('supplier.team'), false);
+        $this->get(route('supplier.team'))->assertOk();
+        // a Branch Admin (their branch's team) and an Organization Admin
+        foreach ([['branch_admin', [$this->pasig->id]], ['org_manager', null]] as [$role, $br]) {
+            $u = $this->staff('desk@elegantoccasion.ph', [$role], $br);
+            $this->actingAs($u)->withSession(['mode' => 'supplier', 'module' => 'manage'])->get(route('supplier.dashboard'))->assertOk()->assertSee(route('supplier.team'), false);
+            $this->get(route('supplier.team'))->assertOk();
+        }
+        // a crew member: no link, no page
+        $crew = $this->staff('staff@elegantoccasion.ph', ['crew'], null);
+        $this->actingAs($crew)->withSession(['mode' => 'supplier'])->get(route('supplier.crew'))->assertOk()->assertDontSee(route('supplier.team'), false);
+        $this->assertNotEquals(200, $this->get(route('supplier.team'))->getStatusCode());
+    }
+
     public function test_branch_admin_runs_their_branch_team_only(): void
     {
         $ba = $this->staff('desk@elegantoccasion.ph', ['branch_admin'], [$this->pasig->id]);

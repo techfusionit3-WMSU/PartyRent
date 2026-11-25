@@ -3,6 +3,8 @@
   <form class="browse-bar" aria-label="Rental dates and sorting" method="GET" action="{{ route('home') }}#results" data-multiday>
     @foreach(array_diff_key($st, ['start' => 1, 'end' => 1, 'sort' => 1]) as $k => $v)@if($v !== '' && ! ($k === 'view' && $v === 'items'))<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endif @endforeach
     <div class="bb-dates">
+      @php($bbNear = \App\Support\Near::get())
+      <a class="bb-field bb-near" href="{{ route('near', ['back' => request()->fullUrl()]) }}" title="{{ __('Where you are renting: only shops that serve this place are shown') }}">{{ icon('map') }}<span class="ellipsis">{{ $bbNear ? $bbNear['label'] : __('Set your location') }}</span><span class="link">{{ __('Change') }}</span></a>
       <label class="bb-field">{{ icon('calendar') }}<span class="sr-only">Rental date</span><input class="input input-sm" type="date" name="start" min="{{ today_iso() }}" value="{{ $st['start'] }}" aria-label="{{ $nDays > 1 ? 'Start date' : 'Rental date' }}" data-md-start data-autosubmit></label>
       <span class="bb-end {{ $nDays > 1 ? '' : 'hidden' }}" data-md-end><span class="muted">to</span><input class="input input-sm" type="date" name="end" min="{{ $st['start'] ?: today_iso() }}" value="{{ $st['end'] }}" aria-label="End date" data-autosubmit></span>
       <label class="switch"><input type="checkbox" data-md-toggle @checked($nDays > 1)><span class="sw"></span>Multiple days</label>

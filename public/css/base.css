@@ -596,3 +596,10 @@ main:focus { outline: none; }
 .near-row { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
 .near-chip .link { color: var(--brand); font-weight: 600; }
 @media (max-width: 640px) { .near-row { justify-content: flex-start; } }
+
+/* place inside the browse date bar */
+.bb-near { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: .85rem; text-decoration: none; color: inherit; max-width: 280px; min-width: 0; }
+.bb-near svg { width: 15px; height: 15px; flex: none; color: var(--brand); }
+.bb-near .ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.bb-near .link { color: var(--brand); font-weight: 600; flex: none; }
+@media (max-width: 640px) { .bb-near { max-width: 100%; flex: 1 1 100%; } }

@@ -430,9 +430,15 @@ class Rentals
         $destinations = [];
         if ($fulfillment === 'delivery') {
             foreach (array_values($o['destinations'] ?? []) as $i => $d) {
+                // a structured address (region / province / city, barangay, street) is the source of the text address;
+                // a typed address alone must name a known city or come with a map pin
+                $parts = is_array($d['addr'] ?? null) && ! empty($d['addr']['cityCode']) ? Locations::cleanAddress($d['addr'] + ['landmark' => '']) : null;
+                $text = $parts && $parts['cityCode'] ? Locations::formatAddress($parts, false) : trim((string) ($d['address'] ?? ''));
+                $city = $parts['cityCode'] ?? (Locations::guessCityInText($text)['code'] ?? null);
                 $destinations[] = [
                     'id' => (string) (($d['id'] ?? '') ?: 'd'.($i + 1)), 'label' => trim((string) (($d['label'] ?? '') ?: 'Location '.($i + 1))),
-                    'address' => trim((string) ($d['address'] ?? '')), 'zoneId' => in_array($d['zoneId'] ?? '', $zoneIds, true) ? $d['zoneId'] : '',
+                    'address' => $text, 'zoneId' => in_array($d['zoneId'] ?? '', $zoneIds, true) ? $d['zoneId'] : '',
+                    'cityCode' => $city, 'addr' => $parts ? array_intersect_key($parts, array_flip(['regionCode', 'provinceCode', 'cityCode', 'barangay', 'street'])) : null,
                     'deliveryTime' => (string) ($d['deliveryTime'] ?? ''), 'contactName' => trim((string) ($d['contactName'] ?? '')), 'contactPhone' => trim((string) ($d['contactPhone'] ?? '')),
                 ] + (isset($d['lat'], $d['lng']) && is_numeric($d['lat']) && is_numeric($d['lng']) && abs((float) $d['lat']) <= 90 && abs((float) $d['lng']) <= 180
                     ? ['lat' => round((float) $d['lat'], 7), 'lng' => round((float) $d['lng'], 7)] : []);
@@ -441,8 +447,15 @@ class Rentals
                 return self::fail('Add a delivery address.');
             }
             foreach ($destinations as $d) {
+                if ($d['addr'] && ($d['addr']['barangay'] === '' || mb_strlen($d['addr']['street']) < 3)) {
+                    return self::fail('Add the barangay and the house no. / street of '.(count($destinations) > 1 ? '"'.$d['label'].'"' : 'your delivery address').'.');
+                }
                 if (mb_strlen($d['address']) < 8) {
                     return self::fail('Enter the complete address for "'.$d['label'].'".');
+                }
+                // the delivery branch is picked from the address: never guess when we cannot tell where it is
+                if (! $d['cityCode'] && ! isset($d['lat'])) {
+                    return self::fail('We cannot tell where "'.$d['label'].'" is. Choose its city and barangay, or pin it on the map.');
                 }
             }
             $ids = array_column($destinations, 'id');
@@ -470,7 +483,10 @@ class Rentals
         }
         // fulfilling branch: the customer's pick, or the recommended one; it must have every item for the dates
         // (its own stock only) and deliver to every address
-        $pick = Branches::choose($s, $lines, $fulfillment, $destinations, ! empty($o['branch_id']) ? (int) $o['branch_id'] : null);
+        // delivery: the branch is assigned from the delivery address (the customer cannot pick one);
+        // pickup: the customer may choose among the branches that cover them and have everything
+        $wanted = $fulfillment === 'pickup' && ! empty($o['branch_id']) ? (int) $o['branch_id'] : null;
+        $pick = Branches::choose($s, $lines, $fulfillment, $destinations, $wanted);
         if (! $pick['ok']) {
             return self::fail($s->name.': '.$pick['error'], ['branches' => $pick['options']]);
         }

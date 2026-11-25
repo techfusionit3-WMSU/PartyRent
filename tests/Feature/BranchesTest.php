@@ -105,19 +105,21 @@ class BranchesTest extends TestCase
         $this->assertCount(3, $q['branches']);
         $this->assertStringContainsString('Branch A – Pasig', $q['html']);
 
-        // choosing BGC instead: allowed (it has the chairs) and the delivery fee follows the branch
+        // delivery: the branch comes from the address; asking for BGC changes nothing (not even through the API)
         $q2 = $this->postJson(route('checkout.quote'), ['shared' => [], 'orders' => [$o + ['branch_id' => $this->bgc->id]]])->json('orders.0');
-        $this->assertSame($this->bgc->id, $q2['branchId']);
-        $this->assertGreaterThan($q['summary']['q']['deliveryFee'], $q2['summary']['q']['deliveryFee']);
-        $this->assertEqualsWithDelta($opts[$this->bgc->id]['fee'], $q2['summary']['q']['deliveryFee'], 0.01);
-
-        // submit with the manual pick: the rental belongs to BGC, every line uses BGC's stock
+        $this->assertSame($this->pasig->id, $q2['branchId']);
+        $this->assertEqualsWithDelta($q['summary']['q']['deliveryFee'], $q2['summary']['q']['deliveryFee'], 0.01);
         $this->checkout($this->s->id, $this->delivery(['branch_id' => $this->bgc->id]))->assertOk()->assertJsonPath('ok', true);
         $r = RentalRequest::latest('id')->firstOrFail();
-        $this->assertSame($this->bgc->id, $r->branch_id);
-        $this->assertSame([$this->bgc->id], array_values(array_unique(array_column($r->lines, 'sourceId'))));
-        $this->assertEqualsWithDelta($opts[$this->bgc->id]['fee'], $r->pricing['deliveryFee'], 0.01);
-        $this->get(route('rentals.show', $r))->assertOk()->assertSee('Rented from')->assertSee('Main Warehouse');
+        $this->assertSame($this->pasig->id, $r->branch_id);
+        $this->assertSame([$this->pasig->id], array_values(array_unique(array_column($r->lines, 'sourceId'))));
+        $this->assertEqualsWithDelta($opts[$this->pasig->id]['fee'], $r->pricing['deliveryFee'], 0.01);
+        $this->get(route('rentals.show', $r))->assertOk()->assertSee('Rented from')->assertSee('Branch A – Pasig');
+
+        // pickup: the customer may choose where to collect among the branches that have everything
+        $this->rent($this->chair->id, 40);
+        $this->checkout($this->s->id, $this->delivery(['fulfillment' => 'pickup', 'destinations' => [], 'branch_id' => $this->bgc->id]))->assertOk();
+        $this->assertSame($this->bgc->id, RentalRequest::latest('id')->firstOrFail()->branch_id);
     }
 
     public function test_never_combines_stock_of_two_branches(): void
@@ -128,12 +130,10 @@ class BranchesTest extends TestCase
         $this->checkout($this->s->id, $this->delivery())->assertStatus(422)->assertJson(fn ($j) => $j->where('ok', false)->where('error', fn ($e) => str_contains($e, 'No single branch'))->etc());
         $this->assertSame(0, RentalRequest::where('customer_id', auth()->id())->where('supplier_id', $this->s->id)->where('status', 'pending')->where('start_date', $this->day())->count());
 
-        // 60 chairs: BGC can, Pasig (50) cannot, so picking Pasig is refused with the reason
+        // 60 chairs: BGC can, Pasig (50) cannot; asking for Pasig is ignored and BGC (which has them) delivers
         CartLine::where('user_id', auth()->id())->delete();
         $this->rent($this->chair->id, 60);
-        $this->checkout($this->s->id, $this->delivery(['branch_id' => $this->pasig->id]))->assertStatus(422)
-            ->assertJson(fn ($j) => $j->where('error', fn ($e) => str_contains($e, 'Branch A – Pasig does not have everything') && str_contains($e, 'Main Warehouse can fulfil'))->etc());
-        $this->checkout($this->s->id, $this->delivery())->assertOk();
+        $this->checkout($this->s->id, $this->delivery(['branch_id' => $this->pasig->id]))->assertOk();
         $this->assertSame($this->bgc->id, RentalRequest::latest('id')->first()->branch_id);
     }
 
@@ -152,8 +152,7 @@ class BranchesTest extends TestCase
         // customer rents the package: BGC is the only eligible branch
         $this->asCustomer();
         $this->rent($k->id, 1, null, 'package');
-        $this->checkout($this->s->id, $this->delivery(['branch_id' => $this->pasig->id]))->assertStatus(422);
-        $this->checkout($this->s->id, $this->delivery())->assertOk();
+        $this->checkout($this->s->id, $this->delivery(['branch_id' => $this->pasig->id]))->assertOk();
         $this->assertSame($this->bgc->id, RentalRequest::latest('id')->first()->branch_id);
     }
 
@@ -172,8 +171,7 @@ class BranchesTest extends TestCase
         // Jose wants 30 the same day: Pasig has only 10 left, so Pasig is refused and BGC is recommended
         $this->asCustomer('jose@demo.ph');
         $this->rent($this->chair->id, 30);
-        $this->checkout($this->s->id, $this->delivery(['contactName' => 'Jose', 'branch_id' => $this->pasig->id]))->assertStatus(422);
-        $this->checkout($this->s->id, $this->delivery(['contactName' => 'Jose']))->assertOk();
+        $this->checkout($this->s->id, $this->delivery(['contactName' => 'Jose', 'branch_id' => $this->pasig->id]))->assertOk();
         $b = RentalRequest::latest('id')->firstOrFail();
         $this->assertSame($this->bgc->id, $b->branch_id);
         // the shop cannot move Jose's rental to Pasig either (not enough there)

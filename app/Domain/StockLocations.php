@@ -47,6 +47,28 @@ class StockLocations
         if ($phone !== '' && ! preg_match('/^(\+?63|0)\d{9,10}$/', preg_replace('/[\s\-()]/', '', $phone))) {
             return self::fail('Enter a valid contact number for the branch (e.g. 0917 555 0101 or (02) 8820 1234).');
         }
+        // delivery coverage: a distance (service_km), or the cities / barangays listed
+        $coverage = null;
+        if (is_array($data['coverage'] ?? null)) {
+            $areas = [];
+            foreach ((array) ($data['coverage']['areas'] ?? []) as $row) {
+                $txt = trim((string) ($row['city'] ?? ''));
+                if ($txt === '') {
+                    continue;
+                }
+                $city = Locations::isCity($txt) ? Locations::get($txt) : (Locations::cityByLabel($txt) ?? Locations::findCityByName($txt));
+                if (! $city) {
+                    return self::fail('"'.$txt.'" is not a city or municipality we know. Pick one from the list.');
+                }
+                $brgys = array_values(array_unique(array_filter(array_map(fn ($b) => trim(preg_replace('/^(brgy\.?|barangay)\s+/i', '', trim($b))), explode(',', (string) ($row['barangays'] ?? ''))))));
+                $areas[$city['code']] = ['city' => $city['code'], 'barangays' => array_values(array_unique(array_merge($areas[$city['code']]['barangays'] ?? [], $brgys)))];
+            }
+            $mode = ($data['coverage']['mode'] ?? 'distance') === 'areas' ? 'areas' : 'distance';
+            if ($mode === 'areas' && ! $areas) {
+                return self::fail('Add at least one city or municipality this branch delivers to, or choose "Within a distance".');
+            }
+            $coverage = ['mode' => $mode, 'areas' => array_values($areas)];
+        }
         $lat = $data['lat'] ?? null;
         $lng = $data['lng'] ?? null;
         $pin = is_numeric($lat) && is_numeric($lng) ? [round((float) $lat, 7), round((float) $lng, 7)] : null;
@@ -56,6 +78,7 @@ class StockLocations
         $rec = ['name' => $name, 'address' => $address, 'contact' => trim((string) ($data['contact'] ?? '')), 'phone' => $phone]
             + (array_key_exists('hours', $data) ? ['hours' => trim((string) $data['hours']) ?: null] : [])
             + (array_key_exists('service_km', $data) ? ['service_km' => is_numeric($data['service_km']) ? round((float) $data['service_km'], 1) : null] : [])
+            + ($coverage ? ['coverage' => $coverage] : [])
             + ($parts ? ['address_parts' => $parts['address_parts'], 'city_code' => $parts['city_code']] : [])
             + (array_key_exists('lat', $data) ? ['lat' => $pin[0] ?? null, 'lng' => $pin[1] ?? null] : []);
         DB::transaction(function () use ($s, &$l, $rec, $data) {
@@ -65,7 +88,7 @@ class StockLocations
             }
         });
         inv()->flush();
-        Notifier::audit($l->wasRecentlyCreated ? 'Added branch' : 'Updated branch', $s->name.' · '.$name);
+        Notifier::audit($l->wasRecentlyCreated ? 'Added branch' : 'Updated branch', $s->name.' · '.$name.' · delivers: '.\App\Domain\Branches::coverageText($l->fresh()));
 
         return ['ok' => true, 'branch' => $l];
     }

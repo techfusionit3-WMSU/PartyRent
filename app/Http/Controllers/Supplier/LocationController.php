@@ -59,12 +59,13 @@ class LocationController extends Controller
         $request->validate([
             'name' => 'required|string|min:2|max:120', 'address' => 'nullable|string|max:300', 'addr' => 'nullable|array',
             'contact' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:40', 'hours' => 'nullable|string|max:120',
-            'service_km' => 'nullable|numeric|min:1|max:2000',
+            'service_km' => 'nullable|numeric|min:1|max:2000', 'coverage' => 'nullable|array', 'coverage.mode' => 'nullable|in:distance,areas',
+            'coverage.areas' => 'nullable|array|max:60', 'coverage.areas.*.city' => 'nullable|string|max:160', 'coverage.areas.*.barangays' => 'nullable|string|max:1000',
             'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180|required_with:lat', 'is_main' => 'nullable|boolean',
         ]);
 
         // only the organization level chooses the main branch
-        $keep = \App\Support\BranchScope::isOrgLevel() ? ['name', 'address', 'addr', 'contact', 'phone', 'hours', 'service_km', 'is_main'] : ['name', 'address', 'addr', 'contact', 'phone', 'hours', 'service_km'];
+        $keep = \App\Support\BranchScope::isOrgLevel() ? ['name', 'address', 'addr', 'contact', 'phone', 'hours', 'service_km', 'coverage', 'is_main'] : ['name', 'address', 'addr', 'contact', 'phone', 'hours', 'service_km', 'coverage'];
 
         return $request->only($keep) + ($request->has('lat') ? ['lat' => $request->input('lat'), 'lng' => $request->input('lng')] : []);
     }

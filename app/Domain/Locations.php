@@ -218,6 +218,46 @@ class Locations
         return null;
     }
 
+    /** A city from its full label ("Zamboanga City, Zamboanga del Sur"), as shown in pickers. */
+    public static function cityByLabel(string $label): ?array
+    {
+        $n = mb_strtolower(trim($label));
+        foreach (self::cities() as $c) {
+            if (mb_strtolower(self::label($c['code'])) === $n) {
+                return $c;
+            }
+        }
+
+        return null;
+    }
+
+    /** The city / municipality whose centre is nearest a point (to read a map pin that came without a city). */
+    public static function nearestCity(array $point): ?array
+    {
+        $best = null;
+        $bd = PHP_FLOAT_MAX;
+        foreach (self::cities() as $c) {
+            if ($c['lat'] === null) {
+                continue;
+            }
+            $d = ($c['lat'] - $point[0]) ** 2 + (($c['lng'] - $point[1]) * cos(deg2rad($point[0]))) ** 2;
+            if ($d < $bd) {
+                [$bd, $best] = [$d, $c];
+            }
+        }
+
+        return $best;
+    }
+
+    /** "Brgy. Tetuan" / "barangay tetuan" / "Tetuan" → "tetuan" (for comparing barangay names). */
+    public static function normBarangay(?string $s): string
+    {
+        $s = mb_strtolower(trim((string) $s));
+        $s = preg_replace('/^(brgy\.?|barangay)\s+/u', '', $s);
+
+        return trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $s));
+    }
+
     public static function norm(string $s): string
     {
         $s = mb_strtolower(trim($s));

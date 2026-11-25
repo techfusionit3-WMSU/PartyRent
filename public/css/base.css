@@ -603,3 +603,15 @@ main:focus { outline: none; }
 .bb-near .ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
 .bb-near .link { color: var(--brand); font-weight: 600; flex: none; }
 @media (max-width: 640px) { .bb-near { max-width: 100%; flex: 1 1 100%; } }
+
+/* branch delivery coverage rows */
+.cov-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 10px; margin-bottom: 8px; }
+@media (max-width: 640px) { .cov-row { grid-template-columns: 1fr; padding-bottom: 8px; border-bottom: 1px dashed var(--line); } }
+
+/* checkout: delivery information (entered once) */
+.deliv-card h3 svg { width: 18px; height: 18px; vertical-align: -3px; color: var(--brand); }
+.place-search { position: relative; }
+.place-sugg { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); max-height: 280px; overflow: auto; }
+.place-sugg li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.place-sugg li:hover, .place-sugg li.on { background: var(--brand-50); }
+.deliv-to { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; background: var(--surface-2, transparent); }

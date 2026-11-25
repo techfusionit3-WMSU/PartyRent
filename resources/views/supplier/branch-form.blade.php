@@ -27,9 +27,49 @@
         <div class="field"><label for="bContact">Person in charge <span class="muted small">(optional)</span></label><input class="input" id="bContact" name="contact" maxlength="120" value="{{ old('contact', $l->contact) }}" placeholder="e.g. Joy Lim"></div>
         <div class="field"><label for="bPhone">Contact number <span class="muted small">(optional)</span></label><input class="input" id="bPhone" name="phone" maxlength="40" value="{{ old('phone', $l->phone) }}" placeholder="0917 555 0101" inputmode="tel"><div class="hint">Mobile or landline, e.g. (02) 8820 1234.</div></div>
         <div class="field"><label for="bHours">Opening hours <span class="muted small">(optional)</span></label><input class="input" id="bHours" name="hours" maxlength="120" value="{{ old('hours', $l->hours) }}" placeholder="e.g. Mon–Sat 8 AM–6 PM"></div>
-        <div class="field"><label for="bKm">Serves customers up to (km) <span class="muted small">(optional)</span></label><input class="input" id="bKm" name="service_km" type="number" min="1" max="2000" step="1" value="{{ old('service_km', $l->service_km) }}" placeholder="Shop default: {{ $s->branchSettings()['serviceKm'] }} km"><div class="hint">Customers farther than this are never offered this branch.</div></div>
       </div>
     </div>
+    @php
+      $cv = \App\Domain\Branches::coverage($l->exists ? $l : new \App\Models\InventoryLocation(['supplier_id' => $s->id]));
+      $cvOld = old('coverage');
+      $cvMode = $cvOld['mode'] ?? ($l->exists ? $cv['mode'] : 'distance');
+      $cvAreas = $cvOld['areas'] ?? array_map(fn ($a) => ['city' => \App\Domain\Locations::label($a['city']), 'barangays' => implode(', ', $a['barangays'])], $l->exists ? $cv['areas'] : []);
+      $cvAreas = array_values(array_pad($cvAreas, max(2, count($cvAreas) + 1), ['city' => '', 'barangays' => '']));
+    @endphp
+    <div class="card cov-card"><h3 class="mb-1">Delivery coverage</h3>
+      <p class="small muted mt-0">Where this branch delivers. Checkout picks the branch for each customer from their delivery address, so a branch is only given addresses it covers. If no branch covers an address, the customer is told before they can send the request.</p>
+      <label class="check mb-1"><input type="radio" name="coverage[mode]" value="distance" @checked($cvMode !== 'areas')> <span><b>Within a distance of this branch</b><span class="small muted" style="display:block">Measured from the branch's map pin to the customer's pinned address (or their city).</span></span></label>
+      <div class="field" data-cov="distance" style="margin-left:26px"><label for="bKm">Up to (km)</label><input class="input" id="bKm" name="service_km" type="number" min="1" max="2000" step="1" value="{{ old('service_km', $l->service_km) }}" placeholder="Shop default: {{ $s->branchSettings()['serviceKm'] }} km" style="max-width:200px"><div class="hint">Leave blank to use the shop default.</div></div>
+      <label class="check mb-1 mt-1"><input type="radio" name="coverage[mode]" value="areas" @checked($cvMode === 'areas')> <span><b>Only the areas I list</b><span class="small muted" style="display:block">Cities or municipalities, and optionally only some of their barangays.</span></span></label>
+      <div data-cov="areas" style="margin-left:26px">
+        <div class="cov-rows" data-cov-rows>
+          @foreach($cvAreas as $i => $a)
+            <div class="cov-row" data-cov-row>
+              <div class="field mb-0"><label class="small" for="covC{{ $i }}">City / municipality</label><input class="input" id="covC{{ $i }}" name="coverage[areas][{{ $i }}][city]" list="covCities" value="{{ $a['city'] }}" placeholder="Start typing, e.g. Zamboanga City" autocomplete="off"></div>
+              <div class="field mb-0"><label class="small" for="covB{{ $i }}">Barangays <span class="muted">(optional)</span></label><input class="input" id="covB{{ $i }}" name="coverage[areas][{{ $i }}][barangays]" value="{{ $a['barangays'] }}" placeholder="All barangays, or e.g. Tetuan, Putik, Guiwan"></div>
+            </div>
+          @endforeach
+        </div>
+        <button type="button" class="btn btn-sm mt-1" data-cov-add>{{ icon('plus') }}Add an area</button>
+        <datalist id="covCities">@foreach(\App\Domain\Locations::cities() as $c)<option value="{{ \App\Domain\Locations::label($c['code']) }}"></option>@endforeach</datalist>
+      </div>
+      @error('coverage')<div class="error-text" style="display:block">{{ $message }}</div>@enderror
+    </div>
+    @push('scripts')
+    <script>
+    (function () {
+      const card = document.querySelector('.cov-card'); if (!card) return;
+      const sync = () => { const m = (card.querySelector('[name="coverage[mode]"]:checked') || {}).value; card.querySelectorAll('[data-cov]').forEach(el => { el.hidden = el.dataset.cov !== m; }); };
+      card.querySelectorAll('[name="coverage[mode]"]').forEach(r => r.addEventListener('change', sync)); sync();
+      card.querySelector('[data-cov-add]').addEventListener('click', () => {
+        const rows = card.querySelector('[data-cov-rows]'), last = rows.lastElementChild, n = rows.children.length, c = last.cloneNode(true);
+        c.querySelectorAll('input').forEach(i => { i.value = ''; i.name = i.name.replace(/\[\d+\]/, '[' + n + ']'); i.id = i.id.replace(/\d+$/, n); });
+        c.querySelectorAll('label').forEach(lb => { lb.htmlFor = lb.htmlFor.replace(/\d+$/, n); });
+        rows.appendChild(c); c.querySelector('input').focus();
+      });
+    })();
+    </script>
+    @endpush
     <div class="card"><h3 class="mb-1">3. Location</h3>
       <p class="small muted mt-0">Deliveries leave from here and pickups happen here, so the delivery fee customers see is measured from this branch.</p>
       @if($l->exists && ! $l->address_parts && $l->address)<div class="alert alert-info mb-2">{{ icon('info') }}<div class="small">Saved address: <b>{{ $l->address }}</b>. Check the region, province and city below and add the barangay, then save.</div></div>@endif

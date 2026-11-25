@@ -13,12 +13,18 @@ Code: `App\Domain\Branches`, `App\Domain\Transfers`, `App\Support\Near`, `App\Su
   address. A guest's choice is kept for the visit; a signed-in customer's choice is saved.
 - Unknown place = no area limit (every branch counts), so nothing breaks for new visitors.
 
-## 2. Service area per branch
+## 2. Delivery coverage per branch
 
-- Each branch serves customers up to a distance (Branches page → edit branch → *Serves customers up to (km)*).
-  Blank = the shop's default (Branches page → *How branches serve customers*, default 50 km).
-- A branch outside the customer's area is **never offered**, for delivery or pickup, whatever the delivery fee setting.
-  For delivery the pinned delivery address is used; otherwise the customer's place.
+Branches page → edit branch → **Delivery coverage**:
+
+- **Within a distance of this branch** (km; blank = the shop default, 50 km), measured from the branch pin to the
+  customer's pinned address, else to the centre of their city; or
+- **Only the areas I list**: cities / municipalities, each optionally limited to some barangays
+  (e.g. *Zamboanga City: Tetuan, Putik*).
+
+A branch that does not cover a place is never offered, for delivery or pickup. The owner and Organization Admins set
+coverage for every branch; a Branch Admin only for their own (another branch's form is a 404). Changes apply to the
+next checkout; existing rentals keep their branch. Each change is in the Store History.
 
 ## 3. Stock near you
 
@@ -27,7 +33,26 @@ Code: `App\Domain\Branches`, `App\Domain\Transfers`, `App\Support\Near`, `App\Su
 - The figure is the best single branch that serves them, or, if the shop combines branches, the nearest branch plus
   what branches near it can lend. The quantity check, calendar and "free" counts use the same figure.
 
-## 4. The branch at checkout (automatic)
+## 4. Checkout: one address, branch assigned automatically
+
+- Checkout has one section per shop (its items, dates, prices, delivery or pickup, payment plan) and then a single
+  **Delivery information** section: the address is entered **once** for every shop that delivers, with contact person,
+  contact number and **General Instructions** (optional; landmarks, gate details, directions).
+- The address: *Find your city or municipality* (type to search; picking one fills region, province and city), or
+  *Use my current location* (pins you and fills the city), or *Use my saved address*; then barangay and house no. /
+  street; optional *Pin on map* for the exact spot. It is kept if the customer leaves checkout and comes back.
+- The server checks it: city, barangay and street are required; a typed address must name a known city or be pinned.
+  It never guesses: "We cannot tell where … is".
+- **Delivery: the branch is assigned by the server** from the address and the coverage above; the customer cannot
+  choose or override it (a branch id sent by the browser is ignored). If several branches cover the address: the one
+  with every item for the dates, then the lowest delivery fee, then the nearest, then the main branch. If none covers
+  it, that shop says *None of its branches delivers to Davao City … Choose Pickup or another address*; other shops in
+  the same checkout are not affected.
+- **Pickup**: the nearest branch that has everything is suggested; the customer may pick another one near them.
+- The assigned branch is shown on the shop section, the rental, the receipt, the shop's Rentals list,
+  Fulfillment & Returns and the crew's jobs ("Delivered by …").
+
+## 4b. Older notes: the branch at checkout
 
 - Checkout shows one line: **Rented from Pasig · 8 km away**. The system picked the branch that has everything for
   the dates, serves the customer, then the lowest delivery fee, then the nearest.

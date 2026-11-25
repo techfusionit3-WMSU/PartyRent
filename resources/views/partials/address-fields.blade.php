@@ -1,7 +1,7 @@
 {{--
   Structured address: Region → Province → City/Municipality selects (+ barangay, street, landmark).
   Params: $key (input prefix, default "addr"), $value (address_parts array), $full (show barangay/street/landmark),
-          $required.
+          $required, $landmark (false hides the landmark field, e.g. at checkout where General Instructions covers it).
   Server-rendered so it works without JS; public/js/app.js cascades the selects and fires a
   `pr:city` event (detail.cityCode) whenever the city changes.
 --}}
@@ -35,6 +35,6 @@
       @if($err('barangay'))<div class="error-text" style="display:block">{{ $err('barangay') }}</div>@endif</div>
     <div class="field full {{ $err('street') ? 'invalid' : '' }}"><label>House no. / building and street</label><input class="input" name="{{ $key }}[street]" {{ $req }} maxlength="180" value="{{ $v['street'] ?? '' }}" placeholder="e.g. 23 Mabini St." autocomplete="street-address">
       @if($err('street'))<div class="error-text" style="display:block">{{ $err('street') }}</div>@endif</div>
-    <div class="field full"><label>Landmark <span class="muted">(optional)</span></label><input class="input" name="{{ $key }}[landmark]" maxlength="180" value="{{ $v['landmark'] ?? '' }}" placeholder="e.g. beside the barangay hall"></div>
+    @if($landmark ?? true)<div class="field full"><label>Landmark <span class="muted">(optional)</span></label><input class="input" name="{{ $key }}[landmark]" maxlength="180" value="{{ $v['landmark'] ?? '' }}" placeholder="e.g. beside the barangay hall"></div>@endif
   @endif
 </div>

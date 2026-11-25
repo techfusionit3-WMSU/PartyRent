@@ -48,7 +48,7 @@
         @if(! empty($r->fulfillment_log['returnDate']))<dt>Returned</dt><dd>{{ fmt_date($r->fulfillment_log['returnDate']) }}</dd>@endif
         <dt>Return status</dt><dd>{{ $r->status === 'completed' ? 'Returned & closed' : ($r->inspection ? 'Inspected' : ($r->status === 'return_pending' ? 'Awaiting return' : ($r->status === 'ongoing' ? 'Due '.fmt_date(add_days($r->end_date, 1)) : '—'))) }}</dd>
       </dl>
-      @if($r->instructions)<p class="small mt-1 mb-0"><b>Your instructions:</b> {{ $r->instructions }}</p>@endif
+      @if($r->instructions)<p class="small mt-1 mb-0"><b>General Instructions:</b> {{ $r->instructions }}</p>@endif
     </div>
     @if($policy['allowed'] && ! in_array($r->status, ['declined', 'cancelled', 'completed'], true))
       <form class="card" method="POST" action="{{ route('rentals.cancel', $r) }}" data-confirm="Cancel {{ $r->code }}? {{ $policy['note'] }}" data-confirm-title="Cancel request?" data-confirm-ok="Cancel request" data-danger>

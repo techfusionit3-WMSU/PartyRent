@@ -18,9 +18,14 @@ use Illuminate\Support\Facades\DB;
  * - A rental has ONE home branch (rental_requests.branch_id): every line uses that branch's stock (line sourceId),
  *   so Inventory::check() validates the branch's stock for the dates and times, packages item by item. The home
  *   branch is the delivery origin (Pricing::deliveryFor) and the pickup place.
- * - Service area: a branch serves customers up to its service distance (inventory_locations.service_km, else the
- *   shop's default, Supplier::branchSettings()['serviceKm']) from where they are (App\Support\Near) or from the
- *   delivery address. A branch outside it is never offered, for delivery or pickup.
+ * - Coverage: a branch serves customers within its service distance (inventory_locations.service_km, else the
+ *   shop's default, Supplier::branchSettings()['serviceKm']), or, when the shop lists them (inventory_locations.coverage
+ *   mode "areas"), only in the listed cities / barangays. It is checked against the delivery address (pin first,
+ *   then barangay and city) or, for pickup and browsing, where the customer is (App\Support\Near). A branch that
+ *   does not cover it is never offered.
+ * - Delivery: the branch is assigned by the server from the delivery address; the customer cannot pick another one.
+ *   Several branches cover the address: every item available there first, then the lowest delivery fee, then the
+ *   nearest, then the main branch. None covers it: the order is refused with the reason, never given to a random one.
  * - At checkout the best branch is picked automatically: every item available there, serves the customer, then the
  *   lowest delivery fee, then the nearest. The customer may pick another eligible branch.
  * - Combining (off unless the shop turns it on, branchSettings()['combine']): when no single branch has everything,
@@ -105,13 +110,14 @@ class Branches
      */
     public static function supplierIdsNear(?array $point = null): ?array
     {
+        $city = $point ? null : (Near::get()['city'] ?? null);
         $point ??= Near::point();
         if (! $point) {
             return null;
         }
         $ids = [];
         foreach (InventoryLocation::where('active', true)->whereHas('supplier', fn ($q) => $q->where('status', 'approved'))->with('supplier')->get() as $b) {
-            if (! isset($ids[$b->supplier_id]) && self::serves($b, $point)) {
+            if (! isset($ids[$b->supplier_id]) && self::serves($b, $point, $city)) {
                 $ids[$b->supplier_id] = true;
             }
         }
@@ -134,12 +140,65 @@ class Branches
         return $ids === null ? $q : $q->whereIn($col, $ids ?: [0]);
     }
 
-    /** Does the branch serve this point? Unknown distance counts as served (no limit we can check). */
-    public static function serves(InventoryLocation $b, ?array $point): bool
+    /** Does the branch serve this point (and city)? Unknown place counts as served (no limit we can check). */
+    public static function serves(InventoryLocation $b, ?array $point, ?string $city = null): bool
     {
-        $km = self::km($b, $point);
+        return self::covers($b, ['point' => $point, 'city' => $city])['ok'];
+    }
 
-        return $km === null || $km <= self::serviceKm($b);
+    /** Coverage of a branch: ['mode' => distance|areas, 'km' => float, 'areas' => [['city' => code, 'barangays' => [..]]]]. */
+    public static function coverage(InventoryLocation $b): array
+    {
+        $c = (array) ($b->coverage ?? []);
+        $areas = array_values(array_filter(array_map(fn ($a) => ['city' => (string) ($a['city'] ?? ''), 'barangays' => array_values(array_filter(array_map('trim', (array) ($a['barangays'] ?? []))))],
+            (array) ($c['areas'] ?? [])), fn ($a) => Locations::isCity($a['city'])));
+
+        return ['mode' => ($c['mode'] ?? '') === 'areas' && $areas ? 'areas' : 'distance', 'km' => self::serviceKm($b), 'areas' => $areas];
+    }
+
+    /** "Within 15 km" / "Zamboanga City (Tetuan, Putik); Isabela City" for lists and notes. */
+    public static function coverageText(InventoryLocation $b): string
+    {
+        $c = self::coverage($b);
+        if ($c['mode'] === 'distance') {
+            return 'Within '.rtrim(rtrim(number_format($c['km'], 1), '0'), '.').' km of the branch';
+        }
+
+        return implode('; ', array_map(fn ($a) => Locations::name($a['city']).($a['barangays'] ? ' ('.implode(', ', $a['barangays']).')' : ''), $c['areas']));
+    }
+
+    /**
+     * Does a branch cover a place? $t = ['point' => [lat, lng]|null, 'city' => code|null, 'barangay' => name|null].
+     * The most precise information wins: a pin is read for its distance (and its city when none is given).
+     * Returns ['ok' => bool, 'km' => ?float, 'why' => ?string].
+     */
+    public static function covers(InventoryLocation $b, array $t): array
+    {
+        $point = $t['point'] ?? null;
+        $city = $t['city'] ?? null;
+        $km = self::km($b, $point ?: (($c = $city ? Locations::get($city) : null) && $c['lat'] !== null ? [(float) $c['lat'], (float) $c['lng']] : null));
+        $cov = self::coverage($b);
+        if ($cov['mode'] === 'areas') {
+            $city = $city ?: ($point ? (Locations::nearestCity($point)['code'] ?? null) : null);
+            if (! $city) {
+                return ['ok' => true, 'km' => $km, 'why' => null]; // nothing to check against (browsing with no place)
+            }
+            $area = collect($cov['areas'])->firstWhere('city', $city);
+            if (! $area) {
+                return ['ok' => false, 'km' => $km, 'why' => $b->name.' does not deliver to '.Locations::name($city)];
+            }
+            $brgy = Locations::normBarangay($t['barangay'] ?? null);
+            if ($area['barangays'] && $brgy !== '' && ! in_array($brgy, array_map([Locations::class, 'normBarangay'], $area['barangays']), true)) {
+                return ['ok' => false, 'km' => $km, 'why' => $b->name.' does not deliver to Brgy. '.trim((string) $t['barangay']).', '.Locations::name($city)];
+            }
+
+            return ['ok' => true, 'km' => $km, 'why' => null];
+        }
+        if ($km !== null && $km > $cov['km']) {
+            return ['ok' => false, 'km' => $km, 'why' => 'Outside the area '.$b->name.' serves (about '.$km.' km away; it serves up to '.rtrim(rtrim(number_format($cov['km'], 1), '0'), '.').' km)'];
+        }
+
+        return ['ok' => true, 'km' => $km, 'why' => null];
     }
 
     /**
@@ -148,10 +207,11 @@ class Branches
      */
     public static function near(Supplier $s, ?array $point = null): array
     {
+        $city = $point ? null : (Near::get()['city'] ?? null);
         $point ??= Near::point();
         $out = [];
         foreach (self::active($s) as $b) {
-            if (self::serves($b, $point)) {
+            if (self::serves($b, $point, $city)) {
                 $out[] = ['branch' => $b, 'km' => self::km($b, $point)];
             }
         }
@@ -215,21 +275,26 @@ class Branches
     public static function options(Supplier $s, array $lines, string $fulfillment, array $destinations = [], ?int $excludeId = null, ?array $point = null): array
     {
         $delivery = $fulfillment === 'delivery';
-        $point ??= Near::point();
-        // where the branch must reach: every pinned delivery address, else where the customer is renting near
-        $targets = $delivery ? array_values(array_filter(array_map(fn ($d) => isset($d['lat'], $d['lng']) && is_numeric($d['lat']) ? [(float) $d['lat'], (float) $d['lng']] : null, $destinations))) : [];
-        $targets = $targets ?: ($point ? [$point] : []);
+        // where the branch must reach: every delivery address (pin, barangay, city), else where the customer is
+        $targets = $delivery ? array_values(array_filter(array_map(fn ($d) => self::target($d), $destinations))) : [];
+        if (! $targets) {
+            $near = $point ? null : Near::get();
+            $point ??= Near::point();
+            $targets = $point ? [['point' => $point, 'city' => $near['city'] ?? null]] : [];
+        }
         $out = [];
         foreach (self::active($s) as $b) {
             $c = self::check($lines, $b, $excludeId);
             $fees = $delivery ? array_map(fn ($d) => Pricing::deliveryFor($s, $b, $d), $destinations ?: [[]]) : [];
-            $kms = array_values(array_filter(array_map(fn ($t) => self::km($b, $t), $targets), fn ($k) => $k !== null));
+            $cov = array_map(fn ($t) => self::covers($b, $t), $targets);
+            $kms = array_values(array_filter(array_column($cov, 'km'), fn ($k) => $k !== null));
             $bad = array_values(array_filter($fees, fn ($f) => ! $f['ok']));
-            $far = $kms && max($kms) > self::serviceKm($b);
+            $miss = collect($cov)->first(fn ($x) => ! $x['ok']);
+            $far = (bool) $miss;
             $out[] = [
                 'id' => $b->id, 'name' => $b->name, 'address' => $b->address, 'city' => $b->cityName(), 'phone' => $b->phone, 'hours' => $b->hours, 'main' => (bool) $b->is_main,
                 'ok' => $c['ok'], 'short' => $c['short'], 'serves' => ! $far, 'deliverable' => ! $bad && ! $far,
-                'note' => $far ? 'Outside the area '.$b->name.' serves (about '.max($kms).' km away; it serves up to '.rtrim(rtrim(number_format(self::serviceKm($b), 1), '0'), '.').' km)' : ($bad[0]['note'] ?? null),
+                'note' => $far ? $miss['why'] : ($bad[0]['note'] ?? null), 'coverage' => self::coverageText($b),
                 'fee' => r2(array_sum(array_column($fees, 'fee'))), 'km' => $kms ? max($kms) : null, 'recommended' => false,
             ];
         }
@@ -274,14 +339,29 @@ class Branches
         if (! $best) {
             $stock = collect($opts)->firstWhere('ok', true);
 
+            $place = ($c = collect($destinations)->pluck('cityCode')->filter()->first()) ? Locations::name($c) : null;
+            $noneCovers = collect($opts)->every(fn ($o) => ! $o['serves']);
+
             return ['ok' => false, 'options' => $opts, 'error' => $stock
-                ? ($stock['note'] ?: 'None of '.$s->name.'\'s branches delivers to your address.').' Choose pickup or another address.'
+                ? ($noneCovers && $fulfillment === 'delivery'
+                    ? 'None of its branches delivers to '.($place ?: 'this address').' (outside every branch\'s delivery area). Choose Pickup at the shop, or another address.'
+                    : ($stock['note'] ?: 'None of '.$s->name.'\'s branches delivers to your address.').' Choose pickup or another address.')
                 : (count($opts) > 1
                     ? (collect($opts)->contains(fn ($o) => ! $o['serves']) ? 'The branches of '.$s->name.' near you do not have every item for your dates.' : 'No single branch of '.$s->name.' has every item for your dates.').self::maxHint($opts).' Lower the quantities or pick other dates.'
                     : $s->name.' does not have every item for your dates: '.implode('; ', array_slice($opts[0]['short'] ?? [], 0, 3)).'.')];
         }
 
         return ['ok' => true, 'branch' => InventoryLocation::find($best['id']), 'options' => $opts];
+    }
+
+    /** Where a delivery address is, for coverage: its pin, city and barangay (null when nothing is known). */
+    public static function target(array $d): ?array
+    {
+        $point = isset($d['lat'], $d['lng']) && is_numeric($d['lat']) && is_numeric($d['lng']) ? [(float) $d['lat'], (float) $d['lng']] : null;
+        $city = $d['cityCode'] ?? ($d['addr']['cityCode'] ?? null);
+        $city = $city && Locations::isCity($city) ? $city : null;
+
+        return $point || $city ? ['point' => $point, 'city' => $city, 'barangay' => $d['addr']['barangay'] ?? ($d['barangay'] ?? null)] : null;
     }
 
     /**

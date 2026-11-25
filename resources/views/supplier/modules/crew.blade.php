@@ -22,8 +22,9 @@
         <div class="row between wrap"><div><span class="badge {{ in_array($j['kind'], ['Return', 'Inspect return'], true) ? 'b-gold' : 'b-teal' }}">{{ __($j['kind']) }}</span> <b>{{ $r->code }}</b> <span class="small muted">· {{ fmt_day($j['d']) }}</span></div>@include('partials.badges', ['status' => $r->status])</div>
         <div class="mt-1"><b>{{ $r->contact_name ?: $r->customer->name }}</b> <span class="small muted">· {{ $r->event_name }}</span></div>
         <div class="small muted">{{ collect($r->lines)->map(fn ($l) => inv()->itemName($l))->implode(', ') }}</div>
+        @if($r->branch && $r->supplier->locations()->count() > 1)<div class="small mt-1">{{ icon('store') }} {{ $road ? __('Delivered by') : __('Pick up at') }} <b>{{ $r->branch->name }}</b></div>@endif
         @if($road && $r->address)<div class="small mt-1">{{ icon('map') }} {{ $r->address }}</div>@elseif(! $road)<div class="small muted mt-1">{{ icon('store') }} {{ __('Customer comes to the shop') }}</div>@endif
-        @if($r->instructions)<div class="small mt-1"><b>{{ __('Note') }}:</b> {{ $r->instructions }}</div>@endif
+        @if($r->instructions)<div class="small mt-1"><b>{{ __('General Instructions') }}:</b> {{ $r->instructions }}</div>@endif
 
         <div class="job-quick">
           @if($phone)<a class="btn" href="tel:{{ $phone }}">{{ icon('user') }}{{ __('Call') }}</a>@else<span></span>@endif

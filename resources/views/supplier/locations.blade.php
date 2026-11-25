@@ -25,7 +25,7 @@
         <div class="row wrap" style="gap:4px">@if($l->is_main)<span class="badge b-purple plain">Main</span>@endif<span class="badge {{ $l->active ? 'b-green' : 'b-gray' }} plain">{{ $l->active ? 'Open for rentals' : 'Paused' }}</span></div></div>
       <div class="small muted">{{ $l->address }}</div>
       <div class="small">{{ $l->contact ? $l->contact.' · ' : '' }}{{ $l->phone ?: 'No contact number yet' }}</div>
-      <div class="small">{{ $l->hours ? $l->hours.' · ' : '' }}Serves up to {{ rtrim(rtrim(number_format(\App\Domain\Branches::serviceKm($l), 1), '0'), '.') }} km{{ $l->service_km === null ? ' (shop default)' : '' }}</div>
+      <div class="small">{{ $l->hours ? $l->hours.' · ' : '' }}Delivers: {{ \App\Domain\Branches::coverageText($l) }}{{ \App\Domain\Branches::coverage($l)['mode'] === 'distance' && $l->service_km === null ? ' (shop default)' : '' }}</div>
       <div class="small">@if($l->hasPin()){{ icon('map', 'width:13px;vertical-align:-2px') }} Pinned on the map @else<a href="{{ route('supplier.locations.edit', $l) }}" style="color:#B45309">{{ icon('alert', 'width:13px;vertical-align:-2px') }} Add a map pin for accurate delivery fees</a>@endif</div>
       <div class="branch-stats"><div><b>{{ $prods->sum(fn ($p) => inv()->stockAt($p->id, $l->id)) }}</b><span>in stock</span></div><div><b>{{ $o['pending'] }}</b><span>new requests</span></div><div><b>{{ $o['booked'] }}</b><span>booked</span></div></div>
       <div class="branch-actions">

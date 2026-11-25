@@ -239,7 +239,8 @@ class MarketController extends Controller
     public static function branchInfo(Supplier $s): array
     {
         $point = \App\Support\Near::point();
-        $rows = \App\Domain\Branches::active($s)->map(fn ($b) => ['b' => $b, 'km' => \App\Domain\Branches::km($b, $point), 'serves' => \App\Domain\Branches::serves($b, $point)])
+        $city = \App\Support\Near::get()['city'] ?? null;
+        $rows = \App\Domain\Branches::active($s)->map(fn ($b) => ['b' => $b, 'km' => \App\Domain\Branches::km($b, $point), 'serves' => \App\Domain\Branches::serves($b, $point, $city)])
             ->sortBy(fn ($x) => [! $x['serves'], $x['km'] ?? PHP_FLOAT_MAX, ! $x['b']->is_main])->values()->all();
 
         return count($rows) > 1 ? $rows : [];

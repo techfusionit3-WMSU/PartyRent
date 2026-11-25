@@ -16,7 +16,7 @@ class InventoryLocation extends Model
 {
     protected $guarded = ['id'];
 
-    protected $casts = ['active' => 'boolean', 'is_main' => 'boolean', 'lat' => 'float', 'lng' => 'float', 'address_parts' => 'array', 'service_km' => 'float'];
+    protected $casts = ['active' => 'boolean', 'is_main' => 'boolean', 'lat' => 'float', 'lng' => 'float', 'address_parts' => 'array', 'service_km' => 'float', 'coverage' => 'array'];
 
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function stock(): HasMany { return $this->hasMany(LocationStock::class); }

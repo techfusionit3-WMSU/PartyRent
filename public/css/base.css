@@ -615,3 +615,14 @@ main:focus { outline: none; }
 .place-sugg li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
 .place-sugg li:hover, .place-sugg li.on { background: var(--brand-50); }
 .deliv-to { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; background: var(--surface-2, transparent); }
+
+/* checkout: one section per store, then delivery rows per store */
+.shop-sec { border-left: 4px solid var(--shop, var(--brand)); }
+.shop-sec-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.shop-sec-sub { text-align: right; display: flex; flex-direction: column; flex: none; }
+.shop-sec-sub b { font-size: 1.05rem; }
+.shop-charges > summary { cursor: pointer; }
+.ful-row { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface); }
+.ful-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ful-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--brand-50); color: var(--brand); font-size: .75rem; font-weight: 800; flex: none; }
+@media (max-width: 640px) { .shop-sec-head { flex-wrap: wrap; } .shop-sec-sub { text-align: left; width: 100%; flex-direction: row; justify-content: space-between; } }

@@ -8,7 +8,7 @@
       @if($q['reservationFee'] > 0)<div class="sum-line"><span class="muted">Reservation fee{{ term('reservation_fee') }}</span><span>{{ money($q['reservationFee']) }}</span></div>@endif
       @if($q['downPayment'] > 0)<div class="sum-line"><span class="muted">Down payment{{ term('down_payment') }}</span><span>{{ money($q['downPayment']) }}</span></div>@endif
     @endif
-    <div class="sum-line strong"><span>Total</span><span>{{ money($q['total']) }}</span></div>
+    <div class="sum-line strong"><span>{{ count($orders) > 1 ? 'Store subtotal' : 'Total' }}</span><span>{{ money($q['total']) }}</span></div>
     @php($first = $q['plan'] === 'full' ? $q['total'] : $q['reservationFee'] + $q['downPayment'])
     <div class="pay-when mt-1">
       <div class="sum-line"><span><b>{{ __('Pay first') }}</b><div class="small muted">{{ __('after the shop accepts') }}</div></span><b>{{ money($first) }}</b></div>
@@ -17,5 +17,5 @@
     </div>
   </div>
 @endforeach
-@if(count($orders) > 1)<div class="sum-line total"><span>Combined total</span><span class="price">{{ money($total) }}</span></div>@endif
+@if(count($orders) > 1)<div class="sum-line total"><span>Checkout total ({{ count($orders) }} stores)</span><span class="price">{{ money($total) }}</span></div>@endif
 <p class="small muted mb-0">{{ __("Nothing is charged until the shop accepts. Each shop's down payment and balance come from its own order total.") }}</p>

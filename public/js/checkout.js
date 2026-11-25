@@ -281,11 +281,11 @@
     const zoneOpts = selz => sh.zones.map(z => '<option value="' + esc(z.id) + '"' + (z.id === selz ? ' selected' : '') + '>' + esc(z.name) + ' — ' + money(z.fee) + '</option>').join('') + '<option value=""' + (!selz ? ' selected' : '') + '>Other areas (standard rate) — ' + money(sh.deliveryFee) + '</option>';
     const multi = multiLoc(o);
     const pinned = d.lat != null && d.lat !== '' && d.lng != null && d.lng !== '';
-    return '<div class="dest-card" data-dest="' + d.id + '"><div class="row between mb-1"><b>' + svg('map') + (multi ? ' Location ' + (i + 1) + (i === 0 ? ' (your delivery address)' : '') : ' Delivery') + '</b>' + (o.destinations.length > 1 ? '<button type="button" class="btn btn-xs btn-ghost" data-rmdest="' + d.id + '">' + svg('trash') + 'Remove</button>' : '') + '</div>' +
+    return '<div class="dest-card" data-dest="' + d.id + '"><div class="row between mb-1"><b>' + svg('map') + (multi ? ' Location ' + (i + 1) + (i === 0 ? ' (the address above)' : '') : ' Delivery details') + '</b>' + (o.destinations.length > 1 ? '<button type="button" class="btn btn-xs btn-ghost" data-rmdest="' + d.id + '">' + svg('trash') + 'Remove</button>' : '') + '</div>' +
       '<div class="form-grid">' +
       (multi ? '<div class="field"><label>Location name / event</label><input class="input" data-d="label" value="' + esc(d.label) + '" placeholder="e.g. Church – Wedding Ceremony"></div>' : '') +
       '<div class="field"><label>Delivery zone</label><select class="input" data-d="zoneId">' + zoneOpts(d.zoneId) + '</select><div class="hint">The zone sets the delivery fee.</div></div>' +
-      (i === 0 ? '<div class="field full"><label>Delivers to</label><div class="deliv-to">' + (d.address ? esc(d.address) + (pinned ? ' <span class="badge b-green plain">Pinned</span>' : '') : '<span class="muted">Enter your address in <b>Delivery information</b> below.</span>') + ' <button type="button" class="link-btn small" data-goaddr>' + (d.address ? 'Edit address' : 'Add address') + '</button></div></div>' :
+      (i === 0 ? (multi ? '<div class="field full"><div class="small muted">Goes to the delivery address above.</div></div>' : '') :
       '<div class="field full"><label>Complete address</label><div class="row" style="gap:8px"><input class="input grow" data-d="address" value="' + esc(d.address) + '" placeholder="House no., street, barangay, city"><button type="button" class="btn ' + (pinned ? 'btn-outline' : '') + '" data-pin="' + d.id + '" title="Pin the exact spot on a map">' + svg('map') + (pinned ? 'Pinned' : 'Pin on map') + '</button></div><div class="hint">' + (pinned ? 'Pinned at ' + (+d.lat).toFixed(5) + ', ' + (+d.lng).toFixed(5) + ' — the driver gets this exact spot.' : 'Optional: pin the exact spot so the driver finds it easily.') + '</div></div>') +
       '<div class="field"><label>Deliver by</label>' + sel(o, d.deliveryTime || sh.times[0], 'data-d="deliveryTime"') + '</div><div class="field"><label>On-site contact (optional)</label><input class="input" data-d="contactName" value="' + esc(d.contactName) + '" placeholder="Name · number"></div></div></div>';
   }
@@ -312,7 +312,7 @@
     };
     let html = del
       ? '<div class="branch-one small mt-2">' + svg('truck') + '<span>Delivered by <b>' + esc(cur.name) + '</b>' + (cur.km != null ? ' · ' + cur.km + ' km away' : '') + ' · assigned from your address (its delivery area covers it)</span></div>'
-      : '<div class="branch-one small mt-2">' + svg('store') + '<span>Pick up at <b>' + esc(cur.name) + '</b>' + (cur.km != null ? ' · ' + cur.km + ' km away' : '') + (cur.address ? ' · ' + esc(cur.address) : '') + '</span></div>';
+      : '<div class="branch-one small mt-2">' + svg('store') + '<span>Pick up at <b>' + esc(cur.name) + '</b>' + (cur.km != null ? ' · ' + cur.km + ' km away' : '') + (cur.address ? ' · ' + esc(cur.address) : '') + ' · ' + esc(cur.hours || o.shop.hours) + '</span></div>';
     if (lenders.length) html += '<div class="small muted mt-1">Part of your order is brought in from our ' + esc(lenders.join(', ')) + ' branch. Nothing changes for you: one rental, one price, ' + (del ? 'delivered from ' : 'picked up at ') + esc(cur.name) + '.</div>';
     const others = del ? [] : list.filter(b => b.id !== cur.id && b.ok && b.deliverable); // delivery: never chosen by hand
     if (others.length) {
@@ -324,24 +324,39 @@
     return html;
   }
 
+  /** One section per store: its name, its items (quantities, dates, times), its services and payment plan, and its
+      subtotal. How the items reach the customer is in the single Delivery information section below the stores. */
   function shopCard(o, idx) {
     const sh = o.shop; const sid = o.supplier_id;
     const q = lastQuote[sid] || {};
-    const multi = multiLoc(o);
-    return '<div class="card" data-shop="' + sid + '"><div class="row between mb-1"><div class="row" style="min-width:0"><div class="logo-tile" style="width:42px;height:42px;font-size:1.3rem;background:' + sh.color + '1a">' + esc(sh.logo) + '</div><div style="min-width:0"><div class="label">Order ' + (idx + 1) + ' of ' + orders.length + '</div><h3 class="mb-0">' + esc(sh.name) + '</h3><div class="small muted">' + esc(o.range) + '</div></div></div></div>' +
-      '<div class="form-grid">' + eventField(o) + '<div class="field"><label>Payment</label><div class="input" style="display:flex;align-items:center;gap:8px;background:var(--surface-2)">' + svg('card') + 'Online: GCash, Maya or card, through PartyRent</div><div class="hint">Nothing is charged now. You pay after the shop accepts, and each payment is confirmed automatically.</div></div></div>' +
+    const n = groupsOf(o).length;
+    return '<section class="card shop-sec" data-shop="' + sid + '" style="--shop:' + esc(sh.color) + '">' +
+      '<header class="shop-sec-head"><div class="logo-tile" style="width:42px;height:42px;font-size:1.3rem;background:' + sh.color + '1a">' + esc(sh.logo) + '</div>' +
+      '<div class="grow" style="min-width:0"><div class="label">Store ' + (idx + 1) + ' of ' + orders.length + '</div><h3 class="mb-0">' + esc(sh.name) + '</h3><div class="small muted">' + esc(o.range) + ' · ' + n + ' item' + (n === 1 ? '' : 's') + '</div></div>' +
+      '<div class="shop-sec-sub"><span class="small muted">Store subtotal</span><b data-subtotal>' + (q.total != null ? money(q.total) : '…') + '</b></div></header>' +
+      (o.first !== o.last ? '<div class="form-grid mt-1">' + eventField(o) + '</div>' : '') +
       '<div class="label mt-2 mb-1">Items &amp; rental times</div><div class="stack-sm">' + itemsBlock(o) + '</div>' +
-      '<div class="label mt-2 mb-1">Delivery or pickup</div><div class="row wrap gap-sm mb-2">' + ['delivery', 'pickup'].map(f => { const ok = sh.fulfillment === 'both' || sh.fulfillment === f; return '<label class="chip ' + (o.fulfillment === f ? 'active' : '') + '" style="' + (ok ? '' : 'opacity:.45;pointer-events:none') + '"><input type="radio" name="ful_' + sid + '" value="' + f + '" data-ful hidden' + (o.fulfillment === f ? ' checked' : '') + (ok ? '' : ' disabled') + '>' + svg(f === 'delivery' ? 'truck' : 'store') + (f === 'delivery' ? 'Delivery' : 'Pickup at shop') + '</label>'; }).join('') + '</div>' +
-      (o.fulfillment === 'delivery'
-        ? '<label class="switch mb-1"><input type="checkbox" data-multiloc' + (multi ? ' checked' : '') + '><span class="sw"></span>Deliver to more than one location</label>' +
-          '<div class="stack-sm">' + o.destinations.map((d, i) => destCard(o, d, i)).join('') + '</div>' +
-          (multi ? '<button type="button" class="btn btn-sm mt-1" data-adddest>' + svg('plus') + 'Add another location</button><p class="small muted mt-1 mb-0">For each item above, choose its location — or use <b>Send some to another location</b> and type how many go there (the first location keeps the rest). Each location has its own delivery fee.</p>' : '')
-        : '<div class="alert alert-info">' + svg('map') + '<div>Pickup at <b>' + esc(branchOf(o) ? branchOf(o).name + ', ' + branchOf(o).address : sh.address) + '</b> · ' + esc(sh.hours) + '</div></div>') +
-      branchBlock(o) +
       (sh.services.length ? '<div class="label mt-2 mb-1">Services</div>' + sh.services.map(x => '<label class="check"><input type="checkbox" data-svc="' + esc(x.id) + '"' + (x.required || o.services.includes(x.id) ? ' checked' : '') + (x.required ? ' disabled' : '') + '> <b>' + esc(x.name) + '</b> — ' + money(x.amount) + (x.per === 'location' ? ' per visit' : '') + (x.required ? ' <span class="badge b-gray plain">included</span>' : '') + '<div class="small muted">' + esc(x.description || '') + '</div></label>').join('') + '<p class="small muted mb-0">Per-visit services are charged once for consecutive days at the same location, and again for each location change or separate date block.</p>' : '') +
       '<div class="label mt-2 mb-1">Payment plan</div><div class="stack-sm">' + sh.plans.map(p => { const dis = p.key === 'installment' && q.installmentOk === false; return '<label class="card card-flat row" style="padding:12px 14px;cursor:pointer;' + (dis ? 'opacity:.55' : '') + '"><input type="radio" name="plan_' + sid + '" value="' + p.key + '" data-plan' + (p.key === o.plan ? ' checked' : '') + (dis ? ' disabled' : '') + ' style="accent-color:var(--brand);width:18px;height:18px"><div class="grow"><b>' + esc(p.label) + '</b><div class="small muted">' + esc(p.summary) + '</div>' + (dis ? '<div class="small" style="color:var(--red)">' + esc(q.installmentMsg) + '</div>' : '') + '</div></label>'; }).join('') + '</div>' +
       (o.plan === 'installment' ? '<div class="card card-flat soft mt-1" style="padding:14px" data-inst><div class="row between wrap"><b>Propose your installment schedule</b><label class="small row" style="gap:6px">Installments <select class="input input-sm" data-instn style="width:auto">' + Array.from({ length: sh.maxInstallments }, (_, i) => '<option' + (i + 1 === o.inst.n ? ' selected' : '') + '>' + (i + 1) + '</option>').join('') + '</select></label></div><p class="small muted">Divide the installment balance into payments of your choice. Every payment must be due on or before the event date. The supplier reviews and approves the schedule.</p><div data-instrows>' + o.inst.items.map((it, i) => '<div class="row mb-1" style="gap:8px" data-ir="' + i + '"><span class="small muted" style="width:26px">#' + (i + 1) + '</span><input class="input input-sm" type="date" data-f="due" value="' + it.due + '" min="' + addDays(today, 1) + '" max="' + o.eventDate + '" aria-label="Due date ' + (i + 1) + '" style="width:auto"><input class="input input-sm" type="number" step="0.01" min="1" data-f="amount" value="' + it.amount + '" aria-label="Amount ' + (i + 1) + '" style="width:130px"></div>').join('') + '</div><div class="row between mt-1"><button type="button" class="btn btn-xs" data-even>Divide evenly</button><span class="small" data-instsum></span></div></div>' : '') +
-      '<div class="mt-2" data-review>' + (q.html || '') + '</div></div>';
+      '<div data-shoperr>' + shopErr(q) + '</div>' +
+      '<details class="mt-2 shop-charges"><summary class="link-btn small">See this store\'s charges</summary><div data-review>' + (q.html || '') + '</div></details></section>';
+  }
+  const shopErr = q => q.ok === false && q.error ? '<div class="alert alert-danger mt-2">' + svg('alert') + '<div class="small">' + esc(q.error) + '</div></div>' : '';
+
+  /** Delivery information: one row per store (delivery or pickup, its assigned branch, fee zone, time). */
+  function fulRow(o, idx) {
+    const sh = o.shop; const sid = o.supplier_id;
+    const q = lastQuote[sid] || {};
+    const multi = multiLoc(o);
+    return '<div class="ful-row" data-fulshop="' + sid + '"><div class="ful-head"><span class="ful-num">' + (idx + 1) + '</span><b>' + esc(sh.name) + '</b></div>' +
+      '<div class="row wrap gap-sm mb-2">' + ['delivery', 'pickup'].map(f => { const ok = sh.fulfillment === 'both' || sh.fulfillment === f; return '<label class="chip ' + (o.fulfillment === f ? 'active' : '') + '" style="' + (ok ? '' : 'opacity:.45;pointer-events:none') + '"><input type="radio" name="ful_' + sid + '" value="' + f + '" data-ful hidden' + (o.fulfillment === f ? ' checked' : '') + (ok ? '' : ' disabled') + '>' + svg(f === 'delivery' ? 'truck' : 'store') + (f === 'delivery' ? 'Delivery' : 'Pickup at shop') + '</label>'; }).join('') + '</div>' +
+      (o.fulfillment === 'delivery'
+        ? '<label class="switch mb-1"><input type="checkbox" data-multiloc' + (multi ? ' checked' : '') + '><span class="sw"></span>Deliver to more than one location</label>' +
+          '<div class="stack-sm">' + o.destinations.map((d, i) => destCard(o, d, i)).join('') + '</div>' +
+          (multi ? '<button type="button" class="btn btn-sm mt-1" data-adddest>' + svg('plus') + 'Add another location</button><p class="small muted mt-1 mb-0">For each item in the store sections above, choose its location — or use <b>Send some to another location</b> and type how many go there (the first location keeps the rest). Each location has its own delivery fee.</p>' : '')
+        : '') +
+      branchBlock(o) + (q.ok === false && q.error ? '<div class="small mt-1" style="color:var(--red)">' + svg('alert') + ' ' + esc(q.error) + '</div>' : '') + '</div>';
   }
 
   /** Map popup to pin a delivery address (Leaflet; window.PR.map has the centre / bounds / tiles). */
@@ -402,6 +417,7 @@
     const a = document.activeElement, card = a && a.closest && a.closest('[data-item]');
     const key = card && (a.matches('[data-qall]') ? '[data-qall]' : a.matches('[data-qday]') ? '[data-qday="' + a.dataset.qday + '"]' : null);
     $('#shops').innerHTML = orders.map(shopCard).join('');
+    const fu = $('#fulfil'); if (fu) fu.innerHTML = orders.map(fulRow).join('');
     if (dvAddr) dvAddr.hidden = !anyDelivery();
     bind();
     if (key) { const el = $('[data-item="' + card.dataset.item + '"] ' + key); if (el) { el.focus(); const n = el.value.length; try { el.type = 'text'; el.setSelectionRange(n, n); el.type = 'number'; } catch (e) { /* number inputs can't place the caret everywhere */ } } }
@@ -430,7 +446,14 @@
         });
         $('#sum').innerHTML = data.summaryHtml;
         if (needDraw) draw();
-        else data.orders.forEach(r => { const box = $('[data-shop="' + r.supplier_id + '"] [data-review]'); if (box) box.innerHTML = r.html; instSum(r.supplier_id); });
+        else data.orders.forEach(r => {
+          const sec = $('[data-shop="' + r.supplier_id + '"]'); if (!sec) return;
+          const rv = $('[data-review]', sec); if (rv) rv.innerHTML = r.html;
+          const st = $('[data-subtotal]', sec); if (st) st.textContent = money(r.total);
+          const er = $('[data-shoperr]', sec); if (er) er.innerHTML = shopErr(r);
+          instSum(r.supplier_id);
+          const row = $('[data-fulshop="' + r.supplier_id + '"]'); const prevOk = row && row.dataset.ok; if (row && String(r.ok) !== prevOk) { row.dataset.ok = String(r.ok); draw(); }
+        });
       } catch (e) { toast('Could not update the prices. Check your connection.', 'error'); }
     }, 150);
   }
@@ -442,18 +465,19 @@
 
   function bind() {
     orders.forEach(o => {
-      const box = $('[data-shop="' + o.supplier_id + '"]'); if (!box) return;
-      $$('[data-k]', box).forEach(el => el.onchange = () => { o[el.dataset.k] = el.value; o.inst.auto = true; requote(true); });
+      const boxes = [$('[data-shop="' + o.supplier_id + '"]'), $('[data-fulshop="' + o.supplier_id + '"]')].filter(Boolean); if (!boxes.length) return;
+      const pick = q => boxes.flatMap(b => $$(q, b));
+      pick('[data-k]').forEach(el => el.onchange = () => { o[el.dataset.k] = el.value; o.inst.auto = true; requote(true); });
       // Delivery ↔ Pickup keeps every line (and its per-location split) as it is.
-      $$('[data-ful]', box).forEach(el => el.onchange = () => { o.fulfillment = el.value; if (o.fulfillment === 'delivery') applyAddr(); draw(); requote(); });
-      $$('[data-goaddr]', box).forEach(b => b.onclick = () => { dvCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => (fld('cityCode').value ? fld('street') : $('[data-place-search]')).focus({ preventScroll: true }), 400); });
-      $$('[data-dest]', box).forEach(card => $$('[data-d]', card).forEach(el => el.oninput = el.onchange = () => {
+      pick('[data-ful]').forEach(el => el.onchange = () => { o.fulfillment = el.value; if (o.fulfillment === 'delivery') applyAddr(); draw(); requote(); });
+      pick('[data-goaddr]').forEach(b => b.onclick = () => { dvCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => (fld('cityCode').value ? fld('street') : $('[data-place-search]')).focus({ preventScroll: true }), 400); });
+      pick('[data-dest]').forEach(card => $$('[data-d]', card).forEach(el => el.oninput = el.onchange = () => {
         const d = o.destinations.find(x => x.id === card.dataset.dest); d[el.dataset.d] = el.value;
         if (el.dataset.d === 'zoneId') d.zonePicked = true; // the customer chose it: stop following the address
         if (el.dataset.d === 'address' && !d.zonePicked) { const zs = $('[data-d="zoneId"]', card); const before = d.zoneId; autoZone(o, d); if (zs && before !== d.zoneId) zs.value = d.zoneId; }
         requote();
       }));
-      const ml = $('[data-multiloc]', box); if (ml) ml.onchange = async () => {
+      const ml = pick('[data-multiloc]')[0]; if (ml) ml.onchange = async () => {
         if (ml.checked) { if (!await enableMultiLoc(o)) { ml.checked = false; return; } }
         else {
           if (o.destinations.length > 1 && !await confirmDialog({ title: 'Use one location only?', message: 'All items go to the first address and the other locations are removed.', ok: 'Use one location' })) { ml.checked = true; return; }
@@ -461,10 +485,10 @@
         }
         draw(); requote();
       };
-      $$('[data-pin]', box).forEach(b => b.onclick = () => { const d = o.destinations.find(x => x.id === b.dataset.pin); pinDialog(d, pos => { d.lat = +pos[0].toFixed(7); d.lng = +pos[1].toFixed(7); draw(); requote(); }); });
-      const add = $('[data-adddest]', box); if (add) add.onclick = () => { let n = o.destinations.length + 1; while (o.destinations.some(d => d.id === 'd' + n)) n++; o.destinations.push({ id: 'd' + n, label: 'Location ' + (o.destinations.length + 1), address: '', zoneId: '', deliveryTime: o.shop.times[0], contactName: '', contactPhone: '' }); draw(); requote(); };
-      $$('[data-rmdest]', box).forEach(b => b.onclick = () => { const id = b.dataset.rmdest; const keep = o.destinations.find(d => d.id !== id); o.lines.forEach(l => { if (l.destId === id) l.destId = keep.id; }); o.destinations = o.destinations.filter(d => d.id !== id); if (o.destinations.length < 2) o.multiLoc = false; mergeSame(o); draw(); requote(); });
-      $$('[data-item]', box).forEach(card => {
+      pick('[data-pin]').forEach(b => b.onclick = () => { const d = o.destinations.find(x => x.id === b.dataset.pin); pinDialog(d, pos => { d.lat = +pos[0].toFixed(7); d.lng = +pos[1].toFixed(7); draw(); requote(); }); });
+      const add = pick('[data-adddest]')[0]; if (add) add.onclick = () => { let n = o.destinations.length + 1; while (o.destinations.some(d => d.id === 'd' + n)) n++; o.destinations.push({ id: 'd' + n, label: 'Location ' + (o.destinations.length + 1), address: '', zoneId: '', deliveryTime: o.shop.times[0], contactName: '', contactPhone: '' }); draw(); requote(); };
+      pick('[data-rmdest]').forEach(b => b.onclick = () => { const id = b.dataset.rmdest; const keep = o.destinations.find(d => d.id !== id); o.lines.forEach(l => { if (l.destId === id) l.destId = keep.id; }); o.destinations = o.destinations.filter(d => d.id !== id); if (o.destinations.length < 2) o.multiLoc = false; mergeSame(o); draw(); requote(); });
+      pick('[data-item]').forEach(card => {
         const cid = +card.dataset.item, grp = () => groupsOf(o).find(x => x.cart_id === cid);
         $$('[data-step]', card).forEach(b => b.onclick = () => { const inp = b.parentNode.querySelector('input'); inp.value = Math.max(1, (parseInt(inp.value, 10) || 0) + +b.dataset.step); inp.dispatchEvent(new Event('input', { bubbles: true })); });
         const qa = $('[data-qall]', card);
@@ -480,20 +504,20 @@
           draw();
         };
       });
-      $$('[data-li]', box).forEach(row => {
+      pick('[data-li]').forEach(row => {
         const i = +row.dataset.li, l = o.lines[i], g = groupsOf(o).find(x => x.cart_id === l.cart_id), k = g.idx.indexOf(i);
         $$('[data-lt]', row).forEach(s => s.onchange = () => { l.time[s.dataset.lt] = s.value; requote(); });
         const ds = $('[data-pdest]', row); if (ds) ds.onchange = () => { l.destId = ds.value; mergeSame(o); draw(); requote(); };
         $$('[data-pq]', row).forEach(inp => inp.onchange = () => setPart(o, g, k, inp.dataset.pq || null, parseInt(inp.value, 10)));
         const rm = $('[data-prm]', row); if (rm) rm.onclick = () => { g.dates.forEach(d => { g.parts[0].days[d] = (Number(g.parts[0].days[d]) || 0) + (Number(l.days[d]) || 0); }); o.lines.splice(i, 1); draw(); requote(); };
       });
-      $$('[data-branch]', box).forEach(r => r.onchange = () => { o.branch_id = +r.value; requote(true); });
-      const ba = $('[data-branchauto]', box); if (ba) ba.onclick = () => { o.branch_id = null; requote(true); };
-      $$('[data-svc]', box).forEach(c => c.onchange = () => { o.services = $$('[data-svc]:checked:not([disabled])', box).map(x => x.dataset.svc); o.inst.auto = true; requote(); });
-      $$('[data-plan]', box).forEach(r => r.onchange = () => { o.plan = r.value; o.inst.auto = true; o.inst.items = []; requote(true); });
-      const n = $('[data-instn]', box); if (n) n.onchange = () => { o.inst.n = +n.value; o.inst.auto = true; requote(true); };
-      const ev = $('[data-even]', box); if (ev) ev.onclick = () => { o.inst.auto = true; requote(true); };
-      $$('[data-ir] [data-f]', box).forEach(inp => inp.onchange = () => { const it = o.inst.items[+inp.closest('[data-ir]').dataset.ir]; it[inp.dataset.f] = inp.dataset.f === 'amount' ? Math.round((+inp.value || 0) * 100) / 100 : inp.value; o.inst.auto = false; instSum(o.supplier_id); requote(); });
+      pick('[data-branch]').forEach(r => r.onchange = () => { o.branch_id = +r.value; requote(true); });
+      const ba = pick('[data-branchauto]')[0]; if (ba) ba.onclick = () => { o.branch_id = null; requote(true); };
+      pick('[data-svc]').forEach(c => c.onchange = () => { o.services = pick('[data-svc]:checked:not([disabled])').map(x => x.dataset.svc); o.inst.auto = true; requote(); });
+      pick('[data-plan]').forEach(r => r.onchange = () => { o.plan = r.value; o.inst.auto = true; o.inst.items = []; requote(true); });
+      const n = pick('[data-instn]')[0]; if (n) n.onchange = () => { o.inst.n = +n.value; o.inst.auto = true; requote(true); };
+      const ev = pick('[data-even]')[0]; if (ev) ev.onclick = () => { o.inst.auto = true; requote(true); };
+      pick('[data-ir] [data-f]').forEach(inp => inp.onchange = () => { const it = o.inst.items[+inp.closest('[data-ir]').dataset.ir]; it[inp.dataset.f] = inp.dataset.f === 'amount' ? Math.round((+inp.value || 0) * 100) / 100 : inp.value; o.inst.auto = false; instSum(o.supplier_id); requote(); });
       instSum(o.supplier_id);
     });
   }

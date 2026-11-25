@@ -42,7 +42,7 @@
     <div class="card deliv-card" id="delivCard">
       <h3 class="mb-1">{{ icon('map') }} Delivery information</h3>
       <div data-deliv-addr>
-        <p class="small muted mt-0">Enter it once: every shop you chose <b>Delivery</b> for delivers here. Each shop's branch that covers this address is assigned automatically.</p>
+        <p class="small muted mt-0">Enter your address once: every store set to <b>Delivery</b> below delivers here, from its branch that covers this address (picked for you).</p>
         <div class="field place-find"><label for="dvSearch">Find your city or municipality</label>
           <div class="place-search"><input class="input" id="dvSearch" type="search" autocomplete="off" placeholder="Type to search, e.g. Zamboanga City" data-place-search aria-controls="dvSugg" aria-expanded="false"><ul class="place-sugg" id="dvSugg" role="listbox" hidden></ul></div>
           <div class="row wrap mt-1" style="gap:6px"><button type="button" class="btn btn-sm" data-dv-locate>{{ icon('map') }}Use my current location</button>@if($saved && ! empty($saved['cityCode']))<button type="button" class="btn btn-sm" data-dv-saved>{{ icon('user') }}Use my saved address</button>@endif</div>
@@ -51,6 +51,8 @@
         <div class="row wrap mt-1" style="gap:8px;align-items:center"><button type="button" class="btn btn-sm" data-dv-pin>{{ icon('map') }}<span data-dv-pinlbl>Pin on map</span></button><span class="small muted" data-dv-pinst>Optional: pin the exact spot. It also picks the branch more precisely.</span></div>
         <div class="alert alert-danger mt-1 hidden" data-dv-err role="alert"></div>
       </div>
+      <div class="label mt-2 mb-1">How each store gets your items to you</div>
+      <div class="stack-sm" id="fulfil"></div>
       <div class="form-grid mt-2">
         <div class="field"><label for="ev-cn">Contact person</label><input class="input" id="ev-cn" data-s="contactName" required value="{{ $u->name }}"></div>
         <div class="field"><label for="ev-cp">Contact number</label><input class="input" id="ev-cp" data-s="contactPhone" data-phone required value="{{ $u->phone }}"></div>
